@@ -244,10 +244,11 @@ export class UIManager {
   updateTimer() {
     if (!this.gameState) return;
 
-    // Calculate nextPhaseTime from blockchain endTimestamp
-    const nextPhaseTime = this.gameState.endTimestamp; // Already in milliseconds from Convex
+    // endTimestamp comes from blockchain as Unix timestamp in SECONDS
+    // Need to convert to milliseconds to match Date.now()
+    const endTimestamp = this.gameState.endTimestamp;
 
-    if (!nextPhaseTime || nextPhaseTime === 0) {
+    if (!endTimestamp || endTimestamp === 0) {
       // No countdown to show yet
       this.timerContainer.setVisible(false);
       this.timerBackground.setVisible(false);
@@ -265,8 +266,12 @@ export class UIManager {
     this.timerContainer.setVisible(true);
     this.timerBackground.setVisible(true);
 
+    // Convert blockchain timestamp from seconds to milliseconds
+    const endTimestampMs = endTimestamp * 1000;
+
+    // Calculate time remaining: endTimestamp - current time
     const currentTime = Date.now();
-    const timeRemaining = Math.max(0, nextPhaseTime - currentTime);
+    const timeRemaining = Math.max(0, endTimestampMs - currentTime);
     const seconds = Math.ceil(timeRemaining / 1000);
 
     // Format time as M:SS
