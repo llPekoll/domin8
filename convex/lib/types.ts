@@ -4,7 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 import { Buffer } from "buffer";
 
 // Program ID (matches deployed program and IDL)
-export const DOMIN8_PROGRAM_ID = new PublicKey("EUG7PPKMmzssdsyCrR4XXRcN5xMp1eBLXgF1SAsp28hT");
+export const DOMIN8_PROGRAM_ID = new PublicKey("93swWR5KYURGFWhDbgat9HxRdJAS5pQKssPffnj9bfXK");
 
 // Game Status enum from the Solana program (simplified for small games MVP)
 export enum GameStatus {
@@ -33,9 +33,12 @@ export interface GameDurationConfig {
 // Bet entry in the game (renamed from PlayerEntry)
 // Note: PublicKeys are serialized as strings for Convex compatibility
 export interface BetEntry {
+  gameRoundId: number; // Which game round this bet belongs to
+  betIndex: number; // Index of this bet (0, 1, 2, ...)
   wallet: string; // PublicKey as base58 string
-  betAmount: number;
-  timestamp: number;
+  betAmount: number; // Amount in lamports
+  timestamp: number; // When bet was placed
+  payoutCollected: boolean; // Track if winnings have been collected
 }
 
 // Game round state (simplified for small games MVP)
@@ -54,6 +57,8 @@ export interface GameRound {
   vrfRequestPubkey: string | null; // PublicKey as base58 string, or null if not requested
   vrfSeed: number[];
   randomnessFulfilled: boolean;
+  // Single-player auto-refund fields (NEW)
+  winnerPrizeUnclaimed?: number; // Amount unclaimed for manual claim fallback (0 if auto-refund succeeded)
 }
 
 // PDA seeds

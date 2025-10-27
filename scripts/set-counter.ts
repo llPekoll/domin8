@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import { Domin8Prgm } from "../target/types/domin8_prgm";
+import type { Domin8Prgm } from "../target/types/domin8_prgm";
 
 async function main() {
   // Setup provider
@@ -32,7 +32,7 @@ async function main() {
   console.log("\nBefore update:");
   console.log("  current_round_id:", counter.currentRoundId.toString());
 
-  const newValue = 7;
+  const newValue = 1;
   console.log(`\n⚠️  Setting counter to ${newValue}...`);
 
   // Call set_counter instruction

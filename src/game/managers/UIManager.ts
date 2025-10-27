@@ -127,45 +127,32 @@ export class UIManager {
 
   private updatePhaseDisplay(gameState: any) {
     const phaseNames: { [key: string]: string } = {
-      arena: "RUNNING TO CENTER",
-      betting: "PLACE YOUR BETS",
-      battle: "FINAL BATTLE",
+      waiting: "PLACE YOUR BETS",
       awaitingWinnerRandomness: "DRAWING WINNER",
       finished: "WINNER DECLARED",
-      results: "WINNER DECLARED",
     };
 
     const phaseName = phaseNames[gameState.status] || "Game Phase";
-    const isSmallGame =
-      gameState.isSmallGame || (gameState.playersCount !== undefined && gameState.playersCount < 8);
-    const maxPhases = isSmallGame ? 3 : 5;
+    const maxPhases = 3; // MVP: 3 phases only
 
-    // Map internal phase to display phase based on game type
-    let displayPhase = gameState.phase;
-    if (isSmallGame) {
-      // Quick game (< 8 participants): Only 3 phases
-      // Phase 1: Waiting
-      // Phase 2: Arena
-      // Phase 3: Results (internal phase 3 when skipping betting/battle)
-      if (gameState.status === "waiting") displayPhase = 1;
-      else if (gameState.status === "arena") displayPhase = 2;
-      else if (gameState.status === "results") displayPhase = 3;
-    } else {
-      // Normal game (≥ 8 participants): 5 phases
-      // Phase 1: Waiting
-      // Phase 2: Arena
-      // Phase 3: Betting
-      // Phase 4: Battle
-      // Phase 5: Results
-      displayPhase = gameState.phase || 1;
-    }
+    // MVP: 3 phases
+    // Phase 1: Waiting (waiting for players)
+    // Phase 2: Drawing Winner (awaitingWinnerRandomness)
+    // Phase 3: Winner Declared (finished)
+    const phaseMapping: { [key: string]: number } = {
+      waiting: 1,
+      awaitingWinnerRandomness: 2,
+      finished: 3,
+    };
+
+    const displayPhase = phaseMapping[gameState.status] || 1;
+
+    // Display phase counter
+    let displayText = `${phaseName} (${displayPhase}/${maxPhases})`;
 
     // Add player count for waiting phase
-    let displayText = `${phaseName}`;
     if (gameState.status === "waiting" && gameState.playersCount !== undefined) {
       displayText = `${phaseName} (${gameState.playersCount}/5)`;
-    } else if (displayPhase) {
-      displayText = `${phaseName} (${displayPhase}/${maxPhases})`;
     }
 
     this.phaseText.setText(displayText);
@@ -267,24 +254,11 @@ export class UIManager {
       return;
     }
 
-    // Determine if it's a quick game
-    const isSmallGame = this.gameState.isSmallGame || this.gameState.playersCount < 8;
-
-    // Show timer only in specific phases
-    if (isSmallGame) {
-      // Quick game: show timer only in phase 1 (waiting)
-      if (this.gameState.status !== "waiting") {
-        this.timerContainer.setVisible(false);
-        this.timerBackground.setVisible(false);
-        return;
-      }
-    } else {
-      // Normal game: show timer only in phase 1 (waiting) and phase 3 (betting)
-      if (this.gameState.status !== "waiting" && this.gameState.status !== "betting") {
-        this.timerContainer.setVisible(false);
-        this.timerBackground.setVisible(false);
-        return;
-      }
+    // MVP: Show timer only during waiting phase
+    if (this.gameState.status !== "waiting") {
+      this.timerContainer.setVisible(false);
+      this.timerBackground.setVisible(false);
+      return;
     }
 
     // Make sure timer is visible

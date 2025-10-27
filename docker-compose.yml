@@ -27,7 +27,14 @@ services:
       - "${SITE_PROXY_PORT:-3211}:3211"
     volumes:
       - data:/convex/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
+      - SOLANA_RPC_ENDPOINT=http://host.docker.internal:8899
+      - ANCHOR_PROVIDER_URL=http://host.docker.internal:8899
+      - RPC_URL=http://host.docker.internal:8899
+      - VITE_SOLANA_RPC_URL=http://host.docker.internal:8899
+      - VITE_CONVEX_URL=http://127.0.0.1:3210
       - INSTANCE_NAME
       - INSTANCE_SECRET
       - CONVEX_RELEASE_VERSION_DEV

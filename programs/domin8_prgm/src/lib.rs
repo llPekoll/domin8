@@ -18,7 +18,7 @@ pub use events::*;
 pub use state::*;
 pub use utils::*;
 
-declare_id!("EUG7PPKMmzssdsyCrR4XXRcN5xMp1eBLXgF1SAsp28hT");
+declare_id!("93swWR5KYURGFWhDbgat9HxRdJAS5pQKssPffnj9bfXK");
 
 #[program]
 pub mod domin8_prgm {
@@ -40,12 +40,16 @@ pub mod domin8_prgm {
     }
 
     /// Close betting window and lock game for winner selection
-    pub fn close_betting_window<'info>(ctx: Context<'_, '_, '_, 'info, CloseBettingWindow<'info>>) -> Result<()> {
+    pub fn close_betting_window<'info>(
+        ctx: Context<'_, '_, '_, 'info, CloseBettingWindow<'info>>,
+    ) -> Result<()> {
         instructions::close_betting_window(ctx)
     }
 
     /// Select winner using VRF and distribute payouts
-    pub fn select_winner_and_payout<'info>(ctx: Context<'_, '_, '_, 'info, SelectWinnerAndPayout<'info>>) -> Result<()> {
+    pub fn select_winner_and_payout<'info>(
+        ctx: Context<'_, '_, '_, 'info, SelectWinnerAndPayout<'info>>,
+    ) -> Result<()> {
         instructions::select_winner_and_payout(ctx)
     }
 
@@ -70,7 +74,9 @@ pub mod domin8_prgm {
     }
 
     /// Emergency refund if VRF timeout (10+ minutes with no randomness)
-    pub fn emergency_refund_vrf_timeout<'info>(ctx: Context<'_, '_, '_, 'info, EmergencyRefundVrfTimeout<'info>>) -> Result<()> {
+    pub fn emergency_refund_vrf_timeout<'info>(
+        ctx: Context<'_, '_, '_, 'info, EmergencyRefundVrfTimeout<'info>>,
+    ) -> Result<()> {
         instructions::emergency_refund_vrf_timeout(ctx)
     }
 
@@ -82,5 +88,11 @@ pub mod domin8_prgm {
     /// Rotate force field (admin only, for fixing stuck VRF states)
     pub fn rotate_force(ctx: Context<RotateForce>) -> Result<()> {
         instructions::rotate_force(ctx)
+    }
+
+    /// Fulfill mock VRF randomness (LOCALNET ONLY - for testing)
+    #[cfg(feature = "localnet")]
+    pub fn fulfill_mock_vrf(ctx: Context<FulfillMockVrf>, randomness: u64) -> Result<()> {
+        instructions::fulfill_mock_vrf(ctx, randomness)
     }
 }

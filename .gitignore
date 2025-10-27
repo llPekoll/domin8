@@ -4,8 +4,8 @@
 
 
 convex/_generated
-
-
+test-output.log
+target/.rustc_info.json
 .anchor/*
 solana
 
@@ -15,9 +15,9 @@ Cargo.lock
 /target/release
 /target/types
 /target/sbpf-solana-solana
+/target/.rustc_info.json
 /coverage
 /dist
-
 /out/
 
 # production
@@ -33,3 +33,6 @@ Cargo.lock
 
 # vercel
 .vercel
+
+test-ledger/
+docker-compose.yml

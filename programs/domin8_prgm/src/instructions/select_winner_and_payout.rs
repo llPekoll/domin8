@@ -4,7 +4,12 @@ use crate::events::WinnerSelected;
 use crate::state::{GameConfig, GameCounter, GameRound, GameStatus};
 use crate::utils::GameUtils;
 use anchor_lang::prelude::*;
+
+#[cfg(not(feature = "localnet"))]
 use orao_solana_vrf::state::RandomnessAccountData;
+
+#[cfg(feature = "localnet")]
+use crate::state::MockVrfAccount;
 
 #[derive(Accounts)]
 pub struct SelectWinnerAndPayout<'info> {
@@ -43,9 +48,18 @@ pub struct SelectWinnerAndPayout<'info> {
     )]
     pub crank: Signer<'info>,
 
-    /// VRF Request Account containing fulfilled randomness
+    #[cfg(not(feature = "localnet"))]
+    /// VRF Request Account containing fulfilled randomness (ORAO)
     /// CHECK: This account was created by ORAO VRF program
     pub vrf_request: AccountInfo<'info>,
+
+    #[cfg(feature = "localnet")]
+    /// Mock VRF Account containing fulfilled randomness (localnet)
+    #[account(
+        seeds = [MockVrfAccount::SEED_PREFIX, game_round.vrf_seed.as_ref()],
+        bump
+    )]
+    pub mock_vrf: Account<'info, MockVrfAccount>,
 
     /// Treasury account for receiving house fees
     #[account(
@@ -68,14 +82,26 @@ pub fn select_winner_and_payout<'info>(
         Domin8Error::InvalidGameStatus
     );
 
+    #[cfg(not(feature = "localnet"))]
     require!(
         ctx.accounts.vrf_request.key() == game_round.vrf_request_pubkey,
         Domin8Error::InvalidVrfAccount
     );
 
-    // 1. READ RANDOMNESS FROM ORAO VRF
+    #[cfg(feature = "localnet")]
+    require!(
+        ctx.accounts.mock_vrf.key() == game_round.vrf_request_pubkey,
+        Domin8Error::InvalidVrfAccount
+    );
+
+    // 1. READ RANDOMNESS FROM VRF
+    #[cfg(not(feature = "localnet"))]
     let randomness = read_orao_randomness(&ctx.accounts.vrf_request)?;
-    msg!("Retrieved ORAO VRF randomness: {}", randomness);
+    
+    #[cfg(feature = "localnet")]
+    let randomness = read_mock_randomness(&ctx.accounts.mock_vrf)?;
+    
+    msg!("Retrieved VRF randomness: {}", randomness);
 
     // Mark randomness as fulfilled
     game_round.randomness_fulfilled = true;
@@ -298,6 +324,7 @@ pub fn select_winner_and_payout<'info>(
     Ok(())
 }
 
+#[cfg(not(feature = "localnet"))]
 fn read_orao_randomness(vrf_account: &AccountInfo) -> Result<u64> {
     // Use ORAO SDK to properly deserialize the VRF account
     let mut data = &vrf_account.try_borrow_data()?[..];
@@ -312,5 +339,15 @@ fn read_orao_randomness(vrf_account: &AccountInfo) -> Result<u64> {
     // Use first 8 bytes as u64
     let randomness = u64::from_le_bytes(rnd64[0..8].try_into().unwrap());
 
+    Ok(randomness)
+}
+
+#[cfg(feature = "localnet")]
+fn read_mock_randomness(mock_vrf: &Account<MockVrfAccount>) -> Result<u64> {
+    require!(mock_vrf.fulfilled, Domin8Error::RandomnessNotFulfilled);
+    
+    // Use first 8 bytes as u64 (same as ORAO)
+    let randomness = u64::from_le_bytes(mock_vrf.randomness[0..8].try_into().unwrap());
+    
     Ok(randomness)
 }

@@ -46,17 +46,17 @@ export function Header() {
     connected && publicKey ? { walletAddress: publicKey.toString() } : "skip"
   );
 
-  // Get game state from Solana-based system
-  const gameState = useQuery(api.gameManagerDb.getGameState);
+  // Get current game state from Convex (auto-synced from blockchain every 5s)
+  const currentRoundState = useQuery(api.events.getCurrentRoundState);
 
   // Debug: log when game status changes
   useEffect(() => {
-    if (gameState?.game) {
+    if (currentRoundState) {
       console.log(
-        `[Header] Game status update - Round ${gameState.game.roundId}: ${gameState.game.status}`
+        `[Header] Game status update - Round ${currentRoundState.roundId}: ${currentRoundState.status}`
       );
     }
-  }, [gameState?.game?.status, gameState?.game?.roundId]);
+  }, [currentRoundState?.status, currentRoundState?.roundId]);
 
   // Fetch ONLY Privy embedded wallet balance via direct RPC
   useEffect(() => {
@@ -126,24 +126,24 @@ export function Header() {
 
             <div className="flex items-center space-x-4">
               {/* Game Status Display */}
-              {gameState && gameState.game && (
+              {currentRoundState && (
                 <div className="flex flex-col items-center text-amber-300">
                   <div className="flex items-center gap-2">
                     <Map className="w-4 h-4 text-amber-400" />
                     <div className="font-bold text-amber-300 text-lg uppercase tracking-wide">
-                      Round #{gameState.game.roundId}
+                      Round #{currentRoundState.roundId}
                     </div>
                   </div>
                   <div className="text-amber-300 text-sm flex items-center gap-1 mt-1">
                     <span className="text-yellow-300">⚡</span>
-                    {gameState.game.status === "waiting" && "Waiting for players"}
-                    {gameState.game.status === "awaitingWinnerRandomness" &&
+                    {currentRoundState.status === "waiting" && "Waiting for players"}
+                    {currentRoundState.status === "awaitingWinnerRandomness" &&
                       "Determining winner..."}
-                    {gameState.game.status === "finished" && "Game Over - Place bet for new round"}
+                    {currentRoundState.status === "finished" && "Game Over - Place bet for new round"}
                     {/* Debug: show status if unexpected */}
                     {!["waiting", "awaitingWinnerRandomness", "finished"].includes(
-                      gameState.game.status
-                    ) && `Status: ${gameState.game.status}`}
+                      currentRoundState.status
+                    ) && `Status: ${currentRoundState.status}`}
                   </div>
                 </div>
               )}

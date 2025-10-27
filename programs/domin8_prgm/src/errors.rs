@@ -126,4 +126,7 @@ pub enum Domin8Error {
 
     #[msg("Invalid bet entry account")]
     InvalidBetEntry,
+
+    #[msg("Randomness has already been fulfilled")]
+    RandomnessAlreadyFulfilled,
 }

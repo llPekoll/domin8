@@ -82,6 +82,7 @@ export class GamePhaseManager {
 
       // VRF dialog shown by React UI (BlockchainRandomnessDialog)
       // Battle animations play while waiting for VRF response (3-8 seconds)
+      // Handle if vrf fails or is delayed (show a dialog, done in App.tsx)
     }
   }
 
@@ -111,8 +112,8 @@ export class GamePhaseManager {
         }
       });
 
-      // Clean up for next game after celebration
-      this.scene.time.delayedCall(5000, () => {
+      // Clean up for next game after celebration (50 sec for now testing)
+      this.scene.time.delayedCall(50000, () => {
         this.handleGameCleanup();
       });
     }

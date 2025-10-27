@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getSolanaRpcUrl(): string {
-  const network = import.meta.env.VITE_SOLANA_NETWORK || "devnet";
+  const network = import.meta.env.VITE_SOLANA_NETWORK || "localnet";
 
   switch (network) {
     case "mainnet":
@@ -14,8 +14,10 @@ export function getSolanaRpcUrl(): string {
       return "https://api.mainnet-beta.solana.com";
     case "testnet":
       return "https://api.testnet.solana.com";
+    case "localnet":
+      return "http://localhost:8899";
     case "devnet":
     default:
-      return "https://api.devnet.solana.com";
+      return "http://localhost:8899";
   }
 }

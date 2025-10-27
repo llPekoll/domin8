@@ -6,25 +6,24 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-domin8_prgm = "EUG7PPKMmzssdsyCrR4XXRcN5xMp1eBLXgF1SAsp28hT"
-domin8_mvp = "11111111111111111111111111111112"  # Will be updated after deploy
+domin8_prgm = "93swWR5KYURGFWhDbgat9HxRdJAS5pQKssPffnj9bfXK"
 orao_vrf = "VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y"
 
 [programs.localnet]
-domin8_prgm = "EUG7PPKMmzssdsyCrR4XXRcN5xMp1eBLXgF1SAsp28hT"
-domin8_mvp = "11111111111111111111111111111112"  # Will be updated after deploy
+domin8_prgm = "93swWR5KYURGFWhDbgat9HxRdJAS5pQKssPffnj9bfXK"
 orao_vrf = "VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y"
 
 [registry]
-url = "https://api.apr.dev"
+url = "https://devnet.helius-rpc.com/?api-key=0df32d0b-da4f-49b3-b154-deaceac254c0"
 
 [provider]
-cluster = "devnet"
+cluster = "localnet"
 wallet = "~/work/domin8/solana/7H9uSFKd1h4pvFPFfqzLpSZyLac7F9ax9ZcFtv9B5oDf.json"
 
 [scripts]
+rotate-force = "NODE_OPTIONS='--loader ts-node/esm' ts-node scripts/rotate-force.ts"
+set-counter = "NODE_OPTIONS='--loader ts-node/esm' ts-node scripts/set-counter.ts"
 test = "NODE_OPTIONS='--loader ts-node/esm' yarn mocha -t 1000000 tests/devnet.test.ts"
 test-comprehensive = "NODE_OPTIONS='--loader ts-node/esm' yarn mocha -t 1000000 tests/comprehensive.test.ts"
+test-local = "NODE_OPTIONS='--loader ts-node/esm' yarn mocha -t 1000000 tests/localnet.test.ts"
 unlock-bets = "NODE_OPTIONS='--loader ts-node/esm' ts-node scripts/unlock-bets.ts"
-set-counter = "NODE_OPTIONS='--loader ts-node/esm' ts-node scripts/set-counter.ts"
-rotate-force = "NODE_OPTIONS='--loader ts-node/esm' ts-node scripts/rotate-force.ts"

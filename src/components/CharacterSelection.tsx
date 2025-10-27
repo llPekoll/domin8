@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useGameContract } from "../hooks/useGameContract";
 import { api } from "../../convex/_generated/api";
@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { Shuffle } from "lucide-react";
 import { CharacterPreviewScene } from "./CharacterPreviewScene";
 import styles from "./ButtonShine.module.css";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { Buffer } from "buffer";
 import { EventBus } from "../game/EventBus";
 
@@ -32,7 +31,6 @@ const CharacterSelection = memo(function CharacterSelection({
 }: CharacterSelectionProps) {
   const { connected, publicKey, solBalance, isLoadingBalance } = usePrivyWallet();
   const { placeBet, validateBet } = useGameContract();
-  const placeEntryBet = useMutation(api.bets.placeEntryBet);
 
   const [currentCharacter, setCurrentCharacter] = useState<Character | null>(null);
   const [betAmount, setBetAmount] = useState<string>("0.1");
@@ -50,17 +48,12 @@ const CharacterSelection = memo(function CharacterSelection({
   // Get all available characters - only fetch once
   const allCharacters = useQuery(api.characters.getActiveCharacters);
 
-  // Get current game state from Convex (SINGLE SOURCE OF TRUTH)
-  const currentGame = useQuery(api.frontend.getCurrentGame);
-
-  const playerParticipants = useQuery(
-    api.frontend.getPlayerParticipants,
-    walletAddress ? { walletAddress } : "skip"
-  );
+  // Get current game state from Convex (auto-synced from blockchain every 5s)
+  const currentRoundState = useQuery(api.events.getCurrentRoundState);
 
   // Derive game state from Convex
-  const canPlaceBet = currentGame?.canJoin ?? false;
-  const playerParticipantCount = playerParticipants?.length ?? 0;
+  const canPlaceBet = currentRoundState ? currentRoundState.status === "waiting" : true;
+  const playerParticipantCount = 0; // TODO: Track participant count when needed
 
   // Initialize with random character when characters load
   useEffect(() => {
@@ -100,8 +93,8 @@ const CharacterSelection = memo(function CharacterSelection({
     EventBus.emit("play-insert-coin-sound");
 
     // Check if player can place bet based on Convex game state
-    if (!canPlaceBet && currentGame) {
-      const status = currentGame.status;
+    if (!canPlaceBet && currentRoundState) {
+      const status = currentRoundState.status;
       if (status === "awaitingWinnerRandomness") {
         toast.error("Game is determining winner, please wait...");
         return;
@@ -137,23 +130,9 @@ const CharacterSelection = memo(function CharacterSelection({
       const signatureHex = await placeBet(amount);
 
       console.log("[CharacterSelection] Transaction successful:", signatureHex);
-      console.log("[CharacterSelection] Registering bet in Convex...");
-
-      // Convert to lamports for Convex
-      const amountLamports = Math.floor(amount * LAMPORTS_PER_SOL);
-
-      // Register bet in Convex database after successful Solana transaction
-      const gameInfo = await placeEntryBet({
-        walletAddress: publicKey.toString(),
-        characterId: currentCharacter._id,
-        betAmount: amountLamports,
-        txSignature: signatureHex,
-      });
-
-      console.log("[CharacterSelection] Game joined:", gameInfo);
 
       toast.success(`Bet placed! 🎲 Game starting!`, {
-        description: `Transaction: ${signatureHex.slice(0, 8)}...${signatureHex.slice(-8)}\nPlayers: ${gameInfo.playersCount}`,
+        description: `Transaction: ${signatureHex.slice(0, 8)}...${signatureHex.slice(-8)}`,
         duration: 5000,
       });
 
@@ -185,16 +164,15 @@ const CharacterSelection = memo(function CharacterSelection({
     currentCharacter,
     betAmount,
     canPlaceBet,
-    currentGame,
+    currentRoundState,
     placeBet,
     validateBet,
-    placeEntryBet,
     onParticipantAdded,
     allCharacters,
   ]);
 
   // Don't render if not connected or no character
-  // In demo mode (currentGame is null), always show the component
+  // In demo mode (currentRoundState is null), always show the component
   if (!connected || !currentCharacter) {
     return null;
   }

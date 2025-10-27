@@ -116,19 +116,8 @@ export class Game extends Scene {
     // Update UI
     this.uiManager.updateGameState(gameState);
 
-    // Handle game phases (old system, will be replaced by updateGamePhase)
+
     this.gamePhaseManager.handleGamePhase(gameState);
-  }
-
-  // Update game phase based on time-based calculation
-  updateGamePhase(phase: string, timeRemaining: number) {
-    console.log(`[Game Scene] Phase update: ${phase}, time remaining: ${timeRemaining}s`);
-
-    // Update UI with phase info
-    this.uiManager.updatePhase?.(phase, timeRemaining);
-
-    // Trigger phase-specific animations
-    this.gamePhaseManager.handlePhaseTransition?.(phase, timeRemaining);
   }
 
   // Public method for real-time participant spawning

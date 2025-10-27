@@ -626,14 +626,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "domin8-mvp"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "orao-solana-vrf",
-]
-
-[[package]]
 name = "domin8_prgm"
 version = "0.1.0"
 dependencies = [

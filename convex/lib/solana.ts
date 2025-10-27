@@ -2,7 +2,7 @@
 "use node";
 import * as anchor from "@coral-xyz/anchor";
 import { Connection, PublicKey, Keypair, Transaction, VersionedTransaction } from "@solana/web3.js";
-import { GameConfig, GameRound, GameStatus, DOMIN8_PROGRAM_ID, PDA_SEEDS } from "./types";
+import { GameConfig, GameRound, GameStatus, DOMIN8_PROGRAM_ID, PDA_SEEDS, BetEntry } from "./types";
 import { Buffer } from "buffer";
 import bs58 from "bs58";
 
@@ -212,7 +212,15 @@ export class SolanaClient {
         return null;
       }
 
-      console.log("Fetched game round account:", account);
+      console.log("=== Game Round Account ===");
+      console.log(`  Round ID: ${account.roundId?.toNumber()}`);
+      console.log(`  Status: ${status}`);
+      console.log(`  Bet Count: ${account.betCount}`);
+      console.log(`  Total Pot: ${account.totalPot?.toNumber()} lamports`);
+      console.log(`  Winner: ${account.winner?.toBase58() ?? "None"}`);
+      console.log(`  Winning Bet Index: ${account.winningBetIndex ?? "N/A"}`);
+      console.log(`  VRF Fulfilled: ${account.randomnessFulfilled ?? false}`);
+      console.log("==========================");
 
       return {
         roundId: account.roundId?.toNumber() ?? 0,
@@ -245,10 +253,11 @@ export class SolanaClient {
   }
 
   // Close betting window and lock game for resolution
+  // NEW: For single-player games, passes player wallet for automatic refund
   async closeBettingWindow(): Promise<string> {
     // Get current round ID to derive correct game PDA
     const currentRoundId = await this.getCurrentRoundId();
-    const { gameConfig, gameCounter, gameRound } = this.getPDAs(currentRoundId);
+    const { gameConfig, gameCounter, gameRound, vault } = this.getPDAs(currentRoundId);
 
     if (!gameRound) {
       throw new Error("Failed to derive game round PDA");
@@ -260,6 +269,8 @@ export class SolanaClient {
 
     // Fetch BetEntry PDAs for all bets (needed to count unique players)
     const remainingAccounts = [];
+    const uniquePlayers = new Set<string>();
+
     for (let i = 0; i < betCount; i++) {
       const { betEntry } = this.getPDAs(currentRoundId, i);
       if (betEntry) {
@@ -268,7 +279,32 @@ export class SolanaClient {
           isWritable: false, // Read-only for validation
           isSigner: false,
         });
+
+        // Track unique players for single-player detection
+        try {
+          const betEntryAccount = await this.program.account.betEntry.fetch(betEntry);
+          uniquePlayers.add(betEntryAccount.wallet.toBase58());
+        } catch (error) {
+          console.error(`Failed to fetch bet entry ${i}:`, error);
+        }
       }
+    }
+
+    // NEW: For single-player games, add the player's wallet for automatic refund
+    if (uniquePlayers.size === 1) {
+      const playerWallet = Array.from(uniquePlayers)[0];
+      remainingAccounts.push({
+        pubkey: new PublicKey(playerWallet),
+        isWritable: true, // IMPORTANT: Must be writable for automatic transfer
+        isSigner: false, // Crank signs, not the player
+      });
+      console.log(
+        `Single-player game detected. Automatic refund will be attempted for player: ${playerWallet}`
+      );
+    } else {
+      console.log(
+        `Multi-player game with ${uniquePlayers.size} players. No automatic refund needed.`
+      );
     }
 
     console.log(`Closing betting window for round ${currentRoundId} with ${betCount} bets`);
@@ -279,6 +315,7 @@ export class SolanaClient {
         counter: gameCounter,
         gameRound: gameRound,
         config: gameConfig,
+        vault, // NOW required for auto-refund (was optional before)
         crank: this.authority.publicKey,
       } as any)
       .remainingAccounts(remainingAccounts)
@@ -364,6 +401,44 @@ export class SolanaClient {
       console.error("Error checking VRF fulfillment:", error);
       return false;
     }
+  }
+
+  // Fetch all bets for a specific round (for bet event capture)
+  async getBetsForRound(roundId: number): Promise<BetEntry[]> {
+    const bets: BetEntry[] = [];
+    
+    // Get bet count from game round
+    const { gameRound } = this.getPDAs(roundId);
+    if (!gameRound) return bets;
+
+    try {
+      const gameRoundAccount = await this.program.account.gameRound.fetch(gameRound);
+      const betCount = gameRoundAccount.betCount;
+
+      // Fetch each bet entry PDA
+      for (let i = 0; i < betCount; i++) {
+        const { betEntry } = this.getPDAs(roundId, i);
+        if (!betEntry) continue;
+
+        try {
+          const betEntryAccount = await this.program.account.betEntry.fetch(betEntry);
+          bets.push({
+            gameRoundId: betEntryAccount.gameRoundId.toNumber(),
+            betIndex: betEntryAccount.betIndex,
+            wallet: betEntryAccount.wallet.toBase58(),
+            betAmount: betEntryAccount.betAmount.toNumber(),
+            timestamp: betEntryAccount.timestamp.toNumber(),
+            payoutCollected: betEntryAccount.payoutCollected,
+          });
+        } catch (error) {
+          console.error(`Failed to fetch bet entry ${i}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching bets for round ${roundId}:`, error);
+    }
+
+    return bets;
   }
 
   // Note: VRF helper methods removed - VRF is now handled directly by the smart contract

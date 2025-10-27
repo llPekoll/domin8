@@ -18,6 +18,10 @@ pub mod emergency_refund_vrf_timeout;
 pub mod set_counter;
 pub mod rotate_force;
 
+// Mock VRF for localnet testing
+#[cfg(feature = "localnet")]
+pub mod fulfill_mock_vrf;
+
 // Re-exports
 pub use initialize::*;
 pub use create_game::*;
@@ -31,3 +35,6 @@ pub use emergency_unlock::*;
 pub use emergency_refund_vrf_timeout::*;
 pub use set_counter::*;
 pub use rotate_force::*;
+
+#[cfg(feature = "localnet")]
+pub use fulfill_mock_vrf::*;

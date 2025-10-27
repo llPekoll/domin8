@@ -7,6 +7,7 @@ use anchor_lang::prelude::*;
 #[derive(Accounts)]
 pub struct CloseBettingWindow<'info> {
     #[account(
+        mut,
         seeds = [GAME_COUNTER_SEED],
         bump
     )]
@@ -26,13 +27,13 @@ pub struct CloseBettingWindow<'info> {
     )]
     pub config: Account<'info, GameConfig>,
 
-    /// CHECK: This is the vault PDA that holds game funds
+    /// The vault PDA that holds game funds
     #[account(
         mut,
         seeds = [b"vault"],
         bump
     )]
-    pub vault: UncheckedAccount<'info>,
+    pub vault: SystemAccount<'info>,
 
     /// The crank authority
     #[account(
@@ -45,7 +46,9 @@ pub struct CloseBettingWindow<'info> {
 
 /// Close betting window and transition game to winner selection phase
 ///
-/// Requires remaining_accounts: All BetEntry PDAs for the game (to count unique players)
+/// Requires remaining_accounts: 
+/// - First: All BetEntry PDAs for the game (to count unique players)
+/// - Then: Unique player wallet accounts (for automatic refund transfer in single-player games)
 pub fn close_betting_window<'info>(ctx: Context<'_, '_, '_, 'info, CloseBettingWindow<'info>>) -> Result<()> {
     let config = &mut ctx.accounts.config;
     let game_round = &mut ctx.accounts.game_round;
@@ -107,12 +110,81 @@ pub fn close_betting_window<'info>(ctx: Context<'_, '_, '_, 'info, CloseBettingW
         game_round.winner = unique_wallets[0]; // Set to the actual player wallet for claim
 
         let total_refund = game_round.total_pot;
+        let winner_wallet = unique_wallets[0];
         msg!(
-            "Single player game - marking for refund: {} lamports (from {} bets)",
+            "Single player game - attempting automatic refund: {} lamports (from {} bets)",
             total_refund,
             bet_count
         );
-        msg!("Player {} can claim full refund via claim_winner_prize", unique_wallets[0]);
+
+        // ⭐ NEW: Attempt automatic refund transfer (similar to select_winner_and_payout)
+        // The winner wallet account is passed after all BetEntry PDAs in remaining_accounts
+        let mut auto_transfer_success = false;
+
+        if total_refund > 0 {
+            // Verify we have the winner wallet account
+            require!(
+                ctx.remaining_accounts.len() > bet_count,
+                Domin8Error::InvalidBetEntry
+            );
+
+            let winner_wallet_account = &ctx.remaining_accounts[bet_count];
+            require!(
+                winner_wallet_account.key() == winner_wallet,
+                Domin8Error::Unauthorized
+            );
+
+            let vault_lamports = ctx.accounts.vault.lamports();
+            require!(
+                vault_lamports >= total_refund,
+                Domin8Error::InsufficientFunds
+            );
+
+            // Use invoke_signed for PDA signing
+            let vault_bump = ctx.bumps.vault;
+            let signer_seeds: &[&[&[u8]]] = &[&[b"vault", &[vault_bump]]];
+
+            let transfer_ix = anchor_lang::solana_program::system_instruction::transfer(
+                &ctx.accounts.vault.key(),
+                &winner_wallet,
+                total_refund,
+            );
+
+            // Attempt transfer - don't fail entire tx if this fails!
+            let transfer_result = anchor_lang::solana_program::program::invoke_signed(
+                &transfer_ix,
+                &[
+                    ctx.accounts.vault.to_account_info(),
+                    winner_wallet_account.clone(),
+                    ctx.accounts.system_program.to_account_info(),
+                ],
+                signer_seeds,
+            );
+
+            match transfer_result {
+                Ok(_) => {
+                    auto_transfer_success = true;
+                    game_round.winner_prize_unclaimed = 0;
+                    msg!(
+                        "✓ Automatic refund succeeded: {} lamports to {}",
+                        total_refund,
+                        winner_wallet
+                    );
+                }
+                Err(e) => {
+                    // Transfer failed - store refund for manual claim
+                    game_round.winner_prize_unclaimed = total_refund;
+                    msg!("⚠️ Automatic refund failed (error: {:?})", e);
+                    msg!(
+                        "   Player can claim {} lamports manually via claim_winner_prize",
+                        total_refund
+                    );
+                }
+            }
+        } else {
+            game_round.winner_prize_unclaimed = 0;
+            auto_transfer_success = true;
+        }
 
         // ⭐ Rotate force field for next game (same logic as select_winner_and_payout)
         let clock = Clock::get()?;
@@ -142,7 +214,7 @@ pub fn close_betting_window<'info>(ctx: Context<'_, '_, '_, 'info, CloseBettingW
             .ok_or(Domin8Error::ArithmeticOverflow)?;
         counter.current_round_id = new_round_id;
 
-        msg!("Single player game - immediate finish, ready for refund claim");
+        msg!("Single player game - immediate finish{}", if auto_transfer_success { ", refund processed automatically" } else { ", ready for manual refund claim" });
         msg!("Bets unlocked - ready for next round");
         msg!("✓ Counter incremented to {}", new_round_id);
         return Ok(());

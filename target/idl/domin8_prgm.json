@@ -1,5 +1,5 @@
 {
-  "address": "EUG7PPKMmzssdsyCrR4XXRcN5xMp1eBLXgF1SAsp28hT",
+  "address": "93swWR5KYURGFWhDbgat9HxRdJAS5pQKssPffnj9bfXK",
   "metadata": {
     "name": "domin8_prgm",
     "version": "0.1.0",
@@ -332,6 +332,7 @@
       "accounts": [
         {
           "name": "counter",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -408,6 +409,9 @@
         },
         {
           "name": "vault",
+          "docs": [
+            "The vault PDA that holds game funds"
+          ],
           "writable": true,
           "pda": {
             "seeds": [
@@ -588,16 +592,9 @@
           "signer": true
         },
         {
-          "name": "vrf_program",
+          "name": "mock_vrf",
           "docs": [
-            "ORAO VRF Program"
-          ],
-          "address": "VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y"
-        },
-        {
-          "name": "network_state",
-          "docs": [
-            "ORAO Network State (validated as PDA from ORAO VRF program)"
+            "Mock VRF account that will store randomness"
           ],
           "writable": true,
           "pda": {
@@ -605,91 +602,23 @@
               {
                 "kind": "const",
                 "value": [
+                  109,
                   111,
-                  114,
-                  97,
-                  111,
-                  45,
+                  99,
+                  107,
+                  95,
                   118,
                   114,
-                  102,
-                  45,
-                  110,
-                  101,
-                  116,
-                  119,
-                  111,
-                  114,
-                  107,
-                  45,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103,
-                  117,
-                  114,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
+                  102
                 ]
+              },
+              {
+                "kind": "account",
+                "path": "config.force",
+                "account": "GameConfig"
               }
-            ],
-            "program": {
-              "kind": "const",
-              "value": [
-                7,
-                71,
-                177,
-                26,
-                250,
-                145,
-                180,
-                209,
-                249,
-                34,
-                242,
-                123,
-                14,
-                186,
-                193,
-                218,
-                178,
-                59,
-                33,
-                41,
-                164,
-                190,
-                243,
-                79,
-                50,
-                164,
-                123,
-                88,
-                245,
-                206,
-                252,
-                120
-              ]
-            }
+            ]
           }
-        },
-        {
-          "name": "treasury",
-          "docs": [
-            "ORAO Treasury"
-          ],
-          "writable": true
-        },
-        {
-          "name": "vrf_request",
-          "docs": [
-            "VRF Request Account (will be created by ORAO VRF program)"
-          ],
-          "writable": true
         },
         {
           "name": "system_program",
@@ -876,6 +805,137 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "fulfill_mock_vrf",
+      "docs": [
+        "Fulfill mock VRF randomness (LOCALNET ONLY - for testing)"
+      ],
+      "discriminator": [
+        139,
+        74,
+        174,
+        239,
+        87,
+        149,
+        243,
+        211
+      ],
+      "accounts": [
+        {
+          "name": "counter",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "game_round",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "counter.current_round_id",
+                "account": "GameCounter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mock_vrf",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  99,
+                  107,
+                  95,
+                  118,
+                  114,
+                  102
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "game_round.vrf_seed",
+                "account": "GameRound"
+              }
+            ]
+          }
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "fulfiller",
+          "docs": [
+            "Any signer can fulfill for testing (in production, only ORAO can fulfill)"
+          ],
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "randomness",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "initialize",
@@ -1300,10 +1360,32 @@
           "signer": true
         },
         {
-          "name": "vrf_request",
+          "name": "mock_vrf",
           "docs": [
-            "VRF Request Account containing fulfilled randomness"
-          ]
+            "Mock VRF Account containing fulfilled randomness (localnet)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  99,
+                  107,
+                  95,
+                  118,
+                  114,
+                  102
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "game_round.vrf_seed",
+                "account": "GameRound"
+              }
+            ]
+          }
         },
         {
           "name": "treasury",
@@ -1450,16 +1532,16 @@
       ]
     },
     {
-      "name": "NetworkState",
+      "name": "MockVrfAccount",
       "discriminator": [
-        212,
-        237,
-        148,
-        56,
-        97,
-        245,
-        51,
-        169
+        2,
+        116,
+        227,
+        203,
+        91,
+        3,
+        104,
+        217
       ]
     }
   ],
@@ -1761,6 +1843,11 @@
       "code": 6040,
       "name": "InvalidBetEntry",
       "msg": "Invalid bet entry account"
+    },
+    {
+      "code": 6041,
+      "name": "RandomnessAlreadyFulfilled",
+      "msg": "Randomness has already been fulfilled"
     }
   ],
   "types": [
@@ -2195,89 +2282,52 @@
       }
     },
     {
-      "name": "NetworkConfiguration",
+      "name": "MockVrfAccount",
+      "docs": [
+        "Mock randomness account that mimics ORAO VRF structure",
+        "Seeds: [b\"mock_vrf\", game_round.vrf_seed]",
+        "This account stores randomness that gets fulfilled by the fulfill_mock_vrf instruction"
+      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "authority",
-            "type": "pubkey"
-          },
-          {
-            "name": "treasury",
-            "type": "pubkey"
-          },
-          {
-            "name": "request_fee",
-            "type": "u64"
-          },
-          {
-            "name": "fulfillment_authorities",
+            "name": "seed",
+            "docs": [
+              "The seed used to request randomness (matches GameRound.vrf_seed)"
+            ],
             "type": {
-              "vec": "pubkey"
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
-            "name": "token_fee_config",
+            "name": "randomness",
+            "docs": [
+              "The fulfilled randomness value (64 bytes to match ORAO)"
+            ],
             "type": {
-              "option": {
-                "defined": {
-                  "name": "OraoTokenFeeConfig"
-                }
-              }
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "NetworkState",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "config",
-            "type": {
-              "defined": {
-                "name": "NetworkConfiguration"
-              }
+              "array": [
+                "u8",
+                64
+              ]
             }
           },
           {
-            "name": "num_received",
+            "name": "fulfilled",
             "docs": [
-              "Total number of received requests."
+              "Whether this randomness has been fulfilled"
             ],
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "OraoTokenFeeConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "mint",
-            "docs": [
-              "ORAO token mint address."
-            ],
-            "type": "pubkey"
+            "type": "bool"
           },
           {
-            "name": "treasury",
+            "name": "fulfilled_at",
             "docs": [
-              "ORAO token treasury account."
+              "Timestamp when fulfilled"
             ],
-            "type": "pubkey"
-          },
-          {
-            "name": "fee",
-            "docs": [
-              "Fee in ORAO SPL token smallest units."
-            ],
-            "type": "u64"
+            "type": "i64"
           }
         ]
       }
