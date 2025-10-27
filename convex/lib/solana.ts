@@ -179,9 +179,9 @@ export class SolanaClient {
   }
 
   // Get current game round state (simplified for small games MVP)
-  async getGameRound(): Promise<GameRound | null> {
-    // First get the current round ID
-    const currentRoundId = await this.getCurrentRoundId();
+  async getGameRound(roundId?: number): Promise<GameRound | null> {
+    // First get the current round ID if not provided
+    const currentRoundId = roundId ?? (await this.getCurrentRoundId());
     console.log("---->Current round ID:", currentRoundId);
 
     // Derive the PDA for the current round
@@ -195,9 +195,16 @@ export class SolanaClient {
       // Fetch account with null check
       const account = await this.program.account.gameRound.fetchNullable(gameRound);
 
-      // If account doesn't exist or was closed, return null
+      // If account doesn't exist or was closed, try previous round
       if (!account) {
         console.log(`Game round ${currentRoundId} account doesn't exist or was closed`);
+
+        // Try previous round if roundId > 0
+        if (currentRoundId > 0) {
+          console.log(`Attempting to fetch previous round ${currentRoundId - 1}`);
+          return this.getGameRound(currentRoundId - 1);
+        }
+        // No more rounds to check
         return null;
       }
 
@@ -406,7 +413,7 @@ export class SolanaClient {
   // Fetch all bets for a specific round (for bet event capture)
   async getBetsForRound(roundId: number): Promise<BetEntry[]> {
     const bets: BetEntry[] = [];
-    
+
     // Get bet count from game round
     const { gameRound } = this.getPDAs(roundId);
     if (!gameRound) return bets;

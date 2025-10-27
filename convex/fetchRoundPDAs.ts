@@ -2,7 +2,6 @@
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { SolanaClient } from "./lib/solana";
-import * as betMutations from "./betEventListenerMutations";
 import { GameStatus } from "./lib/types";
 
 const RPC_ENDPOINT = process.env.SOLANA_RPC_ENDPOINT || "http://127.0.0.1:8899";
@@ -107,7 +106,7 @@ async function scheduleGameActions(ctx: any, gameRound: any) {
 
   try {
     // WAITING STATE: Schedule close betting at endTimestamp
-    if (status === "waiting") {
+    if (status === GameStatus.Waiting) {
       // ⭐ Check if close betting already scheduled (prevent duplicates)
       const alreadyScheduled = await ctx.runMutation(
         internal.gameSchedulerMutations.isJobScheduled,
@@ -166,7 +165,7 @@ async function scheduleGameActions(ctx: any, gameRound: any) {
     }
 
     // AWAITING WINNER RANDOMNESS STATE: Schedule VRF check
-    if (status === "awaitingWinnerRandomness") {
+    if (status === GameStatus.AwaitingWinnerRandomness) {
       // Check if VRF check already scheduled (prevent duplicates)
       const alreadyScheduled = await ctx.runMutation(
         internal.gameSchedulerMutations.isJobScheduled,
@@ -205,7 +204,7 @@ async function scheduleGameActions(ctx: any, gameRound: any) {
     }
 
     // FINISHED STATE: Log completion
-    if (status === "finished") {
+    if (status === GameStatus.Finished) {
       console.log(`✓ Round ${roundId} finished - ready for next game`);
 
       // Mark any previous job (check vrf) as completed
@@ -218,4 +217,5 @@ async function scheduleGameActions(ctx: any, gameRound: any) {
     console.error(`Error scheduling actions for round ${roundId}:`, error);
     // Don't throw - let event capture succeed even if scheduling fails
   }
+if conounter x has no pda get previous round id to update the convex
 }
