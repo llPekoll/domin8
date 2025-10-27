@@ -3,6 +3,7 @@ import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { SolanaClient } from "./lib/solana";
 import * as betMutations from "./betEventListenerMutations";
+import { GameStatus } from "./lib/types";
 
 const RPC_ENDPOINT = process.env.SOLANA_RPC_ENDPOINT || "http://127.0.0.1:8899";
 const CRANK_AUTHORITY_PRIVATE_KEY = process.env.CRANK_AUTHORITY_PRIVATE_KEY || "";
@@ -43,7 +44,7 @@ async function captureGameRoundState(ctx: any, solanaClient: SolanaClient) {
     console.log("Captured Round " + roundId + ": " + status);
 
     // ⭐ NEW: Capture individual bets when in WAITING state
-    if (status === "waiting") {
+    if (status === GameStatus.Waiting) {
       await captureRoundBets(ctx, solanaClient, roundId);
     }
 

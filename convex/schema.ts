@@ -63,17 +63,16 @@ export default defineSchema({
     .index("by_status", ["status"]) // Query rounds by status
     .index("by_captured_at", ["capturedAt"]), // Chronological ordering
 
-  
   bets: defineTable({
     // Core identifiers
-    roundId: v.id("games"),
+    roundId: v.id("gameRoundStates"),
     playerId: v.optional(v.id("players")), // Optional for bots
     walletAddress: v.string(),
 
     // Bet classification
     betType: v.union(
-      v.literal("self"),       // Player betting on themselves (creates participant)
-      v.literal("refund")        // Bank bot opponent
+      v.literal("self"), // Player betting on themselves (creates participant)
+      v.literal("refund") // Bank bot opponent
     ),
 
     // Financial data
@@ -98,7 +97,6 @@ export default defineSchema({
 
     // Game progression (only for self/bank bets)
     isWinner: v.optional(v.boolean()),
-
 
     // Blockchain tracking
     betIndex: v.optional(v.number()), // Index of this bet in the round (0, 1, 2, ...)

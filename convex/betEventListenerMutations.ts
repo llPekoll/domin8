@@ -11,16 +11,24 @@ export const isBetStored = internalMutation({
     betIndex: v.number(),
   },
   handler: async (ctx, args) => {
+    // Find the gameRoundStates document ID for this round
+    const gameRoundState = await ctx.db
+      .query("gameRoundStates")
+      .withIndex("by_round_id", (q) => q.eq("roundId", args.roundId))
+      .first();
+
+    if (!gameRoundState) {
+      // If no game round state exists yet, bet can't be stored
+      return false;
+    }
+
     const existing = await ctx.db
       .query("bets")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("roundId"), args.roundId as any),
-          q.eq(q.field("betIndex"), args.betIndex)
-        )
+      .withIndex("by_round_index", (q) =>
+        q.eq("roundId", gameRoundState._id).eq("betIndex", args.betIndex)
       )
       .first();
-    
+
     return existing !== null;
   },
 });
@@ -43,14 +51,24 @@ export const storeBetFromPDA = internalMutation({
   handler: async (ctx, args) => {
     const { bet } = args;
 
+    // ⭐ Find the gameRoundStates document ID for this round
+    const gameRoundState = await ctx.db
+      .query("gameRoundStates")
+      .withIndex("by_round_id", (q) => q.eq("roundId", bet.gameRoundId))
+      .first();
+
+    if (!gameRoundState) {
+      throw new Error(
+        `Cannot store bet: gameRoundStates not found for round ${bet.gameRoundId}. ` +
+        `Make sure the game round state is captured before storing bets.`
+      );
+    }
+
     // Check if bet already exists (extra safety check)
     const existing = await ctx.db
       .query("bets")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("roundId"), bet.gameRoundId as any),
-          q.eq(q.field("betIndex"), bet.betIndex)
-        )
+      .withIndex("by_round_index", (q) =>
+        q.eq("roundId", gameRoundState._id).eq("betIndex", bet.betIndex)
       )
       .first();
 
@@ -61,7 +79,7 @@ export const storeBetFromPDA = internalMutation({
 
     // Create new bet record
     const betId = await ctx.db.insert("bets", {
-      roundId: bet.gameRoundId as any, // Blockchain round ID (TODO: Map to games table ID later)
+      roundId: gameRoundState._id, // Reference to gameRoundStates document
       walletAddress: bet.wallet,
       betType: "self", // All bets are "self" bets for now
       amount: bet.betAmount / 1e9, // Convert lamports to SOL
@@ -73,7 +91,7 @@ export const storeBetFromPDA = internalMutation({
     });
 
     console.log(`✓ Stored bet: Round ${bet.gameRoundId}, Index ${bet.betIndex}, Wallet ${bet.wallet}, Amount ${bet.betAmount / 1e9} SOL`);
-    
+
     return betId;
   },
 });
