@@ -75,6 +75,12 @@ export const executeCloseBetting = internalAction({
       if (confirmed) {
         console.log(`Round ${roundId}: Betting closed successfully. Tx: ${txSignature}`);
 
+        // Mark job as completed
+        await ctx.runMutation(internal.gameSchedulerMutations.markJobCompleted, {
+          roundId,
+          action: "close_betting",
+        });
+
         // 5. Check if game finished immediately (single-player case)
         // Wait a moment for blockchain to update
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -95,17 +101,24 @@ export const executeCloseBetting = internalAction({
         }
       } else {
         console.error(`Round ${roundId}: Transaction confirmation failed: ${txSignature}`);
+
+        // Mark job as failed
+        await ctx.runMutation(internal.gameSchedulerMutations.markJobFailed, {
+          roundId,
+          action: "close_betting",
+          error: `Transaction confirmation failed: ${txSignature}`,
+        });
       }
     } catch (error) {
       console.error(`Round ${roundId}: Error closing betting:`, error);
-      
+
       // Mark job as failed in database
       await ctx.runMutation(internal.gameSchedulerMutations.markJobFailed, {
         roundId,
         action: "close_betting",
         error: error instanceof Error ? error.message : String(error),
       });
-      
+
       // Don't throw - recovery cron will handle later
     }
   },
@@ -175,11 +188,25 @@ export const executeCheckVrf = internalAction({
         if (confirmed) {
           console.log(`Round ${roundId}: ✓ Winner selected successfully. Tx: ${txSignature}`);
           console.log(`Round ${roundId}: Game complete, ready for next round`);
+
+          // Mark job as completed
+          await ctx.runMutation(internal.gameSchedulerMutations.markJobCompleted, {
+            roundId,
+            action: "check_vrf",
+          });
+
           // Event listener will capture the "finished" state
         } else {
           console.error(
             `Round ${roundId}: Transaction confirmation failed: ${txSignature}`
           );
+
+          // Mark job as failed
+          await ctx.runMutation(internal.gameSchedulerMutations.markJobFailed, {
+            roundId,
+            action: "check_vrf",
+            error: `Transaction confirmation failed: ${txSignature}`,
+          });
         }
 
         return; // Done!
@@ -196,13 +223,21 @@ export const executeCheckVrf = internalAction({
           { roundId, attempt: attempt + 1 }
         );
       } else {
-        // MAX attempts reached - log error
+        // MAX attempts reached - log error and mark as failed
         console.error(
           `Round ${roundId}: ⚠️ VRF fulfillment timeout after ${MAX_VRF_ATTEMPTS} attempts (${MAX_VRF_ATTEMPTS * 2}s)`
         );
         console.error(
           `Round ${roundId}: VRF may still fulfill later - recovery cron will handle`
         );
+
+        // Mark job as failed
+        await ctx.runMutation(internal.gameSchedulerMutations.markJobFailed, {
+          roundId,
+          action: "check_vrf",
+          error: `VRF fulfillment timeout after ${MAX_VRF_ATTEMPTS} attempts`,
+        });
+
         // Recovery mechanism will retry later (future feature)
       }
     } catch (error) {

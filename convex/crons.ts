@@ -35,4 +35,16 @@ crons.interval(
  */
 // TODO LATER: priority low
 
+/**
+ * Scheduled jobs cleanup - removes old completed/failed jobs (safety net)
+ * Runs every 6 hours to clean up jobs older than 7 days
+ * Note: Jobs should be marked completed/failed immediately by the scheduler,
+ * but this cron provides a safety net for any edge cases
+ */
+crons.interval(
+  "cleanup-old-scheduled-jobs",
+  { hours: 6 },
+  internal.gameSchedulerMutations.cleanupOldJobs
+);
+
 export default crons;

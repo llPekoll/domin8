@@ -203,11 +203,17 @@ async function scheduleGameActions(ctx: any, gameRound: any) {
       console.log(`✓ Scheduled VRF check for round ${roundId} (starts in 2s)`);
     }
 
-    // FINISHED STATE: Log completion
+    // FINISHED STATE: Log completion and clean up all jobs
     if (status === GameStatus.Finished) {
       console.log(`✓ Round ${roundId} finished - ready for next game`);
 
-      // Mark any previous job (check vrf) as completed
+      // Mark close_betting job as completed (in case of single-player auto-refund)
+      await ctx.runMutation(internal.gameSchedulerMutations.markJobCompleted, {
+        roundId,
+        action: "close_betting",
+      });
+
+      // Mark check_vrf job as completed (in case of multi-player game)
       await ctx.runMutation(internal.gameSchedulerMutations.markJobCompleted, {
         roundId,
         action: "check_vrf",
@@ -217,5 +223,4 @@ async function scheduleGameActions(ctx: any, gameRound: any) {
     console.error(`Error scheduling actions for round ${roundId}:`, error);
     // Don't throw - let event capture succeed even if scheduling fails
   }
-if conounter x has no pda get previous round id to update the convex
 }
