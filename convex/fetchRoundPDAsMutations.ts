@@ -26,6 +26,8 @@ export const saveGameRoundState = internalMutation({
       endTimestamp: v.number(),
       betCount: v.number(),
       betAmounts: v.array(v.number()),
+      betSkin: v.array(v.number()), // NEW: Array of skin IDs from GameRound.bet_skin
+      betPosition: v.array(v.array(v.number())), // NEW: Array of [x, y] positions from GameRound.bet_position
       totalPot: v.number(),
       winner: v.union(v.string(), v.null()),
       winningBetIndex: v.number(),
@@ -62,6 +64,8 @@ export const saveGameRoundState = internalMutation({
       mapId: selectedMapId, // Random map selected for this round
       betCount: gameRound.betCount,
       betAmounts: gameRound.betAmounts,
+      betSkin: gameRound.betSkin, // NEW: Store skin array
+      betPosition: gameRound.betPosition, // NEW: Store position array
       totalPot: gameRound.totalPot,
       winner: gameRound.winner,
       winningBetIndex: gameRound.winningBetIndex,

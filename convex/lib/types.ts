@@ -4,7 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 import { Buffer } from "buffer";
 
 // Program ID (matches deployed program and IDL)
-export const DOMIN8_PROGRAM_ID = new PublicKey("93swWR5KYURGFWhDbgat9HxRdJAS5pQKssPffnj9bfXK");
+export const DOMIN8_PROGRAM_ID = new PublicKey("4AtbjvHma9wNEP1a426rDDQ2ccBAAZSg9ktRJ54odk6g");
 
 // Game Status enum from the Solana program (simplified for small games MVP)
 export enum GameStatus {
@@ -50,6 +50,8 @@ export interface GameRound {
   endTimestamp: number; // When betting window closes
   betCount: number; // Number of bets placed
   betAmounts: number[]; // Array of bet amounts (max 64)
+  betSkin: number[]; // Array of skin IDs (u8, 0-255, max 64) - from GameRound.bet_skin
+  betPosition: number[][]; // Array of [x, y] positions (u16 coords, max 64) - from GameRound.bet_position
   totalPot: number; // Total accumulated pot from all bets
   winner: string | null; // PublicKey as base58 string, or null if no winner yet
   winningBetIndex: number; // Index of the winning bet

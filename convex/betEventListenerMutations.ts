@@ -77,17 +77,14 @@ export const storeBetFromPDA = internalMutation({
       return existing._id;
     }
 
-    // Create new bet record
+    // Create new bet record (simplified schema)
     const betId = await ctx.db.insert("bets", {
       roundId: gameRoundState._id, // Reference to gameRoundStates document
       walletAddress: bet.wallet,
-      betType: "self", // All bets are "self" bets for now
       amount: bet.betAmount / 1e9, // Convert lamports to SOL
-      status: "pending",
       placedAt: bet.timestamp,
-      onChainConfirmed: true,
-      timestamp: bet.timestamp,
       betIndex: bet.betIndex, // Store bet index for ordering
+      timestamp: bet.timestamp,
     });
 
     console.log(`✓ Stored bet: Round ${bet.gameRoundId}, Index ${bet.betIndex}, Wallet ${bet.wallet}, Amount ${bet.betAmount / 1e9} SOL`);

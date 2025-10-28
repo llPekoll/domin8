@@ -56,7 +56,7 @@ pub struct PlaceBet<'info> {
 
 /// Place an additional bet in the current game round
 /// This instruction is called by players after the first bet has been placed
-pub fn place_bet(ctx: Context<PlaceBet>, amount: u64) -> Result<()> {
+pub fn place_bet(ctx: Context<PlaceBet>, amount: u64, skin: u8, position: [u16; 2]) -> Result<()> {
     let config = &ctx.accounts.config;
     let counter = &ctx.accounts.counter;
     let game_round = &mut ctx.accounts.game_round;
@@ -110,10 +110,7 @@ pub fn place_bet(ctx: Context<PlaceBet>, amount: u64) -> Result<()> {
     )?;
 
     // Check if we've reached max bets
-    require!(
-        game_round.bet_count < 64,
-        Domin8Error::MaxBetsReached
-    );
+    require!(game_round.bet_count < 64, Domin8Error::MaxBetsReached);
 
     // Add to existing pot
     game_round.total_pot = game_round.total_pot.saturating_add(amount);
@@ -121,6 +118,8 @@ pub fn place_bet(ctx: Context<PlaceBet>, amount: u64) -> Result<()> {
     // Store bet amount in array for efficient winner selection
     let bet_index = game_round.bet_count as usize;
     game_round.bet_amounts[bet_index] = amount;
+    game_round.bet_skin[bet_index] = skin;
+    game_round.bet_position[bet_index] = position;
     game_round.bet_count += 1;
 
     // Create BetEntry PDA for detailed tracking
@@ -146,12 +145,10 @@ pub fn place_bet(ctx: Context<PlaceBet>, amount: u64) -> Result<()> {
         round_id: game_round.round_id,
         player: player_key,
         amount,
-        bet_count: game_round.bet_count as u8,
-        total_pot: game_round.total_pot,
-        end_timestamp: game_round.end_timestamp,
-        is_first_bet: false,
+        bet_position: position,
+        bet_skin: skin,
         timestamp: clock.unix_timestamp,
-        bet_index: bet_index as u32,
+        bet_index: game_round.bet_count
     });
 
     Ok(())

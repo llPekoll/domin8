@@ -110,7 +110,12 @@ pub struct CreateGame<'info> {
 
 /// Create a new game round with the first bet
 /// This instruction is called by the first player to place a bet in a new round
-pub fn create_game(ctx: Context<CreateGame>, amount: u64) -> Result<()> {
+pub fn create_game(
+    ctx: Context<CreateGame>,
+    amount: u64,
+    skin: u8,
+    position: [u16; 2],
+) -> Result<()> {
     msg!("Initializing game round creation");
     let config = &mut ctx.accounts.config;
     let counter = &mut ctx.accounts.counter;
@@ -187,13 +192,13 @@ pub fn create_game(ctx: Context<CreateGame>, amount: u64) -> Result<()> {
     {
         // LOCALNET PATH: Initialize mock VRF account
         game_round.vrf_request_pubkey = ctx.accounts.mock_vrf.key();
-        
+
         let mock_vrf = &mut ctx.accounts.mock_vrf;
         mock_vrf.seed = seed;
         mock_vrf.randomness = [0u8; 64];
         mock_vrf.fulfilled = false;
         mock_vrf.fulfilled_at = 0;
-        
+
         msg!("✓ Mock VRF account created (use fulfill_mock_vrf to fulfill)");
         msg!("  Seed: {:?}", &seed[0..16]);
         msg!("  Mock VRF PDA: {}", ctx.accounts.mock_vrf.key());
@@ -210,7 +215,6 @@ pub fn create_game(ctx: Context<CreateGame>, amount: u64) -> Result<()> {
     ]);
     config.force.copy_from_slice(&new_force_hash.0);
     msg!("Force rotated for next game: {:?}", &config.force[0..16]);
-
     // Transfer SOL to vault (AFTER VRF request so player has enough for VRF fee)
     system_program::transfer(
         CpiContext::new(
@@ -230,10 +234,10 @@ pub fn create_game(ctx: Context<CreateGame>, amount: u64) -> Result<()> {
     );
     msg!("VRF requested immediately - will fulfill during waiting period");
     msg!("VRF seed (first 16 bytes): {:?}", &seed[0..16]);
-    
+
     #[cfg(not(feature = "localnet"))]
     msg!("VRF request account: {}", ctx.accounts.vrf_request.key());
-    
+
     #[cfg(feature = "localnet")]
     msg!("Mock VRF account: {}", ctx.accounts.mock_vrf.key());
 
@@ -249,11 +253,15 @@ pub fn create_game(ctx: Context<CreateGame>, amount: u64) -> Result<()> {
 
     // Store first bet in array for efficient winner selection
     game_round.bet_amounts[0] = amount;
+    game_round.bet_skin[0] = skin;
+    game_round.bet_position[0] = position;
     game_round.bet_count = 1;
 
     // Initialize remaining array slots to zero
     for i in 1..64 {
         game_round.bet_amounts[i] = 0;
+        game_round.bet_skin[i] = 0;
+        game_round.bet_position[i] = [0, 0];
     }
 
     msg!(
@@ -287,10 +295,8 @@ pub fn create_game(ctx: Context<CreateGame>, amount: u64) -> Result<()> {
         round_id: game_round.round_id,
         player: player_key,
         amount,
-        bet_count: game_round.bet_count as u8,
-        total_pot: game_round.total_pot,
-        end_timestamp: game_round.end_timestamp,
-        is_first_bet: true,
+        bet_position: position,
+        bet_skin: skin,
         timestamp: clock.unix_timestamp,
         bet_index: 0, // First bet
     });

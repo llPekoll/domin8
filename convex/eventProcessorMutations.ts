@@ -111,18 +111,15 @@ export const processBetPlacedEvent = internalMutation({
       return { skipped: true, reason: "bet_exists" };
     }
 
-    // Create the bet record
+    // Create the bet record (simplified schema)
     const betId = await ctx.db.insert("bets", {
       roundId: gameRoundState._id,
       walletAddress: eventData.player,
-      betType: "self",
       amount: eventData.amount / 1e9, // Convert lamports to SOL
-      status: "pending",
       placedAt: eventData.timestamp,
-      onChainConfirmed: true,
-      timestamp: eventData.timestamp,
       betIndex: eventData.betIndex,
       txSignature: event.signature,
+      timestamp: eventData.timestamp,
     });
 
     // Mark event as processed
@@ -155,5 +152,21 @@ export const isSignatureProcessed = internalMutation({
       .first();
 
     return existing !== null;
+  },
+});
+
+/**
+ * Get the most recent processed signature (by slot number)
+ * Used for incremental event fetching - only fetch events after this signature
+ */
+export const getLatestProcessedSignature = internalMutation({
+  handler: async (ctx) => {
+    const latestEvent = await ctx.db
+      .query("blockchainEvents")
+      .withIndex("by_slot")
+      .order("desc")
+      .first();
+
+    return latestEvent?.signature || null;
   },
 });

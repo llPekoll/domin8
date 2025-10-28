@@ -37,7 +37,6 @@ export const listenForEvents = internalAction({
       // - GameCreated (when first bet creates a round)
       // - GameLocked (when betting closes)
       // - WinnerSelected (when winner is determined)
-
     } catch (error) {
       console.error("[Event Listener] Error:", error);
     }
@@ -50,8 +49,22 @@ export const listenForEvents = internalAction({
  */
 async function captureBetPlacedEvents(ctx: any, solanaClient: SolanaClient) {
   try {
-    // Fetch last 50 transactions (should capture ~15-30s worth of bets)
-    const betEvents = await solanaClient.getAllRecentBetEvents(50);
+    // Get the last processed signature for incremental fetching
+    const lastProcessedSignature = await ctx.runMutation(
+      internal.eventProcessorMutations.getLatestProcessedSignature
+    );
+
+    if (lastProcessedSignature) {
+      console.log(`[Event Listener] Fetching events since ${lastProcessedSignature.slice(0, 8)}...`);
+    } else {
+      console.log(`[Event Listener] First fetch - getting last 50 transactions`);
+    }
+
+    // Fetch transactions since last processed signature (or last 50 if first time)
+    const betEvents = await solanaClient.getAllRecentBetEvents(
+      50,
+      lastProcessedSignature || undefined
+    );
 
     if (betEvents.length === 0) {
       return; // No new events
@@ -75,38 +88,34 @@ async function captureBetPlacedEvents(ctx: any, solanaClient: SolanaClient) {
       }
 
       // Store the event
-      const result = await ctx.runMutation(
-        internal.eventProcessorMutations.storeBetPlacedEvent,
-        {
-          signature: event.signature,
-          slot: event.slot,
-          roundId: event.roundId,
-          eventData: {
-            player: event.player,
-            amount: event.amount,
-            betCount: event.betCount,
-            totalPot: event.totalPot,
-            endTimestamp: event.endTimestamp,
-            isFirstBet: event.isFirstBet,
-            timestamp: event.timestamp,
-            betIndex: event.betIndex,
-          },
-        }
-      );
+      const result = await ctx.runMutation(internal.eventProcessorMutations.storeBetPlacedEvent, {
+        signature: event.signature,
+        slot: event.slot,
+        roundId: event.roundId,
+        eventData: {
+          player: event.player,
+          amount: event.amount,
+          betCount: event.betCount,
+          totalPot: event.totalPot,
+          endTimestamp: event.endTimestamp,
+          isFirstBet: event.isFirstBet,
+          timestamp: event.timestamp,
+          betIndex: event.betIndex,
+        },
+      });
 
       if (!result.alreadyExists) {
         newEvents++;
 
         // Immediately process the event into a bet record
-        await ctx.runMutation(
-          internal.eventProcessorMutations.processBetPlacedEvent,
-          { eventId: result.eventId }
-        );
+        await ctx.runMutation(internal.eventProcessorMutations.processBetPlacedEvent, {
+          eventId: result.eventId,
+        });
 
         console.log(
           `✓ [Event] Round ${event.roundId}, Bet ${event.betIndex}: ` +
-          `${event.player.slice(0, 8)}... - ${event.amount / 1e9} SOL ` +
-          `(tx: ${event.signature.slice(0, 8)}...)`
+            `${event.player.slice(0, 8)}... - ${event.amount / 1e9} SOL ` +
+            `(tx: ${event.signature.slice(0, 8)}...)`
         );
       }
     }
@@ -114,10 +123,9 @@ async function captureBetPlacedEvents(ctx: any, solanaClient: SolanaClient) {
     if (newEvents > 0 || duplicates > 0) {
       console.log(
         `[Event Listener] Processed: ${newEvents} new, ${duplicates} duplicates, ` +
-        `${betEvents.length - newEvents - duplicates} other`
+          `${betEvents.length - newEvents - duplicates} other`
       );
     }
-
   } catch (error) {
     console.error("[Event Listener] Error capturing BetPlaced events:", error);
   }

@@ -52,6 +52,8 @@ export default defineSchema({
     // Game state (snapshot from blockchain)
     betCount: v.number(), // Number of bets placed
     betAmounts: v.array(v.number()), // Array of bet amounts (max 64)
+    betSkin: v.array(v.number()), // Array of skin IDs (u8, max 64) - from GameRound.bet_skin
+    betPosition: v.array(v.array(v.number())), // Array of [x, y] positions (u16, max 64) - from GameRound.bet_position
     totalPot: v.number(), // Total accumulated pot in lamports
     winner: v.union(v.string(), v.null()), // Winner wallet (base58), null if not determined
     winningBetIndex: v.number(), // Index of winning bet
@@ -74,47 +76,23 @@ export default defineSchema({
     roundId: v.id("gameRoundStates"),
     walletAddress: v.string(),
 
-    // Bet classification
-    betType: v.union(
-      v.literal("self"), // Player betting on themselves (creates participant)
-      v.literal("refund") // Bank bot opponent
-    ),
-
     // Financial data
     amount: v.number(), // Bet amount in SOL
-    odds: v.optional(v.number()), // Win probability (0-1) at time of bet
-    payout: v.optional(v.number()), // Actual payout amount if won
 
-    // Status tracking
-    status: v.union(
-      v.literal("pending"),
-      v.literal("won"),
-      v.literal("lost"),
-      v.literal("refunded")
-    ),
     placedAt: v.number(), // Timestamp when bet was placed
-    settledAt: v.optional(v.number()), // Timestamp when bet was settled
-
     // Participant data (only for self/bank bets, null for spectator)
     characterId: v.optional(v.id("characters")),
     position: v.optional(v.object({ x: v.number(), y: v.number() })),
 
-    // Game progression (only for self/bank bets)
-    isWinner: v.optional(v.boolean()),
-
     // Blockchain tracking
     betIndex: v.optional(v.number()), // Index of this bet in the round (0, 1, 2, ...) - REQUIRED from blockchain
     txSignature: v.optional(v.string()), // Transaction signature
-    onChainConfirmed: v.optional(v.boolean()), // Transaction confirmed on-chain
     timestamp: v.optional(v.number()), // When bet was placed (for event listener)
   })
     .index("by_round", ["roundId"])
     .index("by_wallet", ["walletAddress"])
     .index("by_round_wallet", ["roundId", "walletAddress"])
     .index("by_round_index", ["roundId", "betIndex"]) // Query bets by round and index
-    .index("by_status", ["status"])
-    .index("by_bet_type", ["betType"])
-    .index("by_round_type", ["roundId", "betType"])
     .index("by_character", ["characterId"])
     .index("by_tx_signature", ["txSignature"]),
   // ============================================================================
@@ -147,6 +125,7 @@ export default defineSchema({
    */
   characters: defineTable({
     name: v.string(),
+    id: v.optional(v.number()),
     assetPath: v.string(), // Path to character spritesheet (e.g., "/characters/orc.png")
     description: v.optional(v.string()), // Character description
     animations: v.optional(

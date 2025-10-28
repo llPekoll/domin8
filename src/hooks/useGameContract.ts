@@ -36,6 +36,7 @@ import {
   TransactionSignature,
   Transaction,
   VersionedTransaction,
+  Keypair,
 } from "@solana/web3.js";
 import { SystemProgram } from "@solana/web3.js";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
@@ -343,11 +344,15 @@ export const useGameContract = () => {
    * Place a bet in the current game using Anchor Program
    * This function handles both creating a new game (if needed) and placing additional bets
    * @param amount - Bet amount in SOL
+   * @param skin - Character skin ID (0-255)
+   * @param position - Spawn position [x, y] in game coordinates
    * @returns Object with transaction signature, round ID, and bet index
    */
   const placeBet = useCallback(
     async (
-      amount: number
+      amount: number,
+      skin: number = 0,
+      position: [number, number] = [0, 0]
     ): Promise<{ signature: TransactionSignature; roundId: number; betIndex: number }> => {
       console.log("[placeBet] Starting placeBet function");
       console.log("[placeBet] Connected:", connected);
@@ -440,7 +445,7 @@ export const useGameContract = () => {
 
         // Check if we need to create a new game (no game OR game is finished)
         let shouldCreateNewGame = false;
-
+        console.log({ gameRoundInfo });
         if (!gameRoundInfo) {
           shouldCreateNewGame = true;
           console.log("[placeBet] No game exists, creating new game with first bet");
@@ -488,6 +493,7 @@ export const useGameContract = () => {
             shouldCreateNewGame = true;
           }
         }
+        console.log({ shouldCreateNewGame });
 
         if (shouldCreateNewGame) {
           // Creating new game means this is the first bet (index 0)
@@ -510,25 +516,80 @@ export const useGameContract = () => {
           // const configAccountParsed = await program.account.gameConfig.fetch(gameConfigPda);
           // const force = Buffer.from(configAccountParsed.force);
 
-          // LOCALNET: simulate ORAO by creating MockVrfAccount PDA and pass it to create_game
-          // Fetch game config to read the current force field used as VRF seed
-          if (network === "devnet") {
-            // Use Anchor to fetch the GameConfig (has `force: [u8;32]`)
-            const configAccount = await program.account.gameConfig.fetch(gameConfigPda);
-            const forceArr = configAccount.force as any; // usually Uint8Array or number[]
-            const forceBuf = Buffer.from(forceArr as any);
+          // Use Anchor to fetch the GameConfig (has `force: [u8;32]`)
+          const configAccount = await program.account.gameConfig.fetch(gameConfigPda);
+          const forceArr = configAccount.force as any; // usually Uint8Array or number[]
+          const forceBuf = Buffer.from(forceArr as any);
 
-            // Derive mock_vrf PDA using seed [b"mock_vrf", force]
+          // Derive all required PDAs for createGame
+          const { gameCounterPda, vaultPda } = derivePDAs();
+          const gameRoundPdaForCreate = deriveGameRoundPda(currentRoundId);
+          const betEntryPda = deriveBetEntryPda(currentRoundId, 0); // First bet index = 0
+
+          console.log("[placeBet] CreateGame PDAs:");
+          console.log("  - gameConfig:", gameConfigPda.toString());
+          console.log("  - gameCounter:", gameCounterPda.toString());
+          console.log("  - gameRound:", gameRoundPdaForCreate.toString());
+          console.log("  - betEntry:", betEntryPda.toString());
+          console.log("  - vault:", vaultPda.toString());
+
+          // Network check: localnet uses mockVrf, devnet/mainnet use ORAO VRF
+          // Check both network name AND RPC URL to determine if we're on localnet
+          const rpcEndpoint = connection.rpcEndpoint;
+          const isLocalnet =
+            network === "localnet" ||
+            rpcEndpoint.includes("localhost") ||
+            rpcEndpoint.includes("127.0.0.1");
+
+          console.log("[placeBet] Network detection:");
+          console.log("  - Network env:", network);
+          console.log("  - RPC endpoint:", rpcEndpoint);
+          console.log("  - Is localnet:", isLocalnet);
+
+          if (isLocalnet) {
+            // LOCALNET: Use Mock VRF (no ORAO deployment on localnet)
             const mockVrfPda = deriveMockVrfPda(forceBuf);
-
             console.log("[placeBet] Localnet: mock VRF PDA:", mockVrfPda.toString());
+            console.log("[placeBet] Amount/Skin/Position:", amountBN.toString(), skin, position);
+            const { Orao, networkStateAccountAddress, randomnessAccountAddress } = await import(
+              "@orao-network/solana-vrf"
+            );
+            const orao = new Orao(provider as any);
+            console.log("[placeBet] ORAO VRF Program ID:", orao.programId.toString());
 
-            // Call create_game providing the mock_vrf PDA
+            // Derive ORAO VRF accounts
+            const networkState = networkStateAccountAddress();
+            const vrfRequest = randomnessAccountAddress(forceBuf);
+
+            // Fetch treasury from network state
+            // const networkStateData = await orao.getNetworkState();
+            // Fetch treasury from network state
+            const treasury = Keypair.generate().publicKey;
+            // Call create_game with mockVrf account
+
+            //             console.log("[placeBet] ORAO VRF Accounts:");
+            console.log("  - networkState:", networkState.toString());
+            console.log("  - treasury:", treasury.toString());
+            console.log("  - vrfRequest:", vrfRequest.toString());
+            console.log("[placeBet] Amount/Skin/Position:", amountBN.toString(), skin, position);
+
             tx = await program.methods
-              .createGame(amountBN)
+              .createGame(
+                amountBN,
+                skin, // Character skin ID from frontend
+                position // Spawn position [x, y] from frontend
+              )
               .accounts({
+                config: gameConfigPda,
+                counter: gameCounterPda,
+                gameRound: gameRoundPdaForCreate,
+                betEntry: betEntryPda,
+                vault: vaultPda,
                 player: publicKey,
-                mockVrf: mockVrfPda,
+                vrfProgram: orao.programId,
+                networkState: networkState,
+                treasury: treasury,
+                vrfRequest: vrfRequest,
                 systemProgram: SystemProgram.programId,
               })
               .rpc();
@@ -537,10 +598,7 @@ export const useGameContract = () => {
 
             // Auto-fulfill mock VRF to simulate ORAO (helps immediate local testing)
             try {
-              const { gameCounterPda } = derivePDAs();
               const gameRoundPdaAfter = deriveGameRoundPda(currentRoundId);
-
-              // Use a reasonably-random u64 (timestamp) for testing
               const randomnessValue = Math.floor(Date.now() / 1000);
 
               const fulfillSig = await program.methods
@@ -562,30 +620,55 @@ export const useGameContract = () => {
               );
             }
           } else {
-            // DEVNET/MAINNET: Use ORAO VRF
-            // TODO: Implement ORAO VRF integration for devnet/mainnet
-            // For now, throw error since ORAO VRF is not yet fully integrated
-            throw new Error(
-              "ORAO VRF integration for devnet/mainnet is not yet implemented. Please use localnet for testing."
+            // DEVNET/MAINNET: Use ORAO VRF (real verifiable randomness)
+            console.log("[placeBet] Devnet/Mainnet: Using ORAO VRF");
+
+            // Import ORAO SDK dynamically
+            const { Orao, networkStateAccountAddress, randomnessAccountAddress } = await import(
+              "@orao-network/solana-vrf"
             );
 
-            // FUTURE IMPLEMENTATION (when ORAO VRF is integrated):
-            // const { Orao, networkStateAccountAddress, randomnessAccountAddress } = await import("@orao-network/solana-vrf");
-            // const orao = new Orao(provider as any);
-            // const networkState = networkStateAccountAddress();
-            // const force = Buffer.from(configAccount.force);
-            // const vrfRequest = randomnessAccountAddress(force);
-            // const networkStateData = await orao.getNetworkState();
-            // const vrfTreasury = networkStateData.config.treasury;
-            //
-            // tx = await program.methods
-            //   .createGame(amountBN)
-            //   .accounts({
-            //     player: publicKey,
-            //     treasury: vrfTreasury,
-            //     vrfRequest: vrfRequest,
-            //   })
-            //   .rpc();
+            // Initialize ORAO VRF SDK
+            const orao = new Orao(provider as any);
+            console.log("[placeBet] ORAO VRF Program ID:", orao.programId.toString());
+
+            // Derive ORAO VRF accounts
+            const networkState = networkStateAccountAddress();
+            const vrfRequest = randomnessAccountAddress(forceBuf);
+
+            // Fetch treasury from network state
+            const networkStateData = await orao.getNetworkState();
+            const treasury = networkStateData.config.treasury;
+
+            console.log("[placeBet] ORAO VRF Accounts:");
+            console.log("  - networkState:", networkState.toString());
+            console.log("  - treasury:", treasury.toString());
+            console.log("  - vrfRequest:", vrfRequest.toString());
+            console.log("[placeBet] Amount/Skin/Position:", amountBN.toString(), skin, position);
+
+            // Call create_game with ORAO VRF accounts
+            tx = await program.methods
+              .createGame(
+                amountBN,
+                skin, // Character skin ID from frontend
+                position // Spawn position [x, y] from frontend
+              )
+              .accounts({
+                config: gameConfigPda,
+                counter: gameCounterPda,
+                gameRound: gameRoundPdaForCreate,
+                betEntry: betEntryPda,
+                vault: vaultPda,
+                player: publicKey,
+                vrfProgram: orao.programId,
+                networkState: networkState,
+                treasury: treasury,
+                vrfRequest: vrfRequest,
+                systemProgram: SystemProgram.programId,
+              })
+              .rpc();
+
+            console.log("[placeBet] Created new devnet/mainnet game with first bet (ORAO VRF)", tx);
           }
           // Transaction variable 'tx' is now set in the network-specific branches above
         } else {
@@ -601,15 +684,35 @@ export const useGameContract = () => {
           // The bet index for this new bet will be the current bet count
           betIndex = betCount;
 
-          // Call placeBet instruction (camelCase, not snake_case)
-          // Note: All accounts are auto-resolved by Anchor from the IDL
-          // We only need to provide: player (signer)
+          // Derive all required PDAs for placeBet
+          const { gameCounterPda, vaultPda } = derivePDAs();
+          const betEntryPda = deriveBetEntryPda(activeRoundId, betIndex);
+
+          console.log("[placeBet] PlaceBet PDAs:");
+          console.log("  - gameConfig:", gameConfigPda.toString());
+          console.log("  - gameCounter:", gameCounterPda.toString());
+          console.log("  - gameRound:", gameRoundPda.toString());
+          console.log("  - betEntry:", betEntryPda.toString());
+          console.log("  - vault:", vaultPda.toString());
+          console.log("  - betIndex:", betIndex);
+
+          // Call placeBet instruction with all required accounts
           tx = await program.methods
-            .placeBet(amountBN)
+            .placeBet(
+              amountBN,
+              skin, // Character skin ID from frontend
+              position // Spawn position [x, y] from frontend
+            )
             .accounts({
+              config: gameConfigPda,
+              counter: gameCounterPda,
+              gameRound: gameRoundPda,
+              betEntry: betEntryPda,
+              vault: vaultPda,
               player: publicKey,
+              systemProgram: SystemProgram.programId,
             })
-            .rpc();
+            .rpc({ skipPreflight: true });
         }
 
         // Get the actual signature from Privy wallet adapter

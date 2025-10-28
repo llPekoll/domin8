@@ -1,8 +1,8 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 export function getSolanaRpcUrl(): string {
@@ -17,6 +17,7 @@ export function getSolanaRpcUrl(): string {
     case "localnet":
       return "http://localhost:8899";
     case "devnet":
+      return "https://api.devnet.solana.com";
     default:
       return "http://localhost:8899";
   }

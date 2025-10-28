@@ -238,6 +238,11 @@ export class SolanaClient {
         betAmounts: Array.from(account.betAmounts || []).map(
           (amount: any) => amount?.toNumber() ?? 0
         ),
+        // NEW: Character customization arrays from blockchain
+        betSkin: Array.from(account.betSkin || []), // u8 array (0-255)
+        betPosition: Array.from(account.betPosition || []).map(
+          (pos: any) => Array.from(pos || [0, 0]) // [[u16, u16]] -> [[number, number]]
+        ),
         totalPot: account.totalPot?.toNumber() ?? 0,
         winner: account.winner ? account.winner.toBase58() : null, // Convert PublicKey to string or null
         winningBetIndex: account.winningBetIndex ?? 0,
@@ -555,8 +560,11 @@ export class SolanaClient {
   /**
    * Get all BetPlaced events from recent transactions
    * This is more efficient than polling individual bet PDAs
+   *
+   * @param limit - Maximum number of transactions to fetch
+   * @param untilSignature - Fetch transactions until this signature (exclusive) - for incremental fetching
    */
-  async getAllRecentBetEvents(limit: number = 100): Promise<Array<{
+  async getAllRecentBetEvents(limit: number = 100, untilSignature?: string): Promise<Array<{
     signature: string;
     roundId: number;
     player: string;
@@ -570,10 +578,15 @@ export class SolanaClient {
     slot: number;
   }>> {
     try {
-      // Get recent signatures
+      // Get recent signatures, optionally starting from a specific signature
+      const options: any = { limit };
+      if (untilSignature) {
+        options.until = untilSignature; // Fetch transactions until (not including) this signature
+      }
+
       const signatureInfos = await this.connection.getSignaturesForAddress(
         DOMIN8_PROGRAM_ID,
-        { limit },
+        options,
         "confirmed"
       );
 

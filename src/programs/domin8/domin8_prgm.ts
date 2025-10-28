@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/domin8_prgm.json`.
  */
 export type Domin8Prgm = {
-  address: "93swWR5KYURGFWhDbgat9HxRdJAS5pQKssPffnj9bfXK";
+  address: "4AtbjvHma9wNEP1a426rDDQ2ccBAAZSg9ktRJ54odk6g";
   metadata: {
     name: "domin8_prgm";
     version: "0.1.0";
@@ -198,6 +198,7 @@ export type Domin8Prgm = {
       accounts: [
         {
           name: "counter";
+          writable: true;
           pda: {
             seeds: [
               {
@@ -238,6 +239,7 @@ export type Domin8Prgm = {
         },
         {
           name: "vault";
+          docs: ["The vault PDA that holds game funds"];
           writable: true;
           pda: {
             seeds: [
@@ -450,6 +452,16 @@ export type Domin8Prgm = {
         {
           name: "amount";
           type: "u64";
+        },
+        {
+          name: "skin";
+          type: "u8";
+        },
+        {
+          name: "position";
+          type: {
+            array: ["u16", 2];
+          };
         },
       ];
     },
@@ -698,6 +710,16 @@ export type Domin8Prgm = {
           name: "amount";
           type: "u64";
         },
+        {
+          name: "skin";
+          type: "u8";
+        },
+        {
+          name: "position";
+          type: {
+            array: ["u16", 2];
+          };
+        },
       ];
     },
     {
@@ -790,7 +812,7 @@ export type Domin8Prgm = {
         },
         {
           name: "vrf_request";
-          docs: ["VRF Request Account containing fulfilled randomness"];
+          docs: ["VRF Request Account containing fulfilled randomness (ORAO)"];
         },
         {
           name: "treasury";
@@ -1103,6 +1125,11 @@ export type Domin8Prgm = {
       name: "InvalidBetEntry";
       msg: "Invalid bet entry account";
     },
+    {
+      code: 6041;
+      name: "RandomnessAlreadyFulfilled";
+      msg: "Randomness has already been fulfilled";
+    },
   ];
   types: [
     {
@@ -1160,20 +1187,14 @@ export type Domin8Prgm = {
             type: "u64";
           },
           {
-            name: "bet_count";
+            name: "bet_position";
+            type: {
+              array: ["u16", 2];
+            };
+          },
+          {
+            name: "bet_skin";
             type: "u8";
-          },
-          {
-            name: "total_pot";
-            type: "u64";
-          },
-          {
-            name: "end_timestamp";
-            type: "i64";
-          },
-          {
-            name: "is_first_bet";
-            type: "bool";
           },
           {
             name: "timestamp";
@@ -1442,6 +1463,23 @@ export type Domin8Prgm = {
             name: "bet_amounts";
             type: {
               array: ["u64", 64];
+            };
+          },
+          {
+            name: "bet_skin";
+            type: {
+              array: ["u8", 64];
+            };
+          },
+          {
+            name: "bet_position";
+            type: {
+              array: [
+                {
+                  array: ["u16", 2];
+                },
+                64,
+              ];
             };
           },
           {

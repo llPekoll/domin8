@@ -6,6 +6,7 @@ import { GameLobby } from "./components/GameLobby";
 import { BlockchainRandomnessDialog } from "./components/BlockchainRandomnessDialog";
 import { DemoGameManager } from "./components/DemoGameManager";
 import { BlockchainDebugDialog } from "./components/BlockchainDebugDialog";
+import { useParticipantSpawner } from "./hooks/useParticipantSpawner";
 import { api } from "../convex/_generated/api";
 
 export default function App() {
@@ -99,6 +100,9 @@ export default function App() {
       currentRoundState?.randomnessFulfilled === false;
     setShowBlockchainDialog(shouldShowDialog);
   }, [currentRoundState]);
+
+  // Handle real-time participant spawning with fall-from-sky animation
+  useParticipantSpawner(phaserRef, currentRoundState);
 
   return (
     <div className="relative min-h-screen overflow-hidden">

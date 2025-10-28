@@ -30,6 +30,8 @@ pub struct GameRound {
     // Bet amounts array for efficient winner selection (max 64 bets)
     pub bet_amounts: [u64; 64], // Amount for each bet
     // Wallet details stored in separate BetEntry PDAs
+    pub bet_skin: [u8; 64],           //
+    pub bet_position: [[u16; 2]; 64], // Amount for each bet
 
     // Winner
     pub winner: Pubkey,
@@ -46,10 +48,11 @@ pub struct GameRound {
 impl GameRound {
     // 8 (discriminator) + 8 (round_id) + 1 (status) + 8 (start) + 8 (end)
     // + 4 (bet_count) + 8 (total_pot)
-    // + (8 * 64) (bet_amounts) - removed bet_wallets array
+    // + (8 * 64) (bet_amounts) + (1 * 64) (bet_skin) + (2 * 2 * 64) (bet_position)
     // + 32 (winner) + 4 (winning_bet_index) + 8 (winner_prize_unclaimed) + 8 (house_fee_unclaimed)
     // + 32 (vrf_request_pubkey) + 32 (vrf_seed) + 1 (randomness_fulfilled)
-    pub const LEN: usize = 8 + 8 + 1 + 8 + 8 + 4 + 8 + (8 * 64) + 32 + 4 + 8 + 8 + 32 + 32 + 1; // 674 bytes
+    pub const LEN: usize =
+        8 + 8 + 1 + 8 + 8 + 4 + 8 + (8 * 64) + (1 * 64) + (2 * 2 * 64) + 32 + 4 + 8 + 8 + 32 + 32 + 1; // 994 bytes
 
     /// Check if the game is in a state where bets can be placed
     pub fn can_accept_bets(&self) -> bool {

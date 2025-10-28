@@ -18,7 +18,7 @@ pub use events::*;
 pub use state::*;
 pub use utils::*;
 
-declare_id!("93swWR5KYURGFWhDbgat9HxRdJAS5pQKssPffnj9bfXK");
+declare_id!("4AtbjvHma9wNEP1a426rDDQ2ccBAAZSg9ktRJ54odk6g");
 
 #[program]
 pub mod domin8_prgm {
@@ -30,13 +30,23 @@ pub mod domin8_prgm {
     }
 
     /// Create a new game round with the first bet (called by first player)
-    pub fn create_game(ctx: Context<CreateGame>, amount: u64) -> Result<()> {
-        instructions::create_game(ctx, amount)
+    pub fn create_game(
+        ctx: Context<CreateGame>,
+        amount: u64,
+        skin: u8,
+        position: [u16; 2],
+    ) -> Result<()> {
+        instructions::create_game(ctx, amount, skin, position)
     }
 
     /// Place an additional bet in the current game round (called by subsequent players)
-    pub fn place_bet(ctx: Context<PlaceBet>, amount: u64) -> Result<()> {
-        instructions::place_bet(ctx, amount)
+    pub fn place_bet(
+        ctx: Context<PlaceBet>,
+        amount: u64,
+        skin: u8,
+        position: [u16; 2],
+    ) -> Result<()> {
+        instructions::place_bet(ctx, amount, skin, position)
     }
 
     /// Close betting window and lock game for winner selection

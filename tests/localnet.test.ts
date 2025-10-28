@@ -84,8 +84,8 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
     console.log("RPC Endpoint:", connection.rpcEndpoint);
 
     // ⭐ Verify we're on localnet
-    const isLocalnet = connection.rpcEndpoint.includes("localhost") ||
-                       connection.rpcEndpoint.includes("127.0.0.1");
+    const isLocalnet =
+      connection.rpcEndpoint.includes("localhost") || connection.rpcEndpoint.includes("127.0.0.1");
 
     if (isLocalnet) {
       console.log("✅ CLUSTER: LOCALNET (http://127.0.0.1:8899)");
@@ -135,10 +135,7 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
       program.programId
     );
 
-    [vaultPda] = web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("vault")],
-      program.programId
-    );
+    [vaultPda] = web3.PublicKey.findProgramAddressSync([Buffer.from("vault")], program.programId);
 
     console.log("\n=== Global PDAs Derived ===");
     console.log("Game Config PDA:", gameConfigPda.toString());
@@ -173,12 +170,8 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
       console.log("House Fee (bps):", configAccount.houseFeeBasisPoints);
       console.log("Bets Locked:", configAccount.betsLocked);
 
-      expect(configAccount.authority.toString()).to.equal(
-        adminKeypair.publicKey.toString()
-      );
-      expect(configAccount.treasury.toString()).to.equal(
-        treasuryKeypair.publicKey.toString()
-      );
+      expect(configAccount.authority.toString()).to.equal(adminKeypair.publicKey.toString());
+      expect(configAccount.treasury.toString()).to.equal(treasuryKeypair.publicKey.toString());
       expect(configAccount.houseFeeBasisPoints).to.equal(HOUSE_FEE_BPS);
       expect(configAccount.betsLocked).to.equal(false);
 
@@ -188,9 +181,7 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
     it("Should initialize game counter at round 0", async () => {
       console.log("\n=== Test 1.2: Verify Game Counter ===");
 
-      const counterAccount = await program.account.gameCounter.fetch(
-        gameCounterPda
-      );
+      const counterAccount = await program.account.gameCounter.fetch(gameCounterPda);
 
       console.log("Current Round ID:", counterAccount.currentRoundId.toString());
 
@@ -285,7 +276,11 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
         const { networkState, treasury, vrfRequest } = deriveVrfAccounts(roundId);
 
         const createGameTx = await program.methods
-          .createGame(new BN(MIN_BET))
+          .createGame(
+            new BN(MIN_BET),
+            0, // skin
+            [0, 0] // position
+          )
           .accounts({
             config: gameConfigPda,
             counter: gameCounterPda,
@@ -326,7 +321,11 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
       try {
         // Derive bet entry PDA for this single bet
         const [betEntry0] = web3.PublicKey.findProgramAddressSync(
-          [Buffer.from("bet"), new BN(roundId).toArrayLike(Buffer, "le", 8), new BN(0).toArrayLike(Buffer, "le", 4)],
+          [
+            Buffer.from("bet"),
+            new BN(roundId).toArrayLike(Buffer, "le", 8),
+            new BN(0).toArrayLike(Buffer, "le", 4),
+          ],
           program.programId
         );
 
@@ -340,7 +339,11 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
 
         console.log("\nRemaining Accounts Structure:");
         console.log("[0] BetEntry PDA (index 0): " + betEntry0.toString().substring(0, 16) + "...");
-        console.log("[1] Player Wallet (index bet_count): " + player1.publicKey.toString().substring(0, 16) + "...");
+        console.log(
+          "[1] Player Wallet (index bet_count): " +
+            player1.publicKey.toString().substring(0, 16) +
+            "..."
+        );
 
         const closeBettingTx = await program.methods
           .closeBettingWindow()
@@ -369,8 +372,14 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
             const gameRoundData = await program.account.gameRound.fetch(gameRoundPda);
             console.log("\n=== Game Round State After Auto-Refund ===");
             console.log("Status:", gameRoundData.status);
-            console.log("Winner:", gameRoundData.winner?.toString()?.substring(0, 16) + "..." || "N/A");
-            console.log("Winner Prize Unclaimed:", gameRoundData.winnerPrizeUnclaimed?.toString() || "N/A");
+            console.log(
+              "Winner:",
+              gameRoundData.winner?.toString()?.substring(0, 16) + "..." || "N/A"
+            );
+            console.log(
+              "Winner Prize Unclaimed:",
+              gameRoundData.winnerPrizeUnclaimed?.toString() || "N/A"
+            );
 
             if (gameRoundData.winnerPrizeUnclaimed?.toNumber() === 0) {
               console.log("✓ SUCCESS: Auto-refund transferred (unclaimed = 0)");
@@ -420,7 +429,11 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
       console.log("\n--- STEP 1: CREATE_GAME (Player 1) ---");
       try {
         const createGameTx = await program.methods
-          .createGame(new BN(MIN_BET))
+          .createGame(
+            new BN(MIN_BET),
+            0, // skin
+            [0, 0] // position
+          )
           .accounts({
             config: gameConfigPda,
             counter: gameCounterPda,
@@ -459,12 +472,20 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
         // Player 2
         const bet1Index = 1;
         const [betEntry1] = web3.PublicKey.findProgramAddressSync(
-          [Buffer.from("bet"), new BN(roundId).toArrayLike(Buffer, "le", 8), new BN(bet1Index).toArrayLike(Buffer, "le", 4)],
+          [
+            Buffer.from("bet"),
+            new BN(roundId).toArrayLike(Buffer, "le", 8),
+            new BN(bet1Index).toArrayLike(Buffer, "le", 4),
+          ],
           program.programId
         );
 
         const placeBet2Tx = await program.methods
-          .placeBet(new BN(MIN_BET))
+          .placeBet(
+            new BN(MIN_BET),
+            0, // skin
+            [0, 0] // position
+          )
           .accounts({
             config: gameConfigPda,
             counter: gameCounterPda,
@@ -483,12 +504,20 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
         // Player 3
         const bet2Index = 2;
         const [betEntry2] = web3.PublicKey.findProgramAddressSync(
-          [Buffer.from("bet"), new BN(roundId).toArrayLike(Buffer, "le", 8), new BN(bet2Index).toArrayLike(Buffer, "le", 4)],
+          [
+            Buffer.from("bet"),
+            new BN(roundId).toArrayLike(Buffer, "le", 8),
+            new BN(bet2Index).toArrayLike(Buffer, "le", 4),
+          ],
           program.programId
         );
 
         const placeBet3Tx = await program.methods
-          .placeBet(new BN(MIN_BET))
+          .placeBet(
+            new BN(MIN_BET),
+            0, // skin
+            [0, 0] // position
+          )
           .accounts({
             config: gameConfigPda,
             counter: gameCounterPda,
@@ -514,7 +543,11 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
       try {
         const betEntries = [0, 1, 2].map((index) => {
           const [betEntry] = web3.PublicKey.findProgramAddressSync(
-            [Buffer.from("bet"), new BN(roundId).toArrayLike(Buffer, "le", 8), new BN(index).toArrayLike(Buffer, "le", 4)],
+            [
+              Buffer.from("bet"),
+              new BN(roundId).toArrayLike(Buffer, "le", 8),
+              new BN(index).toArrayLike(Buffer, "le", 4),
+            ],
             program.programId
           );
           return { pubkey: betEntry, isSigner: false, isWritable: false };
@@ -605,7 +638,11 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
       console.log("\n--- STEP 1: CREATE_GAME ---");
       try {
         const createGameTx = await program.methods
-          .createGame(new BN(MIN_BET))
+          .createGame(
+            new BN(MIN_BET),
+            0, // skin
+            [0, 0] // position
+          )
           .accounts({
             config: gameConfigPda,
             counter: gameCounterPda,
@@ -655,12 +692,20 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
       try {
         const bet2Index = 1;
         const [betEntry2] = web3.PublicKey.findProgramAddressSync(
-          [Buffer.from("bet"), new BN(roundId).toArrayLike(Buffer, "le", 8), new BN(bet2Index).toArrayLike(Buffer, "le", 4)],
+          [
+            Buffer.from("bet"),
+            new BN(roundId).toArrayLike(Buffer, "le", 8),
+            new BN(bet2Index).toArrayLike(Buffer, "le", 4),
+          ],
           program.programId
         );
 
         const placeBet2Tx = await program.methods
-          .placeBet(new BN(MIN_BET))
+          .placeBet(
+            new BN(MIN_BET),
+            0, // skin
+            [0, 0] // position
+          )
           .accounts({
             config: gameConfigPda,
             counter: gameCounterPda,
@@ -692,12 +737,20 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
       try {
         const bet3Index = 2;
         const [betEntry3] = web3.PublicKey.findProgramAddressSync(
-          [Buffer.from("bet"), new BN(roundId).toArrayLike(Buffer, "le", 8), new BN(bet3Index).toArrayLike(Buffer, "le", 4)],
+          [
+            Buffer.from("bet"),
+            new BN(roundId).toArrayLike(Buffer, "le", 8),
+            new BN(bet3Index).toArrayLike(Buffer, "le", 4),
+          ],
           program.programId
         );
 
         const placeBet3Tx = await program.methods
-          .placeBet(new BN(MIN_BET))
+          .placeBet(
+            new BN(MIN_BET),
+            0, // skin
+            [0, 0] // position
+          )
           .accounts({
             config: gameConfigPda,
             counter: gameCounterPda,
@@ -797,7 +850,10 @@ describe("domin8_prgm - Localnet Tests (Emulated VRF)", () => {
 
       try {
         const gameRoundData = await program.account.gameRound.fetch(gameRoundPda);
-        console.log("Game Round fetched - total bets:", gameRoundData.totalBetAmount?.toString() || "N/A");
+        console.log(
+          "Game Round fetched - total bets:",
+          gameRoundData.totalBetAmount?.toString() || "N/A"
+        );
       } catch (e) {
         console.log("ℹ️  Could not fetch game round data (expected if instruction failed)");
       }

@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const IDL = JSON.parse(readFileSync(join(__dirname, "../convex/lib/domin8_prgm.json"), "utf-8"));
+const IDL = JSON.parse(readFileSync(join(__dirname, "../target/idl/domin8_prgm.json"), "utf-8"));
 
 /**
  * Script to initialize the Domin8 game program

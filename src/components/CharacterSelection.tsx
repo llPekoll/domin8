@@ -146,8 +146,26 @@ const CharacterSelection = memo(function CharacterSelection({
     setIsSubmitting(true);
 
     try {
-      // Use the hook's placeBet function - returns { signature, roundId, betIndex }
-      const betResult = await placeBet(amount);
+      // Calculate character skin ID (convert Convex ID to numeric index)
+      // We'll use a simple hash of the character ID to get a consistent numeric value
+
+      // Calculate spawn position based on current time for randomness
+      // Use a circular layout pattern that will be overridden by server later if needed
+      const now = Date.now();
+      const angle = ((now % 1000) / 1000) * Math.PI * 2; // Random angle based on time
+      const radius = 200;
+      const centerX = 512;
+      const centerY = 384;
+
+      const spawnX = Math.floor(centerX + Math.cos(angle) * radius);
+      const spawnY = Math.floor(centerY + Math.sin(angle) * radius);
+      const position: [number, number] = [spawnX, spawnY];
+
+      console.log("[CharacterSelection] Character data for bet:");
+      console.log("  - Spawn Position:", position);
+
+      // Use the hook's placeBet function with character data
+      const betResult = await placeBet(amount, currentCharacter.id, position);
       const { signature: signatureHex, roundId, betIndex } = betResult;
 
       console.log("[CharacterSelection] Transaction successful:", signatureHex);
