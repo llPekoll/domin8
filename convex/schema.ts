@@ -66,7 +66,6 @@ export default defineSchema({
   bets: defineTable({
     // Core identifiers
     roundId: v.id("gameRoundStates"),
-    playerId: v.optional(v.id("players")), // Optional for bots
     walletAddress: v.string(),
 
     // Bet classification
@@ -93,13 +92,12 @@ export default defineSchema({
     // Participant data (only for self/bank bets, null for spectator)
     characterId: v.optional(v.id("characters")),
     position: v.optional(v.object({ x: v.number(), y: v.number() })),
-    spawnIndex: v.optional(v.number()), // Spawn position index
 
     // Game progression (only for self/bank bets)
     isWinner: v.optional(v.boolean()),
 
     // Blockchain tracking
-    betIndex: v.optional(v.number()), // Index of this bet in the round (0, 1, 2, ...)
+    betIndex: v.optional(v.number()), // Index of this bet in the round (0, 1, 2, ...) - REQUIRED from blockchain
     txSignature: v.optional(v.string()), // Transaction signature
     onChainConfirmed: v.optional(v.boolean()), // Transaction confirmed on-chain
     timestamp: v.optional(v.number()), // When bet was placed (for event listener)

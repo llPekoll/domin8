@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from "react";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useGameContract } from "../hooks/useGameContract";
 import { api } from "../../convex/_generated/api";
@@ -30,11 +30,14 @@ const CharacterSelection = memo(function CharacterSelection({
   onParticipantAdded,
 }: CharacterSelectionProps) {
   const { connected, publicKey, solBalance, isLoadingBalance } = usePrivyWallet();
-  const { placeBet, validateBet } = useGameContract();
+  const { placeBet, validateBet, fetchCurrentRoundId } = useGameContract();
 
   const [currentCharacter, setCurrentCharacter] = useState<Character | null>(null);
   const [betAmount, setBetAmount] = useState<string>("0.1");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Mutation for character assignment
+  const assignCharacterToBet = useMutation(api.betsMutations.assignCharacterToBet);
 
   // Memoize wallet address to prevent unnecessary re-queries
   const walletAddress = useMemo(
@@ -48,11 +51,30 @@ const CharacterSelection = memo(function CharacterSelection({
   // Get all available characters - only fetch once
   const allCharacters = useQuery(api.characters.getActiveCharacters);
 
-  // Get current game state from Convex (auto-synced from blockchain every 5s)
+  // Get current game state from Convex (auto-synced from blockchain every 3s)
   const currentRoundState = useQuery(api.events.getCurrentRoundState);
 
   // Derive game state from Convex
-  const canPlaceBet = currentRoundState ? currentRoundState.status === "waiting" : true;
+  const canPlaceBet = useMemo(() => {
+    if (!currentRoundState) return true; // No game = can create new one
+
+    // Allow betting if game is finished (to create new round)
+    if (currentRoundState.status === "finished") return true;
+
+    // Block betting if game is determining winner
+    if (currentRoundState.status === "awaitingWinnerRandomness") return false;
+
+    // If game is waiting, check if betting window is still open
+    if (currentRoundState.status === "waiting") {
+      const currentTime = Math.floor(Date.now() / 1000);
+      const timeRemaining = currentRoundState.endTimestamp - currentTime;
+      return timeRemaining > 0; // Can bet if time remaining
+    }
+
+    // Default: don't allow betting for unknown statuses
+    return false;
+  }, [currentRoundState]);
+
   const playerParticipantCount = 0; // TODO: Track participant count when needed
 
   // Initialize with random character when characters load
@@ -124,17 +146,95 @@ const CharacterSelection = memo(function CharacterSelection({
     setIsSubmitting(true);
 
     try {
-      console.log("[CharacterSelection] Placing bet via useGameContract hook...");
-
-      // Use the hook's placeBet function
-      const signatureHex = await placeBet(amount);
+      // Use the hook's placeBet function - returns { signature, roundId, betIndex }
+      const betResult = await placeBet(amount);
+      const { signature: signatureHex, roundId, betIndex } = betResult;
 
       console.log("[CharacterSelection] Transaction successful:", signatureHex);
+      console.log("[CharacterSelection] Round ID:", roundId);
+      console.log("[CharacterSelection---] Bet Index:", betIndex);
 
+      // Show different toast based on whether we have a real signature
+      const hasRealSignature = signatureHex && !signatureHex.startsWith("transaction_");
       toast.success(`Bet placed! 🎲 Game starting!`, {
-        description: `Transaction: ${signatureHex.slice(0, 8)}...${signatureHex.slice(-8)}`,
+        description: hasRealSignature
+          ? `Transaction: ${signatureHex.slice(0, 8)}...${signatureHex.slice(-8)}`
+          : `Round ${roundId}, Bet ${betIndex}`,
         duration: 5000,
       });
+
+      // ⭐ Capture character ID in local variable BEFORE async to avoid closure issues
+      const selectedCharacterId = currentCharacter._id;
+      const selectedCharacterName = currentCharacter.name;
+
+      // ⭐ NEW: Assign character to the bet (runs in background, doesn't block UI)
+      // We have the bet index directly from the smart contract!
+      // However, the bet might not be in Convex DB yet (event listener polls every 5s)
+      // So we retry with exponential backoff, starting immediately
+      void (async () => {
+        try {
+          console.log("[CharacterSelection] Assigning character to bet...");
+          console.log("[CharacterSelection] - Round ID:", roundId);
+          console.log("[CharacterSelection] - Bet Index:", betIndex);
+          console.log("[CharacterSelection] - Character ID:", selectedCharacterId);
+          console.log("[CharacterSelection] - Character Name:", selectedCharacterName);
+
+          // Retry logic with exponential backoff
+          // Event listener runs every 5 seconds, so we start with 2s delay
+          const maxRetries = 6;
+          const delays = [2000, 3000, 4000, 6000, 8000, 10000]; // Total: up to ~33 seconds
+          let lastError: any = null;
+          let success = false;
+
+          for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+              // Wait before attempting (except first attempt)
+              if (attempt > 0) {
+                const delay = delays[attempt - 1];
+                console.log(
+                  `[CharacterSelection] Waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}...`
+                );
+                await new Promise((resolve) => setTimeout(resolve, delay));
+              }
+
+              // Assign character to bet
+              await assignCharacterToBet({
+                roundId,
+                betIndex,
+                characterId: selectedCharacterId,
+              });
+
+              console.log("[CharacterSelection] ✓ Character assigned to bet successfully");
+              success = true;
+              break; // Success! Exit retry loop
+            } catch (error: any) {
+              lastError = error;
+              console.log(
+                `[CharacterSelection] ✗ Assign attempt ${attempt + 1}/${maxRetries} failed:`,
+                error.message
+              );
+            }
+          }
+
+          // If all retries failed, log the error but don't crash
+          if (!success && lastError) {
+            console.error(
+              "[CharacterSelection] Failed to assign character after all retries:",
+              lastError
+            );
+            toast.warning("Character will be assigned when game starts", {
+              description: "Event listener is processing your bet",
+            });
+          }
+        } catch (assignError) {
+          console.error(
+            "[CharacterSelection] Unexpected error during character assignment:",
+            assignError
+          );
+          // Don't fail the whole bet placement if character assignment fails
+          // The bet is already placed on-chain
+        }
+      })(); // Execute immediately in background
 
       setBetAmount("0.1");
 
@@ -268,11 +368,17 @@ const CharacterSelection = memo(function CharacterSelection({
           {/* Place bet button */}
           <button
             onClick={() => void handlePlaceBet()}
-            disabled={isSubmitting || isLoadingBalance}
+            disabled={isSubmitting || isLoadingBalance || !canPlaceBet}
             className={`flex justify-center items-center w-full  bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 disabled:from-gray-600 disabled:to-gray-700 rounded-lg font-bold text-white uppercase tracking-wider text-lg transition-all shadow-lg shadow-amber-900/50 disabled:opacity-50 ${styles.shineButton}`}
           >
             <img src="/assets/insert-coin.png" alt="Coin" className="h-8" />
-            {isSubmitting ? "Inserting..." : isLoadingBalance ? "Loading..." : "Insert coin"}
+            {isSubmitting
+              ? "Inserting..."
+              : isLoadingBalance
+                ? "Loading..."
+                : !canPlaceBet
+                  ? "Betting closed"
+                  : "Insert coin"}
           </button>
         </div>
       </div>
