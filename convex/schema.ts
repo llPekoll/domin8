@@ -15,19 +15,22 @@ export default defineSchema({
     eventName: v.string(), // e.g., "GameCreated", "BetPlaced", "WinnerSelected"
     signature: v.string(), // Transaction signature (unique)
     slot: v.number(), // Solana slot number
-    blockTime: v.number(), // Unix timestamp from blockchain
+    blockTime: v.optional(v.number()), // Unix timestamp from blockchain (optional for immediate processing)
 
     // Event data (raw JSON)
     eventData: v.any(), // Full event data as parsed from logs
 
     // Metadata
     roundId: v.optional(v.number()), // Game round ID (if applicable)
-    processed: v.boolean(), // For future processing pipeline
+    processed: v.boolean(), // Whether the event has been processed into database records
+    processedAt: v.optional(v.number()), // When the event was processed
   })
     .index("by_signature", ["signature"]) // Prevent duplicates
     .index("by_event_name", ["eventName"]) // Query by event type
     .index("by_round_id", ["roundId"]) // Query events for specific round
-    .index("by_block_time", ["blockTime"]), // Chronological ordering
+    .index("by_slot", ["slot"]) // Chronological ordering by slot
+    .index("by_block_time", ["blockTime"]) // Chronological ordering by block time
+    .index("by_processed", ["processed"]), // Query unprocessed events
 
   /**
    * Game Round States - Snapshots of game round PDA state
@@ -42,6 +45,9 @@ export default defineSchema({
     startTimestamp: v.number(), // When round started (Unix timestamp)
     endTimestamp: v.number(), // When betting window closes
     capturedAt: v.number(), // When this state was captured (Unix timestamp)
+
+    // Game configuration (selected when round is created)
+    mapId: v.optional(v.id("maps")), // Which map/arena this round uses (all players see same map)
 
     // Game state (snapshot from blockchain)
     betCount: v.number(), // Number of bets placed
@@ -103,7 +109,6 @@ export default defineSchema({
     timestamp: v.optional(v.number()), // When bet was placed (for event listener)
   })
     .index("by_round", ["roundId"])
-    .index("by_player", ["playerId"])
     .index("by_wallet", ["walletAddress"])
     .index("by_round_wallet", ["roundId", "walletAddress"])
     .index("by_round_index", ["roundId", "betIndex"]) // Query bets by round and index

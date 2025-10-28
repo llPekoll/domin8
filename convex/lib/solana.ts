@@ -1,7 +1,7 @@
 // Solana integration layer for the Convex crank service
 "use node";
 import * as anchor from "@coral-xyz/anchor";
-import { Connection, PublicKey, Keypair, Transaction, VersionedTransaction } from "@solana/web3.js";
+import { Connection, PublicKey, Keypair, Transaction, VersionedTransaction, ParsedTransactionWithMeta } from "@solana/web3.js";
 import { GameConfig, GameRound, GameStatus, DOMIN8_PROGRAM_ID, PDA_SEEDS, BetEntry } from "./types";
 import { Buffer } from "buffer";
 import bs58 from "bs58";
@@ -446,6 +446,158 @@ export class SolanaClient {
     }
 
     return bets;
+  }
+
+  /**
+   * Get transaction signatures for the domin8 program within a time range
+   * Used for event-based bet capture
+   */
+  async getProgramSignatures(limit: number = 100, before?: string): Promise<string[]> {
+    try {
+      const signatures = await this.connection.getSignaturesForAddress(
+        DOMIN8_PROGRAM_ID,
+        {
+          limit,
+          before,
+        },
+        "confirmed"
+      );
+
+      return signatures.map(sig => sig.signature);
+    } catch (error) {
+      console.error("Error fetching program signatures:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Parse BetPlaced events from transaction logs
+   * Returns bet data extracted from on-chain events
+   */
+  async parseBetPlacedEvents(signature: string): Promise<Array<{
+    roundId: number;
+    player: string;
+    amount: number;
+    betCount: number;
+    totalPot: number;
+    endTimestamp: number;
+    isFirstBet: boolean;
+    timestamp: number;
+    betIndex: number;
+  }>> {
+    try {
+      const tx = await this.connection.getTransaction(signature, {
+        commitment: "confirmed",
+        maxSupportedTransactionVersion: 0,
+      });
+
+      if (!tx || !tx.meta) {
+        console.log(`Transaction ${signature} not found or has no metadata`);
+        return [];
+      }
+
+      // Check if transaction succeeded
+      if (tx.meta.err) {
+        console.log(`Transaction ${signature} failed:`, tx.meta.err);
+        return [];
+      }
+
+      const events: any[] = [];
+
+      // Parse logs for BetPlaced events
+      // Anchor events are emitted as: "Program data: <base64_encoded_event>"
+      const logs = tx.meta.logMessages || [];
+
+      for (const log of logs) {
+        // Look for anchor event logs
+        if (log.includes("Program data:")) {
+          try {
+            // Extract base64 data
+            const dataMatch = log.match(/Program data: (.+)/);
+            if (!dataMatch) continue;
+
+            const data = Buffer.from(dataMatch[1], "base64");
+
+            // Anchor events start with 8-byte discriminator
+            // BetPlaced event discriminator is derived from "event:BetPlaced"
+            const eventDiscriminator = data.slice(0, 8);
+
+            // Decode the event using Anchor's event parser
+            const eventData = this.program.coder.events.decode(data.toString("base64"));
+
+            if (eventData && eventData.name === "BetPlaced") {
+              events.push({
+                roundId: eventData.data.roundId?.toNumber() ?? 0,
+                player: eventData.data.player?.toBase58() ?? "",
+                amount: eventData.data.amount?.toNumber() ?? 0,
+                betCount: eventData.data.betCount ?? 0,
+                totalPot: eventData.data.totalPot?.toNumber() ?? 0,
+                endTimestamp: eventData.data.endTimestamp?.toNumber() ?? 0,
+                isFirstBet: eventData.data.isFirstBet ?? false,
+                timestamp: eventData.data.timestamp?.toNumber() ?? 0,
+                betIndex: eventData.data.betIndex ?? 0,
+              });
+            }
+          } catch (error) {
+            // Not a BetPlaced event, skip
+            continue;
+          }
+        }
+      }
+
+      return events;
+    } catch (error) {
+      console.error(`Error parsing transaction ${signature}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all BetPlaced events from recent transactions
+   * This is more efficient than polling individual bet PDAs
+   */
+  async getAllRecentBetEvents(limit: number = 100): Promise<Array<{
+    signature: string;
+    roundId: number;
+    player: string;
+    amount: number;
+    betCount: number;
+    totalPot: number;
+    endTimestamp: number;
+    isFirstBet: boolean;
+    timestamp: number;
+    betIndex: number;
+    slot: number;
+  }>> {
+    try {
+      // Get recent signatures
+      const signatureInfos = await this.connection.getSignaturesForAddress(
+        DOMIN8_PROGRAM_ID,
+        { limit },
+        "confirmed"
+      );
+
+      const allEvents: any[] = [];
+
+      // Parse each transaction for BetPlaced events
+      for (const sigInfo of signatureInfos) {
+        const events = await this.parseBetPlacedEvents(sigInfo.signature);
+
+        for (const event of events) {
+          allEvents.push({
+            signature: sigInfo.signature,
+            slot: sigInfo.slot,
+            ...event,
+          });
+        }
+      }
+
+      console.log(`Found ${allEvents.length} BetPlaced events from ${signatureInfos.length} transactions`);
+      return allEvents;
+    } catch (error) {
+      console.error("Error fetching recent bet events:", error);
+      return [];
+    }
   }
 
   // Note: VRF helper methods removed - VRF is now handled directly by the smart contract

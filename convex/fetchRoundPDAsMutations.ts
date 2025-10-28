@@ -37,12 +37,29 @@ export const saveGameRoundState = internalMutation({
   },
   handler: async (ctx, args) => {
     const { gameRound } = args;
+
+    // Select a random map for new game rounds (status === "waiting")
+    let selectedMapId = undefined;
+    if (gameRound.status === "waiting") {
+      const activeMaps = await ctx.db
+        .query("maps")
+        .withIndex("by_active", (q) => q.eq("isActive", true))
+        .collect();
+
+      if (activeMaps.length > 0) {
+        const randomMap = activeMaps[Math.floor(Math.random() * activeMaps.length)];
+        selectedMapId = randomMap._id;
+        console.log(`[saveGameRoundState] Selected map for round ${gameRound.roundId}: ${randomMap.name}`);
+      }
+    }
+
     await ctx.db.insert("gameRoundStates", {
       roundId: gameRound.roundId,
       status: gameRound.status,
       startTimestamp: gameRound.startTimestamp,
       endTimestamp: gameRound.endTimestamp,
       capturedAt: Math.floor(Date.now() / 1000),
+      mapId: selectedMapId, // Random map selected for this round
       betCount: gameRound.betCount,
       betAmounts: gameRound.betAmounts,
       totalPot: gameRound.totalPot,

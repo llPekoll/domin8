@@ -56,43 +56,67 @@ async function captureGameRoundState(ctx: any, solanaClient: SolanaClient) {
 }
 
 /**
- * Capture all bets for a round from blockchain
- * Fetches BetEntry PDAs and stores them in Convex database
+ * Capture all bets for a round using event-based approach
+ * Fetches BetPlaced events from recent transactions and stores them
  */
 async function captureRoundBets(ctx: any, solanaClient: SolanaClient, roundId: number) {
   try {
-    const bets = await solanaClient.getBetsForRound(roundId);
+    console.log(`[Event-Based] Fetching BetPlaced events for round ${roundId}`);
 
-    console.log(`Fetched ${bets.length} bets for round ${roundId}`);
+    // Get recent BetPlaced events from blockchain
+    const betEvents = await solanaClient.getAllRecentBetEvents(50);
 
-    for (const bet of bets) {
-      // Check if bet already stored
-      const existing = await ctx.runMutation(
-        (internal as any).betEventListenerMutations.isBetStored,
+    // Filter events for this specific round
+    const roundEvents = betEvents.filter(event => event.roundId === roundId);
+
+    console.log(`[Event-Based] Found ${roundEvents.length} events for round ${roundId}`);
+
+    for (const event of roundEvents) {
+      // Check if signature already processed
+      const alreadyProcessed = await ctx.runMutation(
+        internal.eventProcessorMutations.isSignatureProcessed,
         {
-          roundId: bet.gameRoundId,
-          betIndex: bet.betIndex,
+          signature: event.signature,
         }
       );
 
-      if (!existing) {
-        await ctx.runMutation((internal as any).betEventListenerMutations.storeBetFromPDA, {
-          bet: {
-            gameRoundId: bet.gameRoundId,
-            betIndex: bet.betIndex,
-            wallet: bet.wallet,
-            betAmount: bet.betAmount,
-            timestamp: bet.timestamp,
-            payoutCollected: bet.payoutCollected,
-          },
-        });
-        console.log(
-          `✓ Stored bet ${bet.betIndex} for round ${roundId}: ${bet.wallet} - ${bet.betAmount / 1e9} SOL`
+      if (!alreadyProcessed) {
+        // Store the event
+        const result = await ctx.runMutation(
+          internal.eventProcessorMutations.storeBetPlacedEvent,
+          {
+            signature: event.signature,
+            slot: event.slot,
+            roundId: event.roundId,
+            eventData: {
+              player: event.player,
+              amount: event.amount,
+              betCount: event.betCount,
+              totalPot: event.totalPot,
+              endTimestamp: event.endTimestamp,
+              isFirstBet: event.isFirstBet,
+              timestamp: event.timestamp,
+              betIndex: event.betIndex,
+            },
+          }
         );
+
+        // Process the event immediately into a bet record
+        if (!result.alreadyExists) {
+          await ctx.runMutation(
+            internal.eventProcessorMutations.processBetPlacedEvent,
+            {
+              eventId: result.eventId,
+            }
+          );
+          console.log(
+            `✓ [Event-Based] Captured bet ${event.betIndex} for round ${roundId}: ${event.player.slice(0, 8)}... - ${event.amount / 1e9} SOL (tx: ${event.signature.slice(0, 8)}...)`
+          );
+        }
       }
     }
   } catch (error) {
-    console.error(`Error capturing bets for round ${roundId}:`, error);
+    console.error(`[Event-Based] Error capturing bets for round ${roundId}:`, error);
     // Don't throw - let game state capture succeed even if bet capture fails
   }
 }

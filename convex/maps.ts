@@ -59,6 +59,31 @@ export const getDefaultMap = query({
     return maps[Math.floor(Math.random() * maps.length)];
   },
 });
+
+/**
+ * Get the map for the current active game round
+ * All players will see the same map for the current round
+ */
+export const getCurrentGameMap = query({
+  args: {},
+  handler: async (ctx) => {
+    // Get the most recent "waiting" round (current active game)
+    const currentRound = await ctx.db
+      .query("gameRoundStates")
+      .withIndex("by_status", (q) => q.eq("status", "waiting"))
+      .order("desc")
+      .first();
+
+    if (!currentRound || !currentRound.mapId) {
+      // No active game or map not selected yet
+      return null;
+    }
+
+    // Get the map details
+    const map = await ctx.db.get(currentRound.mapId);
+    return map;
+  },
+});
 // Ellipse configuration (hardcoded since Convex can't import from src/config)
 const ELLIPSE_RATIO_X = 1.8;     // 80% wider on horizontal axis
 const ELLIPSE_RATIO_Y = 0.5;     // 50% flatter on vertical axis

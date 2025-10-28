@@ -10,8 +10,20 @@ import { internal } from "./_generated/api";
 const crons = cronJobs();
 
 /**
- * Event listener - monitors blockchain for new bets and game events
- * Runs every 5 seconds to detect on-chain transactions
+ * PRIMARY EVENT LISTENER - monitors blockchain for new events (event-driven architecture)
+ * Runs every 3 seconds to capture BetPlaced, GameCreated, WinnerSelected events
+ * This is the main data ingestion mechanism (replaces PDA polling)
+ */
+crons.interval(
+  "blockchain-event-listener",
+  { seconds: 3 },
+  internal.blockchainEventListener.listenForEvents
+);
+
+/**
+ * LEGACY PDA POLLING - captures game round state changes
+ * Runs every 5 seconds as fallback/supplement to event listener
+ * TODO: Can be removed once event-driven architecture is fully tested
  */
 crons.interval(
   "blockchain-fetch-round-pdas",
