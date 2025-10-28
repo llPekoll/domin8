@@ -7,7 +7,7 @@ pub struct GameDurationConfig {
 }
 
 impl GameDurationConfig {
-    pub const LEN: usize = 8 + 8 + 8 + 8; // 32 bytes
+    pub const LEN: usize = 8 + 8; // 32 bytes
 }
 
 /// Global game configuration stored as singleton PDA
@@ -34,8 +34,7 @@ impl GameConfig {
     /// Account space calculation:
     /// 8 (discriminator) + 32 (authority) + 32 (treasury) + 2 (house_fee) + 8 (min_bet) + 8 (max_bet)
     /// + 32 (small_game_duration_config) + 1 (bets_locked) + 32 (force) = 155 bytes
-    pub const LEN: usize =
-        8 + 32 + 32 + 2 + 8 + 8 + GameDurationConfig::LEN + 1 + 32;
+    pub const LEN: usize = 8 + 32 + 32 + 2 + 8 + 8 + GameDurationConfig::LEN + 1 + 32;
 
     /// Calculate house fee from pot amount
     pub fn calculate_house_fee(&self, pot_amount: u64) -> u64 {

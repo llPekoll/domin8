@@ -712,7 +712,7 @@ export const useGameContract = () => {
               player: publicKey,
               systemProgram: SystemProgram.programId,
             })
-            .rpc({ skipPreflight: true });
+            .rpc();
         }
 
         // Get the actual signature from Privy wallet adapter

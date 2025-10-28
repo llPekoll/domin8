@@ -43,7 +43,7 @@ pub struct CreateGame<'info> {
         seeds = [GAME_ROUND_SEED, counter.current_round_id.to_le_bytes().as_ref()],
         bump
     )]
-    pub game_round: Account<'info, GameRound>,
+    pub game_round: Box<Account<'info, GameRound>>,
 
     /// First bet entry PDA (bet_index = 0)
     #[account(

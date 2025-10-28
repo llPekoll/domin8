@@ -24,7 +24,7 @@ pub struct PlaceBet<'info> {
         seeds = [GAME_ROUND_SEED, counter.current_round_id.to_le_bytes().as_ref()],
         bump
     )]
-    pub game_round: Account<'info, GameRound>,
+    pub game_round: Box<Account<'info, GameRound>>,
 
     /// CREATE: BetEntry PDA for storing bet details
     #[account(
@@ -57,7 +57,6 @@ pub struct PlaceBet<'info> {
 /// Place an additional bet in the current game round
 /// This instruction is called by players after the first bet has been placed
 pub fn place_bet(ctx: Context<PlaceBet>, amount: u64, skin: u8, position: [u16; 2]) -> Result<()> {
-    let config = &ctx.accounts.config;
     let counter = &ctx.accounts.counter;
     let game_round = &mut ctx.accounts.game_round;
     let player_key = ctx.accounts.player.key();
