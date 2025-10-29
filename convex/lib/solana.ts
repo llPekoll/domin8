@@ -368,7 +368,7 @@ export class SolanaClient {
 
   // Send prize to winner (risk-based architecture)
   async sendPrizeWinner(roundId: number): Promise<string> {
-    const { config, activeGame } = this.getPDAs();
+    const { config } = this.getPDAs();
     const { gameRound } = this.getPDAs(roundId);
 
     if (!gameRound) {
@@ -382,20 +382,17 @@ export class SolanaClient {
       throw new Error("No winner determined yet");
     }
 
-    // Get treasury from config
-    const configAccount = await this.program.account.domin8Config.fetch(config);
-
-    console.log(`Sending prize to winner for round ${roundId}`);
+    const winnerPubkey = gameAccount.winner;
+    console.log(`Sending prize to winner ${winnerPubkey.toBase58()} for round ${roundId}`);
+    console.log(`Prize amount: ${gameAccount.winnerPrize.toString()} lamports`);
 
     const tx = await this.program.methods
       .sendPrizeWinner(new anchor.BN(roundId))
       .accounts({
         config,
-        activeGame,
-        gameRound,
-        winner: gameAccount.winner,
-        treasury: configAccount.treasury,
-        admin: this.authority.publicKey,
+        game: gameRound,
+        claimer: this.authority.publicKey,
+        winner: winnerPubkey,
         systemProgram: anchor.web3.SystemProgram.programId,
       } as any)
       .rpc();

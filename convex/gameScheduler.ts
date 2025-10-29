@@ -44,7 +44,31 @@ export const executeEndGame = internalAction({
       }
 
       if (latestState.status !== "waiting") {
-        console.log(`Round ${roundId}: Already closed (status: ${latestState.status}), skipping`);
+        console.log(`Round ${roundId}: Already closed (status: ${latestState.status})`);
+
+        // Recovery: If game is closed but prize not sent, schedule sendPrizeWinner
+        if (latestState.status === "finished" && latestState.winner) {
+          console.log(`Round ${roundId}: Game finished but checking if prize was sent...`);
+
+          // Check if sendPrizeWinner already scheduled
+          const prizeSent = await ctx.runQuery(internal.gameSchedulerMutations.isActionScheduled, {
+            roundId,
+            action: "send_prize",
+          });
+
+          if (!prizeSent) {
+            console.log(`Round ${roundId}: Prize not sent yet, scheduling sendPrizeWinner`);
+            await ctx.scheduler.runAfter(
+              0, // Execute immediately
+              internal.gameScheduler.executeSendPrize,
+              { roundId }
+            );
+            return;
+          } else {
+            console.log(`Round ${roundId}: Prize already sent or scheduled`);
+          }
+        }
+
         return;
       }
 
