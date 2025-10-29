@@ -346,25 +346,36 @@ export class SolanaClient {
   // Close betting window and lock game for resolution
   // NEW: For single-player games, passes player wallet for automatic refund
   async closeBettingWindow(): Promise<string> {
-    // Fetch active game to get current round ID and bet count
+    // Fetch active game to get bet count and actual round ID
     const { gameConfig, gameCounter, activeGame, vault } = this.getPDAs();
 
     const activeGameAccount = await this.program.account.gameRound.fetch(activeGame);
-    const currentRoundId = activeGameAccount.roundId.toNumber();
     const betCount = activeGameAccount.betCount;
+    const activeGameRoundId = activeGameAccount.roundId.toNumber();
 
-    // Also need the historical game_round PDA for the instruction
-    const { gameRound } = this.getPDAs(currentRoundId);
+    // IMPORTANT: Use counter.current_round_id to derive game_round PDA
+    // (matches the Solana program's seed constraint)
+    const gameCounterAccount = await this.program.account.gameCounter.fetch(gameCounter);
+    const counterRoundId = gameCounterAccount.currentRoundId.toNumber();
+
+    console.log(`Active game round ID: ${activeGameRoundId}, Counter round ID: ${counterRoundId}`);
+
+    // CRITICAL FIX: The Solana program validates game_round PDA against counter.current_round_id
+    // But if counter was already incremented, we need to use the active game's round ID
+    // This happens when a previous game finished and incremented the counter
+    // Use activeGameRoundId to derive the correct game_round PDA
+    const { gameRound } = this.getPDAs(activeGameRoundId);
     if (!gameRound) {
       throw new Error("Failed to derive game round PDA");
     }
 
-    // Fetch BetEntry PDAs for all bets (needed to count unique players)
+    // CRITICAL: Use the ACTIVE GAME'S round ID to derive BetEntry PDAs
+    // (BetEntry PDAs were created with the round ID at the time bets were placed)
     const remainingAccounts = [];
     const uniquePlayers = new Set<string>();
 
     for (let i = 0; i < betCount; i++) {
-      const { betEntry } = this.getPDAs(currentRoundId, i);
+      const { betEntry } = this.getPDAs(activeGameRoundId, i);
       if (betEntry) {
         remainingAccounts.push({
           pubkey: betEntry,
@@ -399,17 +410,18 @@ export class SolanaClient {
       );
     }
 
-    console.log(`Closing betting window for round ${currentRoundId} with ${betCount} bets`);
+    console.log(`Closing betting window for round ${activeGameRoundId} with ${betCount} bets`);
 
     const tx = await this.program.methods
-      .closeBettingWindow()
+      .closeBettingWindow(new anchor.BN(activeGameRoundId))
       .accounts({
         counter: gameCounter,
         gameRound: gameRound,
         activeGame: activeGame,
         config: gameConfig,
-        vault, // NOW required for auto-refund (was optional before)
+        vault,
         crank: this.authority.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
       } as any)
       .remainingAccounts(remainingAccounts)
       .rpc();

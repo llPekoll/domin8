@@ -29,7 +29,8 @@ export function BlockchainDebugDialog() {
       connection: {
         connected: !!activeGame,
         rpcEndpoint: import.meta.env.VITE_SOLANA_RPC_URL || "https://api.devnet.solana.com",
-        programId: import.meta.env.VITE_GAME_PROGRAM_ID || "A1uzFDgsXN8Mjd1qJvTa7qq5twt43R8ejfrkEbcxNzzQ",
+        programId:
+          import.meta.env.VITE_GAME_PROGRAM_ID || "JC7KUWuJH7SV9jcFM87J5tY1648G97jT1KShaZRy3tnj",
       },
       gameStatus: {
         currentRoundId: activeGame?.roundId?.toString(),
@@ -110,9 +111,7 @@ export function BlockchainDebugDialog() {
               className="p-2 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
               title="Refresh"
             >
-              <RefreshCw
-                className={`w-5 h-5 text-gray-300 ${isLoading ? "animate-spin" : ""}`}
-              />
+              <RefreshCw className={`w-5 h-5 text-gray-300 ${isLoading ? "animate-spin" : ""}`} />
             </button>
             <button
               onClick={() => setIsOpen(false)}
@@ -146,7 +145,10 @@ export function BlockchainDebugDialog() {
             />
             <InfoRow
               label="Program ID"
-              value={import.meta.env.VITE_GAME_PROGRAM_ID || "A1uzFDgsXN8Mjd1qJvTa7qq5twt43R8ejfrkEbcxNzzQ"}
+              value={
+                import.meta.env.VITE_GAME_PROGRAM_ID ||
+                "JC7KUWuJH7SV9jcFM87J5tY1648G97jT1KShaZRy3tnj"
+              }
               mono
               copyable
             />
@@ -155,7 +157,12 @@ export function BlockchainDebugDialog() {
           {/* Game Status */}
           <Section title="Game Status">
             <InfoRow label="Current Round ID" value={activeGame?.roundId?.toString() || "0"} />
-            <InfoRow label="Game Round PDA" value={activeGamePDA?.toBase58() || "N/A"} mono copyable />
+            <InfoRow
+              label="Game Round PDA"
+              value={activeGamePDA?.toBase58() || "N/A"}
+              mono
+              copyable
+            />
             <InfoRow
               label="Game Exists"
               value={activeGame ? "Yes" : "No"}
@@ -253,7 +260,11 @@ export function BlockchainDebugDialog() {
               />
               <InfoRow
                 label="Winning Bet Index"
-                value={activeGame.winningBetIndex !== undefined ? activeGame.winningBetIndex.toString() : "N/A"}
+                value={
+                  activeGame.winningBetIndex !== undefined
+                    ? activeGame.winningBetIndex.toString()
+                    : "N/A"
+                }
               />
               <InfoRow
                 label="VRF Request"

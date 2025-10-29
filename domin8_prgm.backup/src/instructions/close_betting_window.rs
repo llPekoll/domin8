@@ -5,6 +5,7 @@ use crate::state::{GameConfig, GameCounter, GameRound, GameStatus};
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
+#[instruction(round_id: u64)]
 pub struct CloseBettingWindow<'info> {
     #[account(
         mut,
@@ -15,10 +16,18 @@ pub struct CloseBettingWindow<'info> {
 
     #[account(
         mut,
-        seeds = [GAME_ROUND_SEED, counter.current_round_id.to_le_bytes().as_ref()],
+        seeds = [GAME_ROUND_SEED, round_id.to_le_bytes().as_ref()],
         bump
     )]
-    pub game_round: Account<'info, GameRound>,
+    pub game_round: Box<Account<'info, GameRound>>,
+
+    /// The active_game PDA (reusable, always points to current game)
+    #[account(
+        mut,
+        seeds = [b"active_game"],
+        bump
+    )]
+    pub active_game: Box<Account<'info, GameRound>>,
 
     #[account(
         mut,
@@ -46,33 +55,46 @@ pub struct CloseBettingWindow<'info> {
 
 /// Close betting window and transition game to winner selection phase
 ///
-/// Requires remaining_accounts: 
+/// Parameters:
+/// - round_id: The round ID to close (must match active_game.round_id)
+///
+/// Requires remaining_accounts:
 /// - First: All BetEntry PDAs for the game (to count unique players)
 /// - Then: Unique player wallet accounts (for automatic refund transfer in single-player games)
-pub fn close_betting_window<'info>(ctx: Context<'_, '_, '_, 'info, CloseBettingWindow<'info>>) -> Result<()> {
+pub fn close_betting_window<'info>(
+    ctx: Context<'_, '_, '_, 'info, CloseBettingWindow<'info>>,
+    round_id: u64,
+) -> Result<()> {
     let config = &mut ctx.accounts.config;
-    let game_round = &mut ctx.accounts.game_round;
+    let active_game = &mut ctx.accounts.active_game;
+    let game_round = &mut ctx.accounts.game_round; // Historical record
     let clock = Clock::get()?;
 
-    // Validate game state
+    // Validate round_id matches active game
     require!(
-        game_round.status == GameStatus::Waiting,
+        active_game.round_id == round_id,
+        Domin8Error::InvalidGameStatus
+    );
+
+    // Validate game state (check active_game, not historical game_round)
+    require!(
+        active_game.status == GameStatus::Waiting,
         Domin8Error::InvalidGameStatus
     );
 
     // ⭐ Validate betting window has closed (prevents early progression)
     require!(
-        clock.unix_timestamp >= game_round.end_timestamp,
+        clock.unix_timestamp >= active_game.end_timestamp,
         Domin8Error::BettingWindowStillOpen
     );
 
     // ⭐ Lock bets to prevent new bets during resolution
     config.bets_locked = true;
 
-    let bet_count = game_round.bet_count as usize;
+    let bet_count = active_game.bet_count as usize;
     msg!(
         "Closing betting window: game {} with {} bets",
-        game_round.round_id,
+        active_game.round_id,
         bet_count
     );
     msg!("Bets locked - no new bets allowed during resolution");
@@ -98,18 +120,27 @@ pub fn close_betting_window<'info>(ctx: Context<'_, '_, '_, 'info, CloseBettingW
     }
 
     let unique_player_count = unique_wallets.len();
-    msg!("Unique players: {} (from {} total bets)", unique_player_count, bet_count);
+    msg!(
+        "Unique players: {} (from {} total bets)",
+        unique_player_count,
+        bet_count
+    );
 
     // ⭐ Handle single player game (refund scenario)
     // This happens when only ONE unique wallet placed all the bets
     if unique_player_count == 1 {
         // Single player - immediate finish (no competition)
         // Player marked as "winner" so they can claim their full pot back via claim_winner_prize
+        // Update BOTH active_game and game_round
+        active_game.status = GameStatus::Finished;
+        active_game.winning_bet_index = 0;
+        active_game.winner = unique_wallets[0];
+
         game_round.status = GameStatus::Finished;
         game_round.winning_bet_index = 0;
-        game_round.winner = unique_wallets[0]; // Set to the actual player wallet for claim
+        game_round.winner = unique_wallets[0];
 
-        let total_refund = game_round.total_pot;
+        let total_refund = active_game.total_pot;
         let winner_wallet = unique_wallets[0];
         msg!(
             "Single player game - attempting automatic refund: {} lamports (from {} bets)",
@@ -164,6 +195,7 @@ pub fn close_betting_window<'info>(ctx: Context<'_, '_, '_, 'info, CloseBettingW
             match transfer_result {
                 Ok(_) => {
                     auto_transfer_success = true;
+                    active_game.winner_prize_unclaimed = 0;
                     game_round.winner_prize_unclaimed = 0;
                     msg!(
                         "✓ Automatic refund succeeded: {} lamports to {}",
@@ -173,6 +205,7 @@ pub fn close_betting_window<'info>(ctx: Context<'_, '_, '_, 'info, CloseBettingW
                 }
                 Err(e) => {
                     // Transfer failed - store refund for manual claim
+                    active_game.winner_prize_unclaimed = total_refund;
                     game_round.winner_prize_unclaimed = total_refund;
                     msg!("⚠️ Automatic refund failed (error: {:?})", e);
                     msg!(
@@ -182,6 +215,7 @@ pub fn close_betting_window<'info>(ctx: Context<'_, '_, '_, 'info, CloseBettingW
                 }
             }
         } else {
+            active_game.winner_prize_unclaimed = 0;
             game_round.winner_prize_unclaimed = 0;
             auto_transfer_success = true;
         }
@@ -193,7 +227,7 @@ pub fn close_betting_window<'info>(ctx: Context<'_, '_, '_, 'info, CloseBettingW
         // Use hashv directly with multiple slices (no concat needed)
         use anchor_lang::solana_program::keccak::hashv;
         let hash = hashv(&[
-            &game_round.round_id.to_le_bytes(),
+            &active_game.round_id.to_le_bytes(),
             &clock.unix_timestamp.to_le_bytes(),
             &clock.slot.to_le_bytes(),
             &config.force,
@@ -214,7 +248,14 @@ pub fn close_betting_window<'info>(ctx: Context<'_, '_, '_, 'info, CloseBettingW
             .ok_or(Domin8Error::ArithmeticOverflow)?;
         counter.current_round_id = new_round_id;
 
-        msg!("Single player game - immediate finish{}", if auto_transfer_success { ", refund processed automatically" } else { ", ready for manual refund claim" });
+        msg!(
+            "Single player game - immediate finish{}",
+            if auto_transfer_success {
+                ", refund processed automatically"
+            } else {
+                ", ready for manual refund claim"
+            }
+        );
         msg!("Bets unlocked - ready for next round");
         msg!("✓ Counter incremented to {}", new_round_id);
         return Ok(());
@@ -229,25 +270,26 @@ pub fn close_betting_window<'info>(ctx: Context<'_, '_, '_, 'info, CloseBettingW
 
     // Verify VRF was requested during game creation
     require!(
-        game_round.vrf_request_pubkey != Pubkey::default(),
+        active_game.vrf_request_pubkey != Pubkey::default(),
         Domin8Error::InvalidVrfAccount
     );
 
-    // Update game state to AwaitingWinnerRandomness
+    // Update game state to AwaitingWinnerRandomness in BOTH accounts
+    active_game.status = GameStatus::AwaitingWinnerRandomness;
     game_round.status = GameStatus::AwaitingWinnerRandomness;
 
     msg!(
         "Game {} now awaiting winner randomness - VRF already requested at game creation",
-        game_round.round_id
+        active_game.round_id
     );
-    msg!("VRF Request: {}", game_round.vrf_request_pubkey);
+    msg!("VRF Request: {}", active_game.vrf_request_pubkey);
 
     // ⭐ Emit game locked event
     emit!(GameLocked {
-        round_id: game_round.round_id,
-        final_bet_count: game_round.bet_count as u8,
-        total_pot: game_round.total_pot,
-        vrf_request_pubkey: game_round.vrf_request_pubkey,
+        round_id: active_game.round_id,
+        final_bet_count: active_game.bet_count as u8,
+        total_pot: active_game.total_pot,
+        vrf_request_pubkey: active_game.vrf_request_pubkey,
     });
 
     Ok(())

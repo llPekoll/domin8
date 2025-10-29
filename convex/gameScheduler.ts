@@ -36,9 +36,11 @@ export const executeCloseBetting = internalAction({
 
     try {
       // 1. Verify game is still in "waiting" status
+      console.log(1);
       const latestState = await ctx.runQuery(internal.events.getLatestRoundState, {
         roundId,
       });
+      console.log(2);
 
       if (!latestState) {
         console.log(`Round ${roundId}: No state found, skipping`);
@@ -46,16 +48,14 @@ export const executeCloseBetting = internalAction({
       }
 
       if (latestState.status !== "waiting") {
-        console.log(
-          `Round ${roundId}: Already progressed to ${latestState.status}, skipping`
-        );
+        console.log(`Round ${roundId}: Already progressed to ${latestState.status}, skipping`);
         return;
       }
 
       // 2. Verify betting window has actually closed (with buffer for blockchain clock)
       const currentTime = Math.floor(Date.now() / 1000);
       const BLOCKCHAIN_CLOCK_BUFFER = 2; // seconds to account for blockchain clock drift
-      
+
       if (currentTime < latestState.endTimestamp + BLOCKCHAIN_CLOCK_BUFFER) {
         const remaining = latestState.endTimestamp + BLOCKCHAIN_CLOCK_BUFFER - currentTime;
         console.log(
@@ -87,9 +87,7 @@ export const executeCloseBetting = internalAction({
 
         const newState = await solanaClient.getGameRound();
         if (newState?.status === "finished") {
-          console.log(
-            `Round ${roundId}: Single-player game completed (auto-refund processed)`
-          );
+          console.log(`Round ${roundId}: Single-player game completed (auto-refund processed)`);
           // Event listener will capture the "finished" state
           // No VRF check needed
         } else {
@@ -139,7 +137,9 @@ export const executeCheckVrf = internalAction({
     attempt: v.number(),
   },
   handler: async (ctx, { roundId, attempt }) => {
-    console.log(`\n[Scheduler] VRF check for round ${roundId} (attempt ${attempt}/${MAX_VRF_ATTEMPTS})`);
+    console.log(
+      `\n[Scheduler] VRF check for round ${roundId} (attempt ${attempt}/${MAX_VRF_ATTEMPTS})`
+    );
 
     try {
       // 1. Get latest game state
@@ -167,10 +167,10 @@ export const executeCheckVrf = internalAction({
       }
 
       // 2. Check VRF fulfillment
-          const solanaClient = new SolanaClient(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
-        //   const vrfFulfilled = await solanaClient.checkVrfFulfillment(
-        //     latestState.vrfRequestPubkey
-        //   );
+      const solanaClient = new SolanaClient(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
+      //   const vrfFulfilled = await solanaClient.checkVrfFulfillment(
+      //     latestState.vrfRequestPubkey
+      //   );
       const vrfFulfilled = true; // TEMP MOCK in localnet vrf always fulfilled because mocked
 
       if (vrfFulfilled) {
@@ -178,9 +178,7 @@ export const executeCheckVrf = internalAction({
         console.log(`Round ${roundId}: ✓ VRF fulfilled on attempt ${attempt}`);
         console.log(`Round ${roundId}: Calling selectWinnerAndPayout()...`);
 
-        const txSignature = await solanaClient.selectWinnerAndPayout(
-          latestState.vrfRequestPubkey!
-        );
+        const txSignature = await solanaClient.selectWinnerAndPayout(latestState.vrfRequestPubkey!);
 
         // 4. Wait for confirmation
         const confirmed = await solanaClient.confirmTransaction(txSignature);
@@ -197,9 +195,7 @@ export const executeCheckVrf = internalAction({
 
           // Event listener will capture the "finished" state
         } else {
-          console.error(
-            `Round ${roundId}: Transaction confirmation failed: ${txSignature}`
-          );
+          console.error(`Round ${roundId}: Transaction confirmation failed: ${txSignature}`);
 
           // Mark job as failed
           await ctx.runMutation(internal.gameSchedulerMutations.markJobFailed, {
@@ -227,9 +223,7 @@ export const executeCheckVrf = internalAction({
         console.error(
           `Round ${roundId}: ⚠️ VRF fulfillment timeout after ${MAX_VRF_ATTEMPTS} attempts (${MAX_VRF_ATTEMPTS * 2}s)`
         );
-        console.error(
-          `Round ${roundId}: VRF may still fulfill later - recovery cron will handle`
-        );
+        console.error(`Round ${roundId}: VRF may still fulfill later - recovery cron will handle`);
 
         // Mark job as failed
         await ctx.runMutation(internal.gameSchedulerMutations.markJobFailed, {
@@ -243,23 +237,20 @@ export const executeCheckVrf = internalAction({
     } catch (error) {
       console.error(`Round ${roundId}: Error checking VRF (attempt ${attempt}):`, error);
 
-      
-
       // On error, retry if we haven't exceeded max attempts
       if (attempt < MAX_VRF_ATTEMPTS) {
         console.log(`Round ${roundId}: Scheduling retry after error...`);
-        await ctx.scheduler.runAfter(
-          2000,
-          internal.gameScheduler.executeCheckVrf,
-          { roundId, attempt: attempt + 1 }
-        );
+        await ctx.scheduler.runAfter(2000, internal.gameScheduler.executeCheckVrf, {
+          roundId,
+          attempt: attempt + 1,
+        });
       } else {
-            // Mark job as failed in database
-            await ctx.runMutation(internal.gameSchedulerMutations.markJobFailed, {
-                roundId,
-                action: "check_vrf",
-                error: error instanceof Error ? error.message : String(error),
-            });
+        // Mark job as failed in database
+        await ctx.runMutation(internal.gameSchedulerMutations.markJobFailed, {
+          roundId,
+          action: "check_vrf",
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
   },

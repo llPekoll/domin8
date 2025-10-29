@@ -1,42 +1,41 @@
-/// Program constants and configuration
+use anchor_lang::prelude::*;
 
-/// Game constraints
-// Note: No MAX_PLAYERS limit - account dynamically reallocates!
+#[constant]
+pub const SEED: &str = "anchor";
 
-/// Financial constants
-pub const MIN_BET_LAMPORTS: u64 = 10_000_000; // 0.01 SOL
-pub const MAX_BET_LAMPORTS: u64 = 3_000_000_000; // 3 SOL (prevent whale dominance)
-pub const HOUSE_FEE_BASIS_POINTS: u16 = 500; // 5%
+// Game status constants
+pub const GAME_STATUS_OPEN: u8 = 0;
+pub const GAME_STATUS_CLOSED: u8 = 1;
 
-/// PDA seeds for deterministic account derivation
-pub const GAME_CONFIG_SEED: &[u8] = b"game_config";
-pub const GAME_COUNTER_SEED: &[u8] = b"game_counter";
-pub const GAME_ROUND_SEED: &[u8] = b"game_round";
-pub const BET_ENTRY_SEED: &[u8] = b"bet";
-pub const VAULT_SEED: &[u8] = b"vault";
+// Fee constants (basis points)
+pub const MAX_HOUSE_FEE: u64 = 1000; // 10%
 
-/// Default game durations (in seconds)
+// Time constants
+pub const MIN_ROUND_TIME: u64 = 10;     // 10 seconds
+pub const MAX_ROUND_TIME: u64 = 86400;  // 24 hours
+pub const MIN_DEPOSIT_AMOUNT: u64 = 1_000_000; // 0.001 SOL
 
-// Small games (2-64 players)
-pub const DEFAULT_SMALL_GAME_WAITING_DURATION: u64 = 30;
-pub const DEFAULT_SMALL_GAME_ELIMINATION_DURATION: u64 = 0; // No elimination phase
-pub const DEFAULT_SMALL_GAME_SPECTATOR_BETTING_DURATION: u64 = 0; // No spectator betting
-pub const DEFAULT_SMALL_GAME_RESOLVING_DURATION: u64 = 15;
+// VRF constants
+pub const VRF_FORCE_LENGTH: usize = 32; // 32 bytes
 
+// Account size constants
+pub const BET_INFO_SIZE: usize = 2 + 8 + 1 + 4; // wallet_index (2) + amount (8) + skin (1) + position (2*2) = 15 bytes
+pub const WALLET_SIZE: usize = 32; // Pubkey size
+pub const MAX_BETS_PER_GAME: usize = 1000; // Reasonable limit
+pub const MAX_BETS_PER_USER_SMALL: usize = 20; // Max bets per user for bets under 0.01 SOL
+pub const MAX_BETS_PER_USER_LARGE: usize = 30; // Max bets per user for bets >= 0.01 SOL
+pub const SMALL_BET_THRESHOLD: u64 = 10_000_000; // 0.01 SOL in lamports
 
-
-/// Account space calculations for rent exemption
-/// These constants are used to determine the exact amount of SOL needed for rent exemption
-
-/// GameConfig account space: ~146 bytes
-/// - 8 (discriminator) + 32 (authority) + 32 (treasury) + 2 (house_fee) + 8 (min_bet)
-/// - + 32 (small_game_config) + 32 (large_game_config) = 146 bytes
-pub const GAME_CONFIG_SPACE: usize = 146;
-
-/// GameRound account space: ~4797 bytes (~4.7KB)
-/// - Base: 8 + 8 + 1 + 8 + 8 + 8 + 32 + 32 + 32 + 8 = 145 bytes
-/// - Players: 4 + (64 * 48) = 3076 bytes
-/// - Finalists: 4 + (4 * 32) = 132 bytes  
-/// - Spectator bets: 4 + (20 * 72) = 1444 bytes
-/// - Total: ~4797 bytes
-pub const GAME_ROUND_SPACE: usize = 4797;
+pub const BASE_GAME_ACCOUNT_SIZE: usize = 8 + // discriminator
+    8 + // game_round
+    8 + // start_date
+    8 + // end_date
+    8 + // total_deposit
+    8 + // rand
+    1 + 32 + // winner (Option<Pubkey>)
+    8 + // winner_prize
+    1 + 8 + // winning_bet_index (Option<u64>)
+    8 + // user_count
+    32 + // force ([u8; 32])
+    1 + // status
+    4 + 4 + 15 + 20; // wallets Vec<Pubkey> (4) + bets Vec<BetInfo> (4) - actual data allocated dynamically

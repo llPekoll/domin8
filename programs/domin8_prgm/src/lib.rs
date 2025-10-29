@@ -2,8 +2,7 @@ use anchor_lang::prelude::*;
 
 // Import modules
 pub mod constants;
-pub mod errors;
-pub mod events;
+pub mod error;
 pub mod instructions;
 pub mod state;
 pub mod utils;
@@ -13,91 +12,90 @@ use instructions::*;
 
 // Re-export public types for external use
 pub use constants::*;
-pub use errors::*;
-pub use events::*;
+pub use error::*;
 pub use state::*;
 pub use utils::*;
 
-declare_id!("A1uzFDgsXN8Mjd1qJvTa7qq5twt43R8ejfrkEbcxNzzQ");
+declare_id!("JC7KUWuJH7SV9jcFM87J5tY1648G97jT1KShaZRy3tnj");
 
 #[program]
 pub mod domin8_prgm {
     use super::*;
 
-    /// Initialize the game with configuration
-    pub fn initialize(ctx: Context<Initialize>, treasury: Pubkey) -> Result<()> {
-        instructions::initialize(ctx, treasury)
+    /// Initialize global domin8 configuration (admin only)
+    ///
+    /// Parameters:
+    /// - treasury: Pubkey - Treasury wallet for house fees
+    /// - house_fee: u64 - House fee in basis points (e.g., 500 = 5%)
+    /// - min_deposit_amount: u64 - Minimum bet amount in lamports
+    /// - max_deposit_amount: u64 - Maximum bet amount in lamports
+    /// - round_time: u64 - Game duration in seconds
+    pub fn initialize_config(
+        ctx: Context<InitializeConfig>,
+        treasury: Pubkey,
+        house_fee: u64,
+        min_deposit_amount: u64,
+        max_deposit_amount: u64,
+        round_time: u64,
+    ) -> Result<()> {
+        initialize_config::handler(ctx, treasury, house_fee, min_deposit_amount, max_deposit_amount, round_time)
     }
 
-    /// Create a new game round with the first bet (called by first player)
-    pub fn create_game(
-        ctx: Context<CreateGame>,
-        amount: u64,
+    /// Create new game round with first bet
+    ///
+    /// Parameters:
+    /// - round_id: u64 - Round ID for the game
+    /// - bet_amount: u64 - Initial bet amount in lamports
+    /// - skin: u8 - Character skin ID (0-255)
+    /// - position: [u16; 2] - Spawn position [x, y]
+    pub fn create_game_round(
+        ctx: Context<CreateGameRound>,
+        round_id: u64,
+        bet_amount: u64,
         skin: u8,
         position: [u16; 2],
     ) -> Result<()> {
-        instructions::create_game(ctx, amount, skin, position)
+        create_game_round::handler(ctx, round_id, bet_amount, skin, position)
     }
 
-    /// Place an additional bet in the current game round (called by subsequent players)
-    pub fn place_bet(
-        ctx: Context<PlaceBet>,
-        amount: u64,
+    /// Place a bet in the current game round
+    ///
+    /// Parameters:
+    /// - round_id: u64 - Round ID for the game
+    /// - bet_amount: u64 - Bet amount in lamports
+    /// - skin: u8 - Character skin ID (0-255)
+    /// - position: [u16; 2] - Spawn position [x, y]
+    pub fn bet(
+        ctx: Context<Bet>,
+        round_id: u64,
+        bet_amount: u64,
         skin: u8,
         position: [u16; 2],
     ) -> Result<()> {
-        instructions::place_bet(ctx, amount, skin, position)
+        bet::handler(ctx, round_id, bet_amount, skin, position)
     }
 
-    /// Close betting window and lock game for winner selection
-    pub fn close_betting_window<'info>(
-        ctx: Context<'_, '_, '_, 'info, CloseBettingWindow<'info>>,
-    ) -> Result<()> {
-        instructions::close_betting_window(ctx)
+    /// End game, draw winner, and distribute prizes (admin only)
+    ///
+    /// Parameters:
+    /// - round_id: u64 - Round ID for the game
+    pub fn end_game(ctx: Context<EndGame>, round_id: u64) -> Result<()> {
+        end_game::handler(ctx, round_id)
     }
 
-    /// Select winner using VRF and distribute payouts
-    pub fn select_winner_and_payout<'info>(
-        ctx: Context<'_, '_, '_, 'info, SelectWinnerAndPayout<'info>>,
-    ) -> Result<()> {
-        instructions::select_winner_and_payout(ctx)
+    /// Send prize to the winner of a completed game
+    ///
+    /// Parameters:
+    /// - round_id: u64 - Round ID for the game
+    pub fn send_prize_winner(ctx: Context<SendPrizeWinner>, round_id: u64) -> Result<()> {
+        send_prize_winner::handler(ctx, round_id)
     }
 
-    /// Claim winner prize manually (if automatic transfer failed)
-    pub fn claim_winner_prize(ctx: Context<ClaimWinnerPrize>, round_id: u64) -> Result<()> {
-        instructions::claim_winner_prize(ctx, round_id)
-    }
-
-    /// Claim house fee manually (if automatic transfer failed)
-    pub fn claim_house_fee(ctx: Context<ClaimHouseFee>, round_id: u64) -> Result<()> {
-        instructions::claim_house_fee(ctx, round_id)
-    }
-
-    /// Cleanup old game round (backend-triggered after 1 week)
-    pub fn cleanup_old_game(ctx: Context<CleanupOldGame>, round_id: u64) -> Result<()> {
-        instructions::cleanup_old_game(ctx, round_id)
-    }
-
-    /// Emergency unlock bets (admin only, for stuck states)
-    pub fn emergency_unlock(ctx: Context<EmergencyUnlock>) -> Result<()> {
-        instructions::emergency_unlock(ctx)
-    }
-
-    /// Emergency refund if VRF timeout (10+ minutes with no randomness)
-    pub fn emergency_refund_vrf_timeout<'info>(
-        ctx: Context<'_, '_, '_, 'info, EmergencyRefundVrfTimeout<'info>>,
-    ) -> Result<()> {
-        instructions::emergency_refund_vrf_timeout(ctx)
-    }
-
-    /// Rotate force field (admin only, for fixing stuck VRF states)
-    pub fn rotate_force(ctx: Context<RotateForce>) -> Result<()> {
-        instructions::rotate_force(ctx)
-    }
-
-    /// Fulfill mock VRF randomness (LOCALNET ONLY - for testing)
-    #[cfg(feature = "localnet")]
-    pub fn fulfill_mock_vrf(ctx: Context<FulfillMockVrf>, randomness: u64) -> Result<()> {
-        instructions::fulfill_mock_vrf(ctx, randomness)
+    /// Delete a game round from the blockchain (admin only)
+    ///
+    /// Parameters:
+    /// - round_id: u64 - Round ID for the game to delete
+    pub fn delete_game(ctx: Context<DeleteGame>, round_id: u64) -> Result<()> {
+        delete_game::handler(ctx, round_id)
     }
 }
