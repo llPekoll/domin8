@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useGameContract } from "../hooks/useGameContract";
 import { useActiveGame } from "../hooks/useActiveGame";
@@ -37,9 +37,6 @@ const CharacterSelection = memo(function CharacterSelection({
   const [betAmount, setBetAmount] = useState<string>("0.1");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Mutation for character assignment
-  const assignCharacterToBet = useMutation(api.betsMutations.assignCharacterToBet);
-
   // Memoize wallet address to prevent unnecessary re-queries
   const walletAddress = useMemo(
     () => (connected && publicKey ? publicKey.toString() : null),
@@ -59,26 +56,27 @@ const CharacterSelection = memo(function CharacterSelection({
   const canPlaceBet = useMemo(() => {
     if (!activeGame) return true; // No game = can create new one
 
+    // Status: 0 = open/waiting, 1 = closed/determining winner, 2 = finished
+    const gameStatus = activeGame.status;
+    const betCount = activeGame.betCount || 0;
+
+    // Special case: Stuck/empty game (any status with 0 bets) - allow betting to create new game
+    if (betCount === 0) {
+      console.log("[canPlaceBet] Empty game detected - allowing bet to create new game");
+      return true;
+    }
+
     // Allow betting if game is finished (to create new round)
-    const gameStatus = Object.keys(activeGame.status)[0];
-    if (gameStatus === "finished") return true;
+    if (gameStatus === 2) return true;
 
-    // Block betting if game is determining winner
-    if (gameStatus === "awaitingWinnerRandomness") return false;
+    // Block betting if game is determining winner (and has bets)
+    if (gameStatus === 1) return false;
 
-    // If game is waiting, check if betting window is still open
-    if (gameStatus === "waiting") {
+    // If game is open (status 0), check if betting window is still open
+    if (gameStatus === 0) {
       const currentTime = Math.floor(Date.now() / 1000);
-      const endTimestamp = activeGame.endTimestamp?.toNumber() || 0;
+      const endTimestamp = activeGame.endTimestamp?.toNumber() || activeGame.endDate?.toNumber() || 0;
       const timeRemaining = endTimestamp - currentTime;
-
-      // Special case: If window closed but game has NO bets, allow new bet
-      // (This bet will actually create a new game since the old one is expired)
-      const betCount = activeGame.betCount || 0;
-      if (timeRemaining <= 0 && betCount === 0) {
-        console.log("[canPlaceBet] Empty expired game - allowing new bet to create fresh game");
-        return true; // Old game is empty and expired, allow creating new one
-      }
 
       return timeRemaining > 0; // Can bet if time remaining
     }
@@ -128,11 +126,11 @@ const CharacterSelection = memo(function CharacterSelection({
 
     // Check if player can place bet based on blockchain game state
     if (!canPlaceBet && activeGame) {
-      const status = Object.keys(activeGame.status)[0];
-      if (status === "awaitingWinnerRandomness") {
+      const status = activeGame.status;
+      if (status === 1) {
         toast.error("Game is determining winner, please wait...");
         return;
-      } else if (status === "finished") {
+      } else if (status === 2) {
         // Game is finished - allow betting to create new round!
         console.log("Previous game finished, placing bet will create new round");
         // Continue to place bet (don't return)
@@ -174,15 +172,16 @@ const CharacterSelection = memo(function CharacterSelection({
       const position: [number, number] = [spawnX, spawnY];
 
       console.log("[CharacterSelection] Character data for bet:");
+      console.log("  - Skin ID:", currentCharacter.id);
       console.log("  - Spawn Position:", position);
 
-      // Use the hook's placeBet function with character data
+      // Use the hook's placeBet function with character data (skin + position stored on-chain)
       const betResult = await placeBet(amount, currentCharacter.id, position);
       const { signature: signatureHex, roundId, betIndex } = betResult;
 
       console.log("[CharacterSelection] Transaction successful:", signatureHex);
       console.log("[CharacterSelection] Round ID:", roundId);
-      console.log("[CharacterSelection---] Bet Index:", betIndex);
+      console.log("[CharacterSelection] Bet Index:", betIndex);
 
       // Show different toast based on whether we have a real signature
       const hasRealSignature = signatureHex && !signatureHex.startsWith("transaction_");
@@ -193,78 +192,8 @@ const CharacterSelection = memo(function CharacterSelection({
         duration: 5000,
       });
 
-      // ⭐ Capture character ID in local variable BEFORE async to avoid closure issues
-      const selectedCharacterId = currentCharacter._id;
-      const selectedCharacterName = currentCharacter.name;
-
-      // ⭐ NEW: Assign character to the bet (runs in background, doesn't block UI)
-      // We have the bet index directly from the smart contract!
-      // However, the bet might not be in Convex DB yet (event listener polls every 5s)
-      // So we retry with exponential backoff, starting immediately
-      void (async () => {
-        try {
-          console.log("[CharacterSelection] Assigning character to bet...");
-          console.log("[CharacterSelection] - Round ID:", roundId);
-          console.log("[CharacterSelection] - Bet Index:", betIndex);
-          console.log("[CharacterSelection] - Character ID:", selectedCharacterId);
-          console.log("[CharacterSelection] - Character Name:", selectedCharacterName);
-
-          // Retry logic with exponential backoff
-          // Event listener runs every 5 seconds, so we start with 2s delay
-          const maxRetries = 6;
-          const delays = [2000, 3000, 4000, 6000, 8000, 10000]; // Total: up to ~33 seconds
-          let lastError: any = null;
-          let success = false;
-
-          for (let attempt = 0; attempt < maxRetries; attempt++) {
-            try {
-              // Wait before attempting (except first attempt)
-              if (attempt > 0) {
-                const delay = delays[attempt - 1];
-                console.log(
-                  `[CharacterSelection] Waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}...`
-                );
-                await new Promise((resolve) => setTimeout(resolve, delay));
-              }
-
-              // Assign character to bet
-              await assignCharacterToBet({
-                roundId,
-                betIndex,
-                characterId: selectedCharacterId,
-              });
-
-              console.log("[CharacterSelection] ✓ Character assigned to bet successfully");
-              success = true;
-              break; // Success! Exit retry loop
-            } catch (error: any) {
-              lastError = error;
-              console.log(
-                `[CharacterSelection] ✗ Assign attempt ${attempt + 1}/${maxRetries} failed:`,
-                error.message
-              );
-            }
-          }
-
-          // If all retries failed, log the error but don't crash
-          if (!success && lastError) {
-            console.error(
-              "[CharacterSelection] Failed to assign character after all retries:",
-              lastError
-            );
-            toast.warning("Character will be assigned when game starts", {
-              description: "Event listener is processing your bet",
-            });
-          }
-        } catch (assignError) {
-          console.error(
-            "[CharacterSelection] Unexpected error during character assignment:",
-            assignError
-          );
-          // Don't fail the whole bet placement if character assignment fails
-          // The bet is already placed on-chain
-        }
-      })(); // Execute immediately in background
+      // Character skin and position are now stored directly on-chain
+      // No need for Convex character assignment - blockchain is source of truth
 
       setBetAmount("0.1");
 

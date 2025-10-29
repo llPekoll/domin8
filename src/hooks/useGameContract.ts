@@ -130,11 +130,11 @@ class PrivyWalletAdapter {
 const MIN_BET_LAMPORTS = 10_000_000; // 0.01 SOL
 const HOUSE_FEE_BPS = 500; // 5%
 
-// PDA Seeds
-const GAME_CONFIG_SEED = "game_config";
+// PDA Seeds (must match Rust program seeds exactly!)
+const GAME_CONFIG_SEED = "domin8_config";  // matches b"domin8_config" in Rust
 const GAME_COUNTER_SEED = "game_counter";
-const GAME_ROUND_SEED = "game_round";
-const ACTIVE_GAME_SEED = "active_game";
+const GAME_ROUND_SEED = "domin8_game";     // matches b"domin8_game" in Rust
+const ACTIVE_GAME_SEED = "active_game";    // matches b"active_game" in Rust
 const BET_ENTRY_SEED = "bet";
 const VAULT_SEED = "vault";
 
@@ -310,21 +310,25 @@ export const useGameContract = () => {
 
   const fetchCurrentRoundId = useCallback(async (): Promise<number> => {
     try {
-      const { gameCounterPda } = derivePDAs();
-      const accountInfo = await connection.getAccountInfo(gameCounterPda);
+      const { activeGamePda } = derivePDAs();
 
-      if (!accountInfo) return 0;
+      // Check if active game exists
+      const accountInfo = await connection.getAccountInfo(activeGamePda);
+      if (!accountInfo) {
+        console.log("[fetchCurrentRoundId] No active game found, defaulting to round 1");
+        return 1;
+      }
 
-      // Parse current_round_id (u64 at offset 8)
-      const data = accountInfo.data;
-      const roundId = Number(new BN(data.slice(8, 16), "le"));
-
+      // Fetch the active game data
+      const activeGameAccount = await program.account.domin8Game.fetch(activeGamePda);
+      const roundId = activeGameAccount.roundId.toNumber();
+      console.log("[fetchCurrentRoundId] Active game round:", roundId);
       return roundId;
     } catch (error) {
       console.error("Error fetching current round ID:", error);
-      return 0;
+      return 1; // Default to 1 instead of 0
     }
-  }, [connection, derivePDAs]);
+  }, [connection, derivePDAs, program]);
 
   const fetchBetEntry = useCallback(
     async (roundId: number, betIndex: number): Promise<BetEntry | null> => {
@@ -416,7 +420,7 @@ export const useGameContract = () => {
           console.log("[placeBet] Game exists for round", currentRoundId, ", checking status...");
 
           try {
-            const gameRoundAccount = await program.account.gameRound.fetch(currentGameRoundPda);
+            const gameRoundAccount = await program.account.domin8Game.fetch(currentGameRoundPda);
             console.log("[placeBet] Fetched game round account:", gameRoundAccount);
 
             const gameStatus = Object.keys(gameRoundAccount.status)[0];
@@ -488,16 +492,19 @@ export const useGameContract = () => {
           console.log("[placeBet] Available methods:", Object.keys(program.methods));
 
           // Get config to fetch VRF force field
+          console.log("gameConfigPda", gameConfigPda.toString());
+          console.log("Connection RPC endpoint:", connection.rpcEndpoint);
+          console.log("VITE_SOLANA_RPC_URL:", import.meta.env.VITE_SOLANA_RPC_URL);
           const configInfo = await connection.getAccountInfo(gameConfigPda);
           if (!configInfo) {
             throw new Error("Game config not found. Please contact support.");
           }
           // Parse force field from config using Anchor deserialization
-          // const configAccountParsed = await program.account.gameConfig.fetch(gameConfigPda);
+          // const configAccountParsed = await program.account.domin8Config.fetch(gameConfigPda);
           // const force = Buffer.from(configAccountParsed.force);
 
-          // Use Anchor to fetch the GameConfig (has `force: [u8;32]`)
-          const configAccount = await program.account.gameConfig.fetch(gameConfigPda);
+          // Use Anchor to fetch the Domin8Config (has `force: [u8;32]`)
+          const configAccount = await program.account.domin8Config.fetch(gameConfigPda);
           const forceArr = configAccount.force as any; // usually Uint8Array or number[]
           const forceBuf = Buffer.from(forceArr as any);
 
@@ -554,24 +561,25 @@ export const useGameContract = () => {
             console.log("  - vrfRequest:", vrfRequest.toString());
             console.log("[placeBet] Amount/Skin/Position:", amountBN.toString(), skin, position);
 
+            // Convert currentRoundId to BN for Anchor instruction
+            const roundIdBN = new BN(currentRoundId);
+
             tx = await program.methods
-              .createGame(
+              .createGameRound(
+                roundIdBN, // round_id parameter as BN
                 amountBN,
                 skin, // Character skin ID from frontend
                 position // Spawn position [x, y] from frontend
               )
               .accounts({
                 config: gameConfigPda,
-                counter: gameCounterPda,
-                gameRound: gameRoundPdaForCreate,
+                game: gameRoundPdaForCreate,
                 activeGame: activeGamePda,
-                betEntry: betEntryPda,
-                vault: vaultPda,
-                player: publicKey,
-                vrfProgram: orao.programId,
+                user: publicKey,
+                vrfRandomness: vrfRequest,
+                vrfTreasury: treasury,
                 networkState: networkState,
-                treasury: treasury,
-                vrfRequest: vrfRequest,
+                vrfProgram: orao.programId,
                 systemProgram: SystemProgram.programId,
               })
               .rpc();
@@ -629,21 +637,21 @@ export const useGameContract = () => {
             console.log("[placeBet] Amount/Skin/Position:", amountBN.toString(), skin, position);
             console.log("Kamel");
 
-            // Call create_game with ORAO VRF accounts
+            // Convert currentRoundId to BN for Anchor instruction
+            const roundIdBN = new BN(currentRoundId);
+
+            // Call create_game_round with ORAO VRF accounts
             tx = await program.methods
-              .createGame(amountBN, skin, position)
+              .createGameRound(roundIdBN, amountBN, skin, position)
               .accounts({
                 config: gameConfigPda,
-                counter: gameCounterPda,
-                gameRound: gameRoundPdaForCreate,
+                game: gameRoundPdaForCreate,
                 activeGame: activeGamePda,
-                betEntry: betEntryPda,
-                vault: vaultPda,
-                player: publicKey,
-                vrfProgram: orao.programId,
+                user: publicKey,
+                vrfRandomness: vrfRequest,
+                vrfTreasury: treasury,
                 networkState: networkState,
-                treasury: treasury,
-                vrfRequest: vrfRequest,
+                vrfProgram: orao.programId,
                 systemProgram: SystemProgram.programId,
               })
               .rpc();
@@ -656,7 +664,7 @@ export const useGameContract = () => {
           console.log(`[placeBet] Game exists (round ${activeRoundId}), placing additional bet`);
 
           // Fetch fresh game state using Anchor (more reliable than manual parsing)
-          const activeGameAccount = await program.account.gameRound.fetch(activeGamePda);
+          const activeGameAccount = await program.account.domin8Game.fetch(activeGamePda);
           console.log("[placeBet] Active game account:", activeGameAccount);
           const betCount = activeGameAccount.betCount;
           console.log("[placeBet] Current bet count:", betCount);
@@ -678,21 +686,22 @@ export const useGameContract = () => {
           console.log("  - vault:", vaultPda.toString());
           console.log("  - betIndex:", betIndex);
 
-          // Call placeBet instruction with all required accounts
+          // Convert activeRoundId to BN for Anchor instruction
+          const roundIdBN = new BN(activeRoundId);
+
+          // Call bet instruction with all required accounts
           tx = await program.methods
-            .placeBet(
+            .bet(
+              roundIdBN, // round_id parameter as BN
               amountBN,
               skin, // Character skin ID from frontend
               position // Spawn position [x, y] from frontend
             )
             .accounts({
               config: gameConfigPda,
-              counter: gameCounterPda,
-              gameRound: gameRoundPda,
+              game: gameRoundPda,
               activeGame: activeGamePda,
-              betEntry: betEntryPda,
-              vault: vaultPda,
-              player: publicKey,
+              user: publicKey,
               systemProgram: SystemProgram.programId,
             })
             .rpc();

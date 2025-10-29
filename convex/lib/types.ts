@@ -6,85 +6,78 @@ import { Buffer } from "buffer";
 // Program ID (matches deployed program and IDL)
 export const DOMIN8_PROGRAM_ID = new PublicKey("JC7KUWuJH7SV9jcFM87J5tY1648G97jT1KShaZRy3tnj");
 
-// Game Status enum from the Solana program (simplified for small games MVP)
-export enum GameStatus {
-  Waiting = "waiting",
-  AwaitingWinnerRandomness = "awaitingWinnerRandomness",
-  Finished = "finished",
-}
-
-// Game configuration structure (simplified for small games MVP)
+// Game configuration structure (risk-based architecture)
 // Note: PublicKeys are serialized as strings for Convex compatibility
 export interface GameConfig {
-  authority: string; // PublicKey as base58 string
-  treasury: string; // PublicKey as base58 string
-  houseFeeBasisPoints: number;
-  minBetLamports: number;
-  smallGameDurationConfig: GameDurationConfig;
-  betsLocked: boolean; // Whether new bets are currently locked
+  admin: string; // Changed from authority
+  treasury: string;
+  gameRound: number; // NEW: current/next game round number
+  houseFee: number; // Changed from houseFeeBasisPoints
+  minDepositAmount: number; // Changed from minBetLamports
+  maxDepositAmount: number; // NEW: maximum bet amount
+  roundTime: number; // NEW: game duration in seconds
+  lock: boolean; // Changed from betsLocked
+  force: number[]; // NEW: VRF force seed (32 bytes)
 }
 
-// Game duration configuration (simplified for small games MVP)
-export interface GameDurationConfig {
-  waitingPhaseDuration: number;
-  // Only one duration field in the small games MVP - no elimination or spectator phases
+// Bet info structure (risk architecture - stored inline in game)
+export interface BetInfoStruct {
+  walletIndex: number;
+  amount: number;
+  skin: number;
+  position: [number, number];
 }
 
-// Bet entry in the game (renamed from PlayerEntry)
-// Note: PublicKeys are serialized as strings for Convex compatibility
-export interface BetEntry {
-  gameRoundId: number; // Which game round this bet belongs to
-  betIndex: number; // Index of this bet (0, 1, 2, ...)
-  wallet: string; // PublicKey as base58 string
-  betAmount: number; // Amount in lamports
-  timestamp: number; // When bet was placed
-  payoutCollected: boolean; // Track if winnings have been collected
-}
-
-// Game round state (simplified for small games MVP)
+// Game round state (risk-based architecture - matches Domin8Game)
 // Note: PublicKeys are serialized as strings for Convex compatibility
 export interface GameRound {
-  roundId: number;
-  status: GameStatus;
-  startTimestamp: number;
-  endTimestamp: number; // When betting window closes
-  betCount: number; // Number of bets placed
-  betAmounts: number[]; // Array of bet amounts (max 64)
-  betSkin: number[]; // Array of skin IDs (u8, 0-255, max 64) - from GameRound.bet_skin
-  betPosition: number[][]; // Array of [x, y] positions (u16 coords, max 64) - from GameRound.bet_position
-  totalPot: number; // Total accumulated pot from all bets
-  winner: string | null; // PublicKey as base58 string, or null if no winner yet
-  winningBetIndex: number; // Index of the winning bet
-  // ORAO VRF integration
-  vrfRequestPubkey: string | null; // PublicKey as base58 string, or null if not requested
-  vrfSeed: number[];
-  randomnessFulfilled: boolean;
-  // Single-player auto-refund fields (NEW)
-  winnerPrizeUnclaimed?: number; // Amount unclaimed for manual claim fallback (0 if auto-refund succeeded)
+  gameRound: number; // Changed from roundId
+  startDate: number; // Changed from startTimestamp
+  endDate: number; // Changed from endTimestamp
+  totalDeposit: number; // Changed from totalPot
+  rand: number; // NEW: VRF randomness value
+  userCount: number; // NEW: unique user count
+  force: number[]; // NEW: VRF force seed (32 bytes)
+  status: number; // NEW: 0=open, 1=closed (was enum)
+  winner: string | null; // PublicKey as base58 string or null
+  winnerPrize: number; // Changed from winnerPrizeUnclaimed
+  winningBetIndex: number | null; // Index of the winning bet
+  wallets: string[]; // NEW: Array of unique wallet addresses
+  bets: BetInfoStruct[]; // NEW: Array of bet info structs
+
+  // Computed properties for backward compatibility
+  roundId?: number;
+  startTimestamp?: number;
+  endTimestamp?: number;
+  totalPot?: number;
+  betCount?: number;
+  betAmounts?: number[];
+  betSkin?: number[];
+  betPosition?: number[][];
 }
 
-// PDA seeds
+// PDA seeds (updated for risk-based architecture)
 export const PDA_SEEDS = {
-  GAME_CONFIG: Buffer.from("game_config"),
-  GAME_COUNTER: Buffer.from("game_counter"),
-  GAME_ROUND: Buffer.from("game_round"),
-  BET_ENTRY: Buffer.from("bet"),
-  VAULT: Buffer.from("vault"),
+  DOMIN8_CONFIG: Buffer.from("domin8_config"), // Changed from game_config
+  ACTIVE_GAME: Buffer.from("active_game"), // NEW: replaces game_counter
+  DOMIN8_GAME: Buffer.from("domin8_game"), // Changed from game_round
+  // Removed: BET_ENTRY (bets now stored inline in game)
+  // Removed: VAULT (not used in risk architecture)
 } as const;
 
-// Transaction types for logging
+// Transaction types for logging (updated for risk-based architecture)
 export const TRANSACTION_TYPES = {
-  CLOSE_BETTING_WINDOW: "close_betting_window",
-  SELECT_WINNER_AND_PAYOUT: "select_winner_and_payout",
-  CLEANUP_OLD_GAME: "cleanup_old_game",
+  END_GAME: "end_game", // Changed from close_betting_window
+  SEND_PRIZE_WINNER: "send_prize_winner", // Changed from select_winner_and_payout
+  DELETE_GAME: "delete_game", // Changed from cleanup_old_game
 } as const;
 
-// Instruction names
+// Instruction names (updated for risk-based architecture)
 export const INSTRUCTION_NAMES = {
-  INITIALIZE: "initialize",
-  CREATE_GAME: "create_game",
-  PLACE_BET: "place_bet",
-  CLOSE_BETTING_WINDOW: "close_betting_window",
-  SELECT_WINNER_AND_PAYOUT: "select_winner_and_payout",
-  CLEANUP_OLD_GAME: "cleanup_old_game",
+  INITIALIZE_CONFIG: "initialize_config", // Changed from initialize
+  CREATE_GAME_ROUND: "create_game_round", // Changed from create_game
+  BET: "bet", // Changed from place_bet
+  END_GAME: "end_game", // Changed from close_betting_window
+  SEND_PRIZE_WINNER: "send_prize_winner", // Changed from select_winner_and_payout
+  DELETE_GAME: "delete_game", // Changed from cleanup_old_game
 } as const;

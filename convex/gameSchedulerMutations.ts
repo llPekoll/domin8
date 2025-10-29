@@ -6,7 +6,7 @@
  * 2. Prevent duplicate scheduling
  * 3. Monitor job completion status
  */
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -172,5 +172,26 @@ export const cleanupOldJobs = internalMutation({
     }
 
     return oldJobs.length;
+  },
+});
+
+/**
+ * Check if a specific action is already scheduled (Query version for use in actions)
+ */
+export const isActionScheduled = internalQuery({
+  args: {
+    roundId: v.number(),
+    action: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const job = await ctx.db
+      .query("scheduledJobs")
+      .withIndex("by_round_and_status", (q) =>
+        q.eq("roundId", args.roundId).eq("status", "pending")
+      )
+      .filter((q) => q.eq(q.field("action"), args.action))
+      .first();
+
+    return job !== null;
   },
 });

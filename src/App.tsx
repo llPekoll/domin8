@@ -1,13 +1,11 @@
 import { useRef, useState, useEffect } from "react";
-import { useQuery } from "convex/react";
 import { IRefPhaserGame, PhaserGame } from "./PhaserGame";
 import { Header } from "./components/Header";
 import { GameLobby } from "./components/GameLobby";
 import { BlockchainRandomnessDialog } from "./components/BlockchainRandomnessDialog";
 import { DemoGameManager } from "./components/DemoGameManager";
 import { BlockchainDebugDialog } from "./components/BlockchainDebugDialog";
-import { useParticipantSpawner } from "./hooks/useParticipantSpawner";
-import { api } from "../convex/_generated/api";
+import { useActiveGame } from "./hooks/useActiveGame";
 
 export default function App() {
   const [showBlockchainDialog, setShowBlockchainDialog] = useState(false);
@@ -16,12 +14,12 @@ export default function App() {
   // References to the PhaserGame component (game and scene are exposed)
   const phaserRef = useRef<IRefPhaserGame | null>(null);
 
-  // Get current game state from Convex (auto-synced from blockchain every 5s)
-  const currentRoundState = useQuery(api.events.getCurrentRoundState);
+  // Get current game state directly from blockchain (no Convex, <1s updates)
+  const { activeGame: currentRoundState, isLoading } = useActiveGame();
 
-  // Demo mode is active when no real game exists or game is in "finished" state
-  const isDemoMode = false; // TEMP: disable demo mode for testing real game
-  console.log({ currentRoundState });
+  // Demo mode is active when no real game exists or game is finished (status 2)
+  const isDemoMode = !currentRoundState || currentRoundState.status === 2 || currentRoundState.betCount === 0;
+  console.log({ currentRoundState, isDemoMode });
 
   // Event emitted from the PhaserGame component
   const currentScene = (scene: Phaser.Scene) => {
@@ -35,7 +33,7 @@ export default function App() {
 
       // Blockchain calls now handled by Solana crank system (no frontend trigger needed)
       console.log(
-        `Game active - Round ${currentRoundState.roundId}, Status: ${currentRoundState.status}`
+        `Game active - Round ${currentRoundState.roundId?.toString() || currentRoundState.gameRound?.toString()}, Status: ${currentRoundState.status}`
       );
     } else if (scene.scene.key === "DemoScene") {
       // Demo scene is ready - DemoGameManager will handle it
@@ -50,7 +48,7 @@ export default function App() {
       hasScene: !!phaserRef.current?.scene,
       sceneKey: phaserRef.current?.scene?.scene.key,
       currentRoundState: currentRoundState ? {
-        roundId: currentRoundState.roundId,
+        roundId: currentRoundState.roundId?.toString() || currentRoundState.gameRound?.toString(),
         status: currentRoundState.status
       } : null
     });
@@ -61,10 +59,16 @@ export default function App() {
     }
 
     const scene = phaserRef.current.scene;
-    const hasRealGame = currentRoundState && currentRoundState.status !== "finished";
+    // Status 0 = open/waiting (with bets), 1 = closed/determining winner, 2 = finished
+    // Only show real game if status 0 or 1 AND has at least 1 bet
+    const hasRealGame = currentRoundState &&
+                        currentRoundState.status !== 2 &&
+                        currentRoundState.betCount > 0;
 
     console.log("[Scene Switch Effect] Evaluation", {
       hasRealGame,
+      status: currentRoundState?.status,
+      betCount: currentRoundState?.betCount,
       currentScene: scene.scene.key,
       shouldSwitchToGame: hasRealGame && scene.scene.key === "DemoScene",
       shouldSwitchToDemo: !hasRealGame && scene.scene.key === "RoyalRumble"
@@ -87,22 +91,26 @@ export default function App() {
     if (hasRealGame && scene.scene.key === "RoyalRumble") {
       (scene as any).updateGameState?.(currentRoundState);
 
-      console.log(`Game - Round ${currentRoundState.roundId}, Status: ${currentRoundState.status}`);
-      console.log("Bets count:", currentRoundState.betCount);
-      console.log("Total pot:", currentRoundState.totalPot / 1_000_000_000, "SOL");
+      const roundId = currentRoundState.roundId?.toString() || currentRoundState.gameRound?.toString();
+      const betCount = currentRoundState.betCount || 0;
+      const totalPot = currentRoundState.totalPot ? (Number(currentRoundState.totalPot.toString()) / 1_000_000_000) : 0;
+
+      console.log(`Game - Round ${roundId}, Status: ${currentRoundState.status}`);
+      console.log("Bets count:", betCount);
+      console.log("Total pot:", totalPot, "SOL");
     }
   }, [currentRoundState, sceneReady]); // Re-run when scene becomes ready or game state changes
 
-  // Show blockchain dialog during awaitingWinnerRandomness phase when randomness not fulfilled
+  // Show blockchain dialog during winner determination phase (status 1)
   useEffect(() => {
     const shouldShowDialog =
-      currentRoundState?.status === "awaitingWinnerRandomness" &&
+      currentRoundState?.status === 1 &&
       currentRoundState?.randomnessFulfilled === false;
     setShowBlockchainDialog(shouldShowDialog);
   }, [currentRoundState]);
 
-  // Handle real-time participant spawning with fall-from-sky animation
-  useParticipantSpawner(phaserRef, currentRoundState);
+  // Note: Participant data now comes directly from blockchain via useActiveGame
+  // Bet data includes skin and position for spawning characters
 
   return (
     <div className="relative min-h-screen overflow-hidden">

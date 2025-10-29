@@ -2,7 +2,7 @@
 "use node";
 import * as anchor from "@coral-xyz/anchor";
 import { Connection, PublicKey, Keypair, Transaction, VersionedTransaction, ParsedTransactionWithMeta } from "@solana/web3.js";
-import { GameConfig, GameRound, GameStatus, DOMIN8_PROGRAM_ID, PDA_SEEDS, BetEntry } from "./types";
+import { GameConfig, GameRound, DOMIN8_PROGRAM_ID, PDA_SEEDS, BetInfoStruct } from "./types";
 import { Buffer } from "buffer";
 import bs58 from "bs58";
 
@@ -88,23 +88,17 @@ export class SolanaClient {
     this.program = new anchor.Program<Domin8Prgm>(IDL as Domin8Prgm, this.provider);
   }
 
-  // Get PDAs for the game accounts
-  private getPDAs(roundId?: number, betIndex?: number) {
-    const [gameConfig] = PublicKey.findProgramAddressSync(
-      [PDA_SEEDS.GAME_CONFIG],
+  // Get PDAs for the game accounts (risk-based architecture)
+  private getPDAs(roundId?: number) {
+    // Config PDA (global configuration)
+    const [config] = PublicKey.findProgramAddressSync(
+      [PDA_SEEDS.DOMIN8_CONFIG],
       DOMIN8_PROGRAM_ID
     );
 
-    const [gameCounter] = PublicKey.findProgramAddressSync(
-      [PDA_SEEDS.GAME_COUNTER],
-      DOMIN8_PROGRAM_ID
-    );
-
-    const [vault] = PublicKey.findProgramAddressSync([PDA_SEEDS.VAULT], DOMIN8_PROGRAM_ID);
-
-    // Derive active_game PDA (single PDA that always points to current game)
+    // Active game PDA (single PDA that always points to current game)
     const [activeGame] = PublicKey.findProgramAddressSync(
-      [Buffer.from("active_game")],
+      [PDA_SEEDS.ACTIVE_GAME],
       DOMIN8_PROGRAM_ID
     );
 
@@ -114,69 +108,55 @@ export class SolanaClient {
       const roundIdBuffer = Buffer.alloc(8);
       roundIdBuffer.writeBigUInt64LE(BigInt(roundId));
       [gameRound] = PublicKey.findProgramAddressSync(
-        [PDA_SEEDS.GAME_ROUND, roundIdBuffer],
+        [PDA_SEEDS.DOMIN8_GAME, roundIdBuffer],
         DOMIN8_PROGRAM_ID
       );
     }
 
-    // Derive bet entry PDA if both roundId and betIndex are provided
-    let betEntry: PublicKey | undefined;
-    if (roundId !== undefined && betIndex !== undefined) {
-      const roundIdBuffer = Buffer.alloc(8);
-      roundIdBuffer.writeBigUInt64LE(BigInt(roundId));
-      const betIndexBuffer = Buffer.alloc(4);
-      const dataView = new DataView(betIndexBuffer.buffer);
-      dataView.setUint32(0, betIndex, true); // little-endian
-      [betEntry] = PublicKey.findProgramAddressSync(
-        [PDA_SEEDS.BET_ENTRY, roundIdBuffer, betIndexBuffer],
-        DOMIN8_PROGRAM_ID
-      );
-    }
-
-    return { gameConfig, gameCounter, activeGame, gameRound, vault, betEntry };
+    return { config, activeGame, gameRound };
   }
 
-  // Get current round ID from GameCounter
+  // Get current round ID from Domin8Config
   async getCurrentRoundId(): Promise<number> {
-    const { gameCounter } = this.getPDAs();
+    const { config } = this.getPDAs();
 
     try {
-      const account = await this.program.account.gameCounter.fetchNullable(gameCounter);
+      const account = await this.program.account.domin8Config.fetchNullable(config);
 
       if (!account) {
-        console.warn("Game counter account doesn't exist yet");
+        console.warn("Config account doesn't exist yet");
         return 0;
       }
 
-      return account.currentRoundId?.toNumber() ?? 0;
+      return account.gameRound?.toNumber() ?? 0;
     } catch (error) {
-      console.error("Error fetching game counter:", error);
+      console.error("Error fetching config:", error);
       return 0;
     }
   }
 
-  // Get current game configuration
+  // Get current game configuration (risk-based architecture)
   async getGameConfig(): Promise<GameConfig | null> {
-    const { gameConfig } = this.getPDAs();
+    const { config } = this.getPDAs();
 
     try {
-      const account = await this.program.account.gameConfig.fetchNullable(gameConfig);
+      const account = await this.program.account.domin8Config.fetchNullable(config);
 
       if (!account) {
-        console.warn("Game config account doesn't exist yet");
+        console.warn("Config account doesn't exist yet");
         return null;
       }
 
       return {
-        authority: account.authority?.toBase58() ?? "",
+        admin: account.admin?.toBase58() ?? "",
         treasury: account.treasury?.toBase58() ?? "",
-        houseFeeBasisPoints: account.houseFeeBasisPoints ?? 0,
-        minBetLamports: account.minBetLamports?.toNumber() ?? 0,
-        smallGameDurationConfig: {
-          waitingPhaseDuration:
-            account.smallGameDurationConfig?.waitingPhaseDuration?.toNumber() ?? 0,
-        },
-        betsLocked: account.betsLocked ?? false,
+        gameRound: account.gameRound?.toNumber() ?? 0,
+        houseFee: account.houseFee?.toNumber() ?? 0,
+        minDepositAmount: account.minDepositAmount?.toNumber() ?? 0,
+        maxDepositAmount: account.maxDepositAmount?.toNumber() ?? 0,
+        roundTime: account.roundTime?.toNumber() ?? 0,
+        lock: account.lock ?? false,
+        force: Array.from(account.force || []),
       };
     } catch (error) {
       console.error("Error fetching game config:", error);
@@ -184,7 +164,7 @@ export class SolanaClient {
     }
   }
 
-  // Get current game round state (simplified for small games MVP)
+  // Get current game round state (risk-based architecture)
   async getGameRound(roundId?: number): Promise<GameRound | null> {
     // First get the current round ID if not provided
     const currentRoundId = roundId ?? (await this.getCurrentRoundId());
@@ -199,7 +179,7 @@ export class SolanaClient {
 
     try {
       // Fetch account with null check
-      const account = await this.program.account.gameRound.fetchNullable(gameRound);
+      const account = await this.program.account.domin8Game.fetchNullable(gameRound);
 
       // If account doesn't exist or was closed, try previous round
       if (!account) {
@@ -214,48 +194,46 @@ export class SolanaClient {
         return null;
       }
 
-      // Convert status from Anchor enum to our enum (simplified for small games MVP)
-      let status: GameStatus;
-      if (account.status?.waiting) status = GameStatus.Waiting;
-      else if (account.status?.awaitingWinnerRandomness)
-        status = GameStatus.AwaitingWinnerRandomness;
-      else if (account.status?.finished) status = GameStatus.Finished;
-      else {
-        console.warn("Unknown game status:", account.status);
-        return null;
-      }
-
       console.log("=== Game Round Account ===");
-      console.log(`  Round ID: ${account.roundId?.toNumber()}`);
-      console.log(`  Status: ${status}`);
-      console.log(`  Bet Count: ${account.betCount}`);
-      console.log(`  Total Pot: ${account.totalPot?.toNumber()} lamports`);
+      console.log(`  Game Round: ${account.gameRound?.toNumber()}`);
+      console.log(`  Status: ${account.status} (0=open, 1=closed)`);
+      console.log(`  Bet Count: ${account.bets?.length ?? 0}`);
+      console.log(`  Total Deposit: ${account.totalDeposit?.toNumber()} lamports`);
       console.log(`  Winner: ${account.winner?.toBase58() ?? "None"}`);
-      console.log(`  Winning Bet Index: ${account.winningBetIndex ?? "N/A"}`);
-      console.log(`  VRF Fulfilled: ${account.randomnessFulfilled ?? false}`);
+      console.log(`  Winning Bet Index: ${account.winningBetIndex?.toNumber() ?? "N/A"}`);
       console.log("==========================");
 
+      // Transform bets array
+      const bets: BetInfoStruct[] = (account.bets || []).map((bet: any) => ({
+        walletIndex: bet.walletIndex,
+        amount: bet.amount?.toNumber() ?? 0,
+        skin: bet.skin,
+        position: [bet.position[0], bet.position[1]] as [number, number],
+      }));
+
       return {
-        roundId: account.roundId?.toNumber() ?? 0,
-        status,
-        startTimestamp: account.startTimestamp?.toNumber() ?? 0,
-        endTimestamp: account.endTimestamp?.toNumber() ?? 0,
-        betCount: account.betCount ?? 0,
-        betAmounts: Array.from(account.betAmounts || []).map(
-          (amount: any) => amount?.toNumber() ?? 0
-        ),
-        // NEW: Character customization arrays from blockchain
-        betSkin: Array.from(account.betSkin || []), // u8 array (0-255)
-        betPosition: Array.from(account.betPosition || []).map(
-          (pos: any) => Array.from(pos || [0, 0]) // [[u16, u16]] -> [[number, number]]
-        ),
-        totalPot: account.totalPot?.toNumber() ?? 0,
-        winner: account.winner ? account.winner.toBase58() : null, // Convert PublicKey to string or null
-        winningBetIndex: account.winningBetIndex ?? 0,
-        // ORAO VRF integration
-        vrfRequestPubkey: account.vrfRequestPubkey ? account.vrfRequestPubkey.toBase58() : null, // Convert PublicKey to string or null
-        vrfSeed: Array.from(account.vrfSeed || []),
-        randomnessFulfilled: account.randomnessFulfilled ?? false,
+        gameRound: account.gameRound?.toNumber() ?? 0,
+        startDate: account.startDate?.toNumber() ?? 0,
+        endDate: account.endDate?.toNumber() ?? 0,
+        totalDeposit: account.totalDeposit?.toNumber() ?? 0,
+        rand: account.rand?.toNumber() ?? 0,
+        userCount: account.userCount?.toNumber() ?? 0,
+        force: Array.from(account.force || []),
+        status: account.status ?? 0,
+        winner: account.winner ? account.winner.toBase58() : null,
+        winnerPrize: account.winnerPrize?.toNumber() ?? 0,
+        winningBetIndex: account.winningBetIndex ? account.winningBetIndex.toNumber() : null,
+        wallets: (account.wallets || []).map((w: any) => w.toBase58()),
+        bets,
+        // Computed properties for backward compatibility
+        roundId: account.gameRound?.toNumber() ?? 0,
+        startTimestamp: account.startDate?.toNumber() ?? 0,
+        endTimestamp: account.endDate?.toNumber() ?? 0,
+        totalPot: account.totalDeposit?.toNumber() ?? 0,
+        betCount: bets.length,
+        betAmounts: bets.map(b => b.amount),
+        betSkin: bets.map(b => b.skin),
+        betPosition: bets.map(b => b.position),
       };
     } catch (error) {
       // Game round account doesn't exist yet (no bets placed)
@@ -266,7 +244,7 @@ export class SolanaClient {
   }
 
   /**
-   * Get the current active game state
+   * Get the current active game state (risk-based architecture)
    * This fetches from the active_game PDA (single source of truth for current game)
    * Use this instead of getGameRound() for real-time game state
    */
@@ -275,53 +253,53 @@ export class SolanaClient {
 
     try {
       // Fetch account with null check
-      const account = await this.program.account.gameRound.fetchNullable(activeGame);
+      const account = await this.program.account.domin8Game.fetchNullable(activeGame);
 
       if (!account) {
         console.log("No active game exists");
         return null;
       }
 
-      // Convert status from Anchor enum to our enum
-      let status: GameStatus;
-      if (account.status?.waiting) status = GameStatus.Waiting;
-      else if (account.status?.awaitingWinnerRandomness)
-        status = GameStatus.AwaitingWinnerRandomness;
-      else if (account.status?.finished) status = GameStatus.Finished;
-      else {
-        console.warn("Unknown game status:", account.status);
-        return null;
-      }
-
       console.log("=== Active Game Account ===");
-      console.log(`  Round ID: ${account.roundId?.toNumber()}`);
-      console.log(`  Status: ${status}`);
-      console.log(`  Bet Count: ${account.betCount}`);
-      console.log(`  Total Pot: ${account.totalPot?.toNumber()} lamports`);
+      console.log(`  Game Round: ${account.gameRound?.toNumber()}`);
+      console.log(`  Status: ${account.status} (0=open, 1=closed)`);
+      console.log(`  Bet Count: ${account.bets?.length ?? 0}`);
+      console.log(`  Total Deposit: ${account.totalDeposit?.toNumber()} lamports`);
       console.log(`  Winner: ${account.winner?.toBase58() ?? "None"}`);
-      console.log(`  Winning Bet Index: ${account.winningBetIndex ?? "N/A"}`);
-      console.log(`  VRF Fulfilled: ${account.randomnessFulfilled ?? false}`);
+      console.log(`  Winning Bet Index: ${account.winningBetIndex?.toNumber() ?? "N/A"}`);
       console.log("===========================");
 
+      // Transform bets array
+      const bets: BetInfoStruct[] = (account.bets || []).map((bet: any) => ({
+        walletIndex: bet.walletIndex,
+        amount: bet.amount?.toNumber() ?? 0,
+        skin: bet.skin,
+        position: [bet.position[0], bet.position[1]] as [number, number],
+      }));
+
       return {
-        roundId: account.roundId?.toNumber() ?? 0,
-        status,
-        startTimestamp: account.startTimestamp?.toNumber() ?? 0,
-        endTimestamp: account.endTimestamp?.toNumber() ?? 0,
-        betCount: account.betCount ?? 0,
-        betAmounts: Array.from(account.betAmounts || []).map(
-          (amount: any) => amount?.toNumber() ?? 0
-        ),
-        betSkin: Array.from(account.betSkin || []),
-        betPosition: Array.from(account.betPosition || []).map(
-          (pos: any) => Array.from(pos || [0, 0])
-        ),
-        totalPot: account.totalPot?.toNumber() ?? 0,
+        gameRound: account.gameRound?.toNumber() ?? 0,
+        startDate: account.startDate?.toNumber() ?? 0,
+        endDate: account.endDate?.toNumber() ?? 0,
+        totalDeposit: account.totalDeposit?.toNumber() ?? 0,
+        rand: account.rand?.toNumber() ?? 0,
+        userCount: account.userCount?.toNumber() ?? 0,
+        force: Array.from(account.force || []),
+        status: account.status ?? 0,
         winner: account.winner ? account.winner.toBase58() : null,
-        winningBetIndex: account.winningBetIndex ?? 0,
-        vrfRequestPubkey: account.vrfRequestPubkey ? account.vrfRequestPubkey.toBase58() : null,
-        vrfSeed: Array.from(account.vrfSeed || []),
-        randomnessFulfilled: account.randomnessFulfilled ?? false,
+        winnerPrize: account.winnerPrize?.toNumber() ?? 0,
+        winningBetIndex: account.winningBetIndex ? account.winningBetIndex.toNumber() : null,
+        wallets: (account.wallets || []).map((w: any) => w.toBase58()),
+        bets,
+        // Computed properties for backward compatibility
+        roundId: account.gameRound?.toNumber() ?? 0,
+        startTimestamp: account.startDate?.toNumber() ?? 0,
+        endTimestamp: account.endDate?.toNumber() ?? 0,
+        totalPot: account.totalDeposit?.toNumber() ?? 0,
+        betCount: bets.length,
+        betAmounts: bets.map(b => b.amount),
+        betSkin: bets.map(b => b.skin),
+        betPosition: bets.map(b => b.position),
       };
     } catch (error) {
       console.log("Error fetching active game:", error);
@@ -343,202 +321,94 @@ export class SolanaClient {
     return await this.connection.getSlot("confirmed");
   }
 
-  // Close betting window and lock game for resolution
-  // NEW: For single-player games, passes player wallet for automatic refund
-  async closeBettingWindow(): Promise<string> {
-    // Fetch active game to get bet count and actual round ID
-    const { gameConfig, gameCounter, activeGame, vault } = this.getPDAs();
+  // End game and lock for winner selection (risk-based architecture)
+  async endGame(roundId: number): Promise<string> {
+    const { config, activeGame } = this.getPDAs();
+    const { gameRound } = this.getPDAs(roundId);
 
-    const activeGameAccount = await this.program.account.gameRound.fetch(activeGame);
-    const betCount = activeGameAccount.betCount;
-    const activeGameRoundId = activeGameAccount.roundId.toNumber();
-
-    // IMPORTANT: Use counter.current_round_id to derive game_round PDA
-    // (matches the Solana program's seed constraint)
-    const gameCounterAccount = await this.program.account.gameCounter.fetch(gameCounter);
-    const counterRoundId = gameCounterAccount.currentRoundId.toNumber();
-
-    console.log(`Active game round ID: ${activeGameRoundId}, Counter round ID: ${counterRoundId}`);
-
-    // CRITICAL FIX: The Solana program validates game_round PDA against counter.current_round_id
-    // But if counter was already incremented, we need to use the active game's round ID
-    // This happens when a previous game finished and incremented the counter
-    // Use activeGameRoundId to derive the correct game_round PDA
-    const { gameRound } = this.getPDAs(activeGameRoundId);
     if (!gameRound) {
       throw new Error("Failed to derive game round PDA");
     }
 
-    // CRITICAL: Use the ACTIVE GAME'S round ID to derive BetEntry PDAs
-    // (BetEntry PDAs were created with the round ID at the time bets were placed)
-    const remainingAccounts = [];
-    const uniquePlayers = new Set<string>();
-
-    for (let i = 0; i < betCount; i++) {
-      const { betEntry } = this.getPDAs(activeGameRoundId, i);
-      if (betEntry) {
-        remainingAccounts.push({
-          pubkey: betEntry,
-          isWritable: false, // Read-only for validation
-          isSigner: false,
-        });
-
-        // Track unique players for single-player detection
-        try {
-          const betEntryAccount = await this.program.account.betEntry.fetch(betEntry);
-          uniquePlayers.add(betEntryAccount.wallet.toBase58());
-        } catch (error) {
-          console.error(`Failed to fetch bet entry ${i}:`, error);
-        }
-      }
-    }
-
-    // NEW: For single-player games, add the player's wallet for automatic refund
-    if (uniquePlayers.size === 1) {
-      const playerWallet = Array.from(uniquePlayers)[0];
-      remainingAccounts.push({
-        pubkey: new PublicKey(playerWallet),
-        isWritable: true, // IMPORTANT: Must be writable for automatic transfer
-        isSigner: false, // Crank signs, not the player
-      });
-      console.log(
-        `Single-player game detected. Automatic refund will be attempted for player: ${playerWallet}`
-      );
-    } else {
-      console.log(
-        `Multi-player game with ${uniquePlayers.size} players. No automatic refund needed.`
-      );
-    }
-
-    console.log(`Closing betting window for round ${activeGameRoundId} with ${betCount} bets`);
+    console.log(`Ending game for round ${roundId}`);
 
     const tx = await this.program.methods
-      .closeBettingWindow(new anchor.BN(activeGameRoundId))
+      .endGame(new anchor.BN(roundId))
       .accounts({
-        counter: gameCounter,
-        gameRound: gameRound,
-        activeGame: activeGame,
-        config: gameConfig,
-        vault,
-        crank: this.authority.publicKey,
+        config,
+        activeGame,
+        gameRound,
+        admin: this.authority.publicKey,
         systemProgram: anchor.web3.SystemProgram.programId,
       } as any)
-      .remainingAccounts(remainingAccounts)
       .rpc();
 
     return tx;
   }
 
-  // Select winner using VRF and distribute payouts
-  async selectWinnerAndPayout(vrfRequestPubkeyStr: string): Promise<string> {
-    const vrfRequestPubkey = new PublicKey(vrfRequestPubkeyStr);
+  // Send prize to winner (risk-based architecture)
+  async sendPrizeWinner(roundId: number): Promise<string> {
+    const { config, activeGame } = this.getPDAs();
+    const { gameRound } = this.getPDAs(roundId);
 
-    // Fetch active game to get current round ID and bet count
-    const { gameConfig, gameCounter, activeGame, vault } = this.getPDAs();
-
-    const activeGameAccount = await this.program.account.gameRound.fetch(activeGame);
-    const currentRoundId = activeGameAccount.roundId.toNumber();
-
-    // Also need the historical game_round PDA for the instruction
-    const { gameRound } = this.getPDAs(currentRoundId);
     if (!gameRound) {
       throw new Error("Failed to derive game round PDA");
     }
 
-    // Get treasury from game config
-    const gameConfigAccount = await this.program.account.gameConfig.fetch(gameConfig);
+    // Fetch game to get winner
+    const gameAccount = await this.program.account.domin8Game.fetch(gameRound);
 
-    // Fetch BetEntry PDAs for all bets to get player wallet addresses
-    const betCount = activeGameAccount.betCount;
-    const remainingAccounts = [];
-
-    for (let i = 0; i < betCount; i++) {
-      const { betEntry } = this.getPDAs(currentRoundId, i);
-      if (betEntry) {
-        try {
-          const betEntryAccount = await this.program.account.betEntry.fetch(betEntry);
-          remainingAccounts.push({
-            pubkey: betEntryAccount.wallet,
-            isWritable: true, // Player accounts will receive funds if they win
-            isSigner: false, // Player accounts are not signing this transaction
-          });
-        } catch (error) {
-          console.error(`Failed to fetch bet entry ${i}:`, error);
-        }
-      }
+    if (!gameAccount.winner) {
+      throw new Error("No winner determined yet");
     }
 
-    // Skip preflight because simulation doesn't understand PDA signing (invoke_signed)
-    // The vault PDA will sign the transfer within the program
+    // Get treasury from config
+    const configAccount = await this.program.account.domin8Config.fetch(config);
+
+    console.log(`Sending prize to winner for round ${roundId}`);
+
     const tx = await this.program.methods
-      .selectWinnerAndPayout()
+      .sendPrizeWinner(new anchor.BN(roundId))
       .accounts({
-        counter: gameCounter,
-        gameRound: gameRound,
-        activeGame: activeGame,
-        config: gameConfig,
-        vault,
-        crank: this.authority.publicKey,
-        vrfRequest: vrfRequestPubkey,
-        treasury: gameConfigAccount.treasury,
+        config,
+        activeGame,
+        gameRound,
+        winner: gameAccount.winner,
+        treasury: configAccount.treasury,
+        admin: this.authority.publicKey,
         systemProgram: anchor.web3.SystemProgram.programId,
-      } as any) // Temporary until TypeScript types are properly generated
-      .remainingAccounts(remainingAccounts)
-      .rpc({ skipPreflight: true });
+      } as any)
+      .rpc();
 
     return tx;
   }
 
-  // Check if ORAO VRF is fulfilled
-  async checkVrfFulfillment(vrfRequestPubkeyStr: string | null): Promise<boolean> {
-    if (!vrfRequestPubkeyStr) {
-      return false; // No VRF request yet
-    }
+  // Note: VRF functionality removed - risk architecture uses simpler randomness
 
-    try {
-      const vrfRequestPubkey = new PublicKey(vrfRequestPubkeyStr);
-      const vrfAccount = await this.connection.getAccountInfo(vrfRequestPubkey);
-      if (!vrfAccount || vrfAccount.data.length < 49) {
-        return false;
-      }
+  // Fetch all bets for a specific round (risk-based architecture - bets stored inline)
+  async getBetsForRound(roundId: number): Promise<Array<BetInfoStruct & { wallet: string }>> {
+    const bets: Array<BetInfoStruct & { wallet: string }> = [];
 
-      // Check fulfillment flag at offset 48
-      return vrfAccount.data[48] !== 0;
-    } catch (error) {
-      console.error("Error checking VRF fulfillment:", error);
-      return false;
-    }
-  }
-
-  // Fetch all bets for a specific round (for bet event capture)
-  async getBetsForRound(roundId: number): Promise<BetEntry[]> {
-    const bets: BetEntry[] = [];
-
-    // Get bet count from game round
+    // Get game round account
     const { gameRound } = this.getPDAs(roundId);
     if (!gameRound) return bets;
 
     try {
-      const gameRoundAccount = await this.program.account.gameRound.fetch(gameRound);
-      const betCount = gameRoundAccount.betCount;
+      const gameRoundAccount = await this.program.account.domin8Game.fetch(gameRound);
+      const wallets = gameRoundAccount.wallets || [];
+      const betStructs = gameRoundAccount.bets || [];
 
-      // Fetch each bet entry PDA
-      for (let i = 0; i < betCount; i++) {
-        const { betEntry } = this.getPDAs(roundId, i);
-        if (!betEntry) continue;
-
-        try {
-          const betEntryAccount = await this.program.account.betEntry.fetch(betEntry);
+      // Transform inline bets to include wallet address
+      for (const bet of betStructs) {
+        const walletPubkey = wallets[bet.walletIndex];
+        if (walletPubkey) {
           bets.push({
-            gameRoundId: betEntryAccount.gameRoundId.toNumber(),
-            betIndex: betEntryAccount.betIndex,
-            wallet: betEntryAccount.wallet.toBase58(),
-            betAmount: betEntryAccount.betAmount.toNumber(),
-            timestamp: betEntryAccount.timestamp.toNumber(),
-            payoutCollected: betEntryAccount.payoutCollected,
+            walletIndex: bet.walletIndex,
+            amount: bet.amount?.toNumber() ?? 0,
+            skin: bet.skin,
+            position: [bet.position[0], bet.position[1]] as [number, number],
+            wallet: walletPubkey.toBase58(),
           });
-        } catch (error) {
-          console.error(`Failed to fetch bet entry ${i}:`, error);
         }
       }
     } catch (error) {
@@ -747,7 +617,7 @@ export class SolanaClient {
     return false;
   }
 
-  // Health check - test connection and authority
+  // Health check - test connection and authority (risk-based architecture)
   async healthCheck(): Promise<{ healthy: boolean; message: string; slot?: number }> {
     try {
       // Test connection
@@ -764,12 +634,11 @@ export class SolanaClient {
         };
       }
 
-      // Test if game accounts exist
-      const { gameConfig, gameCounter } = this.getPDAs();
-      await this.program.account.gameConfig.fetch(gameConfig);
-      await this.program.account.gameCounter.fetch(gameCounter);
+      // Test if config account exists
+      const { config } = this.getPDAs();
+      await this.program.account.domin8Config.fetch(config);
 
-      // Note: We don't check gameRound here since it may not exist yet (no bets placed)
+      // Note: We don't check activeGame/gameRound here since they may not exist yet (no bets placed)
 
       return {
         healthy: true,

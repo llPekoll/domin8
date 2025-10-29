@@ -12,6 +12,7 @@ import { generateRandomName } from "../lib/nameGenerator";
 import { usePrivy } from "@privy-io/react-auth";
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { getSolanaRpcUrl } from "../lib/utils";
+import { useActiveGame } from "../hooks/useActiveGame";
 
 export function Header() {
   const { connected, publicKey } = usePrivyWallet();
@@ -46,8 +47,8 @@ export function Header() {
     connected && publicKey ? { walletAddress: publicKey.toString() } : "skip"
   );
 
-  // Get current game state from Convex (auto-synced from blockchain every 5s)
-  const currentRoundState = useQuery(api.events.getCurrentRoundState);
+  // Get current game state directly from blockchain (not Convex)
+  const { activeGame: currentRoundState } = useActiveGame();
 
   // Debug: log when game status changes
   useEffect(() => {
@@ -131,19 +132,16 @@ export function Header() {
                   <div className="flex items-center gap-2">
                     <Map className="w-4 h-4 text-amber-400" />
                     <div className="font-bold text-amber-300 text-lg uppercase tracking-wide">
-                      Round #{currentRoundState.roundId}
+                      Round #{currentRoundState.roundId?.toString() || currentRoundState.gameRound?.toString() || "?"}
                     </div>
                   </div>
                   <div className="text-amber-300 text-sm flex items-center gap-1 mt-1">
                     <span className="text-yellow-300">⚡</span>
-                    {currentRoundState.status === "waiting" && "Waiting for players"}
-                    {currentRoundState.status === "awaitingWinnerRandomness" &&
-                      "Determining winner..."}
-                    {currentRoundState.status === "finished" && "Game Over - Place bet for new round"}
+                    {currentRoundState.status === 0 && "Waiting for players"}
+                    {currentRoundState.status === 1 && "Determining winner..."}
+                    {currentRoundState.status === 2 && "Game Over - Place bet for new round"}
                     {/* Debug: show status if unexpected */}
-                    {!["waiting", "awaitingWinnerRandomness", "finished"].includes(
-                      currentRoundState.status
-                    ) && `Status: ${currentRoundState.status}`}
+                    {![0, 1, 2].includes(currentRoundState.status as number) && `Status: ${currentRoundState.status}`}
                   </div>
                 </div>
               )}

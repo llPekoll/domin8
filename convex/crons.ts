@@ -1,8 +1,8 @@
 /**
- * Convex Cron Jobs for Domin8 Game Management
+ * Convex Cron Jobs for Domin8 Game Management (Risk-based Architecture)
  *
  * Scheduled functions for periodic maintenance tasks.
- * Note: Game state progression now uses ctx.scheduler.runAfter() instead of polling.
+ * Uses simple polling pattern from risk.fun worker (proven, reliable).
  */
 import { cronJobs } from "convex/server";
 import { internal } from "./_generated/api";
@@ -10,26 +10,19 @@ import { internal } from "./_generated/api";
 const crons = cronJobs();
 
 /**
- * PRIMARY EVENT LISTENER - monitors blockchain for new events (event-driven architecture)
- * Runs every 3 seconds to capture BetPlaced, GameCreated, WinnerSelected events
- * This is the main data ingestion mechanism (replaces PDA polling)
+ * PRIMARY SYNC SERVICE - Syncs blockchain state to Convex database
+ * Runs every 5 seconds (matches risk.fun worker pattern)
+ *
+ * Functionality:
+ * 1. Fetches active game from blockchain (getActiveGame)
+ * 2. Syncs to Convex database
+ * 3. Schedules endGame action when game expires
  */
-// crons.interval(
-//   "blockchain-event-listener",
-//   { seconds: 3 },
-//   internal.blockchainEventListener.listenForEvents
-// );
-
-/**
- * LEGACY PDA POLLING - captures game round state changes
- * Runs every 5 seconds as fallback/supplement to event listener
- * TODO: Can be removed once event-driven architecture is fully tested
- */
-// crons.interval(
-//   "blockchain-fetch-round-pdas",
-//   { seconds: 5 },
-//   internal.fetchRoundPDAs.fetchRoundPDAs
-// );
+crons.interval(
+  "sync-blockchain-state",
+  { seconds: 5 },
+  internal.syncService.syncBlockchainState
+);
 
 /**
  * Game recovery - self-healing system that catches overdue actions

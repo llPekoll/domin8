@@ -12,24 +12,57 @@ import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
 import { usePrivyWallet } from "./usePrivyWallet";
 import idl from "../programs/domin8/domin8_prgm.json";
 
-// Match GameRound struct from smart contract
+// Bet info structure from smart contract
+export interface BetInfo {
+  walletIndex: number;
+  amount: BN;
+  skin: number;
+  position: [number, number];
+}
+
+// Match Domin8Game struct from smart contract (risk-based architecture)
 export interface ActiveGameState {
-  roundId: BN;
-  status: { waiting?: {} } | { awaitingWinnerRandomness?: {} } | { finished?: {} };
-  startTimestamp: BN;
-  endTimestamp: BN;
-  betCount: number;
-  totalPot: BN;
-  betAmounts: BN[];
-  betSkin: number[];
-  betPosition: [number, number][];
-  winner: PublicKey;
-  winningBetIndex: number;
-  winnerPrizeUnclaimed: BN;
-  houseFeeUnclaimed: BN;
-  vrfRequestPubkey: PublicKey;
-  vrfSeed: number[];
-  randomnessFulfilled: boolean;
+  gameRound: BN;  // Changed from roundId
+  startDate: BN;  // Changed from startTimestamp
+  endDate: BN;    // Changed from endTimestamp
+  totalDeposit: BN;  // Changed from totalPot
+  rand: BN;
+  userCount: BN;
+  force: number[];
+  status: number;  // 0 = open, 1 = closed (simplified from enum)
+  winner: PublicKey | null;
+  winnerPrize: BN;
+  winningBetIndex: BN | null;
+  wallets: PublicKey[];  // NEW: Unique wallet addresses
+  bets: BetInfo[];       // NEW: Array of bet info structs
+
+  // Computed properties for backward compatibility
+  roundId?: BN;
+  startTimestamp?: BN;
+  endTimestamp?: BN;
+  totalPot?: BN;
+  betCount?: number;
+  betAmounts?: BN[];
+  betSkin?: number[];
+  betPosition?: [number, number][];
+}
+
+// Transform raw game data to include backward-compatible computed properties
+function transformGameData(raw: any): ActiveGameState {
+  const bets: BetInfo[] = raw.bets || [];
+
+  return {
+    ...raw,
+    // Add computed properties for backward compatibility
+    roundId: raw.gameRound,
+    startTimestamp: raw.startDate,
+    endTimestamp: raw.endDate,
+    totalPot: raw.totalDeposit,
+    betCount: bets.length,
+    betAmounts: bets.map((b: BetInfo) => b.amount),
+    betSkin: bets.map((b: BetInfo) => b.skin),
+    betPosition: bets.map((b: BetInfo) => b.position),
+  };
 }
 
 export function useActiveGame() {
@@ -171,10 +204,14 @@ export function useActiveGame() {
 
           // Try to fetch the game data
           console.log("[DOMIN8] 🔄 Attempting to fetch game data...");
-          const gameData = await (program.account as any).gameRound.fetch(
+          const rawGameData = await (program.account as any).domin8Game.fetch(
             activeGamePDA
           );
-          console.log("[DOMIN8] ✅ Active game data fetched:", gameData);
+          console.log("[DOMIN8] ✅ Active game data fetched:", rawGameData);
+
+          // Transform data for backward compatibility
+          const gameData = transformGameData(rawGameData);
+
           if (isMounted) {
             setActiveGame(gameData);
           }
@@ -202,10 +239,11 @@ export function useActiveGame() {
 
               try {
                 if (accountInfo.data.length > 0) {
-                  const gameData = (program.coder.accounts as any).decode(
-                    "gameRound",
+                  const rawGameData = (program.coder.accounts as any).decode(
+                    "domin8Game",
                     accountInfo.data
                   );
+                  const gameData = transformGameData(rawGameData);
                   setActiveGame(gameData);
                   console.log("[DOMIN8] 🔄 Active game updated:", gameData);
                 } else {
