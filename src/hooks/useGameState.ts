@@ -1,11 +1,12 @@
 /**
- * Hook for accessing game state from Convex
- * Convex automatically syncs blockchain state every 5 seconds via cron job
- * 
- * This replaces direct blockchain polling with reactive Convex queries
+ * Hook for accessing game state from Solana blockchain
+ *
+ * NOW USES: Direct blockchain subscription via active_game PDA
+ * BEFORE: Convex polling (5 second delay)
+ * BENEFIT: <1 second updates vs 5 seconds
  */
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useActiveGame } from "./useActiveGame";
+import { useMemo } from "react";
 
 export interface BetEntry {
   wallet: string;
@@ -40,67 +41,75 @@ export interface GameConfig {
 }
 
 export function useGameState() {
-  // Query current game state from Convex (auto-synced from blockchain)
-  const currentRoundState = useQuery(api.events.getCurrentRoundState);
-  const stateStats = useQuery(api.events.getStateStats);
+  // Subscribe directly to active_game PDA on Solana blockchain
+  const { activeGame, isLoading, activeGamePDA } = useActiveGame();
 
-  const loading = currentRoundState === undefined || stateStats === undefined;
+  const loading = isLoading;
   const error = null;
 
-  // Helper to convert Convex status to expected format
-  const formatStatus = (status: string): GameState["status"] => {
-    const statusMap: Record<string, GameState["status"]> = {
-      waiting: "Waiting",
-      awaitingWinnerRandomness: "AwaitingWinnerRandomness",
-      finished: "Finished",
+  // Helper to convert blockchain status to expected format
+  const formatStatus = (
+    status: { waiting?: {} } | { awaitingWinnerRandomness?: {} } | { finished?: {} }
+  ): GameState["status"] => {
+    if ("waiting" in status) return "Waiting";
+    if ("awaitingWinnerRandomness" in status) return "AwaitingWinnerRandomness";
+    if ("finished" in status) return "Finished";
+    return "Waiting";
+  };
+
+  // Transform blockchain active_game to GameState interface
+  const gameState: GameState | null = useMemo(() => {
+    if (!activeGame) return null;
+
+    return {
+      roundId: activeGame.roundId.toNumber(),
+      status: formatStatus(activeGame.status),
+      startTimestamp: activeGame.startTimestamp.toNumber(),
+      endTimestamp: activeGame.endTimestamp.toNumber(),
+      bets: Array.from({ length: activeGame.betCount }, (_, index) => ({
+        wallet: `Player ${index + 1}`, // Wallet addresses stored in separate BetEntry PDAs
+        betAmount: activeGame.betAmounts[index].toNumber() / 1_000_000_000, // Convert lamports to SOL
+        timestamp: activeGame.startTimestamp.toNumber(), // Approximate
+      })),
+      initialPot: activeGame.totalPot.toNumber() / 1_000_000_000, // Convert lamports to SOL
+      winner: activeGame.winner.toString(),
+      vrfRequestPubkey: activeGame.vrfRequestPubkey.toString(),
+      vrfSeed: activeGame.vrfSeed,
+      randomnessFulfilled: activeGame.randomnessFulfilled,
+      gameRoundPda: activeGamePDA?.toString() || "Unknown",
+      vaultPda: "Derived from seeds",
     };
-    return statusMap[status] || "Waiting";
-  };
+  }, [activeGame, activeGamePDA]);
 
-  // Transform Convex gameRoundState to GameState interface
-  const gameState: GameState | null = currentRoundState
-    ? {
-        roundId: currentRoundState.roundId,
-        status: formatStatus(currentRoundState.status),
-        startTimestamp: currentRoundState.startTimestamp,
-        endTimestamp: currentRoundState.endTimestamp,
-        bets: currentRoundState.betAmounts.map((amount: number, index: number) => ({
-          wallet: `Player ${index + 1}`, // Wallet addresses not stored in gameRoundStates
-          betAmount: amount / 1_000_000_000, // Convert lamports to SOL
-          timestamp: currentRoundState.startTimestamp, // Approximate
-        })),
-        initialPot: currentRoundState.totalPot / 1_000_000_000, // Convert lamports to SOL
-        winner: currentRoundState.winner,
-        vrfRequestPubkey: currentRoundState.vrfRequestPubkey || "N/A",
-        vrfSeed: currentRoundState.vrfSeed,
-        randomnessFulfilled: currentRoundState.randomnessFulfilled,
-        gameRoundPda: "Tracked via Convex",
-        vaultPda: "Tracked via Convex",
-      }
-    : null;
+  // Mock game config (these are program constants)
+  const gameConfig: GameConfig = useMemo(
+    () => ({
+      authority: "Backend Wallet",
+      treasury: "Treasury Wallet",
+      houseFeeBasisPoints: 500, // 5%
+      minBetLamports: 0.01, // 0.01 SOL
+      vrfFeeLamports: 0.001, // 0.001 SOL
+      vrfNetworkState: "Devnet",
+      vrfTreasury: "VRF Treasury",
+      gameLocked: activeGame?.status
+        ? !("waiting" in activeGame.status)
+        : false,
+    }),
+    [activeGame]
+  );
 
-  // Mock game config (these are program constants, consider fetching from blockchain if needed)
-  const gameConfig: GameConfig = {
-    authority: "Backend Wallet",
-    treasury: "Treasury Wallet",
-    houseFeeBasisPoints: 500, // 5%
-    minBetLamports: 0.01, // 0.01 SOL
-    vrfFeeLamports: 0.001, // 0.001 SOL
-    vrfNetworkState: "Mainnet",
-    vrfTreasury: "VRF Treasury",
-    gameLocked: currentRoundState?.status !== "waiting",
-  };
+  const vaultBalance = -1; // Vault balance not tracked yet
 
-  const vaultBalance = -1; // Vault balance not tracked in Convex yet
-
-  return { 
-    gameState, 
-    gameConfig, 
-    vaultBalance, 
-    loading, 
-    error, 
+  return {
+    gameState,
+    gameConfig,
+    vaultBalance,
+    loading,
+    error,
     refresh: () => {
-      console.log("Convex auto-syncs blockchain state every 5 seconds via cron job");
-    } 
+      console.log(
+        "[DOMIN8] Direct blockchain subscription - no manual refresh needed (updates in <1s)"
+      );
+    },
   };
 }

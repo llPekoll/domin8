@@ -4,7 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 import { Buffer } from "buffer";
 
 // Program ID (matches deployed program and IDL)
-export const DOMIN8_PROGRAM_ID = new PublicKey("4AtbjvHma9wNEP1a426rDDQ2ccBAAZSg9ktRJ54odk6g");
+export const DOMIN8_PROGRAM_ID = new PublicKey("A1uzFDgsXN8Mjd1qJvTa7qq5twt43R8ejfrkEbcxNzzQ");
 
 // Game Status enum from the Solana program (simplified for small games MVP)
 export enum GameStatus {

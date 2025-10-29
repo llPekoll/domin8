@@ -45,6 +45,13 @@ pub struct CreateGame<'info> {
     )]
     pub game_round: Box<Account<'info, GameRound>>,
 
+    #[account(
+        mut,
+        seeds = [b"active_game"],
+        bump
+    )]
+    pub active_game: Box<Account<'info, GameRound>>,
+
     /// First bet entry PDA (bet_index = 0)
     #[account(
         init,
@@ -120,6 +127,7 @@ pub fn create_game(
     let config = &mut ctx.accounts.config;
     let counter = &mut ctx.accounts.counter;
     let game_round = &mut ctx.accounts.game_round;
+    let active_game = &mut ctx.accounts.active_game;
     let player_key = ctx.accounts.player.key();
     let clock = Clock::get()?;
 
@@ -264,6 +272,31 @@ pub fn create_game(
         game_round.bet_position[i] = [0, 0];
     }
 
+    // ⭐ RESET ACTIVE_GAME (like riskdotfun pattern - overwrite active_game for real-time frontend)
+    active_game.round_id = game_round.round_id;
+    active_game.status = game_round.status.clone();
+    active_game.start_timestamp = game_round.start_timestamp;
+    active_game.end_timestamp = game_round.end_timestamp;
+    active_game.bet_count = 1;
+    active_game.total_pot = amount;
+    active_game.bet_amounts[0] = amount;
+    active_game.bet_skin[0] = skin;
+    active_game.bet_position[0] = position;
+    active_game.winner = Pubkey::default();
+    active_game.winning_bet_index = 0;
+    active_game.winner_prize_unclaimed = 0;
+    active_game.house_fee_unclaimed = 0;
+    active_game.vrf_request_pubkey = game_round.vrf_request_pubkey;
+    active_game.vrf_seed = seed;
+    active_game.randomness_fulfilled = false;
+
+    // Initialize remaining array slots to zero in active_game
+    for i in 1..64 {
+        active_game.bet_amounts[i] = 0;
+        active_game.bet_skin[i] = 0;
+        active_game.bet_position[i] = [0, 0];
+    }
+
     msg!(
         "First bet placed: {}, amount: {}, total bets: {}",
         player_key,
@@ -274,6 +307,7 @@ pub fn create_game(
     msg!("game round ->{}", game_round.get_lamports());
     msg!("game Len ->{}", game_round.to_account_info().data_len());
     msg!("Rent {}", Rent::get()?.minimum_balance(GameRound::LEN));
+    msg!("✓ Active game reset for round {}", active_game.round_id);
 
     // ⭐ LOCK SYSTEM (prevents concurrent games using same force)
     config.bets_locked = true;

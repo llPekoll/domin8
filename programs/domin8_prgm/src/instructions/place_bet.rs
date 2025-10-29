@@ -26,6 +26,13 @@ pub struct PlaceBet<'info> {
     )]
     pub game_round: Box<Account<'info, GameRound>>,
 
+    #[account(
+        mut,
+        seeds = [b"active_game"],
+        bump
+    )]
+    pub active_game: Box<Account<'info, GameRound>>,
+
     /// CREATE: BetEntry PDA for storing bet details
     #[account(
         init,
@@ -59,6 +66,7 @@ pub struct PlaceBet<'info> {
 pub fn place_bet(ctx: Context<PlaceBet>, amount: u64, skin: u8, position: [u16; 2]) -> Result<()> {
     let counter = &ctx.accounts.counter;
     let game_round = &mut ctx.accounts.game_round;
+    let active_game = &mut ctx.accounts.active_game;
     let player_key = ctx.accounts.player.key();
     let clock = Clock::get()?;
 
@@ -121,6 +129,13 @@ pub fn place_bet(ctx: Context<PlaceBet>, amount: u64, skin: u8, position: [u16; 
     game_round.bet_position[bet_index] = position;
     game_round.bet_count += 1;
 
+    // ⭐ UPDATE ACTIVE_GAME (frontend subscribes to this for real-time updates)
+    active_game.bet_amounts[bet_index] = amount;
+    active_game.bet_skin[bet_index] = skin;
+    active_game.bet_position[bet_index] = position;
+    active_game.bet_count = game_round.bet_count;
+    active_game.total_pot = game_round.total_pot;
+
     // Create BetEntry PDA for detailed tracking
     let bet_entry = &mut ctx.accounts.bet_entry;
     bet_entry.game_round_id = game_round.round_id;
@@ -138,6 +153,7 @@ pub fn place_bet(ctx: Context<PlaceBet>, amount: u64, skin: u8, position: [u16; 
     );
 
     msg!("Total pot: {} lamports", game_round.total_pot);
+    msg!("✓ Active game updated with bet #{}", bet_index);
 
     // ⭐ Emit bet placed event
     emit!(BetPlaced {

@@ -102,7 +102,13 @@ export class SolanaClient {
 
     const [vault] = PublicKey.findProgramAddressSync([PDA_SEEDS.VAULT], DOMIN8_PROGRAM_ID);
 
-    // Derive per-game PDA if roundId is provided
+    // Derive active_game PDA (single PDA that always points to current game)
+    const [activeGame] = PublicKey.findProgramAddressSync(
+      [Buffer.from("active_game")],
+      DOMIN8_PROGRAM_ID
+    );
+
+    // Derive per-game PDA if roundId is provided (for historical lookups)
     let gameRound: PublicKey | undefined;
     if (roundId !== undefined) {
       const roundIdBuffer = Buffer.alloc(8);
@@ -127,7 +133,7 @@ export class SolanaClient {
       );
     }
 
-    return { gameConfig, gameCounter, gameRound, vault, betEntry };
+    return { gameConfig, gameCounter, activeGame, gameRound, vault, betEntry };
   }
 
   // Get current round ID from GameCounter
@@ -259,6 +265,79 @@ export class SolanaClient {
     }
   }
 
+  /**
+   * Get the current active game state
+   * This fetches from the active_game PDA (single source of truth for current game)
+   * Use this instead of getGameRound() for real-time game state
+   */
+  async getActiveGame(): Promise<GameRound | null> {
+    const { activeGame } = this.getPDAs();
+
+    try {
+      // Fetch account with null check
+      const account = await this.program.account.gameRound.fetchNullable(activeGame);
+
+      if (!account) {
+        console.log("No active game exists");
+        return null;
+      }
+
+      // Convert status from Anchor enum to our enum
+      let status: GameStatus;
+      if (account.status?.waiting) status = GameStatus.Waiting;
+      else if (account.status?.awaitingWinnerRandomness)
+        status = GameStatus.AwaitingWinnerRandomness;
+      else if (account.status?.finished) status = GameStatus.Finished;
+      else {
+        console.warn("Unknown game status:", account.status);
+        return null;
+      }
+
+      console.log("=== Active Game Account ===");
+      console.log(`  Round ID: ${account.roundId?.toNumber()}`);
+      console.log(`  Status: ${status}`);
+      console.log(`  Bet Count: ${account.betCount}`);
+      console.log(`  Total Pot: ${account.totalPot?.toNumber()} lamports`);
+      console.log(`  Winner: ${account.winner?.toBase58() ?? "None"}`);
+      console.log(`  Winning Bet Index: ${account.winningBetIndex ?? "N/A"}`);
+      console.log(`  VRF Fulfilled: ${account.randomnessFulfilled ?? false}`);
+      console.log("===========================");
+
+      return {
+        roundId: account.roundId?.toNumber() ?? 0,
+        status,
+        startTimestamp: account.startTimestamp?.toNumber() ?? 0,
+        endTimestamp: account.endTimestamp?.toNumber() ?? 0,
+        betCount: account.betCount ?? 0,
+        betAmounts: Array.from(account.betAmounts || []).map(
+          (amount: any) => amount?.toNumber() ?? 0
+        ),
+        betSkin: Array.from(account.betSkin || []),
+        betPosition: Array.from(account.betPosition || []).map(
+          (pos: any) => Array.from(pos || [0, 0])
+        ),
+        totalPot: account.totalPot?.toNumber() ?? 0,
+        winner: account.winner ? account.winner.toBase58() : null,
+        winningBetIndex: account.winningBetIndex ?? 0,
+        vrfRequestPubkey: account.vrfRequestPubkey ? account.vrfRequestPubkey.toBase58() : null,
+        vrfSeed: Array.from(account.vrfSeed || []),
+        randomnessFulfilled: account.randomnessFulfilled ?? false,
+      };
+    } catch (error) {
+      console.log("Error fetching active game:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Get the active_game PDA address
+   * This is the single PDA that always points to the current game
+   */
+  getActiveGamePDA(): PublicKey {
+    const { activeGame } = this.getPDAs();
+    return activeGame;
+  }
+
   // Get current Solana slot
   async getCurrentSlot(): Promise<number> {
     return await this.connection.getSlot("confirmed");
@@ -267,17 +346,18 @@ export class SolanaClient {
   // Close betting window and lock game for resolution
   // NEW: For single-player games, passes player wallet for automatic refund
   async closeBettingWindow(): Promise<string> {
-    // Get current round ID to derive correct game PDA
-    const currentRoundId = await this.getCurrentRoundId();
-    const { gameConfig, gameCounter, gameRound, vault } = this.getPDAs(currentRoundId);
+    // Fetch active game to get current round ID and bet count
+    const { gameConfig, gameCounter, activeGame, vault } = this.getPDAs();
 
+    const activeGameAccount = await this.program.account.gameRound.fetch(activeGame);
+    const currentRoundId = activeGameAccount.roundId.toNumber();
+    const betCount = activeGameAccount.betCount;
+
+    // Also need the historical game_round PDA for the instruction
+    const { gameRound } = this.getPDAs(currentRoundId);
     if (!gameRound) {
       throw new Error("Failed to derive game round PDA");
     }
-
-    // Fetch current game round to get bet count
-    const gameRoundAccount = await this.program.account.gameRound.fetch(gameRound);
-    const betCount = gameRoundAccount.betCount;
 
     // Fetch BetEntry PDAs for all bets (needed to count unique players)
     const remainingAccounts = [];
@@ -326,6 +406,7 @@ export class SolanaClient {
       .accounts({
         counter: gameCounter,
         gameRound: gameRound,
+        activeGame: activeGame,
         config: gameConfig,
         vault, // NOW required for auto-refund (was optional before)
         crank: this.authority.publicKey,
@@ -340,22 +421,23 @@ export class SolanaClient {
   async selectWinnerAndPayout(vrfRequestPubkeyStr: string): Promise<string> {
     const vrfRequestPubkey = new PublicKey(vrfRequestPubkeyStr);
 
-    // Get current round ID to derive correct game PDA
-    const currentRoundId = await this.getCurrentRoundId();
-    const { gameConfig, gameCounter, gameRound, vault } = this.getPDAs(currentRoundId);
+    // Fetch active game to get current round ID and bet count
+    const { gameConfig, gameCounter, activeGame, vault } = this.getPDAs();
 
+    const activeGameAccount = await this.program.account.gameRound.fetch(activeGame);
+    const currentRoundId = activeGameAccount.roundId.toNumber();
+
+    // Also need the historical game_round PDA for the instruction
+    const { gameRound } = this.getPDAs(currentRoundId);
     if (!gameRound) {
       throw new Error("Failed to derive game round PDA");
     }
-
-    // Fetch current game round to get bet count
-    const gameRoundAccount = await this.program.account.gameRound.fetch(gameRound);
 
     // Get treasury from game config
     const gameConfigAccount = await this.program.account.gameConfig.fetch(gameConfig);
 
     // Fetch BetEntry PDAs for all bets to get player wallet addresses
-    const betCount = gameRoundAccount.betCount;
+    const betCount = activeGameAccount.betCount;
     const remainingAccounts = [];
 
     for (let i = 0; i < betCount; i++) {
@@ -381,6 +463,7 @@ export class SolanaClient {
       .accounts({
         counter: gameCounter,
         gameRound: gameRound,
+        activeGame: activeGame,
         config: gameConfig,
         vault,
         crank: this.authority.publicKey,

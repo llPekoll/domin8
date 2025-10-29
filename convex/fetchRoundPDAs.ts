@@ -20,9 +20,10 @@ export const fetchRoundPDAs = internalAction({
 
 async function captureGameRoundState(ctx: any, solanaClient: SolanaClient) {
   try {
-    const gameRound = await solanaClient.getGameRound();
+    // Fetch active game state directly from active_game PDA
+    const gameRound = await solanaClient.getActiveGame();
     if (!gameRound) {
-      console.log("No active game round found on blockchain");
+      console.log("No active game found on blockchain");
       return;
     }
     const { roundId, status } = gameRound;
@@ -40,7 +41,7 @@ async function captureGameRoundState(ctx: any, solanaClient: SolanaClient) {
     await ctx.runMutation(internal.fetchRoundPDAsMutations.saveGameRoundState, {
       gameRound,
     });
-    console.log("Captured Round " + roundId + ": " + status);
+    console.log("Captured Active Game - Round " + roundId + ": " + status);
 
     // ⭐ NEW: Capture individual bets when in WAITING state
     if (status === GameStatus.Waiting) {
@@ -50,7 +51,7 @@ async function captureGameRoundState(ctx: any, solanaClient: SolanaClient) {
     // ⭐ NEW: Schedule actions based on game state
     await scheduleGameActions(ctx, gameRound);
   } catch (error) {
-    console.error("Error capturing game round state:", error);
+    console.error("Error capturing active game state:", error);
     throw error;
   }
 }

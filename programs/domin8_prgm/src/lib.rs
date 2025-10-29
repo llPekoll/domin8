@@ -18,7 +18,7 @@ pub use events::*;
 pub use state::*;
 pub use utils::*;
 
-declare_id!("4AtbjvHma9wNEP1a426rDDQ2ccBAAZSg9ktRJ54odk6g");
+declare_id!("A1uzFDgsXN8Mjd1qJvTa7qq5twt43R8ejfrkEbcxNzzQ");
 
 #[program]
 pub mod domin8_prgm {
@@ -88,11 +88,6 @@ pub mod domin8_prgm {
         ctx: Context<'_, '_, '_, 'info, EmergencyRefundVrfTimeout<'info>>,
     ) -> Result<()> {
         instructions::emergency_refund_vrf_timeout(ctx)
-    }
-
-    /// Set counter value (admin only, for fixing stuck states)
-    pub fn set_counter(ctx: Context<SetCounter>, new_value: u64) -> Result<()> {
-        instructions::set_counter(ctx, new_value)
     }
 
     /// Rotate force field (admin only, for fixing stuck VRF states)

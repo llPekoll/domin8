@@ -15,7 +15,6 @@ pub mod claim_house_fee;
 pub mod cleanup_old_game;
 pub mod emergency_unlock;
 pub mod emergency_refund_vrf_timeout;
-pub mod set_counter;
 pub mod rotate_force;
 
 // Mock VRF for localnet testing
@@ -33,7 +32,6 @@ pub use claim_house_fee::*;
 pub use cleanup_old_game::*;
 pub use emergency_unlock::*;
 pub use emergency_refund_vrf_timeout::*;
-pub use set_counter::*;
 pub use rotate_force::*;
 
 #[cfg(feature = "localnet")]

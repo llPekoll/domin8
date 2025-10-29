@@ -14,22 +14,22 @@ const crons = cronJobs();
  * Runs every 3 seconds to capture BetPlaced, GameCreated, WinnerSelected events
  * This is the main data ingestion mechanism (replaces PDA polling)
  */
-crons.interval(
-  "blockchain-event-listener",
-  { seconds: 3 },
-  internal.blockchainEventListener.listenForEvents
-);
+// crons.interval(
+//   "blockchain-event-listener",
+//   { seconds: 3 },
+//   internal.blockchainEventListener.listenForEvents
+// );
 
 /**
  * LEGACY PDA POLLING - captures game round state changes
  * Runs every 5 seconds as fallback/supplement to event listener
  * TODO: Can be removed once event-driven architecture is fully tested
  */
-crons.interval(
-  "blockchain-fetch-round-pdas",
-  { seconds: 5 },
-  internal.fetchRoundPDAs.fetchRoundPDAs
-);
+// crons.interval(
+//   "blockchain-fetch-round-pdas",
+//   { seconds: 5 },
+//   internal.fetchRoundPDAs.fetchRoundPDAs
+// );
 
 /**
  * Game recovery - self-healing system that catches overdue actions

@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use crate::state::{GameConfig, GameCounter, GameDurationConfig};
+use crate::state::{GameConfig, GameCounter, GameDurationConfig, GameRound, GameStatus};
 use crate::constants::*;
 use crate::events::GameInitialized;
 
@@ -23,6 +23,15 @@ pub struct Initialize<'info> {
     )]
     pub counter: Account<'info, GameCounter>,
 
+    #[account(
+        init,
+        payer = authority,
+        space = GameRound::LEN,
+        seeds = [b"active_game"],
+        bump
+    )]
+    pub active_game: Box<Account<'info, GameRound>>,
+
     /// CHECK: This is the vault PDA that will hold game funds
     #[account(
         seeds = [VAULT_SEED],
@@ -42,6 +51,7 @@ pub fn initialize(
 ) -> Result<()> {
     let config = &mut ctx.accounts.config;
     let counter = &mut ctx.accounts.counter;
+    let active_game = &mut ctx.accounts.active_game;
 
     // Initialize game configuration
     config.authority = ctx.accounts.authority.key();
@@ -77,10 +87,29 @@ pub fn initialize(
     // Initialize counter at 0
     counter.current_round_id = 0;
 
+    // Initialize active_game account with default values (like riskdotfun pattern)
+    active_game.round_id = 0; // No active game yet
+    active_game.status = GameStatus::Finished; // Start in finished state
+    active_game.start_timestamp = 0;
+    active_game.end_timestamp = 0;
+    active_game.bet_count = 0;
+    active_game.total_pot = 0;
+    active_game.bet_amounts = [0u64; 64];
+    active_game.bet_skin = [0u8; 64];
+    active_game.bet_position = [[0u16; 2]; 64];
+    active_game.winner = Pubkey::default();
+    active_game.winning_bet_index = 0;
+    active_game.winner_prize_unclaimed = 0;
+    active_game.house_fee_unclaimed = 0;
+    active_game.vrf_request_pubkey = Pubkey::default();
+    active_game.vrf_seed = force;
+    active_game.randomness_fulfilled = false;
+
     msg!("Initial VRF force generated: {:?}", &force[0..16]);
 
     msg!("Domin8 game initialized with authority: {}", ctx.accounts.authority.key());
     msg!("Game counter initialized at round 0");
+    msg!("Active game account initialized");
 
     // Emit initialization event
     emit!(GameInitialized {

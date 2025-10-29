@@ -25,7 +25,14 @@ pub struct SelectWinnerAndPayout<'info> {
         seeds = [GAME_ROUND_SEED, counter.current_round_id.to_le_bytes().as_ref()],
         bump
     )]
-    pub game_round: Account<'info, GameRound>,
+    pub game_round: Box<Account<'info, GameRound>>,
+
+    #[account(
+        mut,
+        seeds = [b"active_game"],
+        bump
+    )]
+    pub active_game: Box<Account<'info, GameRound>>,
 
     #[account(
         mut,
@@ -76,6 +83,7 @@ pub fn select_winner_and_payout<'info>(
     ctx: Context<'_, '_, '_, 'info, SelectWinnerAndPayout<'info>>,
 ) -> Result<()> {
     let game_round = &mut ctx.accounts.game_round;
+    let active_game = &mut ctx.accounts.active_game;
 
     require!(
         game_round.status == GameStatus::AwaitingWinnerRandomness,
@@ -256,6 +264,15 @@ pub fn select_winner_and_payout<'info>(
     // 5. MARK GAME AS FINISHED
     game_round.status = GameStatus::Finished;
     msg!("Game status updated to Finished");
+
+    // ⭐ UPDATE ACTIVE_GAME WITH WINNER INFO (frontend subscribes to this)
+    active_game.winner = winner_wallet;
+    active_game.winning_bet_index = winning_bet_index as u32;
+    active_game.winner_prize_unclaimed = game_round.winner_prize_unclaimed;
+    active_game.house_fee_unclaimed = game_round.house_fee_unclaimed;
+    active_game.status = GameStatus::Finished;
+    active_game.randomness_fulfilled = true;
+    msg!("✓ Active game updated with winner: {}", winner_wallet);
 
     // 6. EMIT ENHANCED WINNER SELECTED EVENT
     let clock = Clock::get()?;
