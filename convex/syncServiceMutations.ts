@@ -15,7 +15,7 @@ export const upsertGameState = internalMutation({
       startDate: v.number(),
       endDate: v.number(),
       totalDeposit: v.number(),
-      rand: v.number(),
+      rand: v.string(), // Changed to string to avoid BN overflow
       userCount: v.number(),
       force: v.array(v.number()),
       status: v.number(),

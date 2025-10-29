@@ -310,19 +310,12 @@ export const useGameContract = () => {
 
   const fetchCurrentRoundId = useCallback(async (): Promise<number> => {
     try {
-      const { activeGamePda } = derivePDAs();
+      const { gameConfigPda } = derivePDAs();
 
-      // Check if active game exists
-      const accountInfo = await connection.getAccountInfo(activeGamePda);
-      if (!accountInfo) {
-        console.log("[fetchCurrentRoundId] No active game found, defaulting to round 1");
-        return 1;
-      }
-
-      // Fetch the active game data
-      const activeGameAccount = await program.account.domin8Game.fetch(activeGamePda);
-      const roundId = activeGameAccount.roundId.toNumber();
-      console.log("[fetchCurrentRoundId] Active game round:", roundId);
+      // Fetch config to get the next round ID
+      const configAccount = await program.account.domin8Config.fetch(gameConfigPda);
+      const roundId = configAccount.gameRound.toNumber();
+      console.log("[fetchCurrentRoundId] Next round ID from config:", roundId);
       return roundId;
     } catch (error) {
       console.error("Error fetching current round ID:", error);

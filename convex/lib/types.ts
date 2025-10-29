@@ -35,7 +35,7 @@ export interface GameRound {
   startDate: number; // Changed from startTimestamp
   endDate: number; // Changed from endTimestamp
   totalDeposit: number; // Changed from totalPot
-  rand: number; // NEW: VRF randomness value
+  rand: string; // NEW: VRF randomness value (string to avoid overflow)
   userCount: number; // NEW: unique user count
   force: number[]; // NEW: VRF force seed (32 bytes)
   status: number; // NEW: 0=open, 1=closed (was enum)

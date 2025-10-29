@@ -216,7 +216,7 @@ export class SolanaClient {
         startDate: account.startDate?.toNumber() ?? 0,
         endDate: account.endDate?.toNumber() ?? 0,
         totalDeposit: account.totalDeposit?.toNumber() ?? 0,
-        rand: account.rand?.toNumber() ?? 0,
+        rand: account.rand?.toString() ?? "0", // Convert to string to avoid overflow
         userCount: account.userCount?.toNumber() ?? 0,
         force: Array.from(account.force || []),
         status: account.status ?? 0,
@@ -282,7 +282,7 @@ export class SolanaClient {
         startDate: account.startDate?.toNumber() ?? 0,
         endDate: account.endDate?.toNumber() ?? 0,
         totalDeposit: account.totalDeposit?.toNumber() ?? 0,
-        rand: account.rand?.toNumber() ?? 0,
+        rand: account.rand?.toString() ?? "0", // Convert to string to avoid overflow
         userCount: account.userCount?.toNumber() ?? 0,
         force: Array.from(account.force || []),
         status: account.status ?? 0,
@@ -332,13 +332,33 @@ export class SolanaClient {
 
     console.log(`Ending game for round ${roundId}`);
 
+    // Fetch config to get treasury and force
+    const configAccount = await this.program.account.domin8Config.fetch(config);
+
+    // Fetch game to get the force seed
+    const gameAccount = await this.program.account.domin8Game.fetch(gameRound);
+
+    // Derive VRF randomness account using ORAO VRF program
+    const ORAO_VRF_PROGRAM_ID = new PublicKey("VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y");
+    const RANDOMNESS_ACCOUNT_SEED = Buffer.from("orao-vrf-randomness-request");
+
+    // Convert force from number[] to Buffer
+    const forceBuffer = Buffer.from(gameAccount.force);
+
+    const [vrfRandomness] = PublicKey.findProgramAddressSync(
+      [RANDOMNESS_ACCOUNT_SEED, forceBuffer],
+      ORAO_VRF_PROGRAM_ID
+    );
+
     const tx = await this.program.methods
       .endGame(new anchor.BN(roundId))
       .accounts({
         config,
+        game: gameRound,
         activeGame,
-        gameRound,
         admin: this.authority.publicKey,
+        treasury: configAccount.treasury,
+        vrfRandomness,
         systemProgram: anchor.web3.SystemProgram.programId,
       } as any)
       .rpc();
