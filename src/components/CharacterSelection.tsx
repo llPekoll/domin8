@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, memo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useGameContract } from "../hooks/useGameContract";
+import { useActiveGame } from "../hooks/useActiveGame";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { toast } from "sonner";
@@ -51,29 +52,40 @@ const CharacterSelection = memo(function CharacterSelection({
   // Get all available characters - only fetch once
   const allCharacters = useQuery(api.characters.getActiveCharacters);
 
-  // Get current game state from Convex (auto-synced from blockchain every 3s)
-  const currentRoundState = useQuery(api.events.getCurrentRoundState);
+  // Get current game state directly from blockchain (real-time, no polling lag)
+  const { activeGame, isLoading: isLoadingGame } = useActiveGame();
 
-  // Derive game state from Convex
+  // Derive game state from blockchain (not Convex, to avoid stale data)
   const canPlaceBet = useMemo(() => {
-    if (!currentRoundState) return true; // No game = can create new one
+    if (!activeGame) return true; // No game = can create new one
 
     // Allow betting if game is finished (to create new round)
-    if (currentRoundState.status === "finished") return true;
+    const gameStatus = Object.keys(activeGame.status)[0];
+    if (gameStatus === "finished") return true;
 
     // Block betting if game is determining winner
-    if (currentRoundState.status === "awaitingWinnerRandomness") return false;
+    if (gameStatus === "awaitingWinnerRandomness") return false;
 
     // If game is waiting, check if betting window is still open
-    if (currentRoundState.status === "waiting") {
+    if (gameStatus === "waiting") {
       const currentTime = Math.floor(Date.now() / 1000);
-      const timeRemaining = currentRoundState.endTimestamp - currentTime;
+      const endTimestamp = activeGame.endTimestamp?.toNumber() || 0;
+      const timeRemaining = endTimestamp - currentTime;
+
+      // Special case: If window closed but game has NO bets, allow new bet
+      // (This bet will actually create a new game since the old one is expired)
+      const betCount = activeGame.betCount || 0;
+      if (timeRemaining <= 0 && betCount === 0) {
+        console.log("[canPlaceBet] Empty expired game - allowing new bet to create fresh game");
+        return true; // Old game is empty and expired, allow creating new one
+      }
+
       return timeRemaining > 0; // Can bet if time remaining
     }
 
     // Default: don't allow betting for unknown statuses
     return false;
-  }, [currentRoundState]);
+  }, [activeGame]);
 
   const playerParticipantCount = 0; // TODO: Track participant count when needed
 
@@ -114,9 +126,9 @@ const CharacterSelection = memo(function CharacterSelection({
     // Play insert coin sound via Phaser
     EventBus.emit("play-insert-coin-sound");
 
-    // Check if player can place bet based on Convex game state
-    if (!canPlaceBet && currentRoundState) {
-      const status = currentRoundState.status;
+    // Check if player can place bet based on blockchain game state
+    if (!canPlaceBet && activeGame) {
+      const status = Object.keys(activeGame.status)[0];
       if (status === "awaitingWinnerRandomness") {
         toast.error("Game is determining winner, please wait...");
         return;
@@ -282,7 +294,7 @@ const CharacterSelection = memo(function CharacterSelection({
     currentCharacter,
     betAmount,
     canPlaceBet,
-    currentRoundState,
+    activeGame,
     placeBet,
     validateBet,
     onParticipantAdded,
@@ -290,7 +302,7 @@ const CharacterSelection = memo(function CharacterSelection({
   ]);
 
   // Don't render if not connected or no character
-  // In demo mode (currentRoundState is null), always show the component
+  // In demo mode (activeGame is null), always show the component
   if (!connected || !currentCharacter) {
     return null;
   }

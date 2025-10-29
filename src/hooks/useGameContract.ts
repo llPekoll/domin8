@@ -392,62 +392,82 @@ export const useGameContract = () => {
         console.log("[placeBet] Game config PDA:", gameConfigPda.toString());
         console.log("[placeBet] Active game PDA:", activeGamePda.toString());
 
-        // Check if active_game exists
-        console.log("[placeBet] Checking active_game account...");
-        const activeGameInfo = await connection.getAccountInfo(activeGamePda);
-        console.log("[placeBet] Active game exists:", !!activeGameInfo);
-
         let tx: string;
         let shouldCreateNewGame = false;
 
-        if (!activeGameInfo) {
+        // Fetch current round ID from counter to check the actual game_round PDA
+        // Note: We check game_round (not active_game) because active_game may have stale data
+        // due to smart contract bug where it's not updated after create_game
+        console.log("[placeBet] Fetching current round ID from counter...");
+        const currentRoundId = await fetchCurrentRoundId();
+        console.log("[placeBet] Current round ID from counter:", currentRoundId);
+
+        // Check the actual game_round PDA for the current round (not active_game)
+        // This is more reliable since active_game may have stale data due to smart contract bug
+        const currentGameRoundPda = deriveGameRoundPda(currentRoundId);
+        const currentGameRoundInfo = await connection.getAccountInfo(currentGameRoundPda);
+
+        if (!currentGameRoundInfo) {
           shouldCreateNewGame = true;
-          console.log("[placeBet] No active game exists, creating new game with first bet");
+          console.log("[placeBet] No game exists for current round, creating new game");
+          activeRoundId = currentRoundId;
         } else {
-          // Active game exists - check if it's still accepting bets
-          console.log("[placeBet] Active game exists, fetching status...");
+          // Game exists for current round - check if it's still accepting bets
+          console.log("[placeBet] Game exists for round", currentRoundId, ", checking status...");
 
           try {
-            const activeGameAccount = await program.account.gameRound.fetchNullable(activeGamePda);
-            console.log("[placeBet] Fetched active game account:", activeGameAccount);
+            const gameRoundAccount = await program.account.gameRound.fetch(currentGameRoundPda);
+            console.log("[placeBet] Fetched game round account:", gameRoundAccount);
 
-            if (!activeGameAccount) {
-              console.log("[placeBet] Active game exists but can't be fetched, creating new game");
+            const gameStatus = Object.keys(gameRoundAccount.status)[0];
+            console.log("[placeBet] Game status:", gameStatus);
+            activeRoundId = currentRoundId;
+
+            if (gameStatus === "finished") {
               shouldCreateNewGame = true;
-            } else {
-              const gameStatus = Object.keys(activeGameAccount.status)[0];
-              console.log("[placeBet] Active game status:", gameStatus);
-              activeRoundId = activeGameAccount.roundId.toNumber();
-              console.log("[placeBet] Active game round ID:", activeRoundId);
+              console.log("[placeBet] Game is finished, need to create new round");
+            } else if (gameStatus === "waiting") {
+              // Check if betting window is still open
+              const endTimestamp = gameRoundAccount.endTimestamp.toNumber();
+              const currentTime = Math.floor(Date.now() / 1000);
+              const betCount = gameRoundAccount.betCount || 0;
 
-              if (gameStatus === "finished") {
-                shouldCreateNewGame = true;
-                console.log("[placeBet] Game is finished, need to create new round");
-              } else if (gameStatus === "waiting") {
-                // Check if betting window is still open
-                const endTimestamp = activeGameAccount.endTimestamp.toNumber();
-                const currentTime = Math.floor(Date.now() / 1000);
-
-                if (currentTime > endTimestamp) {
+              if (currentTime > endTimestamp) {
+                // Betting window closed
+                if (betCount === 0) {
+                  // Empty game that expired - treat as no game (create new one)
+                  console.log("[placeBet] Empty expired game, creating fresh game");
+                  shouldCreateNewGame = true;
+                } else {
+                  // Game has bets but window closed - need to wait for backend to finish
                   throw new Error(
                     "Betting window has closed for this round. Please wait for the game to finish and try again."
                   );
                 }
-
-                console.log("[placeBet] Game is accepting bets, betting window still open");
               } else {
-                // Game is in awaitingWinnerRandomness state - can't place bets
-                throw new Error(
-                  "Game is currently determining winner. Please wait for the game to finish and try again."
-                );
+                console.log("[placeBet] Game is accepting bets, betting window still open");
               }
+            } else if (gameStatus === "awaitingWinnerRandomness") {
+              // Game is determining winner - can't place bets on this round
+              // Need to wait for backend to finish the game
+              throw new Error(
+                "Game is currently determining winner. Please wait for the current game to finish."
+              );
+            } else {
+              // Unknown status - treat as need new game
+              console.log("[placeBet] Unknown game status:", gameStatus);
+              shouldCreateNewGame = true;
             }
           } catch (fetchError: any) {
             // If it's a user-facing error (betting window closed, etc), rethrow
-            if (fetchError.message && fetchError.message.includes("Betting window")) {
+            if (
+              fetchError.message &&
+              (fetchError.message.includes("Betting window") ||
+                fetchError.message.includes("determining winner"))
+            ) {
               throw fetchError;
             }
-            console.error("[placeBet] Error fetching active game:", fetchError);
+            console.error("[placeBet] Error fetching game round:", fetchError);
             console.log("[placeBet] Treating as need new game due to fetch error");
             shouldCreateNewGame = true;
           }
@@ -457,12 +477,7 @@ export const useGameContract = () => {
         if (shouldCreateNewGame) {
           // Creating new game means this is the first bet (index 0)
           betIndex = 0;
-
-          // Fetch current round ID from counter
-          console.log("[placeBet] Fetching current round ID from counter...");
-          const currentRoundId = await fetchCurrentRoundId();
-          console.log("[placeBet] Current round ID:", currentRoundId);
-          activeRoundId = currentRoundId;
+          // activeRoundId already set to currentRoundId above
 
           // Check what network you're actually using
           console.log("Network:", import.meta.env.VITE_SOLANA_NETWORK);
