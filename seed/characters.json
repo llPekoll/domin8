@@ -1,5 +1,6 @@
 [
   {
+    "id": 1,
     "name": "Orc",
     "assetPath": "/characters/orc.png",
     "description": "A mighty fighter with high power and defense",
@@ -10,6 +11,7 @@
     "isActive": true
   },
   {
+    "id": 2,
     "name": "Soldier",
     "assetPath": "/characters/Soldier.png",
     "description": "A holy knight with exceptional power and defense",
@@ -20,6 +22,7 @@
     "isActive": true
   },
   {
+    "id": 3,
     "name": "male",
     "assetPath": "/characters/male.png",
     "description": "A versatile warrior with balanced stats",
@@ -30,6 +33,7 @@
     "isActive": true
   },
   {
+    "id": 4,
     "name": "sam",
     "assetPath": "/characters/sam.png",
     "description": "A quick and agile fighter",
@@ -40,6 +44,7 @@
     "isActive": true
   },
   {
+    "id": 5,
     "name": "warrior",
     "assetPath": "/characters/warrior.png",
     "description": "A seasoned combatant with strong defense",
