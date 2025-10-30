@@ -313,6 +313,8 @@ export const useGameContract = () => {
       const { gameConfigPda } = derivePDAs();
 
       // Fetch config to get the next round ID
+      if (!program) return 1;
+      // @ts-expect-error - Anchor generates camelCase names
       const configAccount = await program.account.domin8Config.fetch(gameConfigPda);
       const roundId = configAccount.gameRound.toNumber();
       console.log("[fetchCurrentRoundId] Next round ID from config:", roundId);
@@ -398,6 +400,7 @@ export const useGameContract = () => {
 
         if (activeGameInfo) {
           try {
+            // @ts-expect-error - Anchor generates camelCase names
             const activeGameAccount = await program.account.domin8Game.fetch(activeGamePda);
             // Status is a number: 0 = GAME_STATUS_OPEN, 1 = GAME_STATUS_CLOSED
             const gameStatus = activeGameAccount.status;
@@ -486,9 +489,10 @@ export const useGameContract = () => {
           // const force = Buffer.from(configAccountParsed.force);
 
           // Use Anchor to fetch the Domin8Config (has `force: [u8;32]`)
+          // @ts-expect-error - Anchor generates camelCase names
           const configAccount = await program.account.domin8Config.fetch(gameConfigPda);
-          const forceArr = configAccount.force as any; // usually Uint8Array or number[]
-          const forceBuf = Buffer.from(forceArr as any);
+          const forceArr = configAccount.force; // usually Uint8Array or number[]
+          const forceBuf = Buffer.from(forceArr);
 
           // Derive all required PDAs for createGame
           const { vaultPda } = derivePDAs();
@@ -547,6 +551,7 @@ export const useGameContract = () => {
             const roundIdBN = new BN(activeRoundId);
 
             tx = await program.methods
+              // @ts-expect-error - Anchor generates snake_case method names
               .createGameRound(
                 roundIdBN, // round_id parameter as BN
                 amountBN,
@@ -574,6 +579,7 @@ export const useGameContract = () => {
               const randomnessValue = Math.floor(Date.now() / 1000);
 
               const fulfillSig = await program.methods
+                // @ts-expect-error - Anchor generates snake_case method names
                 .fulfillMockVrf(new BN(randomnessValue))
                 .accounts({
                   counter: gameCounterPda,
@@ -624,6 +630,7 @@ export const useGameContract = () => {
 
             // Call create_game_round with ORAO VRF accounts
             tx = await program.methods
+              // @ts-expect-error - Anchor generates snake_case method names
               .createGameRound(roundIdBN, amountBN, skin, position)
               .accounts({
                 config: gameConfigPda,
@@ -646,9 +653,10 @@ export const useGameContract = () => {
           console.log(`[placeBet] Game exists (round ${activeRoundId}), placing additional bet`);
 
           // Fetch fresh game state using Anchor (more reliable than manual parsing)
+          // @ts-expect-error - Anchor generates camelCase names
           const activeGameAccount = await program.account.domin8Game.fetch(activeGamePda);
           console.log("[placeBet] Active game account:", activeGameAccount);
-          const betCount = activeGameAccount.betCount;
+          const betCount = activeGameAccount.bets?.length || 0;
           console.log("[placeBet] Current bet count:", betCount);
 
           // The bet index for this new bet will be the current bet count
@@ -680,6 +688,7 @@ export const useGameContract = () => {
               position // Spawn position [x, y] from frontend
             )
             .accounts({
+              // @ts-expect-error - Anchor account names
               config: gameConfigPda,
               game: gameRoundPda,
               activeGame: activeGamePda,

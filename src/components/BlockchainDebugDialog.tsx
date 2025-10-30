@@ -39,27 +39,25 @@ export function BlockchainDebugDialog() {
       },
       gameRound: activeGame
         ? {
-            roundId: activeGame.roundId?.toString(),
-            status: formatStatus(activeGame.status),
-            startTimestamp: activeGame.startTimestamp?.toString(),
-            endTimestamp: activeGame.endTimestamp?.toString(),
-            totalPot: activeGame.totalPot?.toString(),
-            betCount: activeGame.betCount,
-            winner: activeGame.winner?.toString(),
-            winningBetIndex: activeGame.winningBetIndex,
-            vrfRequestPubkey: activeGame.vrfRequestPubkey?.toString(),
-            randomnessFulfilled: activeGame.randomnessFulfilled,
-            betAmounts: activeGame.betAmounts
-              ?.slice(0, activeGame.betCount || 0)
-              .map((amt: any) => amt?.toString()),
-            betSkin: activeGame.betSkin?.slice(0, activeGame.betCount || 0),
-            betPosition: activeGame.betPosition?.slice(0, activeGame.betCount || 0),
-          }
+          roundId: activeGame.roundId?.toString(),
+          status: formatStatus(activeGame.status),
+          startTimestamp: activeGame.startTimestamp?.toString(),
+          endTimestamp: activeGame.endTimestamp?.toString(),
+          totalPot: activeGame.totalPot?.toString(),
+          betCount: activeGame.betCount,
+          winner: activeGame.winner?.toString(),
+          winningBetIndex: activeGame.winningBetIndex,
+          betAmounts: activeGame.betAmounts
+            ?.slice(0, activeGame.betCount || 0)
+            .map((amt: any) => amt?.toString()),
+          betSkin: activeGame.betSkin?.slice(0, activeGame.betCount || 0),
+          betPosition: activeGame.betPosition?.slice(0, activeGame.betCount || 0),
+        }
         : null,
       timestamp: new Date().toISOString(),
     };
 
-    navigator.clipboard.writeText(JSON.stringify(jsonData, null, 2));
+    void navigator.clipboard.writeText(JSON.stringify(jsonData, null, 2));
     setJsonCopied(true);
     setTimeout(() => setJsonCopied(false), 2000);
   };
@@ -96,11 +94,10 @@ export function BlockchainDebugDialog() {
           <div className="flex items-center gap-2">
             <button
               onClick={copyAllAsJSON}
-              className={`px-3 py-2 text-sm font-medium rounded-lg transition-all ${
-                jsonCopied
-                  ? "bg-green-600 text-white"
-                  : "bg-purple-600 hover:bg-purple-700 text-white"
-              }`}
+              className={`px-3 py-2 text-sm font-medium rounded-lg transition-all ${jsonCopied
+                ? "bg-green-600 text-white"
+                : "bg-purple-600 hover:bg-purple-700 text-white"
+                }`}
               title="Copy all state as JSON"
             >
               {jsonCopied ? "✓ Copied!" : "📋 Copy JSON"}
@@ -191,17 +188,16 @@ export function BlockchainDebugDialog() {
                     return (
                       <span
                         key={status}
-                        className={`px-3 py-1.5 rounded-lg text-base font-semibold transition-all ${
-                          isActive
-                            ? status === "Waiting"
-                              ? "bg-blue-500 text-white shadow-lg ring-2 ring-blue-300"
-                              : status === "AwaitingWinnerRandomness"
-                                ? "bg-yellow-500 text-black shadow-lg ring-2 ring-yellow-300"
-                                : status === "Finished"
-                                  ? "bg-green-500 text-white shadow-lg ring-2 ring-green-300"
-                                  : "bg-purple-500 text-white shadow-lg ring-2 ring-purple-300"
-                            : "bg-gray-700/30 text-gray-500 border border-gray-600/50"
-                        }`}
+                        className={`px-3 py-1.5 rounded-lg text-base font-semibold transition-all ${isActive
+                          ? status === "Waiting"
+                            ? "bg-blue-500 text-white shadow-lg ring-2 ring-blue-300"
+                            : status === "AwaitingWinnerRandomness"
+                              ? "bg-yellow-500 text-black shadow-lg ring-2 ring-yellow-300"
+                              : status === "Finished"
+                                ? "bg-green-500 text-white shadow-lg ring-2 ring-green-300"
+                                : "bg-purple-500 text-white shadow-lg ring-2 ring-purple-300"
+                          : "bg-gray-700/30 text-gray-500 border border-gray-600/50"
+                          }`}
                       >
                         {status}
                       </span>
@@ -220,9 +216,9 @@ export function BlockchainDebugDialog() {
                 <h4 className="text-base font-semibold text-purple-300 mb-3">
                   Bets ({activeGame.betCount || 0})
                 </h4>
-                {activeGame.betCount > 0 ? (
+                {(activeGame.betCount ?? 0) > 0 ? (
                   <div className="space-y-2">
-                    {Array.from({ length: activeGame.betCount }).map((_, index) => {
+                    {Array.from({ length: activeGame.betCount ?? 0 }).map((_, index) => {
                       const amount = activeGame.betAmounts?.[index];
                       const skin = activeGame.betSkin?.[index];
                       const position = activeGame.betPosition?.[index];
@@ -261,20 +257,10 @@ export function BlockchainDebugDialog() {
               <InfoRow
                 label="Winning Bet Index"
                 value={
-                  activeGame.winningBetIndex !== undefined
+                  activeGame.winningBetIndex !== undefined && activeGame.winningBetIndex !== null
                     ? activeGame.winningBetIndex.toString()
                     : "N/A"
                 }
-              />
-              <InfoRow
-                label="VRF Request"
-                value={activeGame.vrfRequestPubkey?.toString() || "N/A"}
-                mono
-                copyable
-              />
-              <InfoRow
-                label="Randomness Fulfilled"
-                value={activeGame.randomnessFulfilled ? "Yes" : "No"}
               />
             </Section>
           )}
@@ -331,7 +317,7 @@ function InfoRow({
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(value);
+    void navigator.clipboard.writeText(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -343,15 +329,14 @@ function InfoRow({
         {icon}
         {badge ? (
           <span
-            className={`px-3 py-1 rounded-lg text-base font-semibold ${
-              badge === "Waiting"
-                ? "bg-blue-500/20 text-blue-400"
-                : badge === "AwaitingWinnerRandomness"
-                  ? "bg-yellow-500/20 text-yellow-400"
-                  : badge === "Finished"
-                    ? "bg-green-500/20 text-green-400"
-                    : "bg-gray-500/20 text-gray-400"
-            }`}
+            className={`px-3 py-1 rounded-lg text-base font-semibold ${badge === "Waiting"
+              ? "bg-blue-500/20 text-blue-400"
+              : badge === "AwaitingWinnerRandomness"
+                ? "bg-yellow-500/20 text-yellow-400"
+                : badge === "Finished"
+                  ? "bg-green-500/20 text-green-400"
+                  : "bg-gray-500/20 text-gray-400"
+              }`}
           >
             {badge}
           </span>

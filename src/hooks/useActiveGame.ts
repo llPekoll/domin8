@@ -8,7 +8,7 @@
  */
 import { useMemo, useState, useEffect } from "react";
 import { PublicKey, Connection } from "@solana/web3.js";
-import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
+import { Program, BN } from "@coral-xyz/anchor";
 import { usePrivyWallet } from "./usePrivyWallet";
 import idl from "../programs/domin8/domin8_prgm.json";
 
@@ -277,14 +277,14 @@ export function useActiveGame() {
       }
     };
 
-    fetchAndSubscribe();
+    void fetchAndSubscribe();
 
     // Cleanup subscription on unmount or dependency change
     return () => {
       isMounted = false;
       if (subscriptionId !== null) {
         console.log("[DOMIN8] 🛑 Removing subscription (ID:", subscriptionId, ")");
-        connection.removeAccountChangeListener(subscriptionId);
+        void connection.removeAccountChangeListener(subscriptionId);
       }
     };
   }, [

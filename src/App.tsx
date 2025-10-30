@@ -15,7 +15,7 @@ export default function App() {
   const phaserRef = useRef<IRefPhaserGame | null>(null);
 
   // Get current game state directly from blockchain (no Convex, <1s updates)
-  const { activeGame: currentRoundState, isLoading } = useActiveGame();
+  const { activeGame: currentRoundState } = useActiveGame();
 
   // Demo mode is active when no real game exists or game is finished (status 2)
   const isDemoMode = !currentRoundState || currentRoundState.status === 2 || currentRoundState.betCount === 0;
@@ -63,7 +63,7 @@ export default function App() {
     // Only show real game if status 0 or 1 AND has at least 1 bet
     const hasRealGame = currentRoundState &&
                         currentRoundState.status !== 2 &&
-                        currentRoundState.betCount > 0;
+                        (currentRoundState.betCount ?? 0) > 0;
 
     console.log("[Scene Switch Effect] Evaluation", {
       hasRealGame,
@@ -111,9 +111,8 @@ export default function App() {
 
   // Show blockchain dialog during winner determination phase (status 1)
   useEffect(() => {
-    const shouldShowDialog =
-      currentRoundState?.status === 1 &&
-      currentRoundState?.randomnessFulfilled === false;
+    // Show dialog when game is determining winner (status 1)
+    const shouldShowDialog = currentRoundState?.status === 1;
     setShowBlockchainDialog(shouldShowDialog);
   }, [currentRoundState]);
 

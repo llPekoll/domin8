@@ -61,7 +61,15 @@ export class Game extends Scene {
     });
 
     // Listen for player bet placement to spawn character immediately
-    EventBus.on("player-bet-placed", (data) => {
+    EventBus.on("player-bet-placed", (data: {
+      characterId: number;
+      characterName: string;
+      position: [number, number];
+      betAmount: number;
+      roundId: number;
+      betIndex: number;
+      walletAddress: string;
+    }) => {
       console.log("[Game] 🎯 RECEIVED player-bet-placed EVENT");
       console.log("[Game] Event data:", data);
 

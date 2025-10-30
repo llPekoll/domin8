@@ -48,13 +48,11 @@ export function useGameState() {
   const error = null;
 
   // Helper to convert blockchain status to expected format
-  const formatStatus = (
-    status: { waiting?: {} } | { awaitingWinnerRandomness?: {} } | { finished?: {} }
-  ): GameState["status"] => {
-    if ("waiting" in status) return "Waiting";
-    if ("awaitingWinnerRandomness" in status) return "AwaitingWinnerRandomness";
-    if ("finished" in status) return "Finished";
-    return "Waiting";
+  const formatStatus = (status: number): GameState["status"] => {
+    // Status is a u8 in the smart contract: 0 = Open/Waiting, 1 = Closed/Finished
+    if (status === 0) return "Waiting";
+    if (status === 1) return "Finished";
+    return "Waiting"; // Default to waiting
   };
 
   // Transform blockchain active_game to GameState interface
@@ -62,20 +60,20 @@ export function useGameState() {
     if (!activeGame) return null;
 
     return {
-      roundId: activeGame.roundId.toNumber(),
+      roundId: activeGame.gameRound.toNumber(),
       status: formatStatus(activeGame.status),
-      startTimestamp: activeGame.startTimestamp.toNumber(),
-      endTimestamp: activeGame.endTimestamp.toNumber(),
-      bets: Array.from({ length: activeGame.betCount }, (_, index) => ({
-        wallet: `Player ${index + 1}`, // Wallet addresses stored in separate BetEntry PDAs
-        betAmount: activeGame.betAmounts[index].toNumber() / 1_000_000_000, // Convert lamports to SOL
-        timestamp: activeGame.startTimestamp.toNumber(), // Approximate
-      })),
-      initialPot: activeGame.totalPot.toNumber() / 1_000_000_000, // Convert lamports to SOL
-      winner: activeGame.winner.toString(),
-      vrfRequestPubkey: activeGame.vrfRequestPubkey.toString(),
-      vrfSeed: activeGame.vrfSeed,
-      randomnessFulfilled: activeGame.randomnessFulfilled,
+      startTimestamp: activeGame.startDate.toNumber(),
+      endTimestamp: activeGame.endDate.toNumber(),
+      bets: activeGame.bets?.map((bet: any, index: number) => ({
+        wallet: activeGame.wallets[bet.walletIndex]?.toString() || `Player ${index + 1}`,
+        betAmount: bet.amount.toNumber() / 1_000_000_000, // Convert lamports to SOL
+        timestamp: activeGame.startDate.toNumber(), // Approximate
+      })) || [],
+      initialPot: activeGame.totalDeposit.toNumber() / 1_000_000_000, // Convert lamports to SOL
+      winner: activeGame.winner?.toString() || '',
+      vrfRequestPubkey: '', // VRF request not stored directly in game account
+      vrfSeed: activeGame.rand ? [activeGame.rand.toNumber()] : [], // Using rand field as seed
+      randomnessFulfilled: activeGame.status === 1, // Game is finished when status = 1
       gameRoundPda: activeGamePDA?.toString() || "Unknown",
       vaultPda: "Derived from seeds",
     };
@@ -91,9 +89,7 @@ export function useGameState() {
       vrfFeeLamports: 0.001, // 0.001 SOL
       vrfNetworkState: "Devnet",
       vrfTreasury: "VRF Treasury",
-      gameLocked: activeGame?.status
-        ? !("waiting" in activeGame.status)
-        : false,
+      gameLocked: activeGame?.status === 1 || false, // Locked when status = 1 (Closed)
     }),
     [activeGame]
   );

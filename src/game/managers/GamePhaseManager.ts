@@ -17,7 +17,6 @@ export class GamePhaseManager {
   private playerManager: PlayerManager;
   private animationManager: AnimationManager;
   private currentPhase: string = "";
-  private hasWinner: boolean = false;
 
   constructor(scene: Scene, playerManager: PlayerManager, animationManager: AnimationManager) {
     this.scene = scene;
@@ -41,9 +40,6 @@ export class GamePhaseManager {
       this.playerManager.updateParticipants(participants);
     }
 
-    // Update hasWinner flag
-    this.hasWinner = !!gameState.winnerId;
-
     // Handle blockchain-driven phases
     switch (gameState.status) {
       case "waiting":
@@ -66,8 +62,6 @@ export class GamePhaseManager {
       this.playerManager.clearParticipants();
     }
 
-    // Reset winner flag for new game
-    this.hasWinner = false;
 
     // Spawn participants as they join
     this.playerManager.updateParticipantsInWaiting(participants, mapData);
@@ -152,7 +146,6 @@ export class GamePhaseManager {
   // Reset manager state for new game
   reset() {
     this.currentPhase = "";
-    this.hasWinner = false;
     this.scene.tweens.killAll();
     this.scene.time.removeAllEvents();
     this.playerManager.clearParticipants();

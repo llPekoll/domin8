@@ -27,12 +27,13 @@ crons.interval(
 /**
  * Game recovery - self-healing system that catches unsent prizes
  * Runs every 30 seconds to check for finished games with unclaimed prizes
+ * TODO: Implement recoverUnsentPrizes function in syncService.ts
  */
-crons.interval(
-  "recover-unsent-prizes",
-  { seconds: 30 },
-  internal.syncService.recoverUnsentPrizes
-);
+// crons.interval(
+//   "recover-unsent-prizes",
+//   { seconds: 30 },
+//   internal.syncService.recoverUnsentPrizes
+// );
 
 /**
  * Transaction cleanup - removes 7-day old transactions

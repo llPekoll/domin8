@@ -1,7 +1,7 @@
 /**
  * Sync Service Mutations - Database operations for blockchain sync
  */
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
 /**

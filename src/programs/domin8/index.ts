@@ -27,12 +27,16 @@ export type { Domin8Prgm };
 // Export the Program ID from the IDL
 export const DOMIN8_PROGRAM_ID = new PublicKey(Domin8PrgmIDL.address);
 
-// Re-export useful types from the generated types file
-export type {
-  GameConfig,
-  GameCounter,
-  GameRound,
-  BetEntry,
-  GameStatus,
-  GameDurationConfig,
-} from './domin8_prgm';
+// Extract and re-export types from the IDL
+type IdlTypes = Domin8Prgm['types'][number];
+
+type ExtractType<T extends string> = Extract<IdlTypes, { name: T }>['type'];
+
+export type GameConfig = ExtractType<'Domin8Config'>;
+export type GameCounter = ExtractType<'ActiveGame'>;
+export type GameRound = ExtractType<'Domin8Game'>;
+export type BetEntry = ExtractType<'BetInfo'>;
+export type GameStatus = number; // Status is stored as u8 in the contract
+export type GameDurationConfig = {
+  round_time: number;
+};

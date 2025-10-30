@@ -32,7 +32,7 @@ const CharacterSelection = memo(function CharacterSelection({
   onParticipantAdded,
 }: CharacterSelectionProps) {
   const { connected, publicKey, solBalance, isLoadingBalance } = usePrivyWallet();
-  const { placeBet, validateBet, fetchCurrentRoundId } = useGameContract();
+  const { placeBet, validateBet } = useGameContract();
 
   const [currentCharacter, setCurrentCharacter] = useState<Character | null>(null);
   const [betAmount, setBetAmount] = useState<string>("0.1");
@@ -51,7 +51,7 @@ const CharacterSelection = memo(function CharacterSelection({
   const allCharacters = useQuery(api.characters.getActiveCharacters);
 
   // Get current game state directly from blockchain (real-time, no polling lag)
-  const { activeGame, isLoading: isLoadingGame } = useActiveGame();
+  const { activeGame } = useActiveGame();
 
   // Derive game state from blockchain (not Convex, to avoid stale data)
   const canPlaceBet = useMemo(() => {
