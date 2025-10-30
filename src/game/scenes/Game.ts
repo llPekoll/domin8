@@ -108,7 +108,7 @@ export class Game extends Scene {
         SoundManager.initialize();
 
         // Unlock audio on first interaction
-        SoundManager.unlockAudio(this).then(() => {
+        void SoundManager.unlockAudio(this).then(() => {
           // Play intro sound if it's loaded
           if (this.cache.audio.exists('domin8-intro')) {
             SoundManager.playSound(this, 'domin8-intro', 0.5);
