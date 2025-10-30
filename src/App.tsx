@@ -89,6 +89,14 @@ export default function App() {
 
     // Update game scene with real blockchain game state
     if (hasRealGame && scene.scene.key === "RoyalRumble") {
+      console.log("[App] Updating game state with blockchain data:", {
+        hasBets: !!currentRoundState.bets,
+        betCount: currentRoundState.bets?.length || 0,
+        hasWallets: !!currentRoundState.wallets,
+        walletCount: currentRoundState.wallets?.length || 0,
+        fullData: currentRoundState,
+      });
+
       (scene as any).updateGameState?.(currentRoundState);
 
       const roundId = currentRoundState.roundId?.toString() || currentRoundState.gameRound?.toString();

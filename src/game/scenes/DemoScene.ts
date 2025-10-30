@@ -45,6 +45,7 @@ export class DemoScene extends Scene {
   }
 
   create() {
+    console.log("[DemoScene] 🎮 DemoScene created and ready");
     this.camera = this.cameras.main;
     this.centerX = this.camera.centerX;
     this.centerY = this.camera.centerY;
@@ -73,6 +74,35 @@ export class DemoScene extends Scene {
     // Listen for insert coin event from React UI
     EventBus.on("play-insert-coin-sound", () => {
       SoundManager.playInsertCoin(this);
+    });
+
+    // Listen for player bet placement to spawn character immediately
+    EventBus.on("player-bet-placed", (data) => {
+      console.log("[DemoScene] 🎯 RECEIVED player-bet-placed EVENT");
+      console.log("[DemoScene] Event data:", data);
+
+      // Derive character key from character name (e.g., "Warrior" -> "warrior")
+      const characterKey = data.characterName?.toLowerCase().replace(/\s+/g, "-") || "warrior";
+
+      // Transform the data into the format expected by PlayerManager
+      const participant = {
+        _id: `${data.walletAddress}_${data.betIndex}`, // Unique ID combining wallet + bet index
+        playerId: data.walletAddress,
+        displayName: data.characterName || "Player",
+        betAmount: data.betAmount,
+        character: {
+          key: characterKey, // Derived sprite key
+          name: data.characterName,
+          id: data.characterId, // Store blockchain numeric ID for reference
+        },
+        spawnIndex: data.betIndex, // Use bet index as spawn index
+        isBot: false, // This is a real player
+        eliminated: false,
+        colorHue: undefined, // Will be assigned by backend if needed
+      };
+
+      // Spawn the character in the demo scene
+      this.spawnDemoParticipant(participant);
     });
 
     // Create demo UI
@@ -369,6 +399,10 @@ export class DemoScene extends Scene {
   }
 
   shutdown() {
+    // Clean up event listeners to prevent memory leaks
+    EventBus.off("play-insert-coin-sound");
+    EventBus.off("player-bet-placed");
+
     // Clean up music when scene is shut down
     if (this.battleMusic) {
       this.battleMusic.stop();

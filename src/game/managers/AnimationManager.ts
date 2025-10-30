@@ -103,35 +103,35 @@ export class AnimationManager {
     const anchorWorldY = winnerPlayer.container.y + winnerPlayer.sprite.y;
 
     // Red circle at anchor point
-    debugAnchor.fillStyle(0xff0000, 1);
-    debugAnchor.fillCircle(anchorWorldX, anchorWorldY, 8);
+    // debugAnchor.fillStyle(0xff0000, 1);
+    // debugAnchor.fillCircle(anchorWorldX, anchorWorldY, 8);
 
-    // Yellow crosshair
-    debugAnchor.lineStyle(3, 0xffff00, 1);
-    debugAnchor.beginPath();
-    debugAnchor.moveTo(anchorWorldX - 20, anchorWorldY);
-    debugAnchor.lineTo(anchorWorldX + 20, anchorWorldY);
-    debugAnchor.moveTo(anchorWorldX, anchorWorldY - 20);
-    debugAnchor.lineTo(anchorWorldX, anchorWorldY + 20);
-    debugAnchor.strokePath();
+    // // Yellow crosshair
+    // debugAnchor.lineStyle(3, 0xffff00, 1);
+    // debugAnchor.beginPath();
+    // debugAnchor.moveTo(anchorWorldX - 20, anchorWorldY);
+    // debugAnchor.lineTo(anchorWorldX + 20, anchorWorldY);
+    // debugAnchor.moveTo(anchorWorldX, anchorWorldY - 20);
+    // debugAnchor.lineTo(anchorWorldX, anchorWorldY + 20);
+    // debugAnchor.strokePath();
 
     // Add label showing anchor coordinates
-    const anchorLabel = this.scene.add.text(
-      anchorWorldX + 25,
-      anchorWorldY - 10,
-      `Anchor: (${winnerPlayer.sprite.originX.toFixed(2)}, ${winnerPlayer.sprite.originY.toFixed(2)})`,
-      {
-        fontFamily: "Arial",
-        fontSize: "14px",
-        color: "#ffff00",
-        backgroundColor: "#000000",
-        padding: { x: 5, y: 5 },
-      }
-    );
-    anchorLabel.setDepth(1000);
+    // const anchorLabel = this.scene.add.text(
+    //   anchorWorldX + 25,
+    //   anchorWorldY - 10,
+    //   `Anchor: (${winnerPlayer.sprite.originX.toFixed(2)}, ${winnerPlayer.sprite.originY.toFixed(2)})`,
+    //   {
+    //     fontFamily: "Arial",
+    //     fontSize: "14px",
+    //     color: "#ffff00",
+    //     backgroundColor: "#000000",
+    //     padding: { x: 5, y: 5 },
+    //   }
+    // );
+    // anchorLabel.setDepth(1000);
 
     // Track for cleanup
-    this.celebrationObjects.push(debugAnchor, anchorLabel);
+    // this.celebrationObjects.push(debugAnchor, anchorLabel);
 
     console.log("[AnimationManager] 🎯 DEBUG: Winner sprite anchor at", {
       originX: winnerPlayer.sprite.originX,

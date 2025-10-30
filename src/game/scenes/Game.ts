@@ -27,6 +27,7 @@ export class Game extends Scene {
   }
 
   create() {
+    console.log("[Game] 🎮 Game scene (RoyalRumble) created and ready");
     this.camera = this.cameras.main;
 
     // Calculate proper center coordinates based on actual camera dimensions
@@ -57,6 +58,35 @@ export class Game extends Scene {
     // Listen for insert coin event from React UI
     EventBus.on("play-insert-coin-sound", () => {
       SoundManager.playInsertCoin(this);
+    });
+
+    // Listen for player bet placement to spawn character immediately
+    EventBus.on("player-bet-placed", (data) => {
+      console.log("[Game] 🎯 RECEIVED player-bet-placed EVENT");
+      console.log("[Game] Event data:", data);
+
+      // Derive character key from character name (e.g., "Warrior" -> "warrior")
+      const characterKey = data.characterName?.toLowerCase().replace(/\s+/g, "-") || "warrior";
+
+      // Transform the data into the format expected by PlayerManager
+      const participant = {
+        _id: `${data.walletAddress}_${data.betIndex}`, // Unique ID combining wallet + bet index
+        playerId: data.walletAddress,
+        displayName: data.characterName || "Player",
+        betAmount: data.betAmount,
+        character: {
+          key: characterKey, // Derived sprite key
+          name: data.characterName,
+          id: data.characterId, // Store blockchain numeric ID for reference
+        },
+        spawnIndex: data.betIndex, // Use bet index as spawn index
+        isBot: false, // This is a real player
+        eliminated: false,
+        colorHue: undefined, // Will be assigned by backend if needed
+      };
+
+      // Spawn the character immediately in the scene
+      this.spawnParticipantImmediately(participant);
     });
 
     // Play intro sound when real game starts
@@ -95,7 +125,7 @@ export class Game extends Scene {
     this.uiManager.updateCenter(this.centerX);
   }
 
-  // Update game state from Convex
+  // Update game state from blockchain
   updateGameState(gameState: any) {
     this.gameState = gameState;
 
@@ -113,11 +143,72 @@ export class Game extends Scene {
       }
     }
 
+    // Spawn characters from blockchain bet data
+    if (gameState.bets && gameState.wallets) {
+      console.log("[Game] Spawning characters from blockchain bet data:", {
+        betCount: gameState.bets.length,
+        walletCount: gameState.wallets.length,
+      });
+
+      gameState.bets.forEach((bet: any, betIndex: number) => {
+        const walletAddress = gameState.wallets[bet.walletIndex]?.toBase58();
+        if (!walletAddress) {
+          console.warn("[Game] No wallet found for bet index", betIndex);
+          return;
+        }
+
+        const participantId = `${walletAddress}_${betIndex}`;
+
+        // Skip if participant already exists
+        if (this.playerManager.getParticipant(participantId)) {
+          return;
+        }
+
+        // TODO: Map skin ID to character name/key
+        // For now, use a default mapping
+        const characterName = this.getSkinName(bet.skin);
+        const characterKey = characterName.toLowerCase().replace(/\s+/g, "-");
+
+        const participant = {
+          _id: participantId,
+          playerId: walletAddress,
+          displayName: characterName,
+          betAmount: Number(bet.amount.toString()) / 1_000_000_000, // Convert lamports to SOL
+          character: {
+            key: characterKey,
+            name: characterName,
+            id: bet.skin,
+          },
+          spawnIndex: betIndex,
+          isBot: false,
+          eliminated: false,
+          colorHue: undefined,
+        };
+
+        console.log("[Game] Spawning participant from blockchain:", participant);
+        this.playerManager.addParticipant(participant, false);
+      });
+    }
+
     // Update UI
     this.uiManager.updateGameState(gameState);
 
-
     this.gamePhaseManager.handleGamePhase(gameState);
+  }
+
+  // Helper to map skin ID to character name
+  private getSkinName(skinId: number): string {
+    // TODO: Load this mapping from Convex characters table
+    const skinMap: { [key: number]: string } = {
+      0: "Warrior",
+      1: "Mage",
+      2: "Archer",
+      3: "Orc",
+      4: "Male",
+      5: "Soldier",
+      // Add more mappings as needed
+    };
+    return skinMap[skinId] || "Warrior";
   }
 
   // Public method for real-time participant spawning
@@ -128,6 +219,12 @@ export class Game extends Scene {
   // Add update method to continuously update the timer
   update() {
     this.uiManager.updateTimer();
+  }
+
+  shutdown() {
+    // Clean up event listeners to prevent memory leaks
+    EventBus.off("play-insert-coin-sound");
+    EventBus.off("player-bet-placed");
   }
 
   changeScene() {

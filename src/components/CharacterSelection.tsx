@@ -19,6 +19,7 @@ if (typeof window !== "undefined") {
 
 interface Character {
   _id: Id<"characters">;
+  id?: number; // Blockchain ID
   name: string;
   description?: string;
 }
@@ -172,8 +173,17 @@ const CharacterSelection = memo(function CharacterSelection({
       const position: [number, number] = [spawnX, spawnY];
 
       console.log("[CharacterSelection] Character data for bet:");
-      console.log("  - Skin ID:", currentCharacter.id);
+      console.log("  - Character Name:", currentCharacter.name);
+      console.log("  - Character _id:", currentCharacter._id);
+      console.log("  - Skin ID (blockchain):", currentCharacter.id);
       console.log("  - Spawn Position:", position);
+
+      // Safety check: Ensure character has a blockchain ID
+      if (currentCharacter.id === undefined || currentCharacter.id === null) {
+        toast.error("Character is missing blockchain ID. Please contact support.");
+        console.error("[CharacterSelection] Character missing blockchain ID:", currentCharacter);
+        return;
+      }
 
       // Use the hook's placeBet function with character data (skin + position stored on-chain)
       const betResult = await placeBet(amount, currentCharacter.id, position);
@@ -191,6 +201,21 @@ const CharacterSelection = memo(function CharacterSelection({
           : `Round ${roundId}, Bet ${betIndex}`,
         duration: 5000,
       });
+
+      // Emit event to Phaser to spawn the player's character
+      const eventData = {
+        characterId: currentCharacter.id, // Use blockchain numeric ID
+        characterName: currentCharacter.name,
+        position: position,
+        betAmount: amount,
+        roundId: roundId,
+        betIndex: betIndex,
+        walletAddress: publicKey.toString(),
+      };
+
+      console.log("[CharacterSelection] 🎮 EMITTING player-bet-placed EVENT:", eventData);
+      EventBus.emit("player-bet-placed", eventData);
+      console.log("[CharacterSelection] ✅ Event emitted successfully");
 
       // Character skin and position are now stored directly on-chain
       // No need for Convex character assignment - blockchain is source of truth

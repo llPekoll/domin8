@@ -90,6 +90,7 @@ body {
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    cursor: url('/assets/cursor/Arrow2.png'), auto;
   }
   body {
     @apply bg-background text-foreground;
@@ -99,6 +100,34 @@ body {
     background-repeat: no-repeat;
     background-attachment: fixed;
     min-height: 100vh;
+  }
+
+  /* Not allowed cursor for disabled elements - MUST come before pointer rules */
+  button:disabled,
+  button:disabled *,
+  input:disabled,
+  select:disabled,
+  [disabled],
+  [disabled] *,
+  .cursor-not-allowed,
+  .cursor-not-allowed * {
+    cursor: url('/assets/cursor/Not_Allowed_Thick.png'), not-allowed !important;
+  }
+
+  /* Pointer cursor for clickable elements - excludes disabled elements */
+  button:not(:disabled),
+  button:not(:disabled) *,
+  a,
+  a *,
+  [role="button"]:not([disabled]),
+  [role="button"]:not([disabled]) *,
+  input[type="button"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="reset"]:not(:disabled),
+  select:not(:disabled),
+  .cursor-pointer,
+  .cursor-pointer * {
+    cursor: url('/assets/cursor/Hand3.png'), pointer !important;
   }
 }
 

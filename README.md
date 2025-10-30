@@ -149,12 +149,14 @@ Each developer needs their own wallet and program ID for development. This proje
 #### Setup Your Development Environment
 
 1. **Create your Solana wallet**:
+
 ```bash
 # Generate a new wallet (for testnet/devnet)
 solana-keygen new --outfile solana/my-wallet.json
 ```
 
 2. **Configure your `.env.local`** (not committed to git):
+
 ```bash
 # Copy the example file
 cp .env.example .env.local
@@ -164,6 +166,7 @@ ANCHOR_WALLET=./solana/my-wallet.json
 ```
 
 3. **Build and deploy your program**:
+
 ```bash
 # Build the smart contract
 bun run anchor:build
@@ -173,6 +176,7 @@ bun run anchor:deploy
 ```
 
 4. **Update your `.env.local` with the deployed program ID**:
+
 ```bash
 # After deploy, you'll get a program ID like: 8BH1JMeZCohtUKcfGGTqpYjpwxMowZBi6HrnAhc6eJFz
 # Add it to your .env.local:
@@ -297,3 +301,5 @@ VITE_PRIVY_APP_ID=your-privy-app-id
 - [Solana Cookbook](https://solanacookbook.com/)
 - [Bun Documentation](https://bun.sh/docs)
 - [metalslug font](https://fontstruct.com/fontstructions/download/2547046)
+  //cursor
+  https://aspecsgaming.itch.io/pixel-art-cursors/download/eyJleHBpcmVzIjoxNzYxNzU1NDU5LCJpZCI6Mjc1MDYyOX0%3d.6PqdH7xtvE7mIDdAY4NOXhcY8NM%3d
