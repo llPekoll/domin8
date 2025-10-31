@@ -4,4 +4,10 @@ seed
 tests
 .github
 migrations
-target
+test-ledger
+target/debug
+target/deploy
+target/release
+target/rust-analyzer/flycheck0
+target/sbpf-solana-solana
+target/.rustc_info.json

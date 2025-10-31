@@ -42,12 +42,11 @@ import { SystemProgram } from "@solana/web3.js";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
 import { Buffer } from "buffer";
 import bs58 from "bs58";
-import { Domin8PrgmIDL, DOMIN8_PROGRAM_ID, type Domin8Prgm } from "../programs/domin8";
+import { type Domin8Prgm } from "../../target/types/domin8_prgm";
+import Domin8PrgmIDL from "../../target/idl/domin8_prgm.json";
 
-// Use the program ID from the IDL (or environment override)
-const PROGRAM_ID = import.meta.env.VITE_GAME_PROGRAM_ID
-  ? new PublicKey(import.meta.env.VITE_GAME_PROGRAM_ID)
-  : DOMIN8_PROGRAM_ID;
+// Extract Program ID from IDL
+export const DOMIN8_PROGRAM_ID = new PublicKey(Domin8PrgmIDL.address);
 
 // Simple Wallet adapter for Privy
 // NOTE: Privy's signAndSendAllTransactions both signs AND sends the transaction
@@ -221,20 +220,23 @@ export const useGameContract = () => {
   const derivePDAs = useCallback(() => {
     const [gameConfigPda] = PublicKey.findProgramAddressSync(
       [Buffer.from(GAME_CONFIG_SEED)],
-      PROGRAM_ID
+      DOMIN8_PROGRAM_ID
     );
 
     const [gameCounterPda] = PublicKey.findProgramAddressSync(
       [Buffer.from(GAME_COUNTER_SEED)],
-      PROGRAM_ID
+      DOMIN8_PROGRAM_ID
     );
 
     const [activeGamePda] = PublicKey.findProgramAddressSync(
       [Buffer.from(ACTIVE_GAME_SEED)],
-      PROGRAM_ID
+      DOMIN8_PROGRAM_ID
     );
 
-    const [vaultPda] = PublicKey.findProgramAddressSync([Buffer.from(VAULT_SEED)], PROGRAM_ID);
+    const [vaultPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from(VAULT_SEED)],
+      DOMIN8_PROGRAM_ID
+    );
 
     return { gameConfigPda, gameCounterPda, activeGamePda, vaultPda };
   }, []);
@@ -245,7 +247,7 @@ export const useGameContract = () => {
 
     const [gameRoundPda] = PublicKey.findProgramAddressSync(
       [Buffer.from(GAME_ROUND_SEED), roundIdBuffer],
-      PROGRAM_ID
+      DOMIN8_PROGRAM_ID
     );
 
     return gameRoundPda;
@@ -256,7 +258,10 @@ export const useGameContract = () => {
     const seedPrefix = Buffer.from("mock_vrf");
     const forceBuf = Buffer.from(force);
 
-    const [mockVrfPda] = PublicKey.findProgramAddressSync([seedPrefix, forceBuf], PROGRAM_ID);
+    const [mockVrfPda] = PublicKey.findProgramAddressSync(
+      [seedPrefix, forceBuf],
+      DOMIN8_PROGRAM_ID
+    );
     return mockVrfPda;
   }, []);
 
@@ -267,7 +272,7 @@ export const useGameContract = () => {
 
     const [betEntryPda] = PublicKey.findProgramAddressSync(
       [Buffer.from(BET_ENTRY_SEED), roundIdBuffer, betIndexBuffer],
-      PROGRAM_ID
+      DOMIN8_PROGRAM_ID
     );
 
     return betEntryPda;
@@ -314,7 +319,6 @@ export const useGameContract = () => {
 
       // Fetch config to get the next round ID
       if (!program) return 1;
-      // @ts-expect-error - Anchor generates camelCase names
       const configAccount = await program.account.domin8Config.fetch(gameConfigPda);
       const roundId = configAccount.gameRound.toNumber();
       console.log("[fetchCurrentRoundId] Next round ID from config:", roundId);
@@ -402,7 +406,6 @@ export const useGameContract = () => {
 
         if (activeGameInfo) {
           try {
-            // @ts-expect-error - Anchor generates camelCase names
             const activeGameAccount = await program.account.domin8Game.fetch(activeGamePda);
             // Status is a number: 0 = GAME_STATUS_OPEN, 1 = GAME_STATUS_CLOSED
             const gameStatus = activeGameAccount.status;
@@ -491,7 +494,6 @@ export const useGameContract = () => {
           // const force = Buffer.from(configAccountParsed.force);
 
           // Use Anchor to fetch the Domin8Config (has `force: [u8;32]`)
-          // @ts-expect-error - Anchor generates camelCase names
           const configAccount = await program.account.domin8Config.fetch(gameConfigPda);
           const forceArr = configAccount.force; // usually Uint8Array or number[]
           const forceBuf = Buffer.from(forceArr);
@@ -553,7 +555,6 @@ export const useGameContract = () => {
             const roundIdBN = new BN(activeRoundId);
 
             tx = await program.methods
-              // @ts-expect-error - Anchor generates snake_case method names
               .createGameRound(
                 roundIdBN, // round_id parameter as BN
                 amountBN,
@@ -562,6 +563,7 @@ export const useGameContract = () => {
                 map // Map/background ID from frontend
               )
               .accounts({
+                // @ts-expect-error - this works fine
                 config: gameConfigPda,
                 game: gameRoundPdaForCreate,
                 activeGame: activeGamePda,
@@ -582,7 +584,7 @@ export const useGameContract = () => {
               const randomnessValue = Math.floor(Date.now() / 1000);
 
               const fulfillSig = await program.methods
-                // @ts-expect-error - Anchor generates snake_case method names
+                // @ts-expect-error - this works fine
                 .fulfillMockVrf(new BN(randomnessValue))
                 .accounts({
                   counter: gameCounterPda,
@@ -633,9 +635,9 @@ export const useGameContract = () => {
 
             // Call create_game_round with ORAO VRF accounts
             tx = await program.methods
-              // @ts-expect-error - Anchor generates snake_case method names
               .createGameRound(roundIdBN, amountBN, skin, position, map)
               .accounts({
+                // @ts-expect-error - this works fine
                 config: gameConfigPda,
                 game: gameRoundPdaForCreate,
                 activeGame: activeGamePda,
@@ -656,7 +658,6 @@ export const useGameContract = () => {
           console.log(`[placeBet] Game exists (round ${activeRoundId}), placing additional bet`);
 
           // Fetch fresh game state using Anchor (more reliable than manual parsing)
-          // @ts-expect-error - Anchor generates camelCase names
           const activeGameAccount = await program.account.domin8Game.fetch(activeGamePda);
           console.log("[placeBet] Active game account:", activeGameAccount);
           const betCount = activeGameAccount.bets?.length || 0;
@@ -691,7 +692,7 @@ export const useGameContract = () => {
               position // Spawn position [x, y] from frontend
             )
             .accounts({
-              // @ts-expect-error - Anchor account names
+              // @ts-expect-error - this works fine
               config: gameConfigPda,
               game: gameRoundPda,
               activeGame: activeGamePda,
@@ -842,7 +843,10 @@ export const useGameContract = () => {
 
   // Derive active game PDA for easy access
   const activeGamePda = useMemo(() => {
-    const [pda] = PublicKey.findProgramAddressSync([Buffer.from(ACTIVE_GAME_SEED)], PROGRAM_ID);
+    const [pda] = PublicKey.findProgramAddressSync(
+      [Buffer.from(ACTIVE_GAME_SEED)],
+      DOMIN8_PROGRAM_ID
+    );
     return pda;
   }, []);
 
@@ -876,7 +880,7 @@ export const useGameContract = () => {
     // Constants
     MIN_BET: MIN_BET_LAMPORTS / LAMPORTS_PER_SOL,
     HOUSE_FEE_BPS,
-    PROGRAM_ID,
+    DOMIN8_PROGRAM_ID,
   };
 };
 

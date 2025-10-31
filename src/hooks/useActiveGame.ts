@@ -10,7 +10,7 @@ import { useMemo, useState, useEffect } from "react";
 import { PublicKey, Connection } from "@solana/web3.js";
 import { Program, BN } from "@coral-xyz/anchor";
 import { usePrivyWallet } from "./usePrivyWallet";
-import idl from "../programs/domin8/domin8_prgm.json";
+import idl from "../../target/idl/domin8_prgm.json";
 
 // Bet info structure from smart contract
 export interface BetInfo {
@@ -22,19 +22,19 @@ export interface BetInfo {
 
 // Match Domin8Game struct from smart contract (risk-based architecture)
 export interface ActiveGameState {
-  gameRound: BN;  // Changed from roundId
-  startDate: BN;  // Changed from startTimestamp
-  endDate: BN;    // Changed from endTimestamp
-  totalDeposit: BN;  // Changed from totalPot
+  gameRound: BN; // Changed from roundId
+  startDate: BN; // Changed from startTimestamp
+  endDate: BN; // Changed from endTimestamp
+  totalDeposit: BN; // Changed from totalPot
   rand: BN;
   userCount: BN;
   force: number[];
-  status: number;  // 0 = open, 1 = closed (simplified from enum)
+  status: number; // 0 = open, 1 = closed (simplified from enum)
   winner: PublicKey | null;
   winnerPrize: BN;
   winningBetIndex: BN | null;
-  wallets: PublicKey[];  // NEW: Unique wallet addresses
-  bets: BetInfo[];       // NEW: Array of bet info structs
+  wallets: PublicKey[]; // NEW: Unique wallet addresses
+  bets: BetInfo[]; // NEW: Array of bet info structs
 
   // Computed properties for backward compatibility
   roundId?: BN;
@@ -124,10 +124,7 @@ export function useActiveGame() {
   const activeGamePDA = useMemo(() => {
     if (!program) return null;
 
-    const [pda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("active_game")],
-      program.programId
-    );
+    const [pda] = PublicKey.findProgramAddressSync([Buffer.from("active_game")], program.programId);
     return pda;
   }, [program]);
 
@@ -185,17 +182,9 @@ export function useActiveGame() {
 
           // Check if the account is owned by our program
           if (accountInfo.owner.toBase58() !== program.programId.toBase58()) {
-            console.log(
-              "[DOMIN8] ⚠️ Account exists but is not owned by our program!"
-            );
-            console.log(
-              "[DOMIN8]    Expected owner:",
-              program.programId.toBase58()
-            );
-            console.log(
-              "[DOMIN8]    Actual owner:",
-              accountInfo.owner.toBase58()
-            );
+            console.log("[DOMIN8] ⚠️ Account exists but is not owned by our program!");
+            console.log("[DOMIN8]    Expected owner:", program.programId.toBase58());
+            console.log("[DOMIN8]    Actual owner:", accountInfo.owner.toBase58());
             if (isMounted) {
               setActiveGame(null);
             }
@@ -204,9 +193,7 @@ export function useActiveGame() {
 
           // Try to fetch the game data
           console.log("[DOMIN8] 🔄 Attempting to fetch game data...");
-          const rawGameData = await (program.account as any).domin8Game.fetch(
-            activeGamePDA
-          );
+          const rawGameData = await (program.account as any).domin8Game.fetch(activeGamePDA);
           console.log("[DOMIN8] ✅ Active game data fetched:", rawGameData);
 
           // Transform data for backward compatibility
@@ -216,10 +203,7 @@ export function useActiveGame() {
             setActiveGame(gameData);
           }
         } catch (fetchError) {
-          console.log(
-            "[DOMIN8] ❌ Failed to fetch active game data:",
-            fetchError
-          );
+          console.log("[DOMIN8] ❌ Failed to fetch active game data:", fetchError);
           console.log("[DOMIN8] 💡 This could mean:");
           console.log("[DOMIN8]    1. The account data is corrupted");
           console.log("[DOMIN8]    2. The account type is wrong");
@@ -251,10 +235,7 @@ export function useActiveGame() {
                   console.log("[DOMIN8] ⚠️ Active game account is empty");
                 }
               } catch (decodeError) {
-                console.error(
-                  "[DOMIN8] ❌ Failed to decode game data:",
-                  decodeError
-                );
+                console.error("[DOMIN8] ❌ Failed to decode game data:", decodeError);
                 setActiveGame(null);
               }
             },
@@ -263,10 +244,7 @@ export function useActiveGame() {
           console.log("[DOMIN8] ✅ Subscription active (ID:", subscriptionId, ")");
         }
       } catch (error) {
-        console.error(
-          "[DOMIN8] ❌ Failed to fetch/subscribe to active game:",
-          error
-        );
+        console.error("[DOMIN8] ❌ Failed to fetch/subscribe to active game:", error);
         if (isMounted) {
           setActiveGame(null);
         }
@@ -287,11 +265,7 @@ export function useActiveGame() {
         void connection.removeAccountChangeListener(subscriptionId);
       }
     };
-  }, [
-    program?.programId.toString(),
-    activeGamePDA?.toString(),
-    connection?.rpcEndpoint,
-  ]);
+  }, [program?.programId.toString(), activeGamePDA?.toString(), connection?.rpcEndpoint]);
 
   return {
     activeGame,

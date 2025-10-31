@@ -76,7 +76,7 @@ export default defineSchema({
    */
   characters: defineTable({
     name: v.string(),
-    id: v.optional(v.number()),
+    id: v.number(),
     assetPath: v.string(), // Path to character spritesheet (e.g., "/characters/orc.png")
     description: v.optional(v.string()), // Character description
     animations: v.optional(
@@ -99,7 +99,7 @@ export default defineSchema({
    */
   maps: defineTable({
     name: v.string(),
-    id: v.optional(v.number()),
+    id: v.number(),
     background: v.string(), // Background identifier (e.g., "arena_classic")
     assetPath: v.string(), // Path to map asset (e.g., "/maps/arena_classic.png")
     description: v.optional(v.string()), // Map description
