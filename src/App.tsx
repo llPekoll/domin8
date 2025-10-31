@@ -18,7 +18,8 @@ export default function App() {
   const { activeGame: currentRoundState } = useActiveGame();
 
   // Demo mode is active when no real game exists or game is finished (status 2)
-  const isDemoMode = !currentRoundState || currentRoundState.status === 2 || currentRoundState.betCount === 0;
+  const isDemoMode =
+    !currentRoundState || currentRoundState.status === 2 || currentRoundState.betCount === 0;
   console.log({ currentRoundState, isDemoMode });
 
   // Event emitted from the PhaserGame component
@@ -47,10 +48,13 @@ export default function App() {
       hasPhaserRef: !!phaserRef.current,
       hasScene: !!phaserRef.current?.scene,
       sceneKey: phaserRef.current?.scene?.scene.key,
-      currentRoundState: currentRoundState ? {
-        roundId: currentRoundState.roundId?.toString() || currentRoundState.gameRound?.toString(),
-        status: currentRoundState.status
-      } : null
+      currentRoundState: currentRoundState
+        ? {
+            roundId:
+              currentRoundState.roundId?.toString() || currentRoundState.gameRound?.toString(),
+            status: currentRoundState.status,
+          }
+        : null,
     });
 
     if (!phaserRef.current?.scene) {
@@ -61,9 +65,8 @@ export default function App() {
     const scene = phaserRef.current.scene;
     // Status 0 = open/waiting (with bets), 1 = closed/determining winner, 2 = finished
     // Only show real game if status 0 or 1 AND has at least 1 bet
-    const hasRealGame = currentRoundState &&
-                        currentRoundState.status !== 2 &&
-                        (currentRoundState.betCount ?? 0) > 0;
+    const hasRealGame =
+      currentRoundState && currentRoundState.status !== 2 && (currentRoundState.betCount ?? 0) > 0;
 
     console.log("[Scene Switch Effect] Evaluation", {
       hasRealGame,
@@ -71,7 +74,7 @@ export default function App() {
       betCount: currentRoundState?.betCount,
       currentScene: scene.scene.key,
       shouldSwitchToGame: hasRealGame && scene.scene.key === "DemoScene",
-      shouldSwitchToDemo: !hasRealGame && scene.scene.key === "RoyalRumble"
+      shouldSwitchToDemo: !hasRealGame && scene.scene.key === "RoyalRumble",
     });
 
     // If real game starts and we're in demo scene, switch to game scene
@@ -99,9 +102,12 @@ export default function App() {
 
       (scene as any).updateGameState?.(currentRoundState);
 
-      const roundId = currentRoundState.roundId?.toString() || currentRoundState.gameRound?.toString();
+      const roundId =
+        currentRoundState.roundId?.toString() || currentRoundState.gameRound?.toString();
       const betCount = currentRoundState.betCount || 0;
-      const totalPot = currentRoundState.totalPot ? (Number(currentRoundState.totalPot.toString()) / 1_000_000_000) : 0;
+      const totalPot = currentRoundState.totalPot
+        ? Number(currentRoundState.totalPot.toString()) / 1_000_000_000
+        : 0;
 
       console.log(`Game - Round ${roundId}, Status: ${currentRoundState.status}`);
       console.log("Bets count:", betCount);
@@ -110,11 +116,12 @@ export default function App() {
   }, [currentRoundState, sceneReady]); // Re-run when scene becomes ready or game state changes
 
   // Show blockchain dialog during winner determination phase (status 1)
+  // ONLY for real blockchain games (NOT demo mode)
   useEffect(() => {
-    // Show dialog when game is determining winner (status 1)
-    const shouldShowDialog = currentRoundState?.status === 1;
+    // Show dialog when game is determining winner (status 1) AND not in demo mode
+    const shouldShowDialog = !isDemoMode && currentRoundState?.status === 1;
     setShowBlockchainDialog(shouldShowDialog);
-  }, [currentRoundState]);
+  }, [currentRoundState, isDemoMode]);
 
   // Note: Participant data now comes directly from blockchain via useActiveGame
   // Bet data includes skin and position for spawning characters
