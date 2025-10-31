@@ -92,6 +92,7 @@ pub fn handler(
     active_game.end_date = 0;
     active_game.total_deposit = 0;
     active_game.rand = 0;
+    active_game.map = 0; // Initialize map field
     active_game.user_count = 0;
     active_game.force = [0u8; 32];
     active_game.status = GAME_STATUS_CLOSED;

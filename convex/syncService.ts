@@ -27,7 +27,9 @@ export const syncBlockchainState = internalAction({
       const solanaClient = new SolanaClient(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
 
       // 1. Sync active game to database
+      console.log("ada");
       await syncActiveGame(ctx, solanaClient);
+      console.log("cabrimol");
 
       // 2. Check if any games need to be ended
       await processEndedGames(ctx, solanaClient);
@@ -46,14 +48,18 @@ export const syncBlockchainState = internalAction({
 async function syncActiveGame(ctx: any, solanaClient: SolanaClient) {
   try {
     // Fetch active game from blockchain
+    console.log("cabrimol");
     const activeGame = await solanaClient.getActiveGame();
+    console.log({ activeGame });
 
     if (!activeGame) {
       console.log("[Sync Service] No active game on blockchain");
       return;
     }
 
-    console.log(`[Sync Service] Found active game: round ${activeGame.roundId}, status: ${activeGame.status}`);
+    console.log(
+      `[Sync Service] Found active game: round ${activeGame.roundId}, status: ${activeGame.status}`
+    );
 
     // Upsert game state to database
     await ctx.runMutation(internal.syncServiceMutations.upsertGameState, {
@@ -81,7 +87,9 @@ async function processEndedGames(ctx: any, solanaClient: SolanaClient) {
 
     // Check if game is still open (status: 0)
     if (activeGame.status !== 0) {
-      console.log(`[Sync Service] Game ${activeGame.roundId} already closed (status: ${activeGame.status})`);
+      console.log(
+        `[Sync Service] Game ${activeGame.roundId} already closed (status: ${activeGame.status})`
+      );
       return;
     }
 
@@ -91,7 +99,9 @@ async function processEndedGames(ctx: any, solanaClient: SolanaClient) {
 
     if (now < endTimestamp) {
       const remaining = endTimestamp - now;
-      console.log(`[Sync Service] Game ${activeGame.roundId} still active (${remaining}s remaining)`);
+      console.log(
+        `[Sync Service] Game ${activeGame.roundId} still active (${remaining}s remaining)`
+      );
       return;
     }
 

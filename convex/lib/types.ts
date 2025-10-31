@@ -2,9 +2,10 @@
 "use node";
 import { PublicKey } from "@solana/web3.js";
 import { Buffer } from "buffer";
+import Domin8PrgmIDL from "../../target/idl/domin8_prgm.json";
 
-// Program ID (matches deployed program and IDL)
-export const DOMIN8_PROGRAM_ID = new PublicKey("JC7KUWuJH7SV9jcFM87J5tY1648G97jT1KShaZRy3tnj");
+// Extract Program ID from IDL
+export const DOMIN8_PROGRAM_ID = new PublicKey(Domin8PrgmIDL.address);
 
 // Game configuration structure (risk-based architecture)
 // Note: PublicKeys are serialized as strings for Convex compatibility

@@ -28,9 +28,8 @@ export function BlockchainDebugDialog() {
     const jsonData = {
       connection: {
         connected: !!activeGame,
-        rpcEndpoint: import.meta.env.VITE_SOLANA_RPC_URL || "https://api.devnet.solana.com",
-        programId:
-          import.meta.env.VITE_GAME_PROGRAM_ID || "JC7KUWuJH7SV9jcFM87J5tY1648G97jT1KShaZRy3tnj",
+        rpcEndpoint: import.meta.env.VITE_SOLANA_RPC_URL,
+        programId: import.meta.env.VITE_GAME_PROGRAM_ID,
       },
       gameStatus: {
         currentRoundId: activeGame?.roundId?.toString(),
@@ -39,20 +38,20 @@ export function BlockchainDebugDialog() {
       },
       gameRound: activeGame
         ? {
-          roundId: activeGame.roundId?.toString(),
-          status: formatStatus(activeGame.status),
-          startTimestamp: activeGame.startTimestamp?.toString(),
-          endTimestamp: activeGame.endTimestamp?.toString(),
-          totalPot: activeGame.totalPot?.toString(),
-          betCount: activeGame.betCount,
-          winner: activeGame.winner?.toString(),
-          winningBetIndex: activeGame.winningBetIndex,
-          betAmounts: activeGame.betAmounts
-            ?.slice(0, activeGame.betCount || 0)
-            .map((amt: any) => amt?.toString()),
-          betSkin: activeGame.betSkin?.slice(0, activeGame.betCount || 0),
-          betPosition: activeGame.betPosition?.slice(0, activeGame.betCount || 0),
-        }
+            roundId: activeGame.roundId?.toString(),
+            status: formatStatus(activeGame.status),
+            startTimestamp: activeGame.startTimestamp?.toString(),
+            endTimestamp: activeGame.endTimestamp?.toString(),
+            totalPot: activeGame.totalPot?.toString(),
+            betCount: activeGame.betCount,
+            winner: activeGame.winner?.toString(),
+            winningBetIndex: activeGame.winningBetIndex,
+            betAmounts: activeGame.betAmounts
+              ?.slice(0, activeGame.betCount || 0)
+              .map((amt: any) => amt?.toString()),
+            betSkin: activeGame.betSkin?.slice(0, activeGame.betCount || 0),
+            betPosition: activeGame.betPosition?.slice(0, activeGame.betCount || 0),
+          }
         : null,
       timestamp: new Date().toISOString(),
     };
@@ -94,10 +93,11 @@ export function BlockchainDebugDialog() {
           <div className="flex items-center gap-2">
             <button
               onClick={copyAllAsJSON}
-              className={`px-3 py-2 text-sm font-medium rounded-lg transition-all ${jsonCopied
-                ? "bg-green-600 text-white"
-                : "bg-purple-600 hover:bg-purple-700 text-white"
-                }`}
+              className={`px-3 py-2 text-sm font-medium rounded-lg transition-all ${
+                jsonCopied
+                  ? "bg-green-600 text-white"
+                  : "bg-purple-600 hover:bg-purple-700 text-white"
+              }`}
               title="Copy all state as JSON"
             >
               {jsonCopied ? "✓ Copied!" : "📋 Copy JSON"}
@@ -142,10 +142,7 @@ export function BlockchainDebugDialog() {
             />
             <InfoRow
               label="Program ID"
-              value={
-                import.meta.env.VITE_GAME_PROGRAM_ID ||
-                "JC7KUWuJH7SV9jcFM87J5tY1648G97jT1KShaZRy3tnj"
-              }
+              value={import.meta.env.VITE_GAME_PROGRAM_ID}
               mono
               copyable
             />
@@ -188,16 +185,17 @@ export function BlockchainDebugDialog() {
                     return (
                       <span
                         key={status}
-                        className={`px-3 py-1.5 rounded-lg text-base font-semibold transition-all ${isActive
-                          ? status === "Waiting"
-                            ? "bg-blue-500 text-white shadow-lg ring-2 ring-blue-300"
-                            : status === "AwaitingWinnerRandomness"
-                              ? "bg-yellow-500 text-black shadow-lg ring-2 ring-yellow-300"
-                              : status === "Finished"
-                                ? "bg-green-500 text-white shadow-lg ring-2 ring-green-300"
-                                : "bg-purple-500 text-white shadow-lg ring-2 ring-purple-300"
-                          : "bg-gray-700/30 text-gray-500 border border-gray-600/50"
-                          }`}
+                        className={`px-3 py-1.5 rounded-lg text-base font-semibold transition-all ${
+                          isActive
+                            ? status === "Waiting"
+                              ? "bg-blue-500 text-white shadow-lg ring-2 ring-blue-300"
+                              : status === "AwaitingWinnerRandomness"
+                                ? "bg-yellow-500 text-black shadow-lg ring-2 ring-yellow-300"
+                                : status === "Finished"
+                                  ? "bg-green-500 text-white shadow-lg ring-2 ring-green-300"
+                                  : "bg-purple-500 text-white shadow-lg ring-2 ring-purple-300"
+                            : "bg-gray-700/30 text-gray-500 border border-gray-600/50"
+                        }`}
                       >
                         {status}
                       </span>
@@ -329,14 +327,15 @@ function InfoRow({
         {icon}
         {badge ? (
           <span
-            className={`px-3 py-1 rounded-lg text-base font-semibold ${badge === "Waiting"
-              ? "bg-blue-500/20 text-blue-400"
-              : badge === "AwaitingWinnerRandomness"
-                ? "bg-yellow-500/20 text-yellow-400"
-                : badge === "Finished"
-                  ? "bg-green-500/20 text-green-400"
-                  : "bg-gray-500/20 text-gray-400"
-              }`}
+            className={`px-3 py-1 rounded-lg text-base font-semibold ${
+              badge === "Waiting"
+                ? "bg-blue-500/20 text-blue-400"
+                : badge === "AwaitingWinnerRandomness"
+                  ? "bg-yellow-500/20 text-yellow-400"
+                  : badge === "Finished"
+                    ? "bg-green-500/20 text-green-400"
+                    : "bg-gray-500/20 text-gray-400"
+            }`}
           >
             {badge}
           </span>

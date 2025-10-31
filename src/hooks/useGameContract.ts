@@ -549,7 +549,13 @@ export const useGameContract = () => {
             console.log("  - networkState:", networkState.toString());
             console.log("  - treasury:", treasury.toString());
             console.log("  - vrfRequest:", vrfRequest.toString());
-            console.log("[placeBet] Amount/Skin/Position:", amountBN.toString(), skin, position);
+            console.log(
+              "[placeBet] Amount/Skin/Position:",
+              amountBN.toString(),
+              { skin },
+              { position },
+              { map }
+            );
 
             // Convert activeRoundId to BN for Anchor instruction
             const roundIdBN = new BN(activeRoundId);
@@ -627,8 +633,13 @@ export const useGameContract = () => {
             console.log("  - networkState:", networkState.toString());
             console.log("  - treasury:", treasury.toString());
             console.log("  - vrfRequest:", vrfRequest.toString());
-            console.log("[placeBet] Amount/Skin/Position:", amountBN.toString(), skin, position);
-            console.log("Kamel");
+            console.log(
+              "[placeBet] Amount/Skin/Position:",
+              amountBN.toString(),
+              { skin },
+              { position },
+              { map }
+            );
 
             // Convert activeRoundId to BN for Anchor instruction
             const roundIdBN = new BN(activeRoundId);
@@ -648,7 +659,7 @@ export const useGameContract = () => {
                 vrfProgram: orao.programId,
                 systemProgram: SystemProgram.programId,
               })
-              .rpc();
+              .rpc({ skipPreflight: true });
 
             console.log("[placeBet] Created new devnet/mainnet game with first bet (ORAO VRF)", tx);
           }
@@ -699,7 +710,7 @@ export const useGameContract = () => {
               user: publicKey,
               systemProgram: SystemProgram.programId,
             })
-            .rpc();
+            .rpc({ skipPreflight: true });
         }
 
         // Get the actual signature from Privy wallet adapter

@@ -13,13 +13,12 @@ Cargo.lock
 /target/debug
 /target/deploy
 /target/release
-/target/types
 /target/sbpf-solana-solana
 /target/.rustc_info.json
 /coverage
 /dist
 /out/
-
+target/rust-analyzer/
 # production
 /build
 
