@@ -32,6 +32,7 @@ pub const BASE_GAME_ACCOUNT_SIZE: usize = 8 + // discriminator
     8 + // end_date
     8 + // total_deposit
     8 + // rand
+    1 + // map (u8)
     1 + 32 + // winner (Option<Pubkey>)
     8 + // winner_prize
     1 + 8 + // winning_bet_index (Option<u64>)

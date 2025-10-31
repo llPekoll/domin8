@@ -88,12 +88,14 @@ pub struct CreateGameRound<'info> {
 /// - bet_amount: [u64] Initial bet amount
 /// - skin: [u8] Character skin ID (0-255)
 /// - position: [[u16; 2]] Spawn position [x, y]
+/// - map: [u8] Map/background ID (0-255)
 pub fn handler(
     ctx: Context<CreateGameRound>,
     round_id: u64,
     bet_amount: u64,
     skin: u8,
     position: [u16; 2],
+    map: u8,
 ) -> Result<()> {
     let config = &mut ctx.accounts.config;
     let game = &mut ctx.accounts.game;
@@ -141,6 +143,7 @@ pub fn handler(
     game.end_date = clock.unix_timestamp + config.round_time as i64;
     game.total_deposit = bet_amount;
     game.rand = 0; // Will be filled when VRF is ready
+    game.map = map; // Set the map/background ID
     game.winner = None;
     game.winner_prize = 0; // Will be set when game ends
     game.winning_bet_index = None; // Will be set when game ends
@@ -156,6 +159,7 @@ pub fn handler(
     active_game.end_date = clock.unix_timestamp + config.round_time as i64;
     active_game.total_deposit = bet_amount;
     active_game.rand = 0; // Will be filled when VRF is ready
+    active_game.map = map; // Set the map/background ID
     active_game.winner = None;
     active_game.winner_prize = 0; // Will be set when game ends
     active_game.winning_bet_index = None; // Will be set when game ends
@@ -236,6 +240,7 @@ pub fn handler(
     msg!("Game round {} created by user: {}", round_id, user.key());
     msg!("Initial bet: {} lamports", bet_amount);
     msg!("Character skin: {}", skin);
+    msg!("Map ID: {}", map);
     msg!("Spawn position: [{}, {}]", position[0], position[1]);
     msg!("Game ends at: {}", game.end_date);
     msg!("VRF force (hex): {}", Utils::bytes_to_hex(&force));

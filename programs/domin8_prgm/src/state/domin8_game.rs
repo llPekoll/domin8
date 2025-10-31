@@ -17,7 +17,7 @@ pub struct Domin8Game {
     pub end_date: i64,
     pub total_deposit: u64,
     pub rand: u64,
-    pub background: u8, // Background ID (0-255)
+    pub map: u8, // Map/background ID (0-255)
     pub user_count: u64,
     pub force: [u8; 32], // VRF force seed for this game
     pub status: u8,      // 0 = open, 1 = closed

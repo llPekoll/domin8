@@ -351,13 +351,15 @@ export const useGameContract = () => {
    * @param amount - Bet amount in SOL
    * @param skin - Character skin ID (0-255)
    * @param position - Spawn position [x, y] in game coordinates
+   * @param map - Map/background ID (0-255), defaults to 0
    * @returns Object with transaction signature, round ID, and bet index
    */
   const placeBet = useCallback(
     async (
       amount: number,
       skin: number = 0,
-      position: [number, number] = [0, 0]
+      position: [number, number] = [0, 0],
+      map: number = 0
     ): Promise<{ signature: TransactionSignature; roundId: number; betIndex: number }> => {
       console.log("[placeBet] Starting placeBet function");
       console.log("[placeBet] Connected:", connected);
@@ -556,7 +558,8 @@ export const useGameContract = () => {
                 roundIdBN, // round_id parameter as BN
                 amountBN,
                 skin, // Character skin ID from frontend
-                position // Spawn position [x, y] from frontend
+                position, // Spawn position [x, y] from frontend
+                map // Map/background ID from frontend
               )
               .accounts({
                 config: gameConfigPda,
@@ -631,7 +634,7 @@ export const useGameContract = () => {
             // Call create_game_round with ORAO VRF accounts
             tx = await program.methods
               // @ts-expect-error - Anchor generates snake_case method names
-              .createGameRound(roundIdBN, amountBN, skin, position)
+              .createGameRound(roundIdBN, amountBN, skin, position, map)
               .accounts({
                 config: gameConfigPda,
                 game: gameRoundPdaForCreate,

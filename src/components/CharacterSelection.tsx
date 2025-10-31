@@ -50,6 +50,9 @@ const CharacterSelection = memo(function CharacterSelection({
   // Get all available characters - only fetch once
   const allCharacters = useQuery(api.characters.getActiveCharacters);
 
+  // Get all available maps - for selecting random map on game creation
+  const allMaps = useQuery(api.maps.getAllActiveMaps);
+
   // Get current game state directly from blockchain (real-time, no polling lag)
   const { activeGame } = useActiveGame();
 
@@ -185,8 +188,16 @@ const CharacterSelection = memo(function CharacterSelection({
         return;
       }
 
-      // Use the hook's placeBet function with character data (skin + position stored on-chain)
-      const betResult = await placeBet(amount, currentCharacter.id, position);
+      // Select a random map for the game (only applies when creating a new game)
+      let mapId = 0; // Default map ID
+      if (allMaps && allMaps.length > 0) {
+        const randomMap = allMaps[Math.floor(Math.random() * allMaps.length)];
+        mapId = randomMap.id ?? 0; // Use map's blockchain ID
+        console.log("[CharacterSelection] Selected map:", randomMap.name, "ID:", mapId);
+      }
+
+      // Use the hook's placeBet function with character data (skin + position + map stored on-chain)
+      const betResult = await placeBet(amount, currentCharacter.id, position, mapId);
       const { signature: signatureHex, roundId, betIndex } = betResult;
 
       console.log("[CharacterSelection] Transaction successful:", signatureHex);

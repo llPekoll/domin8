@@ -48,14 +48,16 @@ pub mod domin8_prgm {
     /// - bet_amount: u64 - Initial bet amount in lamports
     /// - skin: u8 - Character skin ID (0-255)
     /// - position: [u16; 2] - Spawn position [x, y]
+    /// - map: u8 - Map/background ID (0-255)
     pub fn create_game_round(
         ctx: Context<CreateGameRound>,
         round_id: u64,
         bet_amount: u64,
         skin: u8,
         position: [u16; 2],
+        map: u8,
     ) -> Result<()> {
-        create_game_round::handler(ctx, round_id, bet_amount, skin, position)
+        create_game_round::handler(ctx, round_id, bet_amount, skin, position, map)
     }
 
     /// Place a bet in the current game round

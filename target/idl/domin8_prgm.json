@@ -149,7 +149,8 @@
         "- round_id: u64 - Round ID for the game",
         "- bet_amount: u64 - Initial bet amount in lamports",
         "- skin: u8 - Character skin ID (0-255)",
-        "- position: [u16; 2] - Spawn position [x, y]"
+        "- position: [u16; 2] - Spawn position [x, y]",
+        "- map: u8 - Map/background ID (0-255)"
       ],
       "discriminator": [
         96,
@@ -363,6 +364,10 @@
               2
             ]
           }
+        },
+        {
+          "name": "map",
+          "type": "u8"
         }
       ]
     },
@@ -1042,6 +1047,10 @@
           {
             "name": "rand",
             "type": "u64"
+          },
+          {
+            "name": "map",
+            "type": "u8"
           },
           {
             "name": "user_count",

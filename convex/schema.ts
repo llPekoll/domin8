@@ -99,6 +99,7 @@ export default defineSchema({
    */
   maps: defineTable({
     name: v.string(),
+    id: v.optional(v.number()),
     background: v.string(), // Background identifier (e.g., "arena_classic")
     assetPath: v.string(), // Path to map asset (e.g., "/maps/arena_classic.png")
     description: v.optional(v.string()), // Map description

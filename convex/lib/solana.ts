@@ -12,7 +12,7 @@ import IDL from "./domin8_prgm.json";
 
 // Simple NodeWallet implementation for server-side use
 class NodeWallet implements anchor.Wallet {
-  constructor(readonly payer: Keypair) { }
+  constructor(readonly payer: Keypair) {}
 
   async signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T> {
     if (tx instanceof Transaction) {
@@ -74,8 +74,8 @@ export class SolanaClient {
     } catch (error) {
       throw new Error(
         `Failed to parse CRANK_AUTHORITY_PRIVATE_KEY: ${error instanceof Error ? error.message : String(error)}\n` +
-        `Supported formats: JSON array [1,2,3,...] or Base58 string (88 chars)\n` +
-        `Received (first 50 chars): ${authorityPrivateKey.substring(0, 50)}...`
+          `Supported formats: JSON array [1,2,3,...] or Base58 string (88 chars)\n` +
+          `Received (first 50 chars): ${authorityPrivateKey.substring(0, 50)}...`
       );
     }
 
@@ -91,10 +91,7 @@ export class SolanaClient {
   // Get PDAs for the game accounts (risk-based architecture)
   private getPDAs(roundId?: number) {
     // Config PDA (global configuration)
-    const [config] = PublicKey.findProgramAddressSync(
-      [PDA_SEEDS.DOMIN8_CONFIG],
-      DOMIN8_PROGRAM_ID
-    );
+    const [config] = PublicKey.findProgramAddressSync([PDA_SEEDS.DOMIN8_CONFIG], DOMIN8_PROGRAM_ID);
 
     // Active game PDA (single PDA that always points to current game)
     const [activeGame] = PublicKey.findProgramAddressSync(
@@ -121,7 +118,6 @@ export class SolanaClient {
     const { config } = this.getPDAs();
 
     try {
-      // @ts-expect-error - Anchor generates camelCase names
       const account = await this.program.account.domin8Config.fetchNullable(config);
 
       if (!account) {
@@ -141,7 +137,6 @@ export class SolanaClient {
     const { config } = this.getPDAs();
 
     try {
-      // @ts-expect-error - Anchor generates camelCase names
       const account = await this.program.account.domin8Config.fetchNullable(config);
 
       if (!account) {
@@ -181,7 +176,6 @@ export class SolanaClient {
 
     try {
       // Fetch account with null check
-      // @ts-expect-error - Anchor generates camelCase names
       const account = await this.program.account.domin8Game.fetchNullable(gameRound);
 
       // If account doesn't exist or was closed, try previous round
@@ -234,9 +228,9 @@ export class SolanaClient {
         endTimestamp: account.endDate?.toNumber() ?? 0,
         totalPot: account.totalDeposit?.toNumber() ?? 0,
         betCount: bets.length,
-        betAmounts: bets.map(b => b.amount),
-        betSkin: bets.map(b => b.skin),
-        betPosition: bets.map(b => b.position),
+        betAmounts: bets.map((b) => b.amount),
+        betSkin: bets.map((b) => b.skin),
+        betPosition: bets.map((b) => b.position),
       };
     } catch (error) {
       // Game round account doesn't exist yet (no bets placed)
@@ -256,7 +250,6 @@ export class SolanaClient {
 
     try {
       // Fetch account with null check
-      // @ts-expect-error - Anchor generates camelCase names
       const account = await this.program.account.domin8Game.fetchNullable(activeGame);
 
       if (!account) {
@@ -301,9 +294,9 @@ export class SolanaClient {
         endTimestamp: account.endDate?.toNumber() ?? 0,
         totalPot: account.totalDeposit?.toNumber() ?? 0,
         betCount: bets.length,
-        betAmounts: bets.map(b => b.amount),
-        betSkin: bets.map(b => b.skin),
-        betPosition: bets.map(b => b.position),
+        betAmounts: bets.map((b) => b.amount),
+        betSkin: bets.map((b) => b.skin),
+        betPosition: bets.map((b) => b.position),
       };
     } catch (error) {
       console.log("Error fetching active game:", error);
@@ -337,11 +330,9 @@ export class SolanaClient {
     console.log(`Ending game for round ${roundId}`);
 
     // Fetch config to get treasury and force
-    // @ts-expect-error - Anchor generates camelCase names
     const configAccount = await this.program.account.domin8Config.fetch(config);
 
     // Fetch game to get the force seed
-    // @ts-expect-error - Anchor generates camelCase names
     const gameAccount = await this.program.account.domin8Game.fetch(gameRound);
 
     // Derive VRF randomness account using ORAO VRF program
@@ -357,7 +348,6 @@ export class SolanaClient {
     );
 
     const tx = await this.program.methods
-      // @ts-expect-error - Anchor generates snake_case method names
       .endGame(new anchor.BN(roundId))
       .accounts({
         config,
@@ -383,7 +373,6 @@ export class SolanaClient {
     }
 
     // Fetch game to get winner
-    // @ts-expect-error - Anchor generates camelCase names
     const gameAccount = await this.program.account.domin8Game.fetch(gameRound);
 
     if (!gameAccount.winner) {
@@ -395,7 +384,6 @@ export class SolanaClient {
     console.log(`Prize amount: ${gameAccount.winnerPrize.toString()} lamports`);
 
     const tx = await this.program.methods
-      // @ts-expect-error - Anchor generates snake_case method names
       .sendPrizeWinner(new anchor.BN(roundId))
       .accounts({
         config,
@@ -420,7 +408,6 @@ export class SolanaClient {
     if (!gameRound) return bets;
 
     try {
-      // @ts-expect-error - Anchor generates camelCase names
       const gameRoundAccount = await this.program.account.domin8Game.fetch(gameRound);
       const wallets = gameRoundAccount.wallets || [];
       const betStructs = gameRoundAccount.bets || [];
@@ -460,7 +447,7 @@ export class SolanaClient {
         "confirmed"
       );
 
-      return signatures.map(sig => sig.signature);
+      return signatures.map((sig) => sig.signature);
     } catch (error) {
       console.error("Error fetching program signatures:", error);
       return [];
@@ -471,17 +458,19 @@ export class SolanaClient {
    * Parse BetPlaced events from transaction logs
    * Returns bet data extracted from on-chain events
    */
-  async parseBetPlacedEvents(signature: string): Promise<Array<{
-    roundId: number;
-    player: string;
-    amount: number;
-    betCount: number;
-    totalPot: number;
-    endTimestamp: number;
-    isFirstBet: boolean;
-    timestamp: number;
-    betIndex: number;
-  }>> {
+  async parseBetPlacedEvents(signature: string): Promise<
+    Array<{
+      roundId: number;
+      player: string;
+      amount: number;
+      betCount: number;
+      totalPot: number;
+      endTimestamp: number;
+      isFirstBet: boolean;
+      timestamp: number;
+      betIndex: number;
+    }>
+  > {
     try {
       const tx = await this.connection.getTransaction(signature, {
         commitment: "confirmed",
@@ -552,19 +541,24 @@ export class SolanaClient {
    * @param limit - Maximum number of transactions to fetch
    * @param untilSignature - Fetch transactions until this signature (exclusive) - for incremental fetching
    */
-  async getAllRecentBetEvents(limit: number = 100, untilSignature?: string): Promise<Array<{
-    signature: string;
-    roundId: number;
-    player: string;
-    amount: number;
-    betCount: number;
-    totalPot: number;
-    endTimestamp: number;
-    isFirstBet: boolean;
-    timestamp: number;
-    betIndex: number;
-    slot: number;
-  }>> {
+  async getAllRecentBetEvents(
+    limit: number = 100,
+    untilSignature?: string
+  ): Promise<
+    Array<{
+      signature: string;
+      roundId: number;
+      player: string;
+      amount: number;
+      betCount: number;
+      totalPot: number;
+      endTimestamp: number;
+      isFirstBet: boolean;
+      timestamp: number;
+      betIndex: number;
+      slot: number;
+    }>
+  > {
     try {
       // Get recent signatures, optionally starting from a specific signature
       const options: any = { limit };
@@ -593,7 +587,9 @@ export class SolanaClient {
         }
       }
 
-      console.log(`Found ${allEvents.length} BetPlaced events from ${signatureInfos.length} transactions`);
+      console.log(
+        `Found ${allEvents.length} BetPlaced events from ${signatureInfos.length} transactions`
+      );
       return allEvents;
     } catch (error) {
       console.error("Error fetching recent bet events:", error);
@@ -659,7 +655,6 @@ export class SolanaClient {
 
       // Test if config account exists
       const { config } = this.getPDAs();
-      // @ts-expect-error - Anchor generates snake_case method names
       await this.program.account.domin8Config.fetch(config);
 
       // Note: We don't check activeGame/gameRound here since they may not exist yet (no bets placed)
