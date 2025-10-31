@@ -27,9 +27,7 @@ export const syncBlockchainState = internalAction({
       const solanaClient = new SolanaClient(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
 
       // 1. Sync active game to database
-      console.log("ada");
       await syncActiveGame(ctx, solanaClient);
-      console.log("cabrimol");
 
       // 2. Check if any games need to be ended
       await processEndedGames(ctx, solanaClient);

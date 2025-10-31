@@ -147,6 +147,124 @@ export type Domin8Prgm = {
       ]
     },
     {
+      "name": "closeGameNoFee",
+      "docs": [
+        "Close game without fees for refund scenarios (admin only)",
+        "",
+        "Used for single player refunds or game cancellations.",
+        "Sets winner to first player with full pot as prize (no house fee).",
+        "After calling this, use send_prize_winner to complete the refund.",
+        "",
+        "Parameters:",
+        "- round_id: u64 - Round ID for the game"
+      ],
+      "discriminator": [
+        102,
+        129,
+        204,
+        196,
+        149,
+        58,
+        147,
+        226
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "roundId"
+              }
+            ]
+          }
+        },
+        {
+          "name": "activeGame",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  99,
+                  116,
+                  105,
+                  118,
+                  101,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "roundId",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "createGameRound",
       "docs": [
         "Create new game round with first bet",

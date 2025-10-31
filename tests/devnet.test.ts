@@ -1295,6 +1295,336 @@ describe("domin8_prgm - Devnet Tests (Real ORAO VRF)", () => {
     });
   });
 
+  //
+  // 7.5. SINGLE PLAYER REFUND FLOW (close_game_no_fee)
+  //
+  describe("7.5. Single Player Refund Flow (close_game_no_fee)", () => {
+    let refundRoundId: number;
+    let refundGameRoundPda: web3.PublicKey;
+    let playerBalanceBefore: number;
+
+    it("Should create game with single player for refund test", async () => {
+      console.log("\n=== Test 7.5.1: Create Single Player Game ===");
+
+      // Get next round ID
+      const counterAccount = await program.account.gameCounter.fetch(gameCounterPda);
+      refundRoundId = counterAccount.currentRoundId.toNumber();
+
+      console.log("Refund test round ID:", refundRoundId);
+
+      // Derive game round PDA
+      const roundIdBuffer = Buffer.alloc(8);
+      roundIdBuffer.writeBigUInt64LE(BigInt(refundRoundId));
+
+      [refundGameRoundPda] = web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("domin8_game"), roundIdBuffer],
+        program.programId
+      );
+
+      console.log("Refund Game Round PDA:", refundGameRoundPda.toString());
+
+      // Get VRF accounts
+      const configAccount = await program.account.domin8Config.fetch(gameConfigPda);
+      const vrfForce = configAccount.force;
+      const vrfRandomness = randomnessAccountAddress(Buffer.from(vrfForce));
+      const networkState = networkStateAccountAddress();
+      const networkStateData = await vrf.getNetworkState();
+      const vrfTreasury = networkStateData.config.treasury;
+
+      // Record player balance before bets
+      playerBalanceBefore = await connection.getBalance(player1.publicKey);
+      console.log("Player1 balance before:", playerBalanceBefore / web3.LAMPORTS_PER_SOL, "SOL");
+
+      const betAmount = 100_000_000; // 0.1 SOL
+      const skin = 1;
+      const position: [number, number] = [100, 200];
+      const map = 0;
+
+      // Create game with first bet
+      const tx = await program.methods
+        .createGameRound(
+          new BN(refundRoundId),
+          new BN(betAmount),
+          skin,
+          position,
+          map
+        )
+        .accounts({
+          config: gameConfigPda,
+          game: refundGameRoundPda,
+          activeGame: activeGamePda,
+          user: player1.publicKey,
+          vrfRandomness,
+          vrfTreasury,
+          vrfConfig: networkState,
+          vrfProgram: vrf.programId,
+          systemProgram: web3.SystemProgram.programId,
+        })
+        .signers([player1])
+        .rpc();
+
+      console.log("✓ Game created. TX:", tx);
+
+      // Place 3 more bets from same player
+      for (let i = 0; i < 3; i++) {
+        await program.methods
+          .bet(
+            new BN(refundRoundId),
+            new BN(betAmount),
+            skin,
+            position
+          )
+          .accounts({
+            config: gameConfigPda,
+            game: refundGameRoundPda,
+            activeGame: activeGamePda,
+            user: player1.publicKey,
+            systemProgram: web3.SystemProgram.programId,
+          })
+          .signers([player1])
+          .rpc();
+
+        console.log(`✓ Additional bet ${i + 2} placed`);
+      }
+
+      // Verify game state
+      const activeGame = await program.account.domin8Game.fetch(activeGamePda);
+      console.log("\n=== Single Player Game Created ===");
+      console.log("Total Bets:", activeGame.bets.length);
+      console.log("Unique Players:", activeGame.wallets.length);
+      console.log("Total Pot:", activeGame.totalDeposit.toNumber() / web3.LAMPORTS_PER_SOL, "SOL");
+
+      expect(activeGame.bets.length).to.equal(4);
+      expect(activeGame.wallets.length).to.equal(1); // Only 1 unique player
+      expect(activeGame.totalDeposit.toNumber()).to.equal(betAmount * 4);
+    });
+
+    it("Should wait for game to expire", async () => {
+      console.log("\n=== Test 7.5.2: Wait for Game Expiry ===");
+
+      const game = await program.account.domin8Game.fetch(refundGameRoundPda);
+      const endDate = game.endDate.toNumber();
+      const now = Math.floor(Date.now() / 1000);
+      const remaining = endDate - now;
+
+      if (remaining > 0) {
+        console.log(`Waiting ${remaining} seconds for game to expire...`);
+        await new Promise((resolve) => setTimeout(resolve, (remaining + 2) * 1000));
+        console.log("✓ Game expired");
+      } else {
+        console.log("✓ Game already expired");
+      }
+    });
+
+    it("Should close game without fees (refund setup)", async () => {
+      console.log("\n=== Test 7.5.3: Close Game Without Fees ===");
+
+      // Call close_game_no_fee
+      const tx = await program.methods
+        .closeGameNoFee(new BN(refundRoundId))
+        .accounts({
+          config: gameConfigPda,
+          game: refundGameRoundPda,
+          activeGame: activeGamePda,
+          admin: adminKeypair.publicKey,
+          systemProgram: web3.SystemProgram.programId,
+        })
+        .signers([adminKeypair])
+        .rpc();
+
+      console.log("✓ Game closed for refund. TX:", tx);
+
+      // Verify game state
+      const game = await program.account.domin8Game.fetch(refundGameRoundPda);
+      const config = await program.account.domin8Config.fetch(gameConfigPda);
+
+      console.log("\n=== After close_game_no_fee ===");
+      console.log("Game Status:", game.status); // 1 = closed
+      console.log("Winner:", game.winner?.toString());
+      console.log("Winner Prize:", game.winnerPrize.toNumber() / web3.LAMPORTS_PER_SOL, "SOL");
+      console.log("System Locked:", config.lock);
+
+      expect(game.status).to.equal(1); // Closed
+      expect(game.winner?.toString()).to.equal(player1.publicKey.toString());
+      expect(game.winnerPrize.toNumber()).to.equal(400_000_000); // Full pot (0.4 SOL)!
+      expect(config.lock).to.equal(false); // System unlocked
+    });
+
+    it("Should send full refund to player", async () => {
+      console.log("\n=== Test 7.5.4: Send Refund to Player ===");
+
+      const balanceBefore = await connection.getBalance(player1.publicKey);
+
+      // Call send_prize_winner to complete refund
+      const tx = await program.methods
+        .sendPrizeWinner(new BN(refundRoundId))
+        .accounts({
+          config: gameConfigPda,
+          game: refundGameRoundPda,
+          claimer: adminKeypair.publicKey,
+          winner: player1.publicKey,
+          systemProgram: web3.SystemProgram.programId,
+        })
+        .signers([adminKeypair])
+        .rpc();
+
+      console.log("✓ Refund sent. TX:", tx);
+
+      // Verify player balance
+      const balanceAfter = await connection.getBalance(player1.publicKey);
+      const refundReceived = balanceAfter - balanceBefore;
+
+      console.log("\n=== Refund Complete ===");
+      console.log("Balance Before:", balanceBefore / web3.LAMPORTS_PER_SOL, "SOL");
+      console.log("Balance After:", balanceAfter / web3.LAMPORTS_PER_SOL, "SOL");
+      console.log("Refund Received:", refundReceived / web3.LAMPORTS_PER_SOL, "SOL");
+
+      // Verify game state
+      const game = await program.account.domin8Game.fetch(refundGameRoundPda);
+      console.log("Winner Prize (after send):", game.winnerPrize.toNumber());
+
+      expect(game.winnerPrize.toNumber()).to.equal(0); // Prize sent
+      expect(refundReceived).to.equal(400_000_000); // Full 0.4 SOL refund!
+
+      console.log("✓ ✓ ✓ Single player received FULL refund (no fees)!");
+    });
+
+    it("Should reject close_game_no_fee if not admin", async () => {
+      console.log("\n=== Test 7.5.5: Reject Non-Admin Access ===");
+
+      // Create another single-player game for this test
+      const counterAccount = await program.account.gameCounter.fetch(gameCounterPda);
+      const testRoundId = counterAccount.currentRoundId.toNumber();
+
+      const roundIdBuffer = Buffer.alloc(8);
+      roundIdBuffer.writeBigUInt64LE(BigInt(testRoundId));
+
+      const [testGamePda] = web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("domin8_game"), roundIdBuffer],
+        program.programId
+      );
+
+      // Create game
+      const configAccount = await program.account.domin8Config.fetch(gameConfigPda);
+      const vrfForce = configAccount.force;
+      const vrfRandomness = randomnessAccountAddress(Buffer.from(vrfForce));
+      const networkState = networkStateAccountAddress();
+      const networkStateData = await vrf.getNetworkState();
+      const vrfTreasury = networkStateData.config.treasury;
+
+      await program.methods
+        .createGameRound(
+          new BN(testRoundId),
+          new BN(100_000_000),
+          1,
+          [100, 200],
+          0
+        )
+        .accounts({
+          config: gameConfigPda,
+          game: testGamePda,
+          activeGame: activeGamePda,
+          user: player1.publicKey,
+          vrfRandomness,
+          vrfTreasury,
+          vrfConfig: networkState,
+          vrfProgram: vrf.programId,
+          systemProgram: web3.SystemProgram.programId,
+        })
+        .signers([player1])
+        .rpc();
+
+      // Wait for game to expire
+      await new Promise((resolve) => setTimeout(resolve, 32000));
+
+      // Try to close as non-admin
+      try {
+        await program.methods
+          .closeGameNoFee(new BN(testRoundId))
+          .accounts({
+            config: gameConfigPda,
+            game: testGamePda,
+            activeGame: activeGamePda,
+            admin: player1.publicKey, // ❌ Not admin
+            systemProgram: web3.SystemProgram.programId,
+          })
+          .signers([player1])
+          .rpc();
+
+        assert.fail("Should have rejected non-admin");
+      } catch (error: any) {
+        console.log("✓ Correctly rejected non-admin:", error.message);
+        expect(error.message).to.include("Unauthorized");
+      }
+    });
+
+    it("Should reject close_game_no_fee if game not expired", async () => {
+      console.log("\n=== Test 7.5.6: Reject Non-Expired Game ===");
+
+      // Create a fresh game
+      const counterAccount = await program.account.gameCounter.fetch(gameCounterPda);
+      const testRoundId = counterAccount.currentRoundId.toNumber();
+
+      const roundIdBuffer = Buffer.alloc(8);
+      roundIdBuffer.writeBigUInt64LE(BigInt(testRoundId));
+
+      const [testGamePda] = web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("domin8_game"), roundIdBuffer],
+        program.programId
+      );
+
+      // Create game
+      const configAccount = await program.account.domin8Config.fetch(gameConfigPda);
+      const vrfForce = configAccount.force;
+      const vrfRandomness = randomnessAccountAddress(Buffer.from(vrfForce));
+      const networkState = networkStateAccountAddress();
+      const networkStateData = await vrf.getNetworkState();
+      const vrfTreasury = networkStateData.config.treasury;
+
+      await program.methods
+        .createGameRound(
+          new BN(testRoundId),
+          new BN(100_000_000),
+          1,
+          [100, 200],
+          0
+        )
+        .accounts({
+          config: gameConfigPda,
+          game: testGamePda,
+          activeGame: activeGamePda,
+          user: player1.publicKey,
+          vrfRandomness,
+          vrfTreasury,
+          vrfConfig: networkState,
+          vrfProgram: vrf.programId,
+          systemProgram: web3.SystemProgram.programId,
+        })
+        .signers([player1])
+        .rpc();
+
+      // Try to close immediately (before expiry)
+      try {
+        await program.methods
+          .closeGameNoFee(new BN(testRoundId))
+          .accounts({
+            config: gameConfigPda,
+            game: testGamePda,
+            activeGame: activeGamePda,
+            admin: adminKeypair.publicKey,
+            systemProgram: web3.SystemProgram.programId,
+          })
+          .signers([adminKeypair])
+          .rpc();
+
+        assert.fail("Should have rejected non-expired game");
+      } catch (error: any) {
+        console.log("✓ Correctly rejected non-expired game:", error.message);
+        expect(error.message).to.include("GameNotEnded");
+      }
+    });
+  });
+
   describe("8. Test Summary", () => {
     it("Should display comprehensive test summary", () => {
       console.log("\n╔════════════════════════════════════════════╗");
@@ -1315,7 +1645,15 @@ describe("domin8_prgm - Devnet Tests (Real ORAO VRF)", () => {
       console.log("✓ Betting window closure tested");
       console.log("✓ Winner selection flow verified (multi-player)");
       console.log("✓ Edge cases validated");
-      console.log("✓ Security checks passed\n");
+      console.log("✓ Security checks passed");
+      console.log("");
+      console.log("✓ NEW: Single Player Refund (close_game_no_fee)");
+      console.log("   - Single player places 4 bets (0.4 SOL total)");
+      console.log("   - Admin calls close_game_no_fee (no fees)");
+      console.log("   - Admin calls send_prize_winner (full refund)");
+      console.log("   - Player receives 100% refund (0.4 SOL)");
+      console.log("   - Unauthorized access rejected");
+      console.log("   - Non-expired game rejection verified\n");
 
       console.log("📝 IMPLEMENTATION DETAILS:");
       console.log("   • Single-player games pass player wallet at remaining_accounts[bet_count]");
@@ -1326,7 +1664,8 @@ describe("domin8_prgm - Devnet Tests (Real ORAO VRF)", () => {
       console.log("   • Graceful failure handling - transaction never fails\n");
 
       console.log("🎉 All tests passed! Smart contract is working correctly.\n");
-      console.log("✅ Single-player automatic refund feature verified");
+      console.log("✅ Single-player automatic refund feature verified (old)");
+      console.log("✅ Single-player close_game_no_fee refund feature verified (new)");
       console.log("✅ Ready for production deployment\n");
     });
   });

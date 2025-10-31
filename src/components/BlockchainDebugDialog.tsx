@@ -5,12 +5,12 @@
 
 import { useState } from "react";
 import { useActiveGame } from "../hooks/useActiveGame";
-import { CircleHelp, RefreshCw, X, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { CircleHelp, X, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 
 export function BlockchainDebugDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [jsonCopied, setJsonCopied] = useState(false);
-  const { activeGame, isLoading, activeGamePDA } = useActiveGame();
+  const { activeGame, activeGamePDA } = useActiveGame();
 
   if (!isOpen) {
     return (
@@ -61,12 +61,30 @@ export function BlockchainDebugDialog() {
     setTimeout(() => setJsonCopied(false), 2000);
   };
 
-  const formatStatus = (status: any) => {
-    if (!status) return "Unknown";
-    const keys = Object.keys(status);
-    const statusKey = keys[0] || "Unknown";
-    // Capitalize first letter for display
-    return statusKey.charAt(0).toUpperCase() + statusKey.slice(1);
+  const formatStatus = (status: any): string => {
+    // Status is numeric: 0 = Open/Waiting, 1 = Closed/Determining Winner
+    if (status === undefined || status === null) return "Unknown";
+
+    // Handle numeric status (current system)
+    if (typeof status === "number") {
+      switch (status) {
+        case 0:
+          return "Open";
+        case 1:
+          return "Closed";
+        default:
+          return `Unknown (${status})`;
+      }
+    }
+
+    // Legacy: handle object status (old system)
+    if (typeof status === "object") {
+      const keys = Object.keys(status);
+      const statusKey = keys[0] || "Unknown";
+      return statusKey.charAt(0).toUpperCase() + statusKey.slice(1);
+    }
+
+    return String(status);
   };
 
   const formatDate = (timestamp: any) => {
@@ -101,14 +119,6 @@ export function BlockchainDebugDialog() {
               title="Copy all state as JSON"
             >
               {jsonCopied ? "✓ Copied!" : "📋 Copy JSON"}
-            </button>
-            <button
-              onClick={() => window.location.reload()}
-              disabled={isLoading}
-              className="p-2 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
-              title="Refresh"
-            >
-              <RefreshCw className={`w-5 h-5 text-gray-300 ${isLoading ? "animate-spin" : ""}`} />
             </button>
             <button
               onClick={() => setIsOpen(false)}
@@ -179,7 +189,7 @@ export function BlockchainDebugDialog() {
               <div className="py-2">
                 <span className="text-gray-400 text-base font-medium">Status:</span>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {["Waiting", "AwaitingWinnerRandomness", "Finished"].map((status) => {
+                  {["Open", "Closed"].map((status) => {
                     const currentStatus = formatStatus(activeGame.status);
                     const isActive = currentStatus.toLowerCase() === status.toLowerCase();
                     return (
@@ -187,13 +197,11 @@ export function BlockchainDebugDialog() {
                         key={status}
                         className={`px-3 py-1.5 rounded-lg text-base font-semibold transition-all ${
                           isActive
-                            ? status === "Waiting"
+                            ? status === "Open"
                               ? "bg-blue-500 text-white shadow-lg ring-2 ring-blue-300"
-                              : status === "AwaitingWinnerRandomness"
+                              : status === "Closed"
                                 ? "bg-yellow-500 text-black shadow-lg ring-2 ring-yellow-300"
-                                : status === "Finished"
-                                  ? "bg-green-500 text-white shadow-lg ring-2 ring-green-300"
-                                  : "bg-purple-500 text-white shadow-lg ring-2 ring-purple-300"
+                                : "bg-gray-500 text-white shadow-lg ring-2 ring-gray-300"
                             : "bg-gray-700/30 text-gray-500 border border-gray-600/50"
                         }`}
                       >

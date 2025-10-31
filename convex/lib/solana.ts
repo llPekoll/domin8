@@ -250,9 +250,7 @@ export class SolanaClient {
 
     try {
       // Fetch account with null check
-      console.log("zoe");
       const account = await this.program.account.domin8Game.fetchNullable(activeGame);
-      console.log("mabricol");
       console.log({ account });
       if (!account) {
         console.log("No active game exists");
@@ -358,6 +356,31 @@ export class SolanaClient {
         admin: this.authority.publicKey,
         treasury: configAccount.treasury,
         vrfRandomness,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      } as any)
+      .rpc();
+
+    return tx;
+  }
+
+  // Close game without fees for refund (risk-based architecture)
+  async closeGameNoFee(roundId: number): Promise<string> {
+    const { config, activeGame } = this.getPDAs();
+    const { gameRound } = this.getPDAs(roundId);
+
+    if (!gameRound) {
+      throw new Error("Failed to derive game round PDA");
+    }
+
+    console.log(`Closing game ${roundId} without fees for refund...`);
+
+    const tx = await this.program.methods
+      .closeGameNoFee(new anchor.BN(roundId))
+      .accounts({
+        config,
+        game: gameRound,
+        activeGame,
+        admin: this.authority.publicKey,
         systemProgram: anchor.web3.SystemProgram.programId,
       } as any)
       .rpc();
