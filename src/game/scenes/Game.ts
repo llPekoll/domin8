@@ -6,6 +6,7 @@ import { GamePhaseManager } from '../managers/GamePhaseManager';
 import { UIManager } from '../managers/UIManager';
 import { BackgroundManager } from '../managers/BackgroundManager';
 import { SoundManager } from '../managers/SoundManager';
+import { logger } from '../../lib/logger';
 
 export class Game extends Scene {
   camera!: Phaser.Cameras.Scene2D.Camera;
@@ -27,7 +28,7 @@ export class Game extends Scene {
   }
 
   create() {
-    console.log("[Game] 🎮 Game scene (RoyalRumble) created and ready");
+    logger.game.debug("[Game] 🎮 Game scene (RoyalRumble) created and ready");
     this.camera = this.cameras.main;
 
     // Calculate proper center coordinates based on actual camera dimensions
@@ -70,8 +71,8 @@ export class Game extends Scene {
       betIndex: number;
       walletAddress: string;
     }) => {
-      console.log("[Game] 🎯 RECEIVED player-bet-placed EVENT");
-      console.log("[Game] Event data:", data);
+      logger.game.debug("[Game] 🎯 RECEIVED player-bet-placed EVENT");
+      logger.game.debug("[Game] Event data:", data);
 
       // Derive character key from character name (e.g., "Warrior" -> "warrior")
       const characterKey = data.characterName?.toLowerCase().replace(/\s+/g, "-") || "warrior";
@@ -116,7 +117,7 @@ export class Game extends Scene {
           }
         });
       } catch (e) {
-        console.error('[Game] Failed to play intro sound:', e);
+        logger.game.error('[Game] Failed to play intro sound:', e);
       }
     }
   }
@@ -153,7 +154,7 @@ export class Game extends Scene {
 
     // Spawn characters from blockchain bet data
     if (gameState.bets && gameState.wallets) {
-      console.log("[Game] Spawning characters from blockchain bet data:", {
+      logger.game.debug("[Game] Spawning characters from blockchain bet data:", {
         betCount: gameState.bets.length,
         walletCount: gameState.wallets.length,
       });
@@ -161,7 +162,7 @@ export class Game extends Scene {
       gameState.bets.forEach((bet: any, betIndex: number) => {
         const walletAddress = gameState.wallets[bet.walletIndex]?.toBase58();
         if (!walletAddress) {
-          console.warn("[Game] No wallet found for bet index", betIndex);
+          logger.game.warn("[Game] No wallet found for bet index", betIndex);
           return;
         }
 
@@ -193,7 +194,7 @@ export class Game extends Scene {
           colorHue: undefined,
         };
 
-        console.log("[Game] Spawning participant from blockchain:", participant);
+        logger.game.debug("[Game] Spawning participant from blockchain:", participant);
         this.playerManager.addParticipant(participant, false);
       });
     }

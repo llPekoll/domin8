@@ -5,6 +5,7 @@ import { AnimationManager } from "../managers/AnimationManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
 import { demoMapData } from "../main";
+import { logger } from "../../lib/logger";
 
 /**
  * DemoScene - Pure client-side demo mode
@@ -45,7 +46,7 @@ export class DemoScene extends Scene {
   }
 
   create() {
-    console.log("[DemoScene] 🎮 DemoScene created and ready");
+    logger.game.debug("[DemoScene] 🎮 DemoScene created and ready");
     this.camera = this.cameras.main;
     this.centerX = this.camera.centerX;
     this.centerY = this.camera.centerY;
@@ -56,10 +57,10 @@ export class DemoScene extends Scene {
 
     // Initialize background immediately with preloaded demo map
     if (demoMapData?.background) {
-      console.log("[DemoScene] Initializing background with:", demoMapData.background);
+      logger.game.debug("[DemoScene] Initializing background with:", demoMapData.background);
       this.backgroundManager.setTexture(demoMapData.background);
     } else {
-      console.warn("[DemoScene] No demo map data available!");
+      logger.game.warn("[DemoScene] No demo map data available!");
     }
 
     this.scale.on("resize", () => this.handleResize(), this);
@@ -86,8 +87,8 @@ export class DemoScene extends Scene {
       betIndex: number;
       walletAddress: string;
     }) => {
-      console.log("[DemoScene] 🎯 RECEIVED player-bet-placed EVENT");
-      console.log("[DemoScene] Event data:", data);
+      logger.game.debug("[DemoScene] 🎯 RECEIVED player-bet-placed EVENT");
+      logger.game.debug("[DemoScene] Event data:", data);
 
       // Derive character key from character name (e.g., "Warrior" -> "warrior")
       const characterKey = data.characterName?.toLowerCase().replace(/\s+/g, "-") || "warrior";
@@ -263,7 +264,7 @@ export class DemoScene extends Scene {
 
         // Check if audio file is loaded
         if (!this.cache.audio.exists("battle-theme")) {
-          console.error("[DemoScene] battle-theme audio not loaded!");
+          logger.game.error("[DemoScene] battle-theme audio not loaded!");
           return;
         }
 
@@ -275,7 +276,7 @@ export class DemoScene extends Scene {
         // Register with SoundManager for centralized control
         SoundManager.setBattleMusic(this.battleMusic);
       } catch (e) {
-        console.error("[DemoScene] Failed to start battle music:", e);
+        logger.game.error("[DemoScene] Failed to start battle music:", e);
       }
     }
   }
@@ -295,7 +296,7 @@ export class DemoScene extends Scene {
   }
 
   public setDemoMap(mapData: any) {
-    console.log("[DemoScene] setDemoMap called:", mapData?.name);
+    logger.game.debug("[DemoScene] setDemoMap called:", mapData?.name);
 
     if (mapData?.background) {
       this.backgroundManager.setTexture(mapData.background);
@@ -305,7 +306,7 @@ export class DemoScene extends Scene {
   public spawnDemoParticipant(participant: any) {
     const participantId = participant._id || participant.id;
 
-    console.log("[DemoScene] spawnDemoParticipant called", {
+    logger.game.debug("[DemoScene] spawnDemoParticipant called", {
       id: participantId,
       currentParticipantsCount: this.participants.length,
       playerManagerCount: this.playerManager.getParticipants().size,
@@ -313,7 +314,7 @@ export class DemoScene extends Scene {
 
     // Check if participant already exists to prevent double spawning
     if (this.playerManager.getParticipant(participantId)) {
-      console.warn(
+      logger.game.warn(
         `[DemoScene] Participant ${participantId} already exists in PlayerManager, skipping duplicate spawn`
       );
       return;
@@ -321,16 +322,16 @@ export class DemoScene extends Scene {
 
     // Also check in our local participants array
     if (this.participants.find((p) => (p._id || p.id) === participantId)) {
-      console.warn(
+      logger.game.warn(
         `[DemoScene] Participant ${participantId} found in local array, skipping duplicate spawn`
       );
       return;
     }
 
-    console.log(`[DemoScene] Adding participant ${participantId} to scene`);
+    logger.game.debug(`[DemoScene] Adding participant ${participantId} to scene`);
     this.playerManager.addParticipant(participant);
     this.participants.push(participant);
-    console.log(`[DemoScene] Participant ${participantId} added successfully`);
+    logger.game.debug(`[DemoScene] Participant ${participantId} added successfully`);
   }
 
   public moveParticipantsToCenter() {
@@ -338,7 +339,7 @@ export class DemoScene extends Scene {
 
     // After 2 seconds of running, start continuous explosions
     this.time.delayedCall(500, () => {
-      console.log("[DemoScene] 💥 Starting continuous explosions after 2 seconds of running");
+      logger.game.debug("[DemoScene] 💥 Starting continuous explosions after 2 seconds of running");
       this.animationManager.createContinuousExplosions();
     });
   }
@@ -359,7 +360,7 @@ export class DemoScene extends Scene {
 
     // After 3 seconds: Show winner celebration
     this.time.delayedCall(3000, () => {
-      console.log("[DemoScene] 🎉 Starting winner celebration for:", winner);
+      logger.game.debug("[DemoScene] 🎉 Starting winner celebration for:", winner);
 
       const demoGameState = {
         status: "results",
@@ -371,20 +372,20 @@ export class DemoScene extends Scene {
       // Show winner with PlayerManager (scales up, golden tint, etc.)
       const winnerParticipant = this.playerManager.showResults(demoGameState);
 
-      console.log("[DemoScene] Winner participant from showResults:", winnerParticipant);
+      logger.game.debug("[DemoScene] Winner participant from showResults:", winnerParticipant);
 
       // Add celebration animations (confetti, text, bounce)
       if (winnerParticipant) {
-        console.log("[DemoScene] 🏆 Calling addWinnerCelebration");
+        logger.game.debug("[DemoScene] 🏆 Calling addWinnerCelebration");
         this.animationManager.addWinnerCelebration(winnerParticipant, winner);
       } else {
-        console.error("[DemoScene] ❌ No winner participant returned!");
+        logger.game.error("[DemoScene] ❌ No winner participant returned!");
       }
     });
   }
 
   public clearDemoParticipants() {
-    console.log("[DemoScene] Clearing demo participants", {
+    logger.game.debug("[DemoScene] Clearing demo participants", {
       count: this.participants.length,
     });
     this.playerManager.clearParticipants();

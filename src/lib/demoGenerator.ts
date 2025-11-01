@@ -1,5 +1,6 @@
 // Demo mode utilities - all client-side, no database
 import { DEMO_TIMINGS } from "../config/demoTimings";
+import { logger } from "./logger";
 
 export const DEMO_BOT_NAMES = [
   "Shadow",
@@ -127,7 +128,7 @@ export function generateRandomSpawnIntervals(
   let remainingTime = totalTime;
   let remainingBots = count;
 
-  console.log(
+  logger.game.debug(
     `[DemoGenerator] 🎲 Generating spawn intervals for ${count} bots over ${totalTime}ms`
   );
 
@@ -135,7 +136,7 @@ export function generateRandomSpawnIntervals(
     if (i === count - 1) {
       // Last bot: use all remaining time to fill the 20 seconds
       spawnTimes.push(remainingTime);
-      console.log(`[DemoGenerator] Bot ${i}: ${Math.round(remainingTime)}ms (final bot)`);
+      logger.game.debug(`[DemoGenerator] Bot ${i}: ${Math.round(remainingTime)}ms (final bot)`);
     } else {
       // Calculate average time per remaining bot
       const avgTime = remainingTime / remainingBots;
@@ -147,21 +148,21 @@ export function generateRandomSpawnIntervals(
       if (roll < 0.3) {
         // BURST: 30% chance - spawn very quickly (0.2-0.8s)
         randomInterval = minInterval + Math.random() * 600;
-        console.log(`[DemoGenerator] Bot ${i}: ${Math.round(randomInterval)}ms ⚡ BURST`);
+        logger.game.debug(`[DemoGenerator] Bot ${i}: ${Math.round(randomInterval)}ms ⚡ BURST`);
       } else if (roll < 0.5) {
         // LONG PAUSE: 20% chance - dramatic gap (2-3s)
         randomInterval = Math.max(
           minInterval,
           Math.min(maxInterval, avgTime * 1.5 + Math.random() * 1000)
         );
-        console.log(`[DemoGenerator] Bot ${i}: ${Math.round(randomInterval)}ms 🕐 PAUSE`);
+        logger.game.debug(`[DemoGenerator] Bot ${i}: ${Math.round(randomInterval)}ms 🕐 PAUSE`);
       } else {
         // NORMAL: 50% chance - varied timing around average (0.5-2s)
         randomInterval = Math.max(
           minInterval,
           Math.min(maxInterval, avgTime + (Math.random() - 0.5) * avgTime * 1.2)
         );
-        console.log(`[DemoGenerator] Bot ${i}: ${Math.round(randomInterval)}ms 🎯 NORMAL`);
+        logger.game.debug(`[DemoGenerator] Bot ${i}: ${Math.round(randomInterval)}ms 🎯 NORMAL`);
       }
 
       spawnTimes.push(randomInterval);
@@ -173,7 +174,7 @@ export function generateRandomSpawnIntervals(
   // Calculate cumulative times for logging
   const cumulative = 0;
 
-  console.log("[DemoGenerator] ✅ Spawn schedule:", {
+  logger.game.debug("[DemoGenerator] ✅ Spawn schedule:", {
     totalDuration: Math.round(cumulative),
     firstSpawn: Math.round(spawnTimes[0]),
     lastSpawn: Math.round(spawnTimes[spawnTimes.length - 1]),

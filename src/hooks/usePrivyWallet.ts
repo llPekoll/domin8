@@ -3,6 +3,7 @@ import { useWallets } from "@privy-io/react-auth/solana";
 import { PublicKey, Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useState, useEffect } from "react";
 import { getSolanaRpcUrl } from "../lib/utils";
+import { logger } from "../lib/logger";
 
 export function usePrivyWallet() {
   const { ready, authenticated } = usePrivy();
@@ -35,7 +36,7 @@ export function usePrivyWallet() {
         const balanceSOL = balanceLamports / LAMPORTS_PER_SOL;
         setSolBalance(balanceSOL);
       } catch (error) {
-        console.error("Error fetching SOL balance:", error);
+        logger.solana.error("Error fetching SOL balance:", error);
         setSolBalance(0);
       } finally {
         setIsLoadingBalance(false);
@@ -61,7 +62,7 @@ export function usePrivyWallet() {
       const balanceSOL = balanceLamports / LAMPORTS_PER_SOL;
       setSolBalance(balanceSOL);
     } catch (error) {
-      console.error("Error refreshing SOL balance:", error);
+      logger.solana.error("Error refreshing SOL balance:", error);
     } finally {
       setIsLoadingBalance(false);
     }
