@@ -99,6 +99,9 @@ export class SolanaClient {
       DOMIN8_PROGRAM_ID
     );
 
+    console.log("current program id:", this.program.programId.toBase58());
+    console.log("roundId:", roundId);
+
     // Derive per-game PDA if roundId is provided (for historical lookups)
     let gameRound: PublicKey | undefined;
     if (roundId !== undefined) {
@@ -174,6 +177,8 @@ export class SolanaClient {
       throw new Error("Failed to derive game round PDA");
     }
 
+    console.log("game_round: ", gameRound)
+
     try {
       // Fetch account with null check
       const account = await this.program.account.domin8Game.fetchNullable(gameRound);
@@ -248,7 +253,7 @@ export class SolanaClient {
    */
   async getActiveGame(): Promise<GameRound | null> {
     const { activeGame } = this.getPDAs();
-
+    console.log("---->Fetching active game from PDA:", activeGame.toBase58());
     try {
       // Fetch account with null check
       const account = await this.program.account.domin8Game.fetchNullable(activeGame);
@@ -365,31 +370,7 @@ export class SolanaClient {
     return tx;
   }
 
-  // Close game without fees for refund (risk-based architecture)
-  async closeGameNoFee(roundId: number): Promise<string> {
-    const { config, activeGame } = this.getPDAs();
-    const { gameRound } = this.getPDAs(roundId);
-
-    if (!gameRound) {
-      throw new Error("Failed to derive game round PDA");
-    }
-
-    console.log(`Closing game ${roundId} without fees for refund...`);
-
-    const tx = await this.program.methods
-      .closeGameNoFee(new anchor.BN(roundId))
-      .accounts({
-        config,
-        game: gameRound,
-        activeGame,
-        admin: this.authority.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      } as any)
-      .rpc();
-
-    return tx;
-  }
-
+ 
   // Send prize to winner (risk-based architecture)
   async sendPrizeWinner(roundId: number): Promise<string> {
     const { config } = this.getPDAs();

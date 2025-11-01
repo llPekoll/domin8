@@ -57,6 +57,10 @@ export const executeEndGame = internalAction({
       // Check if already closed
       if (activeGame.status !== 0) {
         console.log(`Round ${roundId}: Already closed (status: ${activeGame.status})`);
+        console.log("winner and winner prize info:", {
+          winner: activeGame.winner,
+          winnerPrize: activeGame.winnerPrize,
+        });
 
         // Recovery: If game is closed but prize not sent, schedule sendPrizeWinner
         if (activeGame.status === 1 && activeGame.winner && activeGame.winnerPrize > 0) {
@@ -76,7 +80,7 @@ export const executeEndGame = internalAction({
             );
 
             // Save job to database
-            await ctx.runMutation(internal.gameSchedulerMutations.saveScheduledJob, {
+            await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
               jobId: jobId.toString(),
               roundId,
               action: "send_prize",
@@ -103,63 +107,13 @@ export const executeEndGame = internalAction({
 
       // 3. **CRITICAL CHECK**: Count unique players (wallet addresses)
       const uniquePlayers = new Set(activeGame.wallets).size;
-      const betCount = activeGame.betCount || 0;
+      const betCount = activeGame.bets?.length || 0;
 
       console.log(`Round ${roundId}: Player analysis:`, {
         uniquePlayers,
         betCount,
         totalPot: activeGame.totalDeposit,
       });
-
-      // 4a. CASE: Single player or no bets → REFUND
-      if (uniquePlayers === 1 || betCount === 1) {
-        console.log(`Round ${roundId}: 🔄 SINGLE PLAYER DETECTED - Initiating refund...`);
-
-        try {
-          // Step 1: Close game without fees (sets winner = player, prize = full pot)
-          console.log(`Round ${roundId}: Calling close_game_no_fee...`);
-          const closeTx = await solanaClient.closeGameNoFee(roundId);
-          const closeConfirmed = await solanaClient.confirmTransaction(closeTx);
-
-          if (!closeConfirmed) {
-            throw new Error(`close_game_no_fee confirmation failed: ${closeTx}`);
-          }
-
-          console.log(`Round ${roundId}: ✅ Game closed for refund. Tx: ${closeTx}`);
-
-          // Step 2: Send the full pot back to player (reusing send_prize_winner)
-          await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait for blockchain update
-
-          console.log(`Round ${roundId}: Calling send_prize_winner for refund...`);
-          const refundTx = await solanaClient.sendPrizeWinner(roundId);
-          const refundConfirmed = await solanaClient.confirmTransaction(refundTx);
-
-          if (!refundConfirmed) {
-            throw new Error(`Refund confirmation failed: ${refundTx}`);
-          }
-
-          console.log(`Round ${roundId}: ✅ REFUND COMPLETE. Tx: ${refundTx}`);
-
-          // Mark as completed
-          await ctx.runMutation(internal.gameSchedulerMutations.markJobCompleted, {
-            roundId,
-            action: "end_game",
-          });
-
-          console.log(`Round ${roundId}: 🎉 Single player refunded successfully`);
-          return;
-        } catch (error) {
-          console.error(`Round ${roundId}: ❌ Refund failed:`, error);
-
-          await ctx.runMutation(internal.gameSchedulerMutations.markJobFailed, {
-            roundId,
-            action: "end_game",
-            error: `REFUND FAILED: ${error instanceof Error ? error.message : String(error)}`,
-          });
-
-          return;
-        }
-      }
 
       // 4b. CASE: No players (edge case) → Delete game
       if (betCount === 0) {
@@ -209,7 +163,7 @@ export const executeEndGame = internalAction({
           );
 
           // Save job to database
-          await ctx.runMutation(internal.gameSchedulerMutations.saveScheduledJob, {
+          await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
             jobId: jobId.toString(),
             roundId,
             action: "send_prize",

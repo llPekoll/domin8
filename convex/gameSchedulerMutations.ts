@@ -10,10 +10,10 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
- * Save a scheduled job to the database
- * Used for tracking and preventing duplicates
+ * Upsert a scheduled job to the database
+ * Updates existing job or creates new one
  */
-export const saveScheduledJob = internalMutation({
+export const upsertScheduledJob = internalMutation({
   args: {
     jobId: v.string(),
     roundId: v.number(),
@@ -21,7 +21,7 @@ export const saveScheduledJob = internalMutation({
     scheduledTime: v.number(),
   },
   handler: async (ctx, args) => {
-    // Check if job already exists (prevent duplicates)
+    // Check if job already exists
     const existing = await ctx.db
       .query("scheduledJobs")
       .withIndex("by_round_and_status", (q) =>
@@ -31,8 +31,13 @@ export const saveScheduledJob = internalMutation({
       .first();
 
     if (existing) {
+      // Update existing job
+      await ctx.db.patch(existing._id, {
+        jobId: args.jobId,
+        scheduledTime: args.scheduledTime,
+      });
       console.log(
-        `Job already exists for round ${args.roundId} action ${args.action}, skipping`
+        `Updated existing job for round ${args.roundId} action ${args.action}`
       );
       return existing._id;
     }

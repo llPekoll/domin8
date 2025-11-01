@@ -123,8 +123,8 @@ async function processEndedGames(ctx: any, solanaClient: SolanaClient) {
       { roundId: activeGame.roundId }
     );
 
-    // Save job to database for tracking
-    await ctx.runMutation(internal.gameSchedulerMutations.saveScheduledJob, {
+    // Upsert job to database for tracking (avoid duplicates)
+    await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
       jobId: jobId.toString(),
       roundId: activeGame.roundId,
       action: "end_game",

@@ -16,7 +16,7 @@ pub use error::*;
 pub use state::*;
 pub use utils::*;
 
-declare_id!("EzQkRkntgZqbi3cvHVuTyjrb5XnLGhNE2GDXrBA8y7dV");
+declare_id!("D8zxCM4tehr4Aux9zvonwCCYjV71WEgFnssWxgpgEEb7");
 
 #[program]
 pub mod domin8_prgm {
@@ -91,18 +91,6 @@ pub mod domin8_prgm {
     /// - round_id: u64 - Round ID for the game
     pub fn send_prize_winner(ctx: Context<SendPrizeWinner>, round_id: u64) -> Result<()> {
         send_prize_winner::handler(ctx, round_id)
-    }
-
-    /// Close game without fees for refund scenarios (admin only)
-    ///
-    /// Used for single player refunds or game cancellations.
-    /// Sets winner to first player with full pot as prize (no house fee).
-    /// After calling this, use send_prize_winner to complete the refund.
-    ///
-    /// Parameters:
-    /// - round_id: u64 - Round ID for the game
-    pub fn close_game_no_fee(ctx: Context<CloseGameNoFee>, round_id: u64) -> Result<()> {
-        close_game_no_fee::handler(ctx, round_id)
     }
 
     /// Delete a game round from the blockchain (admin only)
