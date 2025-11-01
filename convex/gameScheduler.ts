@@ -61,11 +61,30 @@ export const executeEndGame = internalAction({
         // Recovery: If game is closed but prize not sent, schedule sendPrizeWinner
         if (activeGame.status === 1 && activeGame.winner && activeGame.winnerPrize > 0) {
           console.log(`Round ${roundId}: Game closed but prize not sent yet, scheduling...`);
-          await ctx.scheduler.runAfter(
-            0, // Execute immediately
-            internal.gameScheduler.executeSendPrize,
-            { roundId }
-          );
+
+          // Check if already scheduled
+          const alreadyScheduled = await ctx.runQuery(internal.gameSchedulerMutations.isActionScheduled, {
+            roundId,
+            action: "send_prize",
+          });
+
+          if (!alreadyScheduled) {
+            const jobId = await ctx.scheduler.runAfter(
+              0, // Execute immediately
+              internal.gameScheduler.executeSendPrize,
+              { roundId }
+            );
+
+            // Save job to database
+            await ctx.runMutation(internal.gameSchedulerMutations.saveScheduledJob, {
+              jobId: jobId.toString(),
+              roundId,
+              action: "send_prize",
+              scheduledTime: Math.floor(Date.now() / 1000),
+            });
+
+            console.log(`Round ${roundId}: Scheduled send_prize (jobId: ${jobId})`);
+          }
         }
         return;
       }
@@ -183,11 +202,21 @@ export const executeEndGame = internalAction({
           console.log(`Round ${roundId}: Prize amount: ${updatedGame.winnerPrize} lamports`);
 
           // Schedule sendPrizeWinner
-          await ctx.scheduler.runAfter(
+          const jobId = await ctx.scheduler.runAfter(
             1000, // 1 second delay
             internal.gameScheduler.executeSendPrize,
             { roundId }
           );
+
+          // Save job to database
+          await ctx.runMutation(internal.gameSchedulerMutations.saveScheduledJob, {
+            jobId: jobId.toString(),
+            roundId,
+            action: "send_prize",
+            scheduledTime: Math.floor(Date.now() / 1000) + 1, // 1 second from now
+          });
+
+          console.log(`Round ${roundId}: Scheduled send_prize (jobId: ${jobId})`);
         } else {
           console.warn(`Round ${roundId}: ⚠️ No winner found after end_game`);
         }

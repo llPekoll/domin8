@@ -65,6 +65,40 @@ export const upsertGameState = internalMutation({
       }
     }
 
+    // BACKFILL LOGIC: If this is a "finished" game, ensure we have a "waiting" state
+    if (status === "finished") {
+      const waitingState = await db
+        .query("gameRoundStates")
+        .withIndex("by_round_and_status", (q) => q.eq("roundId", roundId).eq("status", "waiting"))
+        .first();
+
+      if (!waitingState) {
+        console.log(`[Sync Mutations] Backfilling missing "waiting" state for round ${roundId}`);
+
+        // Create the missing "waiting" state using game start data
+        await db.insert("gameRoundStates", {
+          roundId,
+          status: "waiting",
+          startTimestamp: gameRound.startTimestamp || gameRound.startDate,
+          endTimestamp: gameRound.endTimestamp || gameRound.endDate,
+          totalPot: gameRound.totalPot || gameRound.totalDeposit,
+          betCount: gameRound.betCount || gameRound.bets.length,
+          mapId,
+          winner: null, // No winner during waiting phase
+          winningBetIndex: 0,
+          betAmounts: gameRound.betAmounts || gameRound.bets.map((b) => b.amount),
+          betSkin: gameRound.betSkin || gameRound.bets.map((b) => b.skin),
+          betPosition: gameRound.betPosition || gameRound.bets.map((b) => b.position),
+          vrfRequestPubkey: null,
+          vrfSeed: [],
+          randomnessFulfilled: false, // Not fulfilled during waiting
+          capturedAt: gameRound.startTimestamp || gameRound.startDate, // Use start time
+        });
+
+        console.log(`[Sync Mutations] ✅ Created backfilled "waiting" state for round ${roundId}`);
+      }
+    }
+
     // Check if game state already exists for this round and status
     const existingState = await db
       .query("gameRoundStates")

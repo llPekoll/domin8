@@ -117,13 +117,21 @@ async function processEndedGames(ctx: any, solanaClient: SolanaClient) {
     }
 
     // Schedule endGame action
-    await ctx.scheduler.runAfter(
+    const jobId = await ctx.scheduler.runAfter(
       0, // Execute immediately
       internal.gameScheduler.executeEndGame,
       { roundId: activeGame.roundId }
     );
 
-    console.log(`[Sync Service] Scheduled endGame for round ${activeGame.roundId}`);
+    // Save job to database for tracking
+    await ctx.runMutation(internal.gameSchedulerMutations.saveScheduledJob, {
+      jobId: jobId.toString(),
+      roundId: activeGame.roundId,
+      action: "end_game",
+      scheduledTime: now,
+    });
+
+    console.log(`[Sync Service] Scheduled endGame for round ${activeGame.roundId} (jobId: ${jobId})`);
   } catch (error) {
     console.error("[Sync Service] Error processing ended games:", error);
   }

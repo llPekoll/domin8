@@ -214,6 +214,7 @@ export class SolanaClient {
         endDate: account.endDate?.toNumber() ?? 0,
         totalDeposit: account.totalDeposit?.toNumber() ?? 0,
         rand: account.rand?.toString() ?? "0", // Convert to string to avoid overflow
+        map: account.map ?? 0, // Map/background ID (0-255)
         userCount: account.userCount?.toNumber() ?? 0,
         force: Array.from(account.force || []),
         status: account.status ?? 0,
@@ -280,6 +281,7 @@ export class SolanaClient {
         endDate: account.endDate?.toNumber() ?? 0,
         totalDeposit: account.totalDeposit?.toNumber() ?? 0,
         rand: account.rand?.toString() ?? "0", // Convert to string to avoid overflow
+        map: account.map ?? 0, // Map/background ID (0-255)
         userCount: account.userCount?.toNumber() ?? 0,
         force: Array.from(account.force || []),
         status: account.status ?? 0,

@@ -126,8 +126,15 @@ pub fn handler(
     // Minimal logging to save CU
     msg!("Game {} ended: winner={}, pot={}", round_id, selected_winner, total_pot);
 
-    // Calculate house fee
-    let house_fee_amount = Utils::calculate_fee(total_pot, config_data.house_fee)?;
+    // Check if single player (refund scenario - no fees)
+    let is_single_player = active_game_data.user_count == 1;
+
+    // Calculate house fee (zero for single player)
+    let house_fee_amount = if is_single_player {
+        0
+    } else {
+        Utils::calculate_fee(total_pot, config_data.house_fee)?
+    };
 
     // Winner gets the remaining amount after fees are deducted
     let winner_prize = total_pot
@@ -138,7 +145,7 @@ pub fn handler(
     require!(house_fee_amount <= total_pot, Domin8Error::ArithmeticError);
 
     // Minimal fee logging
-    msg!("House fee: {}, Winner prize: {}", house_fee_amount, winner_prize);
+    msg!("Single player: {}, House fee: {}, Winner prize: {}", is_single_player, house_fee_amount, winner_prize);
 
     // Calculate rent-exempt minimum for the game account
     let rent = Rent::get()?;
