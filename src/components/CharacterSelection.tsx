@@ -11,6 +11,7 @@ import { CharacterPreviewScene } from "./CharacterPreviewScene";
 import styles from "./ButtonShine.module.css";
 import { Buffer } from "buffer";
 import { EventBus } from "../game/EventBus";
+import { logger } from "../lib/logger";
 
 // Make Buffer available globally for Privy
 if (typeof window !== "undefined") {
@@ -66,7 +67,7 @@ const CharacterSelection = memo(function CharacterSelection({
 
     // Special case: Stuck/empty game (any status with 0 bets) - allow betting to create new game
     if (betCount === 0) {
-      console.log("[canPlaceBet] Empty game detected - allowing bet to create new game");
+      logger.ui.debug("[canPlaceBet] Empty game detected - allowing bet to create new game");
       return true;
     }
 
@@ -136,7 +137,7 @@ const CharacterSelection = memo(function CharacterSelection({
         return;
       } else if (status === 2) {
         // Game is finished - allow betting to create new round!
-        console.log("Previous game finished, placing bet will create new round");
+        logger.ui.debug("Previous game finished, placing bet will create new round");
         // Continue to place bet (don't return)
       } else {
         toast.error("Cannot place bet at this time");
@@ -175,16 +176,17 @@ const CharacterSelection = memo(function CharacterSelection({
       const spawnY = Math.floor(centerY + Math.sin(angle) * radius);
       const position: [number, number] = [spawnX, spawnY];
 
-      console.log("[CharacterSelection] Character data for bet:");
-      console.log("  - Character Name:", currentCharacter.name);
-      console.log("  - Character _id:", currentCharacter._id);
-      console.log("  - Skin ID (blockchain):", currentCharacter.id);
-      console.log("  - Spawn Position:", position);
+      logger.ui.debug("[CharacterSelection] Character data for bet:", {
+        name: currentCharacter.name,
+        convexId: currentCharacter._id,
+        skinId: currentCharacter.id,
+        position
+      });
 
       // Safety check: Ensure character has a blockchain ID
       if (currentCharacter.id === undefined || currentCharacter.id === null) {
         toast.error("Character is missing blockchain ID. Please contact support.");
-        console.error("[CharacterSelection] Character missing blockchain ID:", currentCharacter);
+        logger.ui.error("[CharacterSelection] Character missing blockchain ID:", currentCharacter);
         return;
       }
 
@@ -193,16 +195,18 @@ const CharacterSelection = memo(function CharacterSelection({
       if (allMaps && allMaps.length > 0) {
         const randomMap = allMaps[Math.floor(Math.random() * allMaps.length)];
         mapId = randomMap.id ?? 0; // Use map's blockchain ID
-        console.log("[CharacterSelection] Selected map:", randomMap.name, "ID:", mapId);
+        logger.ui.debug("[CharacterSelection] Selected map:", randomMap.name, "ID:", mapId);
       }
 
       // Use the hook's placeBet function with character data (skin + position + map stored on-chain)
       const betResult = await placeBet(amount, currentCharacter.id, position, mapId);
       const { signature: signatureHex, roundId, betIndex } = betResult;
 
-      console.log("[CharacterSelection] Transaction successful:", signatureHex);
-      console.log("[CharacterSelection] Round ID:", roundId);
-      console.log("[CharacterSelection] Bet Index:", betIndex);
+      logger.ui.debug("[CharacterSelection] Transaction successful:", {
+        signature: signatureHex,
+        roundId,
+        betIndex
+      });
 
       // Show different toast based on whether we have a real signature
       const hasRealSignature = signatureHex && !signatureHex.startsWith("transaction_");
@@ -224,9 +228,9 @@ const CharacterSelection = memo(function CharacterSelection({
         walletAddress: publicKey.toString(),
       };
 
-      console.log("[CharacterSelection] 🎮 EMITTING player-bet-placed EVENT:", eventData);
+      logger.ui.debug("[CharacterSelection] 🎮 EMITTING player-bet-placed EVENT:", eventData);
       EventBus.emit("player-bet-placed", eventData);
-      console.log("[CharacterSelection] ✅ Event emitted successfully");
+      logger.ui.debug("[CharacterSelection] ✅ Event emitted successfully");
 
       // Character skin and position are now stored directly on-chain
       // No need for Convex character assignment - blockchain is source of truth
@@ -247,7 +251,7 @@ const CharacterSelection = memo(function CharacterSelection({
 
       onParticipantAdded?.();
     } catch (error) {
-      console.error("Failed to place bet:", error);
+      logger.ui.error("Failed to place bet:", error);
       toast.error(error instanceof Error ? error.message : "Failed to place bet");
     } finally {
       setIsSubmitting(false);

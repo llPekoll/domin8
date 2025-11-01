@@ -7,6 +7,7 @@
  */
 import { useActiveGame } from "./useActiveGame";
 import { useMemo } from "react";
+import { logger } from "../lib/logger";
 
 export interface BetEntry {
   wallet: string;
@@ -103,7 +104,7 @@ export function useGameState() {
     loading,
     error,
     refresh: () => {
-      console.log(
+      logger.solana.debug(
         "[DOMIN8] Direct blockchain subscription - no manual refresh needed (updates in <1s)"
       );
     },

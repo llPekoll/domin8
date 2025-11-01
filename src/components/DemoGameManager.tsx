@@ -11,6 +11,7 @@ import {
 import { IRefPhaserGame } from "../PhaserGame";
 import { DEMO_TIMINGS } from "../config/demoTimings";
 import { generateRandomEllipsePositions } from "../config/spawnConfig";
+import { logger } from "../lib/logger";
 
 export type DemoPhase = "spawning" | "arena" | "results";
 
@@ -70,14 +71,14 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
       setPhase("spawning");
 
       // Generate truly random positions around ellipse with collision avoidance
-      console.log("[DemoGameManager] 🎲 GENERATING RANDOM POSITIONS - New Game");
+      logger.game.debug("[DemoGameManager] 🎲 GENERATING RANDOM POSITIONS - New Game");
       const newRandomPositions = generateRandomEllipsePositions(
         DEMO_PARTICIPANT_COUNT,
         512, // centerX
         384 // centerY
       );
       setShuffledPositions(newRandomPositions);
-      console.log(
+      logger.game.debug(
         "[DemoGameManager] First 3 positions in new game:",
         newRandomPositions.slice(0, 3).map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) }))
       );
@@ -88,7 +89,7 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
       spawnTimeoutsRef.current = [];
     } else {
       // Clean up when deactivated
-      console.log("[DemoGameManager] Deactivating demo mode");
+      logger.game.debug("[DemoGameManager] Deactivating demo mode");
       setSpawnedParticipants([]);
       setShuffledPositions([]);
       isSpawningRef.current = false;
@@ -126,7 +127,7 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
       characters.length === 0 ||
       shuffledPositions.length === 0
     ) {
-      console.log("[DemoGameManager] Spawn effect early return - conditions not met", {
+      logger.game.debug("[DemoGameManager] Spawn effect early return - conditions not met", {
         isActive,
         phase,
         hasDemoMap: !!demoMap,
@@ -138,14 +139,14 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
 
     // Check if already spawning to prevent double spawning
     if (isSpawningRef.current || spawnTimeoutsRef.current.length > 0) {
-      console.log("[DemoGameManager] Already spawning or timeouts exist, skipping", {
+      logger.game.debug("[DemoGameManager] Already spawning or timeouts exist, skipping", {
         isSpawning: isSpawningRef.current,
         timeoutCount: spawnTimeoutsRef.current.length,
       });
       return;
     }
 
-    console.log("[DemoGameManager] Starting spawn sequence");
+    logger.game.debug("[DemoGameManager] Starting spawn sequence");
     isSpawningRef.current = true;
     spawnCountRef.current = 0; // Reset spawn count
 
@@ -164,7 +165,7 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
       const timeout = setTimeout(() => {
         // Use ref-based counting to avoid race conditions
         if (spawnCountRef.current >= DEMO_PARTICIPANT_COUNT) {
-          console.log(`[DemoGameManager] Spawn ${index}: Max participants reached via ref`);
+          logger.game.debug(`[DemoGameManager] Spawn ${index}: Max participants reached via ref`);
           return;
         }
 
@@ -173,17 +174,17 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
 
         // Get next position from shuffled state
         if (!shuffledPositions || shuffledPositions.length === 0) {
-          console.error("[DemoGameManager] No shuffled positions available!");
+          logger.game.error("[DemoGameManager] No shuffled positions available!");
           return;
         }
 
         const nextPosition = shuffledPositions[currentSpawnIndex];
         if (!nextPosition) {
-          console.error(`[DemoGameManager] No position at index ${currentSpawnIndex}`);
+          logger.game.error(`[DemoGameManager] No position at index ${currentSpawnIndex}`);
           return;
         }
 
-        console.log(`[DemoGameManager] 🎯 USING SHUFFLED POSITION - Spawn #${currentSpawnIndex}:`, {
+        logger.game.debug(`[DemoGameManager] 🎯 USING SHUFFLED POSITION - Spawn #${currentSpawnIndex}:`, {
           arrayIndex: currentSpawnIndex,
           totalPositions: shuffledPositions.length,
           position: { x: Math.round(nextPosition.x), y: Math.round(nextPosition.y) },
@@ -196,7 +197,7 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
           nextPosition // Use shuffled position from pre-generated list
         );
 
-        console.log(`[DemoGameManager] ✅ Participant created with position:`, {
+        logger.game.debug(`[DemoGameManager] ✅ Participant created with position:`, {
           id: newParticipant._id,
           spawnIndex: currentSpawnIndex,
           participantPosition: newParticipant.position,
@@ -208,13 +209,13 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
 
         // Spawn in Phaser scene first
         if (phaserRef.current?.scene?.scene.key === "DemoScene") {
-          console.log(`[DemoGameManager] Calling spawnDemoParticipant for ${newParticipant._id}`);
+          logger.game.debug(`[DemoGameManager] Calling spawnDemoParticipant for ${newParticipant._id}`);
           (phaserRef.current.scene as any).spawnDemoParticipant?.(newParticipant);
         }
 
         // Then update state
         setSpawnedParticipants((prev) => {
-          console.log(
+          logger.game.debug(
             `[DemoGameManager] Updating state: prev.length=${prev.length}, adding ${newParticipant._id}`
           );
           return [...prev, newParticipant];
@@ -226,7 +227,7 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
 
     // Cleanup all timeouts on unmount or phase change
     return () => {
-      console.log("[DemoGameManager] Spawn effect cleanup, clearing timeouts");
+      logger.game.debug("[DemoGameManager] Spawn effect cleanup, clearing timeouts");
       spawnTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
       spawnTimeoutsRef.current = [];
       // Don't reset isSpawningRef here - only reset when phase changes to spawning
@@ -290,7 +291,7 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
 
   // Set demo map when scene is ready and map is loaded
   useEffect(() => {
-    console.log("[DemoGameManager] Set map effect triggered", {
+    logger.game.debug("[DemoGameManager] Set map effect triggered", {
       isActive,
       hasDemoMap: !!demoMap,
       mapName: demoMap?.name,
@@ -306,7 +307,7 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
 
     const scene = phaserRef.current.scene;
     if (scene.scene.key === "DemoScene") {
-      console.log("[DemoGameManager] Calling setDemoMap on DemoScene with:", {
+      logger.game.debug("[DemoGameManager] Calling setDemoMap on DemoScene with:", {
         mapName: demoMap.name,
         backgroundKey: demoMap.background,
         assetPath: demoMap.assetPath,
