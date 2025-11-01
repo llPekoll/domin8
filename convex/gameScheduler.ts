@@ -223,33 +223,33 @@ export const executeSendPrize = internalAction({
       const solanaClient = new SolanaClient(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
 
       // 1. Get current game state from blockchain
-      const activeGame = await solanaClient.getActiveGame();
+      const gameRound = await solanaClient.getGameRound(roundId);
 
-      if (!activeGame) {
+      if (!gameRound) {
         console.log(`Round ${roundId}: No active game found, skipping`);
         return;
       }
 
       // Verify this is the correct round
-      if (activeGame.gameRound !== roundId) {
-        console.log(`Round ${roundId}: Not the active game (active: ${activeGame.gameRound}), skipping`);
+      if (gameRound.gameRound !== roundId) {
+        console.log(`Round ${roundId}: Not the active game (active: ${gameRound.gameRound}), skipping`);
         return;
       }
 
       // Check if game is closed (status: 1)
-      if (activeGame.status !== 1) {
-        console.log(`Round ${roundId}: Game not closed yet (status: ${activeGame.status}), skipping`);
+      if (gameRound.status !== 1) {
+        console.log(`Round ${roundId}: Game not closed yet (status: ${gameRound.status}), skipping`);
         return;
       }
 
       // Check if winner exists
-      if (!activeGame.winner) {
+      if (!gameRound.winner) {
         console.warn(`Round ${roundId}: ⚠️ No winner determined yet, skipping`);
         return;
       }
 
       // Check if prize already sent (winnerPrize will be 0 after sending)
-      if (activeGame.winnerPrize === 0) {
+      if (gameRound.winnerPrize === 0) {
         console.log(`Round ${roundId}: ✅ Prize already sent, game complete`);
 
         // Mark job as completed
@@ -264,8 +264,8 @@ export const executeSendPrize = internalAction({
 
       // 2. Call sendPrizeWinner
       console.log(`Round ${roundId}: Calling send_prize_winner instruction...`);
-      console.log(`Round ${roundId}: Winner: ${activeGame.winner}`);
-      console.log(`Round ${roundId}: Prize: ${activeGame.winnerPrize} lamports`);
+      console.log(`Round ${roundId}: Winner: ${gameRound.winner}`);
+      console.log(`Round ${roundId}: Prize: ${gameRound.winnerPrize} lamports`);
 
       const txSignature = await solanaClient.sendPrizeWinner(roundId);
 
@@ -283,7 +283,7 @@ export const executeSendPrize = internalAction({
 
         // 4. Verify prize was sent
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        const updatedGame = await solanaClient.getActiveGame();
+        const updatedGame = await solanaClient.getGameRound(roundId);
 
         if (updatedGame?.winnerPrize === 0) {
           console.log(`Round ${roundId}: ✅ Verified: Prize successfully distributed`);

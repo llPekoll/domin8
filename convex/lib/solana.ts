@@ -373,8 +373,7 @@ export class SolanaClient {
  
   // Send prize to winner (risk-based architecture)
   async sendPrizeWinner(roundId: number): Promise<string> {
-    const { config } = this.getPDAs();
-    const { gameRound } = this.getPDAs(roundId);
+    const { config, activeGame, gameRound } = this.getPDAs(roundId);
 
     if (!gameRound) {
       throw new Error("Failed to derive game round PDA");

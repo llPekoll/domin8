@@ -61,7 +61,7 @@ class PrivyWalletAdapter {
     private privyWallet: any,
     private network: string
   ) {
-    logger.solana.debug("[PrivyWalletAdapter] Initialized with network:", network);
+    // logger.solana.debug("[PrivyWalletAdapter] Initialized with network:", network);
   }
 
   async signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T> {
