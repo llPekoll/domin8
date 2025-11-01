@@ -1,6 +1,7 @@
 import { Scene } from "phaser";
 import { GameParticipant } from "./PlayerManager";
 import { SoundManager } from "./SoundManager";
+import { logger } from "../../lib/logger";
 
 export class AnimationManager {
   private scene: Scene;
@@ -37,7 +38,7 @@ export class AnimationManager {
   private celebrationObjects: Phaser.GameObjects.GameObject[] = [];
 
   clearCelebration() {
-    console.log("[AnimationManager] Clearing celebration objects:", this.celebrationObjects.length);
+    logger.game.debug("[AnimationManager] Clearing celebration objects:", this.celebrationObjects.length);
     this.celebrationObjects.forEach((obj) => {
       if (obj && obj.active) {
         obj.destroy();
@@ -133,7 +134,7 @@ export class AnimationManager {
     // Track for cleanup
     // this.celebrationObjects.push(debugAnchor, anchorLabel);
 
-    console.log("[AnimationManager] 🎯 DEBUG: Winner sprite anchor at", {
+    logger.game.debug("[AnimationManager] 🎯 DEBUG: Winner sprite anchor at", {
       originX: winnerPlayer.sprite.originX,
       originY: winnerPlayer.sprite.originY,
       worldX: anchorWorldX,
@@ -300,15 +301,15 @@ export class AnimationManager {
       bloodLeft.setAlpha(1);
       // Keep pixel art crisp when scaling
       bloodLeft.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
-      console.log(
+      logger.game.debug(
         "Looking for blood-from-left6-big:",
         this.scene.anims.exists("blood-from-left6-big")
       );
       if (this.scene.anims.exists("blood-from-left6-big")) {
         bloodLeft.play("blood-from-left6-big");
-        console.log("Playing blood-from-left6-big animation");
+        logger.game.debug("Playing blood-from-left6-big animation");
       } else {
-        console.log("Animation not found, showing static sprite");
+        logger.game.debug("Animation not found, showing static sprite");
         bloodLeft.setFrame("blood_spritesheet 70.ase"); // Show a static frame
       }
       bloodLeft.once("animationcomplete", () => {
@@ -864,7 +865,7 @@ export class AnimationManager {
       });
     }
 
-    console.log(
+    logger.game.debug(
       "[AnimationManager] 💥 Started continuous explosion sequence with",
       explosionCount,
       "explosions"

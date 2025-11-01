@@ -11,14 +11,14 @@ const crons = cronJobs();
 
 /**
  * PRIMARY SYNC SERVICE - Syncs blockchain state to Convex database
- * Runs every 5 seconds (matches risk.fun worker pattern)
+ * Runs every 10 seconds (matches risk.fun worker pattern)
  *
  * Functionality:
  * 1. Fetches active game from blockchain (getActiveGame)
  * 2. Syncs to Convex database
  * 3. Schedules endGame action when game expires
  */
-crons.interval("sync-blockchain-state", { seconds: 30 }, internal.syncService.syncBlockchainState);
+crons.interval("sync-blockchain-state", { seconds: 10 }, internal.syncService.syncBlockchainState);
 
 /**
  * Game recovery - self-healing system that catches unsent prizes

@@ -1,6 +1,7 @@
 import { Scene } from "phaser";
 import { PlayerManager } from "./PlayerManager";
 import { AnimationManager } from "./AnimationManager";
+import { logger } from "../../lib/logger";
 
 /**
  * Game Phase Manager - Simplified to match blockchain states
@@ -33,7 +34,7 @@ export class GamePhaseManager {
     const phaseChanged = this.currentPhase !== gameState.status;
     this.currentPhase = gameState.status;
 
-    console.log(`[GamePhaseManager] Phase: ${gameState.status}, Changed: ${phaseChanged}`);
+    logger.game.debug(`[GamePhaseManager] Phase: ${gameState.status}, Changed: ${phaseChanged}`);
 
     // Update participants with latest data from backend
     if (gameState.status !== "waiting") {
@@ -52,7 +53,7 @@ export class GamePhaseManager {
         this.handleFinishedPhase(gameState, phaseChanged);
         break;
       default:
-        console.warn(`[GamePhaseManager] Unknown phase: ${gameState.status}`);
+        logger.game.warn(`[GamePhaseManager] Unknown phase: ${gameState.status}`);
     }
   }
 
@@ -69,7 +70,7 @@ export class GamePhaseManager {
 
   private handleAwaitingWinnerRandomness(phaseChanged: boolean) {
     if (phaseChanged) {
-      console.log("[GamePhaseManager] Betting closed, VRF requested");
+      logger.game.debug("[GamePhaseManager] Betting closed, VRF requested");
 
       // Move all participants to center for battle
       this.playerManager.moveParticipantsToCenter();
@@ -82,12 +83,12 @@ export class GamePhaseManager {
 
   private handleFinishedPhase(gameState: any, phaseChanged: boolean) {
     if (phaseChanged) {
-      console.log("[GamePhaseManager] Game finished - showing winner");
+      logger.game.debug("[GamePhaseManager] Game finished - showing winner");
 
       // Verify winner exists
       const hasWinner = !!gameState.winnerId;
       if (!hasWinner) {
-        console.log("⚠️ Cannot show results - no winner determined");
+        logger.game.debug("⚠️ Cannot show results - no winner determined");
         return;
       }
 
@@ -114,7 +115,7 @@ export class GamePhaseManager {
   }
 
   private handleGameCleanup() {
-    console.log("[GamePhaseManager] Cleaning up finished game");
+    logger.game.debug("[GamePhaseManager] Cleaning up finished game");
 
     // Clear all effects and reset state
     this.scene.tweens.killAll();

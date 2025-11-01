@@ -14,6 +14,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { toast } from "sonner";
 import { User } from "lucide-react";
+import { logger } from "../lib/logger";
 
 interface ProfileDialogProps {
   open: boolean;
@@ -60,7 +61,7 @@ export function ProfileDialog({
       toast.success("Display name updated successfully!");
       onOpenChange(false);
     } catch (error) {
-      console.error("Failed to update display name:", error);
+      logger.ui.error("Failed to update display name:", error);
       toast.error("Failed to update display name. Please try again.");
     } finally {
       setIsUpdating(false);

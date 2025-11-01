@@ -6,6 +6,7 @@ import { BlockchainRandomnessDialog } from "./components/BlockchainRandomnessDia
 import { DemoGameManager } from "./components/DemoGameManager";
 import { BlockchainDebugDialog } from "./components/BlockchainDebugDialog";
 import { useActiveGame } from "./hooks/useActiveGame";
+import { logger } from "./lib/logger";
 
 export default function App() {
   const [showBlockchainDialog, setShowBlockchainDialog] = useState(false);
@@ -20,11 +21,11 @@ export default function App() {
   // Demo mode is active when no real game exists or game is finished (status 2)
   const isDemoMode =
     !currentRoundState || currentRoundState.status === 2 || currentRoundState.betCount === 0;
-  console.log({ currentRoundState, isDemoMode });
+  logger.ui.debug({ currentRoundState, isDemoMode });
 
   // Event emitted from the PhaserGame component
   const currentScene = (scene: Phaser.Scene) => {
-    console.log("[currentScene callback] Scene ready:", scene.scene.key);
+    logger.ui.debug("[currentScene callback] Scene ready:", scene.scene.key);
     setSceneReady(true); // Mark scene as ready to trigger effect
 
     // Handle scene based on whether we're in demo or real game
@@ -33,18 +34,18 @@ export default function App() {
       (scene as any).updateGameState?.(currentRoundState);
 
       // Blockchain calls now handled by Solana crank system (no frontend trigger needed)
-      console.log(
+      logger.ui.debug(
         `Game active - Round ${currentRoundState.roundId?.toString() || currentRoundState.gameRound?.toString()}, Status: ${currentRoundState.status}`
       );
     } else if (scene.scene.key === "DemoScene") {
       // Demo scene is ready - DemoGameManager will handle it
-      console.log("DemoScene is ready");
+      logger.ui.debug("DemoScene is ready");
     }
   };
 
   // Switch scenes when transitioning between demo and real game
   useEffect(() => {
-    console.log("[Scene Switch Effect] Triggered", {
+    logger.ui.debug("[Scene Switch Effect] Triggered", {
       hasPhaserRef: !!phaserRef.current,
       hasScene: !!phaserRef.current?.scene,
       sceneKey: phaserRef.current?.scene?.scene.key,
@@ -58,7 +59,7 @@ export default function App() {
     });
 
     if (!phaserRef.current?.scene) {
-      console.log("[Scene Switch Effect] Waiting for Phaser scene to be ready...");
+      logger.ui.debug("[Scene Switch Effect] Waiting for Phaser scene to be ready...");
       return;
     }
 
@@ -68,7 +69,7 @@ export default function App() {
     const hasRealGame =
       currentRoundState && currentRoundState.status !== 2 && (currentRoundState.betCount ?? 0) > 0;
 
-    console.log("[Scene Switch Effect] Evaluation", {
+    logger.ui.debug("[Scene Switch Effect] Evaluation", {
       hasRealGame,
       status: currentRoundState?.status,
       betCount: currentRoundState?.betCount,
@@ -79,20 +80,20 @@ export default function App() {
 
     // If real game starts and we're in demo scene, switch to game scene
     if (hasRealGame && scene.scene.key === "DemoScene") {
-      console.log("✅ Switching from DemoScene to RoyalRumble - Real game started");
-      console.log("Game state:", currentRoundState);
+      logger.ui.debug("✅ Switching from DemoScene to RoyalRumble - Real game started");
+      logger.ui.debug("Game state:", currentRoundState);
       scene.scene.start("RoyalRumble");
     }
 
     // If no game (or finished game) and we're in game scene, switch back to demo
     if (!hasRealGame && scene.scene.key === "RoyalRumble") {
-      console.log("✅ Switching from RoyalRumble to DemoScene - Game ended or idle");
+      logger.ui.debug("✅ Switching from RoyalRumble to DemoScene - Game ended or idle");
       scene.scene.start("DemoScene");
     }
 
     // Update game scene with real blockchain game state
     if (hasRealGame && scene.scene.key === "RoyalRumble") {
-      console.log("[App] Updating game state with blockchain data:", {
+      logger.ui.debug("[App] Updating game state with blockchain data:", {
         hasBets: !!currentRoundState.bets,
         betCount: currentRoundState.bets?.length || 0,
         hasWallets: !!currentRoundState.wallets,
@@ -109,9 +110,9 @@ export default function App() {
         ? Number(currentRoundState.totalPot.toString()) / 1_000_000_000
         : 0;
 
-      console.log(`Game - Round ${roundId}, Status: ${currentRoundState.status}`);
-      console.log("Bets count:", betCount);
-      console.log("Total pot:", totalPot, "SOL");
+      logger.ui.debug(`Game - Round ${roundId}, Status: ${currentRoundState.status}`);
+      logger.ui.debug("Bets count:", betCount);
+      logger.ui.debug("Total pot:", totalPot, "SOL");
     }
   }, [currentRoundState, sceneReady]); // Re-run when scene becomes ready or game state changes
 

@@ -9,6 +9,7 @@ import { MultiParticipantPanel } from "./MultiParticipantPanel";
 import { CharacterSelection } from "./CharacterSelection";
 import { generateRandomName } from "../lib/nameGenerator";
 import { Users, Gamepad2 } from "lucide-react";
+import { logger } from "../lib/logger";
 
 export function GameLobby() {
   const { connected, publicKey } = usePrivyWallet();
@@ -30,7 +31,7 @@ export function GameLobby() {
 
     try {
       const randomName = generateRandomName();
-      console.log(
+      logger.ui.debug(
         "Manual player creation for wallet:",
         publicKey.toString(),
         "with name:",
@@ -45,7 +46,7 @@ export function GameLobby() {
         `Player created! Your display name is: ${randomName}. You've been given a random character and 1000 starting coins.`
       );
     } catch (error) {
-      console.error("Failed to create player:", error);
+      logger.ui.error("Failed to create player:", error);
       toast.error(error instanceof Error ? error.message : "Failed to create player");
     }
   };

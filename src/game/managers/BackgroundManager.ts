@@ -1,4 +1,5 @@
 import { Scene } from "phaser";
+import { logger } from "../../lib/logger";
 
 /**
  * BackgroundManager - Simple background image display
@@ -35,7 +36,7 @@ export class BackgroundManager {
    */
   setTexture(textureKey: string) {
     if (!this.scene.textures.exists(textureKey)) {
-      console.warn("[BackgroundManager] Texture not found:", textureKey);
+      logger.game.warn("[BackgroundManager] Texture not found:", textureKey);
       return;
     }
 

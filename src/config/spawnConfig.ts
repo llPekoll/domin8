@@ -3,6 +3,7 @@
  * Controls the shape and positioning of participant spawn locations
  * NEW: Fully randomized spawns - no predictable patterns
  */
+import { logger } from "../lib/logger";
 
 export const SPAWN_CONFIG = {
   // Ellipse ratios - multiply radius by these values for each axis
@@ -81,7 +82,7 @@ export function generateRandomEllipsePositions(
 ): Array<{ x: number; y: number }> {
   const positions: Array<{ x: number; y: number }> = [];
 
-  console.log(`[SpawnConfig] 🎲 Generating ${count} FULLY RANDOM positions`);
+  logger.game.debug(`[SpawnConfig] 🎲 Generating ${count} FULLY RANDOM positions`);
 
   for (let i = 0; i < count; i++) {
     let attempts = 0;
@@ -131,25 +132,25 @@ export function generateRandomEllipsePositions(
         SPAWN_CONFIG.MIN_SPAWN_RADIUS +
         Math.random() * (SPAWN_CONFIG.MAX_SPAWN_RADIUS - SPAWN_CONFIG.MIN_SPAWN_RADIUS);
       position = calculateEllipsePosition(fallbackAngle, fallbackRadius, centerX, centerY, true);
-      console.warn(
+      logger.game.warn(
         `[SpawnConfig] ⚠️ Could not find non-overlapping position for spawn ${i}, using fallback`
       );
     }
 
     positions.push(position);
 
-    console.log(`[SpawnConfig] 🎯 Random spawn ${i}:`, {
+    logger.game.debug(`[SpawnConfig] 🎯 Random spawn ${i}:`, {
       x: Math.round(position.x),
       y: Math.round(position.y),
       attempts,
     });
   }
 
-  console.log(
+  logger.game.debug(
     "[SpawnConfig] ✅ Generated positions - first 3:",
     positions.slice(0, 3).map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) }))
   );
-  console.log(
+  logger.game.debug(
     "[SpawnConfig] ✅ Generated positions - last 3:",
     positions.slice(-3).map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) }))
   );

@@ -13,6 +13,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { getSolanaRpcUrl } from "../lib/utils";
 import { useActiveGame } from "../hooks/useActiveGame";
+import { logger } from "../lib/logger";
 
 export function Header() {
   const { connected, publicKey } = usePrivyWallet();
@@ -53,7 +54,7 @@ export function Header() {
   // Debug: log when game status changes
   useEffect(() => {
     if (currentRoundState) {
-      console.log(
+      logger.ui.debug(
         `[Header] Game status update - Round ${currentRoundState.roundId}: ${currentRoundState.status}`
       );
     }
@@ -75,7 +76,7 @@ export function Header() {
         const lamports = await connection.getBalance(publicKey);
         setBalance(lamports / LAMPORTS_PER_SOL);
       } catch (error) {
-        console.error("Failed to fetch Privy wallet balance:", error);
+        logger.ui.error("Failed to fetch Privy wallet balance:", error);
         setBalance(null);
       } finally {
         setIsLoadingBalance(false);
@@ -105,7 +106,7 @@ export function Header() {
           toast.success(`Welcome! Your display name is: ${randomName}`);
         })
         .catch((error) => {
-          console.error("Failed to create player:", error);
+          logger.ui.error("Failed to create player:", error);
           toast.error("Failed to create player profile. Please refresh the page and try again.");
           setHasAttemptedCreation(false);
         });

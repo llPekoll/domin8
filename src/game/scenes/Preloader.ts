@@ -1,5 +1,6 @@
 import { Scene } from "phaser";
 import { currentMapData, charactersData, demoMapData } from "../main";
+import { logger } from "../../lib/logger";
 
 export class Preloader extends Scene {
   constructor() {
@@ -34,15 +35,15 @@ export class Preloader extends Scene {
 
     // Check if data is available (should always be true due to PhaserGame.tsx guard)
     if (!charactersData || charactersData.length === 0) {
-      console.error("[Preloader] No characters data available! This should not happen.");
+      logger.game.error("[Preloader] No characters data available! This should not happen.");
       return;
     }
     if (!demoMapData) {
-      console.error("[Preloader] No demo map data available!");
+      logger.game.error("[Preloader] No demo map data available!");
       return;
     }
 
-    console.log("[Preloader] Data check passed:", {
+    logger.game.debug("[Preloader] Data check passed:", {
       charactersCount: charactersData.length,
       demoMap: demoMapData?.name,
       currentMap: currentMapData?.name || "none",
@@ -52,17 +53,17 @@ export class Preloader extends Scene {
     charactersData.forEach((character) => {
       const key = character.name.toLowerCase().replace(/\s+/g, "-");
       const jsonPath = character.assetPath.replace(".png", ".json");
-      console.log("[Preloader] Loading character atlas:", key, character.assetPath);
+      logger.game.debug("[Preloader] Loading character atlas:", key, character.assetPath);
       this.load.atlas(key, character.assetPath, jsonPath);
     });
 
     // Load demo map (single random map for demo mode)
-    console.log("[Preloader] Loading demo map:", demoMapData.background, demoMapData.assetPath);
+    logger.game.debug("[Preloader] Loading demo map:", demoMapData.background, demoMapData.assetPath);
     this.load.image(demoMapData.background, demoMapData.assetPath);
 
     // Load current game map if available (for real games)
     if (currentMapData && currentMapData.background && currentMapData.assetPath) {
-      console.log("[Preloader] Loading current game map:", currentMapData.background);
+      logger.game.debug("[Preloader] Loading current game map:", currentMapData.background);
       this.load.image(currentMapData.background, currentMapData.assetPath);
     }
 
@@ -109,20 +110,20 @@ export class Preloader extends Scene {
 
     // Log load errors for debugging
     this.load.on("loaderror", (file: any) => {
-      console.error("[Preloader] Failed to load file:", file.key, file.src);
+      logger.game.error("[Preloader] Failed to load file:", file.key, file.src);
     });
   }
 
   create() {
     // Safety check before creating animations
     if (!charactersData || charactersData.length === 0) {
-      console.error("[Preloader] No characters data for animations, starting DemoScene anyway");
+      logger.game.error("[Preloader] No characters data for animations, starting DemoScene anyway");
       this.scene.start("DemoScene");
       return;
     }
 
     // Create animations for all characters dynamically from database
-    console.log("[Preloader] Creating animations for", charactersData.length, "characters");
+    logger.game.debug("[Preloader] Creating animations for", charactersData.length, "characters");
     charactersData.forEach((character) => {
       const key = character.name.toLowerCase().replace(/\s+/g, "-");
 

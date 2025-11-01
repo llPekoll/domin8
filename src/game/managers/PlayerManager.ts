@@ -1,6 +1,7 @@
 import { Scene } from "phaser";
 import { calculateEllipsePosition } from "../../config/spawnConfig";
 import { SoundManager } from "./SoundManager";
+import { logger } from "../../lib/logger";
 
 export interface GameParticipant {
   id: string;
@@ -78,7 +79,7 @@ export class PlayerManager {
   addParticipant(participant: any, withFanfare: boolean = false) {
     const participantId = participant._id || participant.id;
 
-    console.log("[PlayerManager] addParticipant called", {
+    logger.game.debug("[PlayerManager] addParticipant called", {
       id: participantId,
       existingCount: this.participants.size,
       alreadyExists: this.participants.has(participantId),
@@ -86,7 +87,7 @@ export class PlayerManager {
 
     // Double-check participant doesn't already exist
     if (this.participants.has(participantId)) {
-      console.error("[PlayerManager] Participant already exists!", participantId);
+      logger.game.error("[PlayerManager] Participant already exists!", participantId);
       return;
     }
 
@@ -103,7 +104,7 @@ export class PlayerManager {
       }
     }
 
-    console.log("[PlayerManager] Creating container for", participantId);
+    logger.game.debug("[PlayerManager] Creating container for", participantId);
     const container = this.scene.add.container(spawnX, spawnY);
 
     // Set depth based on Y position - higher Y = further back = lower depth
@@ -248,10 +249,10 @@ export class PlayerManager {
       onComplete: () => {
         // Play random impact sound when hitting ground
         try {
-          console.log(`[PlayerManager] Playing random impact sound for ${participantId}`);
+          logger.game.debug(`[PlayerManager] Playing random impact sound for ${participantId}`);
           SoundManager.playRandomImpact(this.scene, 0.4);
         } catch (e) {
-          console.error("[PlayerManager] Failed to play impact sound:", e);
+          logger.game.error("[PlayerManager] Failed to play impact sound:", e);
         }
       },
     });
@@ -276,7 +277,7 @@ export class PlayerManager {
     };
 
     this.participants.set(participantId, gameParticipant);
-    console.log("[PlayerManager] Participant added successfully", {
+    logger.game.debug("[PlayerManager] Participant added successfully", {
       id: participantId,
       newCount: this.participants.size,
     });
@@ -442,7 +443,7 @@ export class PlayerManager {
     // Find winner - get directly from PlayerManager using winnerId
     const winnerId = gameState.winnerId;
 
-    console.log("[PlayerManager] showResults called", {
+    logger.game.debug("[PlayerManager] showResults called", {
       winnerId,
       participantIds: Array.from(this.participants.keys()),
       hasWinner: this.participants.has(winnerId),
@@ -475,7 +476,7 @@ export class PlayerManager {
       const targetThroneY = this.centerY + 180;
       const containerY = targetThroneY + spriteOffset;
 
-      console.log("[PlayerManager] 🎯 Winner positioning debug:", {
+      logger.game.debug("[PlayerManager] 🎯 Winner positioning debug:", {
         centerY: this.centerY,
         targetThroneY: targetThroneY,
         spriteOffset: spriteOffset,
@@ -524,11 +525,11 @@ export class PlayerManager {
         winnerParticipant.sprite.play(victoryAnimKey);
       }
 
-      console.log("[PlayerManager] Returning winner participant:", winnerParticipant.id);
+      logger.game.debug("[PlayerManager] Returning winner participant:", winnerParticipant.id);
       return winnerParticipant;
     }
 
-    console.error("[PlayerManager] Winner participant not found for ID:", winnerId);
+    logger.game.error("[PlayerManager] Winner participant not found for ID:", winnerId);
     return null;
   }
 
