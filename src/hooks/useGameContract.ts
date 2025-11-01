@@ -69,7 +69,7 @@ class PrivyWalletAdapter {
     logger.solana.debug("[PrivyWalletAdapter] Signing transaction", {
       chainId,
       network: this.network,
-      wallet: this.privyWallet?.address
+      wallet: this.privyWallet?.address,
     });
 
     // Serialize transaction
@@ -453,7 +453,9 @@ export const useGameContract = () => {
             if (fetchError.message?.includes("Betting window")) {
               throw fetchError;
             }
-            logger.solana.debug("[placeBet] Error fetching active game, will try to create new one");
+            logger.solana.debug(
+              "[placeBet] Error fetching active game, will try to create new one"
+            );
             shouldCreateNewGame = true;
           }
         } else {
@@ -596,7 +598,10 @@ export const useGameContract = () => {
               })
               .rpc();
 
-            logger.solana.info("[placeBet] Created new localnet game with first bet (mock VRF)", tx);
+            logger.solana.info(
+              "[placeBet] Created new localnet game with first bet (mock VRF)",
+              tx
+            );
 
             // Auto-fulfill mock VRF to simulate ORAO (helps immediate local testing)
             try {
@@ -615,9 +620,9 @@ export const useGameContract = () => {
                 })
                 .rpc();
 
-              logger.solana.debug("[placeBet] Auto-fulfilled mock VRF (localnet):", fulfillSig);
+              logger.solana.error("[placeBet] Auto-fulfilled mock VRF (localnet):", fulfillSig);
             } catch (fulfillErr) {
-              logger.solana.warn(
+              logger.solana.error(
                 "[placeBet] Auto-fulfill mock VRF failed (you can call fulfill_mock_vrf manually):",
                 fulfillErr
               );
@@ -673,12 +678,17 @@ export const useGameContract = () => {
               })
               .rpc({ skipPreflight: true });
 
-            logger.solana.info("[placeBet] Created new devnet/mainnet game with first bet (ORAO VRF)", tx);
+            logger.solana.info(
+              "[placeBet] Created new devnet/mainnet game with first bet (ORAO VRF)",
+              tx
+            );
           }
           // Transaction variable 'tx' is now set in the network-specific branches above
         } else {
           // Game exists - PLACE an additional bet
-          logger.solana.debug(`[placeBet] Game exists (round ${activeRoundId}), placing additional bet`);
+          logger.solana.debug(
+            `[placeBet] Game exists (round ${activeRoundId}), placing additional bet`
+          );
 
           // Fetch fresh game state using Anchor (more reliable than manual parsing)
           const activeGameAccount = await program.account.domin8Game.fetch(activeGamePda);
@@ -755,11 +765,13 @@ export const useGameContract = () => {
           errorMessage.includes("Signature");
 
         if (isSignatureError) {
-          logger.solana.warn(
+          logger.solana.error(
             "[placeBet] ✅ Privy signature verification error (expected behavior with skipPreflight)"
           );
-          logger.solana.warn("[placeBet] Transaction succeeded on-chain, ignoring client-side error");
-          logger.solana.debug("[placeBet] Error details:", errorMessage);
+          logger.solana.error(
+            "[placeBet] Transaction succeeded on-chain, ignoring client-side error"
+          );
+          logger.solana.error("[placeBet] Error details:", errorMessage);
 
           // Extract transaction signature from error or use a placeholder
           // The transaction HAS succeeded, we just need a signature for tracking

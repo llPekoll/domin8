@@ -1,18 +1,18 @@
 /**
  * Custom Logger System for Royal Rumble
- * 
+ *
  * Provides category-based logging with environment variable configuration.
  * Supports multiple debug modes: SOLANA, UI, GAME, GENERAL
- * 
+ *
  * Usage:
  * ```typescript
  * import { logger } from '~/lib/logger';
- * 
+ *
  * // General logging
  * logger.info('Application started');
  * logger.warn('Configuration missing');
  * logger.error('Failed to connect', error);
- * 
+ *
  * // Category-specific logging
  * logger.solana.debug('Transaction sent:', txSignature);
  * logger.ui.debug('Component mounted:', componentName);
@@ -33,10 +33,10 @@ export enum LogLevel {
 }
 
 export enum LogCategory {
-  GENERAL = 'GENERAL',
-  SOLANA = 'SOLANA',
-  UI = 'UI',
-  GAME = 'GAME',
+  GENERAL = "GENERAL",
+  SOLANA = "SOLANA",
+  UI = "UI",
+  GAME = "GAME",
 }
 
 interface LoggerConfig {
@@ -56,15 +56,21 @@ interface LoggerConfig {
  */
 function parseLogLevel(levelStr?: string): LogLevel {
   if (!levelStr) return LogLevel.DEBUG;
-  
+
   const normalized = levelStr.toUpperCase();
   switch (normalized) {
-    case 'NONE': return LogLevel.NONE;
-    case 'ERROR': return LogLevel.ERROR;
-    case 'WARN': return LogLevel.WARN;
-    case 'INFO': return LogLevel.INFO;
-    case 'DEBUG': return LogLevel.DEBUG;
-    default: return LogLevel.DEBUG;
+    case "NONE":
+      return LogLevel.NONE;
+    case "ERROR":
+      return LogLevel.ERROR;
+    case "WARN":
+      return LogLevel.WARN;
+    case "INFO":
+      return LogLevel.INFO;
+    case "DEBUG":
+      return LogLevel.DEBUG;
+    default:
+      return LogLevel.DEBUG;
   }
 }
 
@@ -72,20 +78,20 @@ function parseLogLevel(levelStr?: string): LogLevel {
  * Parse categories from environment variable
  */
 function parseCategories(categoriesStr?: string): Set<LogCategory> {
-  if (!categoriesStr || categoriesStr.trim() === '') {
+  if (!categoriesStr || categoriesStr.trim() === "") {
     return new Set<LogCategory>();
   }
-  
+
   const categories = new Set<LogCategory>();
-  const parts = categoriesStr.split(',').map(s => s.trim().toUpperCase());
-  
+  const parts = categoriesStr.split(",").map((s) => s.trim().toUpperCase());
+
   for (const part of parts) {
-    if (part === 'SOLANA') categories.add(LogCategory.SOLANA);
-    else if (part === 'UI') categories.add(LogCategory.UI);
-    else if (part === 'GAME') categories.add(LogCategory.GAME);
-    else if (part === 'GENERAL') categories.add(LogCategory.GENERAL);
+    if (part === "SOLANA") categories.add(LogCategory.SOLANA);
+    else if (part === "UI") categories.add(LogCategory.UI);
+    else if (part === "GAME") categories.add(LogCategory.GAME);
+    else if (part === "GENERAL") categories.add(LogCategory.GENERAL);
   }
-  
+
   return categories;
 }
 
@@ -95,7 +101,7 @@ function parseCategories(categoriesStr?: string): Set<LogCategory> {
 function parseBoolean(value?: string, defaultValue: boolean = false): boolean {
   if (!value) return defaultValue;
   const normalized = value.toLowerCase().trim();
-  return normalized === 'true' || normalized === '1' || normalized === 'yes';
+  return normalized === "true" || normalized === "1" || normalized === "yes";
 }
 
 /**
@@ -116,15 +122,15 @@ function loadConfig(): LoggerConfig {
 // ============================================================================
 
 const COLORS = {
-  ERROR: '#ff4444',
-  WARN: '#ffaa00',
-  INFO: '#4488ff',
-  DEBUG: '#888888',
-  SOLANA: '#14F195', // Solana green
-  UI: '#9945FF', // Purple
-  GAME: '#FF6B6B', // Red
-  GENERAL: '#666666',
-  TIMESTAMP: '#999999',
+  ERROR: "#ff4444",
+  WARN: "#ffaa00",
+  INFO: "#4488ff",
+  DEBUG: "#888888",
+  SOLANA: "#14F195", // Solana green
+  UI: "#9945FF", // Purple
+  GAME: "#FF6B6B", // Red
+  GENERAL: "#666666",
+  TIMESTAMP: "#999999",
 };
 
 // ============================================================================
@@ -137,8 +143,7 @@ const COLORS = {
 class CategoryLogger {
   constructor(
     private category: LogCategory,
-    private config: LoggerConfig,
-    private parentLogger: Logger
+    private config: LoggerConfig
   ) {}
 
   /**
@@ -155,17 +160,17 @@ class CategoryLogger {
    */
   private formatMessage(message: string): string {
     const parts: string[] = [];
-    
+
     if (this.config.timestamp) {
       const now = new Date();
-      const timestamp = now.toISOString().split('T')[1].split('.')[0];
+      const timestamp = now.toISOString().split("T")[1].split(".")[0];
       parts.push(`[${timestamp}]`);
     }
-    
+
     parts.push(`[${this.category}]`);
     parts.push(message);
-    
-    return parts.join(' ');
+
+    return parts.join(" ");
   }
 
   /**
@@ -173,53 +178,54 @@ class CategoryLogger {
    */
   private getCategoryColor(): string {
     switch (this.category) {
-      case LogCategory.SOLANA: return COLORS.SOLANA;
-      case LogCategory.UI: return COLORS.UI;
-      case LogCategory.GAME: return COLORS.GAME;
-      case LogCategory.GENERAL: return COLORS.GENERAL;
-      default: return COLORS.DEBUG;
+      case LogCategory.SOLANA:
+        return COLORS.SOLANA;
+      case LogCategory.UI:
+        return COLORS.UI;
+      case LogCategory.GAME:
+        return COLORS.GAME;
+      case LogCategory.GENERAL:
+        return COLORS.GENERAL;
+      default:
+        return COLORS.DEBUG;
     }
   }
 
   /**
    * Log with styling
    */
-  private log(level: LogLevel, levelName: string, color: string, args: any[]): void {
+  private log(level: LogLevel, args: any[]): void {
     if (!this.isEnabled()) return;
     if (this.config.level < level) return;
 
     const categoryColor = this.getCategoryColor();
-    const message = typeof args[0] === 'string' ? args[0] : '';
-    const rest = typeof args[0] === 'string' ? args.slice(1) : args;
+    const message = typeof args[0] === "string" ? args[0] : "";
+    const rest = typeof args[0] === "string" ? args.slice(1) : args;
 
     const formattedMsg = this.formatMessage(message);
-    
+
     // Use styled console output
-    console.log(
-      `%c${formattedMsg}`,
-      `color: ${categoryColor}; font-weight: bold;`,
-      ...rest
-    );
+    console.log(`%c${formattedMsg}`, `color: ${categoryColor}; font-weight: bold;`, ...rest);
   }
 
   debug(...args: any[]): void {
-    this.log(LogLevel.DEBUG, 'DEBUG', COLORS.DEBUG, args);
+    this.log(LogLevel.DEBUG, args);
   }
 
   info(...args: any[]): void {
-    this.log(LogLevel.INFO, 'INFO', COLORS.INFO, args);
+    this.log(LogLevel.INFO, args);
   }
 
   warn(...args: any[]): void {
-    this.log(LogLevel.WARN, 'WARN', COLORS.WARN, args);
+    this.log(LogLevel.WARN, args);
   }
 
   error(...args: any[]): void {
-    this.log(LogLevel.ERROR, 'ERROR', COLORS.ERROR, args);
-    
+    this.log(LogLevel.ERROR, args);
+
     // Add stack trace for errors if enabled
-    if (this.config.stackTrace && args.some(arg => arg instanceof Error)) {
-      const error = args.find(arg => arg instanceof Error);
+    if (this.config.stackTrace && args.some((arg) => arg instanceof Error)) {
+      const error = args.find((arg) => arg instanceof Error);
       if (error) {
         console.error(error.stack);
       }
@@ -294,7 +300,7 @@ class Logger {
 
   private constructor() {
     this.config = loadConfig();
-    
+
     // Initialize category loggers
     this.solana = new CategoryLogger(LogCategory.SOLANA, this.config, this);
     this.ui = new CategoryLogger(LogCategory.UI, this.config, this);
@@ -352,7 +358,7 @@ class Logger {
   private formatMessage(message: string): string {
     if (this.config.timestamp) {
       const now = new Date();
-      const timestamp = now.toISOString().split('T')[1].split('.')[0];
+      const timestamp = now.toISOString().split("T")[1].split(".")[0];
       return `[${timestamp}] ${message}`;
     }
     return message;
@@ -361,65 +367,49 @@ class Logger {
   /**
    * General logging methods (always respect log level, not category filter)
    */
-  
+
   debug(...args: any[]): void {
     if (!this.config.enabled) return;
     if (this.config.level < LogLevel.DEBUG) return;
-    
-    const message = typeof args[0] === 'string' ? args[0] : '';
-    const rest = typeof args[0] === 'string' ? args.slice(1) : args;
-    
-    console.log(
-      `%c${this.formatMessage(message)}`,
-      `color: ${COLORS.DEBUG};`,
-      ...rest
-    );
+
+    const message = typeof args[0] === "string" ? args[0] : "";
+    const rest = typeof args[0] === "string" ? args.slice(1) : args;
+
+    console.log(`%c${this.formatMessage(message)}`, `color: ${COLORS.DEBUG};`, ...rest);
   }
 
   info(...args: any[]): void {
     if (!this.config.enabled) return;
     if (this.config.level < LogLevel.INFO) return;
-    
-    const message = typeof args[0] === 'string' ? args[0] : '';
-    const rest = typeof args[0] === 'string' ? args.slice(1) : args;
-    
-    console.log(
-      `%c${this.formatMessage(message)}`,
-      `color: ${COLORS.INFO};`,
-      ...rest
-    );
+
+    const message = typeof args[0] === "string" ? args[0] : "";
+    const rest = typeof args[0] === "string" ? args.slice(1) : args;
+
+    console.log(`%c${this.formatMessage(message)}`, `color: ${COLORS.INFO};`, ...rest);
   }
 
   warn(...args: any[]): void {
     if (!this.config.enabled) return;
     if (this.config.level < LogLevel.WARN) return;
-    
-    const message = typeof args[0] === 'string' ? args[0] : '';
-    const rest = typeof args[0] === 'string' ? args.slice(1) : args;
-    
-    console.warn(
-      `%c${this.formatMessage(message)}`,
-      `color: ${COLORS.WARN};`,
-      ...rest
-    );
+
+    const message = typeof args[0] === "string" ? args[0] : "";
+    const rest = typeof args[0] === "string" ? args.slice(1) : args;
+
+    console.warn(`%c${this.formatMessage(message)}`, `color: ${COLORS.WARN};`, ...rest);
   }
 
   error(...args: any[]): void {
     if (!this.config.enabled) return;
     if (this.config.level < LogLevel.ERROR) return;
-    
-    const message = typeof args[0] === 'string' ? args[0] : '';
-    const rest = typeof args[0] === 'string' ? args.slice(1) : args;
-    
-    console.error(
-      `%c${this.formatMessage(message)}`,
-      `color: ${COLORS.ERROR};`,
-      ...rest
-    );
+
+    const message = typeof args[0] === "string" ? args[0] : "";
+    const rest = typeof args[0] === "string" ? args.slice(1) : args;
+
+    console.error(`%c${this.formatMessage(message)}`, `color: ${COLORS.ERROR};`, ...rest);
 
     // Add stack trace for errors if enabled
-    if (this.config.stackTrace && args.some(arg => arg instanceof Error)) {
-      const error = args.find(arg => arg instanceof Error);
+    if (this.config.stackTrace && args.some((arg) => arg instanceof Error)) {
+      const error = args.find((arg) => arg instanceof Error);
       if (error) {
         console.error(error.stack);
       }
@@ -429,7 +419,7 @@ class Logger {
   /**
    * General grouping methods
    */
-  
+
   group(label: string): void {
     if (!this.config.enabled) return;
     console.group(this.formatMessage(label));
@@ -448,7 +438,7 @@ class Logger {
   /**
    * Performance timing (general)
    */
-  
+
   time(label: string): void {
     if (!this.config.enabled) return;
     console.time(this.formatMessage(label));
