@@ -204,8 +204,17 @@ class CategoryLogger {
 
     const formattedMsg = this.formatMessage(message);
 
-    // Use styled console output
-    console.log(`%c${formattedMsg}`, `color: ${categoryColor}; font-weight: bold;`, ...rest);
+    // Use appropriate console method based on level
+    switch (level) {
+      case LogLevel.ERROR:
+        console.error(`%c${formattedMsg}`, `color: ${categoryColor}; font-weight: bold;`, ...rest);
+        break;
+      case LogLevel.WARN:
+        console.warn(`%c${formattedMsg}`, `color: ${categoryColor}; font-weight: bold;`, ...rest);
+        break;
+      default:
+        console.log(`%c${formattedMsg}`, `color: ${categoryColor}; font-weight: bold;`, ...rest);
+    }
   }
 
   debug(...args: any[]): void {
@@ -302,9 +311,9 @@ class Logger {
     this.config = loadConfig();
 
     // Initialize category loggers
-    this.solana = new CategoryLogger(LogCategory.SOLANA, this.config, this);
-    this.ui = new CategoryLogger(LogCategory.UI, this.config, this);
-    this.game = new CategoryLogger(LogCategory.GAME, this.config, this);
+    this.solana = new CategoryLogger(LogCategory.SOLANA, this.config);
+    this.ui = new CategoryLogger(LogCategory.UI, this.config);
+    this.game = new CategoryLogger(LogCategory.GAME, this.config);
   }
 
   /**

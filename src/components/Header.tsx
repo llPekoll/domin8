@@ -139,10 +139,9 @@ export function Header() {
                   <div className="text-amber-300 text-sm flex items-center gap-1 mt-1">
                     <span className="text-yellow-300">⚡</span>
                     {currentRoundState.status === 0 && "Waiting for players"}
-                    {currentRoundState.status === 1 && "Determining winner..."}
-                    {currentRoundState.status === 2 && "Game Over - Place bet for new round"}
+                    {currentRoundState.status === 1 && "Game Over - Place bet for new round"}
                     {/* Debug: show status if unexpected */}
-                    {![0, 1, 2].includes(currentRoundState.status as number) && `Status: ${currentRoundState.status}`}
+                    {![0, 1].includes(currentRoundState.status as number) && `Status: ${currentRoundState.status}`}
                   </div>
                 </div>
               )}
