@@ -44,6 +44,7 @@ import { Buffer } from "buffer";
 import bs58 from "bs58";
 import { type Domin8Prgm } from "../../target/types/domin8_prgm";
 import Domin8PrgmIDL from "../../target/idl/domin8_prgm.json";
+import { logger } from "../lib/logger";
 
 // Extract Program ID from IDL
 export const DOMIN8_PROGRAM_ID = new PublicKey(Domin8PrgmIDL.address);
@@ -60,14 +61,16 @@ class PrivyWalletAdapter {
     private privyWallet: any,
     private network: string
   ) {
-    // console.log("[PrivyWalletAdapter] Initialized with network:", network);
+    logger.solana.debug("[PrivyWalletAdapter] Initialized with network:", network);
   }
 
   async signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T> {
     const chainId = `solana:${this.network}` as `${string}:${string}`;
-    console.log("[PrivyWalletAdapter] Signing transaction with chainId:", chainId);
-    console.log("[PrivyWalletAdapter] Network:", this.network);
-    console.log("[PrivyWalletAdapter] Privy wallet:", this.privyWallet);
+    logger.solana.debug("[PrivyWalletAdapter] Signing transaction", {
+      chainId,
+      network: this.network,
+      wallet: this.privyWallet?.address
+    });
 
     // Serialize transaction
     let serialized: Uint8Array;
@@ -211,7 +214,7 @@ export const useGameContract = () => {
       const program = new Program<Domin8Prgm>(Domin8PrgmIDL as any, provider);
       return { provider, program, walletAdapter: wallet };
     } catch (error) {
-      console.error("Failed to create Anchor program:", error);
+      logger.solana.error("Failed to create Anchor program:", error);
       return { provider: null, program: null, walletAdapter: null };
     }
   }, [connected, publicKey, selectedWallet, connection, network]);
@@ -290,7 +293,7 @@ export const useGameContract = () => {
       // For now, return null and handle in calling code
       return null;
     } catch (error) {
-      console.error("Error fetching game config:", error);
+      logger.solana.error("Error fetching game config:", error);
       return null;
     }
   }, [connection, derivePDAs]);
@@ -306,7 +309,7 @@ export const useGameContract = () => {
         // Parse account data (use anchor IDL in production)
         return null;
       } catch (error) {
-        console.error("Error fetching game round:", error);
+        logger.solana.error("Error fetching game round:", error);
         return null;
       }
     },
@@ -321,10 +324,10 @@ export const useGameContract = () => {
       if (!program) return 1;
       const configAccount = await program.account.domin8Config.fetch(gameConfigPda);
       const roundId = configAccount.gameRound.toNumber();
-      console.log("[fetchCurrentRoundId] Next round ID from config:", roundId);
+      logger.solana.debug("[fetchCurrentRoundId] Next round ID from config:", roundId);
       return roundId;
     } catch (error) {
-      console.error("Error fetching current round ID:", error);
+      logger.solana.error("Error fetching current round ID:", error);
       return 1; // Default to 1 instead of 0
     }
   }, [connection, derivePDAs, program]);
@@ -340,7 +343,7 @@ export const useGameContract = () => {
         // Parse bet entry data
         return null;
       } catch (error) {
-        console.error("Error fetching bet entry:", error);
+        logger.solana.error("Error fetching bet entry:", error);
         return null;
       }
     },
@@ -365,11 +368,13 @@ export const useGameContract = () => {
       position: [number, number] = [0, 0],
       map: number = 0
     ): Promise<{ signature: TransactionSignature; roundId: number; betIndex: number }> => {
-      console.log("[placeBet] Starting placeBet function");
-      console.log("[placeBet] Connected:", connected);
-      console.log("[placeBet] PublicKey:", publicKey?.toString());
-      console.log("[placeBet] Program:", program ? "initialized" : "null");
-      console.log("[placeBet] WalletAdapter:", walletAdapter ? "initialized" : "null");
+      logger.solana.group("[placeBet] Starting placeBet function");
+      logger.solana.debug("Connection status", {
+        connected,
+        publicKey: publicKey?.toString(),
+        program: program ? "initialized" : "null",
+        walletAdapter: walletAdapter ? "initialized" : "null",
+      });
 
       if (!connected || !publicKey || !program) {
         throw new Error("Wallet not connected or program not initialized");
@@ -384,24 +389,26 @@ export const useGameContract = () => {
       let betIndex = 0;
 
       try {
-        console.log("[placeBet] Placing bet of", amount, "SOL");
+        logger.solana.debug("[placeBet] Placing bet of", amount, "SOL");
 
         // Convert SOL to lamports
         const amountLamports = Math.floor(amount * LAMPORTS_PER_SOL);
         const amountBN = new BN(amountLamports);
-        console.log("[placeBet] Amount in lamports:", amountLamports);
+        logger.solana.debug("[placeBet] Amount in lamports:", amountLamports);
 
         // Derive PDAs
-        console.log("[placeBet] Deriving PDAs...");
+        logger.solana.debug("[placeBet] Deriving PDAs...");
         const { gameConfigPda, gameCounterPda, activeGamePda } = derivePDAs();
-        console.log("[placeBet] Game config PDA:", gameConfigPda.toString());
-        console.log("[placeBet] Active game PDA:", activeGamePda.toString());
+        logger.solana.debug("[placeBet] PDAs derived", {
+          gameConfig: gameConfigPda.toString(),
+          activeGame: activeGamePda.toString(),
+        });
 
         let tx: string;
         let shouldCreateNewGame = false;
 
         // STEP 1: Check active_game first to see if there's an open game
-        console.log("[placeBet] Checking active_game for open game...");
+        logger.solana.debug("[placeBet] Checking active_game for open game...");
         const activeGameInfo = await connection.getAccountInfo(activeGamePda);
 
         if (activeGameInfo) {
@@ -409,12 +416,11 @@ export const useGameContract = () => {
             const activeGameAccount = await program.account.domin8Game.fetch(activeGamePda);
             // Status is a number: 0 = GAME_STATUS_OPEN, 1 = GAME_STATUS_CLOSED
             const gameStatus = activeGameAccount.status;
-            console.log(
-              "[placeBet] Active game status:",
-              gameStatus,
-              "(0=open, 1=closed) Round:",
-              activeGameAccount.gameRound.toNumber()
-            );
+            logger.solana.debug("[placeBet] Active game found", {
+              status: gameStatus,
+              statusText: gameStatus === 0 ? "open" : "closed",
+              round: activeGameAccount.gameRound.toNumber(),
+            });
 
             if (gameStatus === 0) {
               // Game is open - check if betting window is still open
@@ -424,13 +430,13 @@ export const useGameContract = () => {
 
               if (currentTime < endTimestamp) {
                 // Active game is open and accepting bets!
-                console.log("[placeBet] Found open game, placing bet");
+                logger.solana.debug("[placeBet] Found open game, placing bet");
                 shouldCreateNewGame = false;
                 activeRoundId = activeGameAccount.gameRound.toNumber();
               } else {
                 // Game expired
                 if (betCount === 0) {
-                  console.log("[placeBet] Empty expired game, creating new one");
+                  logger.solana.debug("[placeBet] Empty expired game, creating new one");
                   shouldCreateNewGame = true;
                 } else {
                   throw new Error(
@@ -440,33 +446,33 @@ export const useGameContract = () => {
               }
             } else {
               // Game is closed (status=1) - need new game
-              console.log("[placeBet] Active game is closed, need new game");
+              logger.solana.debug("[placeBet] Active game is closed, need new game");
               shouldCreateNewGame = true;
             }
           } catch (fetchError: any) {
             if (fetchError.message?.includes("Betting window")) {
               throw fetchError;
             }
-            console.log("[placeBet] Error fetching active game, will try to create new one");
+            logger.solana.debug("[placeBet] Error fetching active game, will try to create new one");
             shouldCreateNewGame = true;
           }
         } else {
           // No active game exists
-          console.log("[placeBet] No active game found, creating new game");
+          logger.solana.debug("[placeBet] No active game found, creating new game");
           shouldCreateNewGame = true;
         }
 
         // STEP 2: If we need to create a new game, get the next round ID from config
         if (shouldCreateNewGame) {
           const nextRoundId = await fetchCurrentRoundId();
-          console.log("[placeBet] Next round ID from config:", nextRoundId);
+          logger.solana.debug("[placeBet] Next round ID from config:", nextRoundId);
           activeRoundId = nextRoundId;
 
           // Note: We don't check config.lock here - let the smart contract enforce it
           // This prevents race conditions between frontend and backend (endGame unlocks)
         }
 
-        console.log("[placeBet] Decision:", { shouldCreateNewGame, activeRoundId });
+        logger.solana.debug("[placeBet] Decision", { shouldCreateNewGame, activeRoundId });
 
         if (shouldCreateNewGame) {
           // Creating new game means this is the first bet (index 0)
@@ -474,17 +480,21 @@ export const useGameContract = () => {
           // activeRoundId already set above from config.game_round
 
           // Check what network you're actually using
-          console.log("Network:", import.meta.env.VITE_SOLANA_NETWORK);
-          console.log("RPC URL:", import.meta.env.VITE_SOLANA_RPC_URL);
-          console.log("Program ID:", import.meta.env.VITE_GAME_PROGRAM_ID);
+          logger.solana.debug("[placeBet] Network configuration", {
+            network: import.meta.env.VITE_SOLANA_NETWORK,
+            rpcUrl: import.meta.env.VITE_SOLANA_RPC_URL,
+            programId: import.meta.env.VITE_GAME_PROGRAM_ID,
+          });
           // No game exists OR game is finished - CREATE a new game with this bet
-          console.log("[placeBet] Creating new game for round", activeRoundId);
-          console.log("[placeBet] Available methods:", Object.keys(program.methods));
+          logger.solana.debug("[placeBet] Creating new game for round", activeRoundId);
+          logger.solana.debug("[placeBet] Available methods:", Object.keys(program.methods));
 
           // Get config to fetch VRF force field
-          console.log("gameConfigPda", gameConfigPda.toString());
-          console.log("Connection RPC endpoint:", connection.rpcEndpoint);
-          console.log("VITE_SOLANA_RPC_URL:", import.meta.env.VITE_SOLANA_RPC_URL);
+          logger.solana.debug("[placeBet] Game config details", {
+            gameConfigPda: gameConfigPda.toString(),
+            rpcEndpoint: connection.rpcEndpoint,
+            envRpcUrl: import.meta.env.VITE_SOLANA_RPC_URL,
+          });
           const configInfo = await connection.getAccountInfo(gameConfigPda);
           if (!configInfo) {
             throw new Error("Game config not found. Please contact support.");
@@ -503,13 +513,14 @@ export const useGameContract = () => {
           const gameRoundPdaForCreate = deriveGameRoundPda(activeRoundId);
           const betEntryPda = deriveBetEntryPda(activeRoundId, 0); // First bet index = 0
 
-          console.log("[placeBet] CreateGame PDAs:");
-          console.log("  - gameConfig:", gameConfigPda.toString());
-          console.log("  - gameCounter:", gameCounterPda.toString());
-          console.log("  - gameRound:", gameRoundPdaForCreate.toString());
-          console.log("  - activeGame:", activeGamePda.toString());
-          console.log("  - betEntry:", betEntryPda.toString());
-          console.log("  - vault:", vaultPda.toString());
+          logger.solana.debug("[placeBet] CreateGame PDAs", {
+            gameConfig: gameConfigPda.toString(),
+            gameCounter: gameCounterPda.toString(),
+            gameRound: gameRoundPdaForCreate.toString(),
+            activeGame: activeGamePda.toString(),
+            betEntry: betEntryPda.toString(),
+            vault: vaultPda.toString(),
+          });
 
           // Network check: localnet uses mockVrf, devnet/mainnet use ORAO VRF
           // Check both network name AND RPC URL to determine if we're on localnet
@@ -519,21 +530,26 @@ export const useGameContract = () => {
             rpcEndpoint.includes("localhost") ||
             rpcEndpoint.includes("127.0.0.1");
 
-          console.log("[placeBet] Network detection:");
-          console.log("  - Network env:", network);
-          console.log("  - RPC endpoint:", rpcEndpoint);
-          console.log("  - Is localnet:", isLocalnet);
+          logger.solana.debug("[placeBet] Network detection", {
+            networkEnv: network,
+            rpcEndpoint,
+            isLocalnet,
+          });
 
           if (isLocalnet) {
             // LOCALNET: Use Mock VRF (no ORAO deployment on localnet)
             const mockVrfPda = deriveMockVrfPda(forceBuf);
-            console.log("[placeBet] Localnet: mock VRF PDA:", mockVrfPda.toString());
-            console.log("[placeBet] Amount/Skin/Position:", amountBN.toString(), skin, position);
+            logger.solana.debug("[placeBet] Localnet: using mock VRF", {
+              mockVrfPda: mockVrfPda.toString(),
+              amount: amountBN.toString(),
+              skin,
+              position,
+            });
             const { Orao, networkStateAccountAddress, randomnessAccountAddress } = await import(
               "@orao-network/solana-vrf"
             );
             const orao = new Orao(provider as any);
-            console.log("[placeBet] ORAO VRF Program ID:", orao.programId.toString());
+            logger.solana.debug("[placeBet] ORAO VRF Program ID:", orao.programId.toString());
 
             // Derive ORAO VRF accounts
             const networkState = networkStateAccountAddress();
@@ -545,17 +561,15 @@ export const useGameContract = () => {
             const treasury = Keypair.generate().publicKey;
             // Call create_game with mockVrf account
 
-            //             console.log("[placeBet] ORAO VRF Accounts:");
-            console.log("  - networkState:", networkState.toString());
-            console.log("  - treasury:", treasury.toString());
-            console.log("  - vrfRequest:", vrfRequest.toString());
-            console.log(
-              "[placeBet] Amount/Skin/Position:",
-              amountBN.toString(),
-              { skin },
-              { position },
-              { map }
-            );
+            logger.solana.debug("[placeBet] ORAO VRF Accounts", {
+              networkState: networkState.toString(),
+              treasury: treasury.toString(),
+              vrfRequest: vrfRequest.toString(),
+              amount: amountBN.toString(),
+              skin,
+              position,
+              map,
+            });
 
             // Convert activeRoundId to BN for Anchor instruction
             const roundIdBN = new BN(activeRoundId);
@@ -582,7 +596,7 @@ export const useGameContract = () => {
               })
               .rpc();
 
-            console.log("[placeBet] Created new localnet game with first bet (mock VRF)", tx);
+            logger.solana.info("[placeBet] Created new localnet game with first bet (mock VRF)", tx);
 
             // Auto-fulfill mock VRF to simulate ORAO (helps immediate local testing)
             try {
@@ -601,16 +615,16 @@ export const useGameContract = () => {
                 })
                 .rpc();
 
-              console.log("[placeBet] Auto-fulfilled mock VRF (localnet):", fulfillSig);
+              logger.solana.debug("[placeBet] Auto-fulfilled mock VRF (localnet):", fulfillSig);
             } catch (fulfillErr) {
-              console.warn(
+              logger.solana.warn(
                 "[placeBet] Auto-fulfill mock VRF failed (you can call fulfill_mock_vrf manually):",
                 fulfillErr
               );
             }
           } else {
             // DEVNET/MAINNET: Use ORAO VRF (real verifiable randomness)
-            console.log("[placeBet] Devnet/Mainnet: Using ORAO VRF");
+            logger.solana.debug("[placeBet] Devnet/Mainnet: Using ORAO VRF");
 
             // Import ORAO SDK dynamically
             const { Orao, networkStateAccountAddress, randomnessAccountAddress } = await import(
@@ -619,7 +633,7 @@ export const useGameContract = () => {
 
             // Initialize ORAO VRF SDK
             const orao = new Orao(provider as any);
-            console.log("[placeBet] ORAO VRF Program ID:", orao.programId.toString());
+            logger.solana.debug("[placeBet] ORAO VRF Program ID:", orao.programId.toString());
 
             // Derive ORAO VRF accounts
             const networkState = networkStateAccountAddress();
@@ -629,17 +643,15 @@ export const useGameContract = () => {
             const networkStateData = await orao.getNetworkState();
             const treasury = networkStateData.config.treasury;
 
-            console.log("[placeBet] ORAO VRF Accounts:");
-            console.log("  - networkState:", networkState.toString());
-            console.log("  - treasury:", treasury.toString());
-            console.log("  - vrfRequest:", vrfRequest.toString());
-            console.log(
-              "[placeBet] Amount/Skin/Position:",
-              amountBN.toString(),
-              { skin },
-              { position },
-              { map }
-            );
+            logger.solana.debug("[placeBet] ORAO VRF Accounts", {
+              networkState: networkState.toString(),
+              treasury: treasury.toString(),
+              vrfRequest: vrfRequest.toString(),
+              amount: amountBN.toString(),
+              skin,
+              position,
+              map,
+            });
 
             // Convert activeRoundId to BN for Anchor instruction
             const roundIdBN = new BN(activeRoundId);
@@ -661,18 +673,18 @@ export const useGameContract = () => {
               })
               .rpc({ skipPreflight: true });
 
-            console.log("[placeBet] Created new devnet/mainnet game with first bet (ORAO VRF)", tx);
+            logger.solana.info("[placeBet] Created new devnet/mainnet game with first bet (ORAO VRF)", tx);
           }
           // Transaction variable 'tx' is now set in the network-specific branches above
         } else {
           // Game exists - PLACE an additional bet
-          console.log(`[placeBet] Game exists (round ${activeRoundId}), placing additional bet`);
+          logger.solana.debug(`[placeBet] Game exists (round ${activeRoundId}), placing additional bet`);
 
           // Fetch fresh game state using Anchor (more reliable than manual parsing)
           const activeGameAccount = await program.account.domin8Game.fetch(activeGamePda);
-          console.log("[placeBet] Active game account:", activeGameAccount);
+          logger.solana.debug("[placeBet] Active game account:", activeGameAccount);
           const betCount = activeGameAccount.bets?.length || 0;
-          console.log("[placeBet] Current bet count:", betCount);
+          logger.solana.debug("[placeBet] Current bet count:", betCount);
 
           // The bet index for this new bet will be the current bet count
           betIndex = betCount;
@@ -682,14 +694,15 @@ export const useGameContract = () => {
           const { vaultPda } = derivePDAs();
           const betEntryPda = deriveBetEntryPda(activeRoundId, betIndex);
 
-          console.log("[placeBet] PlaceBet PDAs:");
-          console.log("  - gameConfig:", gameConfigPda.toString());
-          console.log("  - gameCounter:", gameCounterPda.toString());
-          console.log("  - gameRound:", gameRoundPda.toString());
-          console.log("  - activeGame:", activeGamePda.toString());
-          console.log("  - betEntry:", betEntryPda.toString());
-          console.log("  - vault:", vaultPda.toString());
-          console.log("  - betIndex:", betIndex);
+          logger.solana.debug("[placeBet] PlaceBet PDAs", {
+            gameConfig: gameConfigPda.toString(),
+            gameCounter: gameCounterPda.toString(),
+            gameRound: gameRoundPda.toString(),
+            activeGame: activeGamePda.toString(),
+            betEntry: betEntryPda.toString(),
+            vault: vaultPda.toString(),
+            betIndex,
+          });
 
           // Convert activeRoundId to BN for Anchor instruction
           const roundIdBN = new BN(activeRoundId);
@@ -716,9 +729,12 @@ export const useGameContract = () => {
         // Get the actual signature from Privy wallet adapter
         // (since Privy signs+sends, the tx variable from .rpc() might not be accurate)
         const actualSignature = walletAdapter?.lastSignature || tx;
-        console.log("[placeBet] Transaction successful:", actualSignature);
-        console.log("[placeBet] Bet index:", betIndex);
-        console.log("[placeBet] Round ID:", activeRoundId);
+        logger.solana.info("[placeBet] Transaction successful", {
+          signature: actualSignature,
+          betIndex,
+          roundId: activeRoundId,
+        });
+        logger.solana.groupEnd();
 
         return {
           signature: actualSignature,
@@ -726,7 +742,8 @@ export const useGameContract = () => {
           betIndex,
         };
       } catch (error: any) {
-        console.error("[placeBet] Error:", error);
+        logger.solana.groupEnd();
+        logger.solana.error("[placeBet] Error:", error);
 
         // WORKAROUND: Privy signing sometimes throws "signature verification failed"
         // but the transaction actually succeeds on-chain. Check if it's just a signing error.
@@ -738,11 +755,11 @@ export const useGameContract = () => {
           errorMessage.includes("Signature");
 
         if (isSignatureError) {
-          console.warn(
+          logger.solana.warn(
             "[placeBet] ✅ Privy signature verification error (expected behavior with skipPreflight)"
           );
-          console.warn("[placeBet] Transaction succeeded on-chain, ignoring client-side error");
-          console.log("[placeBet] Error details:", errorMessage);
+          logger.solana.warn("[placeBet] Transaction succeeded on-chain, ignoring client-side error");
+          logger.solana.debug("[placeBet] Error details:", errorMessage);
 
           // Extract transaction signature from error or use a placeholder
           // The transaction HAS succeeded, we just need a signature for tracking
@@ -751,7 +768,7 @@ export const useGameContract = () => {
           // Try to extract from Privy wallet
           if (walletAdapter?.lastSignature) {
             extractedSignature = walletAdapter.lastSignature;
-            console.log("[placeBet] Using signature from Privy:", extractedSignature);
+            logger.solana.debug("[placeBet] Using signature from Privy:", extractedSignature);
           }
 
           // Return success - transaction went through on-chain
@@ -800,7 +817,7 @@ export const useGameContract = () => {
       const balance = await connection.getBalance(publicKey);
       return balance / LAMPORTS_PER_SOL;
     } catch (error) {
-      console.error("Error fetching balance:", error);
+      logger.solana.error("Error fetching balance:", error);
       return 0;
     }
   }, [publicKey, connection]);
