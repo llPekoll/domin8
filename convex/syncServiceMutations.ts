@@ -126,11 +126,12 @@ export const upsertGameState = internalMutation({
       capturedAt: Math.floor(Date.now() / 1000),
     };
 
-    if (existingState) {
+    // Do not update if the existing state is finished as the data is final
+    if (existingState && existingState.status === "waiting") {
       // Update existing state
       await db.patch(existingState._id, gameData);
       console.log(`[Sync Mutations] Updated game ${roundId} (status: ${status}, map: ${gameRound.map})`);
-    } else {
+    } else if (!existingState) {
       // Create new state
       await db.insert("gameRoundStates", gameData);
       console.log(`[Sync Mutations] Created game ${roundId} (status: ${status}, map: ${gameRound.map})`);
