@@ -96,29 +96,6 @@ export const verifyOwnership = action({
 });
 ```
 
-#### Layer 4: Smart Contract Verification (Optional - Not Recommended)
-```rust
-// In your Solana program - NOT IMPLEMENTING THIS
-pub fn place_bet(
-    ctx: Context<PlaceBet>,
-    character_id: u8,
-) -> Result<()> {
-    // For NFT characters (e.g., character_id >= 100 means exclusive)
-    if character_id >= 100 {
-        // Verify player has NFT in their wallet
-        let nft_mint = get_nft_mint_for_character(character_id)?;
-        // ... token account verification
-    }
-    Ok(())
-}
-```
-
-**Why skip Layer 4?**
-- Adds complexity to on-chain program
-- Increases transaction costs
-- NFT gating is a "cosmetic" feature, not critical for game integrity
-- Layers 1-3 provide sufficient security for this use case
-
 ### Recommended Security Flow
 ```
 1. User selects NFT character (client-side)
@@ -908,7 +885,6 @@ convex/
 - Rate limiting on NFT verification calls
 - Caching verified NFTs to reduce RPC costs
 - Webhook-based NFT transfer detection
-- Smart contract-level verification (if needed)
 
 ---
 
