@@ -255,7 +255,6 @@ export class SolanaClient {
     try {
       // Fetch account with null check
       const account = await this.program.account.domin8Game.fetchNullable(activeGame);
-      console.log({ account });
       if (!account) {
         console.log("No active game exists");
         return null;
