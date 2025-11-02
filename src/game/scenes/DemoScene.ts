@@ -394,6 +394,8 @@ export class DemoScene extends Scene {
   }
 
   public transitionToRealGame() {
+    logger.game.debug("[DemoScene] 🎬 Starting transition to RoyalRumble");
+
     this.clearDemoParticipants();
     // Hide demo UI
     if (this.demoUIContainer) {
@@ -404,7 +406,22 @@ export class DemoScene extends Scene {
       this.battleMusic.stop();
       this.battleMusic = null;
     }
-    this.scene.start("RoyalRumble");
+
+    // Create wipe transition effect
+    const fx = this.cameras.main.postFX.addWipe();
+    logger.game.debug("[DemoScene] Wipe effect created:", fx);
+
+    this.scene.transition({
+      target: "RoyalRumble",
+      duration: 1000,
+      moveBelow: true,
+      onUpdate: (progress: number) => {
+        fx.progress = progress;
+      },
+      onComplete: () => {
+        logger.game.debug("[DemoScene] ✅ Transition to RoyalRumble complete");
+      }
+    });
   }
 
   shutdown() {

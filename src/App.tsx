@@ -82,13 +82,15 @@ export default function App() {
     if (hasRealGame && scene.scene.key === "DemoScene") {
       logger.ui.debug("✅ Switching from DemoScene to RoyalRumble - Real game started");
       logger.ui.debug("Game state:", currentRoundState);
-      scene.scene.start("RoyalRumble");
+      // Use the transition method instead of direct scene.start
+      (scene as any).transitionToRealGame?.();
     }
 
     // If no game (or finished game) and we're in game scene, switch back to demo
     if (!hasRealGame && scene.scene.key === "RoyalRumble") {
       logger.ui.debug("✅ Switching from RoyalRumble to DemoScene - Game ended or idle");
-      scene.scene.start("DemoScene");
+      // Use the transition method instead of direct scene.start
+      (scene as any).transitionToDemo?.();
     }
 
     // Update game scene with real blockchain game state

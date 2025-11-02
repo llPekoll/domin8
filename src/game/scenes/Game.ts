@@ -230,6 +230,26 @@ export class Game extends Scene {
     this.uiManager.updateTimer();
   }
 
+  public transitionToDemo() {
+    logger.game.debug("[Game] 🎬 Starting transition to DemoScene");
+
+    // Create wipe transition effect
+    const fx = this.cameras.main.postFX.addWipe();
+    logger.game.debug("[Game] Wipe effect created:", fx);
+
+    this.scene.transition({
+      target: "DemoScene",
+      duration: 1000,
+      moveBelow: true,
+      onUpdate: (progress: number) => {
+        fx.progress = progress;
+      },
+      onComplete: () => {
+        logger.game.debug("[Game] ✅ Transition to DemoScene complete");
+      }
+    });
+  }
+
   shutdown() {
     // Clean up event listeners to prevent memory leaks
     EventBus.off("play-insert-coin-sound");
