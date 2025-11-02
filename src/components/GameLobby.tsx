@@ -12,7 +12,7 @@ import { Users, Gamepad2 } from "lucide-react";
 import { logger } from "../lib/logger";
 
 export function GameLobby() {
-  const { connected, publicKey } = usePrivyWallet();
+  const { connected, publicKey, externalWalletAddress } = usePrivyWallet();
   // TODO: need to be redone in a blockchainway
   // Get player data
   const playerData = useQuery(
@@ -35,12 +35,15 @@ export function GameLobby() {
         "Manual player creation for wallet:",
         publicKey.toString(),
         "with name:",
-        randomName
+        randomName,
+        "external wallet:",
+        externalWalletAddress || "none (email/social login)"
       );
 
       await createPlayer({
         walletAddress: publicKey.toString(),
         displayName: randomName,
+        externalWalletAddress: externalWalletAddress || undefined,
       });
       toast.success(
         `Player created! Your display name is: ${randomName}. You've been given a random character and 1000 starting coins.`

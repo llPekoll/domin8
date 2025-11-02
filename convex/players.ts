@@ -50,7 +50,8 @@ export const getPlayerWithCharacter = query({
 export const createPlayer = mutation({
   args: {
     walletAddress: v.string(),
-    displayName: v.optional(v.string())
+    displayName: v.optional(v.string()),
+    externalWalletAddress: v.optional(v.string())
   },
   handler: async (ctx, args) => {
     const existingPlayer = await ctx.db
@@ -64,6 +65,7 @@ export const createPlayer = mutation({
 
     const playerId = await ctx.db.insert("players", {
       walletAddress: args.walletAddress,
+      externalWalletAddress: args.externalWalletAddress,
       displayName: args.displayName,
       lastActive: Date.now(),
       totalGamesPlayed: 0,

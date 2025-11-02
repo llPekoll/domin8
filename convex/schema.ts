@@ -116,6 +116,7 @@ export default defineSchema({
    */
   players: defineTable({
     walletAddress: v.string(),
+    externalWalletAddress: v.optional(v.string()), // External wallet (e.g., Phantom) for NFT verification
     displayName: v.optional(v.string()),
     lastActive: v.number(),
     totalGamesPlayed: v.number(),

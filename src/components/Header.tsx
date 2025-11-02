@@ -16,7 +16,7 @@ import { useActiveGame } from "../hooks/useActiveGame";
 import { logger } from "../lib/logger";
 
 export function Header() {
-  const { connected, publicKey } = usePrivyWallet();
+  const { connected, publicKey, externalWalletAddress } = usePrivyWallet();
   const { user, authenticated } = usePrivy();
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [hasAttemptedCreation, setHasAttemptedCreation] = useState(false);
@@ -101,6 +101,7 @@ export function Header() {
       createPlayer({
         walletAddress: walletAddr,
         displayName: randomName,
+        externalWalletAddress: externalWalletAddress || undefined,
       })
         .then(() => {
           toast.success(`Welcome! Your display name is: ${randomName}`);
@@ -115,7 +116,7 @@ export function Header() {
     if (!connected) {
       setHasAttemptedCreation(false);
     }
-  }, [connected, publicKey, playerData, hasAttemptedCreation, createPlayer]);
+  }, [connected, publicKey, playerData, hasAttemptedCreation, createPlayer, externalWalletAddress]);
 
   return (
     <>
