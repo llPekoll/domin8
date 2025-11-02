@@ -417,8 +417,9 @@ const CharacterSelection = memo(function CharacterSelection({
             </div>
             
             <div className="flex items-center gap-2">
-              {/* NFT Character Button - Only show if external wallet has unlocked characters */}
-              {externalWalletAddress && unlockedCharacters.length > 0 && (
+              {/* NFT Character Button */}
+              
+              {externalWalletAddress && (
                 <button
                   onClick={() => setShowNFTModal(true)}
                   disabled={isLoadingNFTs}
