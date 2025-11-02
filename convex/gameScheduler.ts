@@ -40,17 +40,23 @@ export const executeEndGame = internalAction({
     try {
       const solanaClient = new SolanaClient(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
 
+      
+
       // 1. Get current game state from blockchain (active_game PDA)
-      const activeGame = await solanaClient.getActiveGame();
+      let activeGame = await solanaClient.getActiveGame();
+
+      // If this is not the active game, use getGameRound to fetch specific round data
+      if (activeGame?.gameRound !== roundId) {
+        console.log(`Round ${roundId}: Not the active game (active: ${activeGame?.gameRound}), fetching specific round data`);
+        activeGame = await solanaClient.getGameRound(roundId);
+        if (!activeGame) {
+          console.log(`Round ${roundId}: No game found on blockchain, skipping`);
+          return;
+        }
+      }
 
       if (!activeGame) {
         console.log(`Round ${roundId}: No active game found, skipping`);
-        return;
-      }
-
-      // Verify this is the correct round
-      if (activeGame.gameRound !== roundId) {
-        console.log(`Round ${roundId}: Not the active game (active: ${activeGame.gameRound}), skipping`);
         return;
       }
 

@@ -36,6 +36,7 @@ export interface ActiveGameState {
   winningBetIndex: BN | null;
   wallets: PublicKey[]; // NEW: Unique wallet addresses
   bets: BetInfo[]; // NEW: Array of bet info structs
+  map: number; // Map/background ID (0-255)
 
   // Computed properties for backward compatibility
   roundId?: BN;

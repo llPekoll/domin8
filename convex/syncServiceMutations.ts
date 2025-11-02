@@ -1,7 +1,7 @@
 /**
  * Sync Service Mutations - Database operations for blockchain sync
  */
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -126,14 +126,45 @@ export const upsertGameState = internalMutation({
       capturedAt: Math.floor(Date.now() / 1000),
     };
 
-    if (existingState) {
+    // Do not update if the existing state is finished as the data is final
+    if (existingState && existingState.status === "waiting") {
       // Update existing state
       await db.patch(existingState._id, gameData);
       console.log(`[Sync Mutations] Updated game ${roundId} (status: ${status}, map: ${gameRound.map})`);
-    } else {
+    } else if (!existingState) {
       // Create new state
       await db.insert("gameRoundStates", gameData);
       console.log(`[Sync Mutations] Created game ${roundId} (status: ${status}, map: ${gameRound.map})`);
     }
+  },
+});
+
+/**
+ * Query to find ended games still in "waiting" status
+ * Returns games where endTimestamp < currentTime and status = "waiting"
+ */
+export const getEndedWaitingGames = internalQuery({
+  args: {
+    currentTime: v.number(),
+  },
+  handler: async (ctx, { currentTime }) => {
+    const { db } = ctx;
+
+    // Find all games in "waiting" status that have passed their end time
+    const endedGames = await db
+      .query("gameRoundStates")
+      .withIndex("by_status", (q) => q.eq("status", "waiting"))
+      .filter((q) => q.lt(q.field("endTimestamp"), currentTime))
+      .collect();
+
+    // Return simplified game data
+    return endedGames.map((game) => ({
+      _id: game._id,
+      roundId: game.roundId,
+      endTimestamp: game.endTimestamp,
+      startTimestamp: game.startTimestamp,
+      betCount: game.betCount,
+      totalPot: game.totalPot,
+    }));
   },
 });
