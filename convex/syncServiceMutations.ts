@@ -1,7 +1,7 @@
 /**
  * Sync Service Mutations - Database operations for blockchain sync
  */
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -135,5 +135,35 @@ export const upsertGameState = internalMutation({
       await db.insert("gameRoundStates", gameData);
       console.log(`[Sync Mutations] Created game ${roundId} (status: ${status}, map: ${gameRound.map})`);
     }
+  },
+});
+
+/**
+ * Query to find ended games still in "waiting" status
+ * Returns games where endTimestamp < currentTime and status = "waiting"
+ */
+export const getEndedWaitingGames = internalQuery({
+  args: {
+    currentTime: v.number(),
+  },
+  handler: async (ctx, { currentTime }) => {
+    const { db } = ctx;
+
+    // Find all games in "waiting" status that have passed their end time
+    const endedGames = await db
+      .query("gameRoundStates")
+      .withIndex("by_status", (q) => q.eq("status", "waiting"))
+      .filter((q) => q.lt(q.field("endTimestamp"), currentTime))
+      .collect();
+
+    // Return simplified game data
+    return endedGames.map((game) => ({
+      _id: game._id,
+      roundId: game.roundId,
+      endTimestamp: game.endTimestamp,
+      startTimestamp: game.startTimestamp,
+      betCount: game.betCount,
+      totalPot: game.totalPot,
+    }));
   },
 });
