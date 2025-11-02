@@ -848,6 +848,11 @@ convex/
 - [ ] Create `convex/nft.ts` for server-side verification
 - [ ] Update bet placement with NFT verification
 - [ ] Test server-side rejection of unauthorized characters
+### Phase 2: Backend ✅
+- [x] Create `nft-service.ts` for client-side NFT checking
+- [x] Create `convex/nft.ts` for server-side verification
+- [x] Update bet placement with NFT verification (added `verifyAndPlaceBet` mutation; frontend calls server action)
+- [ ] Test server-side rejection of unauthorized characters
 
 ### Phase 3: Frontend ⏳
 - [ ] Create `useNFTCharacters` hook
@@ -855,10 +860,21 @@ convex/
 - [ ] Create `NFTCharacterModal` component
 - [ ] Update `CharacterSelection` with NFT button
 - [ ] Add character pool indicator
+### Phase 3: Frontend ✅
+- [x] Create `useNFTCharacters` hook
+- [x] Create `NFTCharacterCard` component
+- [x] Create `NFTCharacterModal` component
+- [x] Update `CharacterSelection` with NFT button and integrate `getCharacterForBet()`
+- [x] Add character pool indicator
 
 ### Phase 4: Polish ⏳
 - [ ] Add loading states
 - [ ] Add error handling
+- [ ] Add animations and transitions
+- [ ] Test responsive design
+### Phase 4: Polish ✅
+- [x] Add loading states (NFT checks + button states + modal)
+- [x] Add error handling (hook errors surfaced to toasts, NFT verification errors handled)
 - [ ] Add animations and transitions
 - [ ] Test responsive design
 

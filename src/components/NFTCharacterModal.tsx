@@ -27,6 +27,8 @@ interface NFTCharacterModalProps {
   selectedCharacters: Character[];
   onSelectCharacters: (characters: Character[]) => void;
   unlockedCharacters: Character[];
+  isLoading?: boolean;
+  error?: string | null;
   allExclusiveCharacters: Character[];
 }
 
@@ -36,6 +38,8 @@ export function NFTCharacterModal({
   selectedCharacters,
   onSelectCharacters,
   unlockedCharacters,
+  isLoading,
+  error,
   allExclusiveCharacters,
 }: NFTCharacterModalProps) {
   const [tempSelected, setTempSelected] = useState<Character[]>(selectedCharacters);
@@ -83,7 +87,17 @@ export function NFTCharacterModal({
         </DialogHeader>
         
         {/* Unlocked Characters Grid */}
-        {unlockedCharacters.length > 0 ? (
+        {isLoading ? (
+          <div className="text-center py-12">
+            <p className="text-amber-300">Checking your NFTs…</p>
+            <p className="text-amber-500 text-sm mt-2">This may take a few seconds.</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <p className="text-red-400">Failed to check NFTs</p>
+            <p className="text-amber-400 text-sm mt-2">{error}</p>
+          </div>
+        ) : unlockedCharacters.length > 0 ? (
           <div>
             <h3 className="text-amber-200 font-bold mb-3 text-lg">
               Unlocked Characters ({unlockedCharacters.length})

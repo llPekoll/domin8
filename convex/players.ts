@@ -1,4 +1,5 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, action } from "./_generated/server";
+import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 
 export const getPlayer = query({
@@ -175,5 +176,80 @@ export const addAchievement = mutation({
         achievements,
       });
     }
+  },
+});
+
+/**
+ * Get Character Requirements
+ * 
+ * Returns information about a character's requirements (e.g., NFT ownership).
+ * Used by frontend to determine if character needs special verification.
+ */
+export const getCharacterRequirements = query({
+  args: {
+    characterId: v.id("characters"),
+  },
+  handler: async (ctx, args) => {
+    const character = await ctx.db.get(args.characterId);
+    
+    if (!character) {
+      return null;
+    }
+    
+    return {
+      characterId: character._id,
+      characterName: character.name,
+      requiresNFT: !!character.nftCollection,
+      nftCollection: character.nftCollection || null,
+    };
+  },
+});
+
+/**
+ * Server-side verification helper for bets
+ *
+ * This mutation can be called by the frontend prior to submitting an on-chain
+ * place_bet transaction. It verifies (on the server) that the external wallet
+ * owns any required NFT for the requested character. It does NOT attempt to
+ * place the on-chain bet — that remains the responsibility of the client.
+ */
+export const verifyAndPlaceBet = action({
+  args: {
+    walletAddress: v.string(),
+    externalWalletAddress: v.optional(v.string()),
+    characterId: v.id("characters"),
+    betAmount: v.number(),
+  },
+  handler: async (ctx, args) => {
+    // Basic sanity checks - fetch character requirements via query (actions don't have direct db access)
+    const characterRequirements = await ctx.runQuery(api.players.getCharacterRequirements, {
+      characterId: args.characterId,
+    });
+
+    if (!characterRequirements) {
+      throw new Error("Character not found");
+    }
+
+    // If character requires an NFT, verify ownership via internal action
+    if (characterRequirements.requiresNFT && characterRequirements.nftCollection) {
+      if (!args.externalWalletAddress) {
+        throw new Error("External wallet required for NFT characters");
+      }
+
+      // Run the internal verification action from an Action context
+      const hasNFT = await ctx.runAction(internal.nft.verifyNFTOwnershipInternal, {
+        walletAddress: args.externalWalletAddress,
+        collectionAddress: characterRequirements.nftCollection,
+      });
+
+      if (!hasNFT) {
+        throw new Error(`You don't own the required NFT for ${characterRequirements.characterName}`);
+      }
+    }
+
+    // All verification passed. Actions can perform additional server-side
+    // work here (e.g., logging, running mutations) if desired. We return
+    // success so the client can proceed to submit the on-chain transaction.
+    return { ok: true };
   },
 });
