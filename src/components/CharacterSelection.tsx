@@ -217,9 +217,10 @@ const CharacterSelection = memo(function CharacterSelection({
         duration: 5000,
       });
 
-      // Emit event to Phaser to spawn the player's character
+      // Emit event for DemoScene to handle spawning (demo is client-side only)
+      // Real game (Game.ts) will spawn characters from blockchain subscription
       const eventData = {
-        characterId: currentCharacter.id, // Use blockchain numeric ID
+        characterId: currentCharacter.id,
         characterName: currentCharacter.name,
         position: position,
         betAmount: amount,
@@ -231,9 +232,6 @@ const CharacterSelection = memo(function CharacterSelection({
       logger.ui.debug("[CharacterSelection] 🎮 EMITTING player-bet-placed EVENT:", eventData);
       EventBus.emit("player-bet-placed", eventData);
       logger.ui.debug("[CharacterSelection] ✅ Event emitted successfully");
-
-      // Character skin and position are now stored directly on-chain
-      // No need for Convex character assignment - blockchain is source of truth
 
       setBetAmount("0.1");
 

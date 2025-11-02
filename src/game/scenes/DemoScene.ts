@@ -411,15 +411,17 @@ export class DemoScene extends Scene {
     const fx = this.cameras.main.postFX.addWipe();
     logger.game.debug("[DemoScene] Wipe effect created:", fx);
 
+    // Listen for transition complete event
+    this.events.once('transitionout', () => {
+      logger.game.debug("[DemoScene] ✅ Transition to RoyalRumble complete");
+    });
+
     this.scene.transition({
       target: "RoyalRumble",
       duration: 1000,
       moveBelow: true,
       onUpdate: (progress: number) => {
         fx.progress = progress;
-      },
-      onComplete: () => {
-        logger.game.debug("[DemoScene] ✅ Transition to RoyalRumble complete");
       }
     });
   }

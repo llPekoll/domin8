@@ -61,42 +61,8 @@ export class Game extends Scene {
       SoundManager.playInsertCoin(this);
     });
 
-    // Listen for player bet placement to spawn character immediately
-    EventBus.on("player-bet-placed", (data: {
-      characterId: number;
-      characterName: string;
-      position: [number, number];
-      betAmount: number;
-      roundId: number;
-      betIndex: number;
-      walletAddress: string;
-    }) => {
-      logger.game.debug("[Game] 🎯 RECEIVED player-bet-placed EVENT");
-      logger.game.debug("[Game] Event data:", data);
-
-      // Derive character key from character name (e.g., "Warrior" -> "warrior")
-      const characterKey = data.characterName?.toLowerCase().replace(/\s+/g, "-") || "warrior";
-
-      // Transform the data into the format expected by PlayerManager
-      const participant = {
-        _id: `${data.walletAddress}_${data.betIndex}`, // Unique ID combining wallet + bet index
-        playerId: data.walletAddress,
-        displayName: data.characterName || "Player",
-        betAmount: data.betAmount,
-        character: {
-          key: characterKey, // Derived sprite key
-          name: data.characterName,
-          id: data.characterId, // Store blockchain numeric ID for reference
-        },
-        spawnIndex: data.betIndex, // Use bet index as spawn index
-        isBot: false, // This is a real player
-        eliminated: false,
-        colorHue: undefined, // Will be assigned by backend if needed
-      };
-
-      // Spawn the character immediately in the scene
-      this.spawnParticipantImmediately(participant);
-    });
+    // Characters now spawn automatically via blockchain subscription (useActiveGame)
+    // No need for separate event listener - updateGameState handles all spawning
 
     // Play intro sound when real game starts
     this.playIntroSound();
@@ -220,11 +186,6 @@ export class Game extends Scene {
     return skinMap[skinId] || "Warrior";
   }
 
-  // Public method for real-time participant spawning
-  public spawnParticipantImmediately(participant: any) {
-    this.playerManager.spawnParticipantImmediately(participant);
-  }
-
   // Add update method to continuously update the timer
   update() {
     this.uiManager.updateTimer();
@@ -237,15 +198,17 @@ export class Game extends Scene {
     const fx = this.cameras.main.postFX.addWipe();
     logger.game.debug("[Game] Wipe effect created:", fx);
 
+    // Listen for transition complete event
+    this.events.once('transitionout', () => {
+      logger.game.debug("[Game] ✅ Transition to DemoScene complete");
+    });
+
     this.scene.transition({
       target: "DemoScene",
       duration: 1000,
       moveBelow: true,
       onUpdate: (progress: number) => {
         fx.progress = progress;
-      },
-      onComplete: () => {
-        logger.game.debug("[Game] ✅ Transition to DemoScene complete");
       }
     });
   }
@@ -253,7 +216,6 @@ export class Game extends Scene {
   shutdown() {
     // Clean up event listeners to prevent memory leaks
     EventBus.off("play-insert-coin-sound");
-    EventBus.off("player-bet-placed");
   }
 
   changeScene() {

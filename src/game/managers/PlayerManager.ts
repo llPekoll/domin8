@@ -140,9 +140,15 @@ export class PlayerManager {
       sprite.play(animKey);
     }
 
-    // Apply base 5x multiplier + bet scaling FIRST
+    // Apply base 3x multiplier + bet scaling FIRST
     const betScale = participant.size || this.calculateParticipantScale(participant.betAmount);
     const scale = betScale * this.BASE_SCALE_MULTIPLIER;
+    console.log(`[PlayerManager] Character scale calculated:`, {
+      participantId,
+      betAmount: participant.betAmount,
+      betScale,
+      finalScale: scale,
+    });
     sprite.setScale(scale);
     sprite.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
 
@@ -283,12 +289,13 @@ export class PlayerManager {
     });
   }
 
-  private calculateParticipantScale(betAmountInCoins: number): number {
-    const minBet = 10;
-    const maxBet = 10000;
+  private calculateParticipantScale(betAmountInSOL: number): number {
+    // Bet range: 0.01 - 10 SOL (from CLAUDE.md)
+    const minBet = 0.01;
+    const maxBet = 10;
     const minScale = 1.0;
-    const maxScale = 2.0;
-    const clampedBet = Math.max(minBet, Math.min(maxBet, betAmountInCoins));
+    const maxScale = 10.0; // Much bigger range: 1x to 5x (then × 3.0 base = 3x to 15x final)
+    const clampedBet = Math.max(minBet, Math.min(maxBet, betAmountInSOL));
     const scale = minScale + ((clampedBet - minBet) / (maxBet - minBet)) * (maxScale - minScale);
     return scale;
   }
@@ -531,18 +538,6 @@ export class PlayerManager {
 
     logger.game.error("[PlayerManager] Winner participant not found for ID:", winnerId);
     return null;
-  }
-
-  spawnParticipantImmediately(participant: any) {
-    // Check if participant already exists
-    if (this.participants.has(participant._id)) {
-      // Update existing participant's bet amount/scale
-      this.updateParticipantScale(participant);
-      return;
-    }
-
-    // Add new participant with fanfare effect (golden flash)
-    this.addParticipant(participant, true);
   }
 
   // Update participants in any phase (not just waiting)
