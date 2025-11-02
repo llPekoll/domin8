@@ -177,8 +177,6 @@ export class SolanaClient {
       throw new Error("Failed to derive game round PDA");
     }
 
-    console.log("game_round: ", gameRound)
-
     try {
       // Fetch account with null check
       const account = await this.program.account.domin8Game.fetchNullable(gameRound);
@@ -370,10 +368,9 @@ export class SolanaClient {
     return tx;
   }
 
- 
   // Send prize to winner (risk-based architecture)
   async sendPrizeWinner(roundId: number): Promise<string> {
-    const { config, activeGame, gameRound } = this.getPDAs(roundId);
+    const { config, gameRound } = this.getPDAs(roundId);
 
     if (!gameRound) {
       throw new Error("Failed to derive game round PDA");
