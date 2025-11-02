@@ -3,11 +3,13 @@ import { useQuery } from "convex/react";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useGameContract } from "../hooks/useGameContract";
 import { useActiveGame } from "../hooks/useActiveGame";
+import { useNFTCharacters } from "../hooks/useNFTCharacters";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { toast } from "sonner";
-import { Shuffle } from "lucide-react";
+import { Shuffle, Star } from "lucide-react";
 import { CharacterPreviewScene } from "./CharacterPreviewScene";
+import { NFTCharacterModal } from "./NFTCharacterModal";
 import styles from "./ButtonShine.module.css";
 import { Buffer } from "buffer";
 import { EventBus } from "../game/EventBus";
@@ -32,12 +34,16 @@ interface CharacterSelectionProps {
 const CharacterSelection = memo(function CharacterSelection({
   onParticipantAdded,
 }: CharacterSelectionProps) {
-  const { connected, publicKey, solBalance, isLoadingBalance } = usePrivyWallet();
+  const { connected, publicKey, solBalance, isLoadingBalance, externalWalletAddress } = usePrivyWallet();
   const { placeBet, validateBet } = useGameContract();
 
   const [currentCharacter, setCurrentCharacter] = useState<Character | null>(null);
   const [betAmount, setBetAmount] = useState<string>("0.1");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // NFT character selection state
+  const [showNFTModal, setShowNFTModal] = useState(false);
+  const [selectedNFTCharacters, setSelectedNFTCharacters] = useState<Character[]>([]);
 
   // Memoize wallet address to prevent unnecessary re-queries
   const walletAddress = useMemo(
@@ -56,6 +62,12 @@ const CharacterSelection = memo(function CharacterSelection({
 
   // Get current game state directly from blockchain (real-time, no polling lag)
   const { activeGame } = useActiveGame();
+  
+  // NFT character checking
+  const { unlockedCharacters, isLoading: isLoadingNFTs } = useNFTCharacters(externalWalletAddress);
+  
+  // Get all exclusive characters for modal
+  const allExclusiveChars = useQuery(api.characters.getExclusiveCharacters);
 
   // Derive game state from blockchain (not Convex, to avoid stale data)
   const canPlaceBet = useMemo(() => {
@@ -91,6 +103,16 @@ const CharacterSelection = memo(function CharacterSelection({
   }, [activeGame]);
 
   const playerParticipantCount = 0; // TODO: Track participant count when needed
+
+  // Get character for bet (NFT pool or regular)
+  const getCharacterForBet = useCallback(() => {
+    if (selectedNFTCharacters.length > 0) {
+      // Randomly pick from selected NFT pool
+      const randomIndex = Math.floor(Math.random() * selectedNFTCharacters.length);
+      return selectedNFTCharacters[randomIndex];
+    }
+    return currentCharacter; // Fallback to default character
+  }, [selectedNFTCharacters, currentCharacter]);
 
   // Initialize with random character when characters load
   useEffect(() => {
@@ -305,16 +327,42 @@ const CharacterSelection = memo(function CharacterSelection({
                 <p className="text-amber-100 font-bold text-xl uppercase tracking-wide">
                   {currentCharacter.name}
                 </p>
-                <p className="text-amber-400 text-base">Ready for battle</p>
+                <p className="text-amber-400 text-base">
+                  {selectedNFTCharacters.length > 0 
+                    ? `Pool: ${selectedNFTCharacters.length} NFT chars` 
+                    : 'Ready for battle'
+                  }
+                </p>
               </div>
             </div>
-            <button
-              onClick={handleReroll}
-              className="p-2 bg-amber-800/50 hover:bg-amber-700/50 rounded-lg border border-amber-600/50 transition-colors"
-              disabled={!allCharacters || allCharacters.length <= 1}
-            >
-              <Shuffle className="w-4 h-4 text-amber-300" />
-            </button>
+            
+            <div className="flex items-center gap-2">
+              {/* NFT Character Button - Only show if external wallet has unlocked characters */}
+              {externalWalletAddress && unlockedCharacters.length > 0 && (
+                <button
+                  onClick={() => setShowNFTModal(true)}
+                  className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 rounded-lg border border-purple-400/50 transition-all shadow-lg shadow-purple-500/20"
+                  title="Select exclusive NFT characters"
+                >
+                  <Star className="w-4 h-4 fill-current" />
+                  <span className="text-sm font-bold">NFT</span>
+                  {selectedNFTCharacters.length > 0 && (
+                    <span className="bg-purple-900/50 px-2 py-0.5 rounded-full text-xs font-bold">
+                      {selectedNFTCharacters.length}
+                    </span>
+                  )}
+                </button>
+              )}
+              
+              {/* Reroll Button */}
+              <button
+                onClick={handleReroll}
+                className="p-2 bg-amber-800/50 hover:bg-amber-700/50 rounded-lg border border-amber-600/50 transition-colors"
+                disabled={!allCharacters || allCharacters.length <= 1}
+              >
+                <Shuffle className="w-4 h-4 text-amber-300" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -381,6 +429,16 @@ const CharacterSelection = memo(function CharacterSelection({
           </button>
         </div>
       </div>
+      
+      {/* NFT Character Modal */}
+      <NFTCharacterModal
+        open={showNFTModal}
+        onOpenChange={setShowNFTModal}
+        selectedCharacters={selectedNFTCharacters}
+        onSelectCharacters={setSelectedNFTCharacters}
+        unlockedCharacters={unlockedCharacters}
+        allExclusiveCharacters={allExclusiveChars || []}
+      />
     </div>
   );
 });
