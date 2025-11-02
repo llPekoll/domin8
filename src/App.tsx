@@ -5,6 +5,7 @@ import { GameLobby } from "./components/GameLobby";
 import { BlockchainRandomnessDialog } from "./components/BlockchainRandomnessDialog";
 import { DemoGameManager } from "./components/DemoGameManager";
 import { BlockchainDebugDialog } from "./components/BlockchainDebugDialog";
+import { MultiParticipantPanel } from "./components/MultiParticipantPanel";
 import { useActiveGame } from "./hooks/useActiveGame";
 import { logger } from "./lib/logger";
 
@@ -148,6 +149,9 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Participant List Panel (bottom-right) */}
+      <MultiParticipantPanel />
 
       {/* Blockchain Randomness Dialog */}
       <BlockchainRandomnessDialog open={showBlockchainDialog} />
