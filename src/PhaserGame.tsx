@@ -1,8 +1,7 @@
-import { forwardRef, useEffect, useLayoutEffect, useRef } from "react";
-import { useQuery } from "convex/react";
-import { api } from "../convex/_generated/api";
-import StartGame, { setCharactersData, setDemoMapData } from "./game/main";
+import { forwardRef, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import StartGame, { setCharactersData, setAllMapsData, setDemoMapData } from "./game/main";
 import { EventBus } from "./game/EventBus";
+import { useAssets } from "./contexts/AssetsContext";
 
 export interface IRefPhaserGame {
   game: Phaser.Game | null;
@@ -19,24 +18,27 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
 ) {
   const game = useRef<Phaser.Game | null>(null);
 
-  // TODO: Fetch current game state from Solana blockchain
-  // For now in demo mode, use random map
+  // Fetch all data from assets context (shared across app)
+  const { characters, maps: allMaps } = useAssets();
 
-  const characters = useQuery(api.characters.getActiveCharacters);
-  const demoMap = useQuery(api.maps.getRandomMap); // Fetch single random map for demo mode
+  // Select random map client-side for demo mode (only recalculate when map count changes)
+  const demoMap = useMemo(() => {
+    if (!allMaps || allMaps.length === 0) return null;
+    return allMaps[Math.floor(Math.random() * allMaps.length)];
+  }, [allMaps?.length]);
 
   // Check if all required data is loaded
-  const isDataReady = characters && characters.length > 0 && demoMap;
+  const isDataReady = characters && characters.length > 0 && allMaps && allMaps.length > 0 && demoMap;
 
   useLayoutEffect(() => {
     if (game.current === null && isDataReady) {
-      // TODO: Pass current game's map data when Solana integration is complete
-      // For now in demo mode, only use demoMap
-
       // Pass characters data to Phaser
       setCharactersData(characters);
 
-      // Pass single demo map for demo mode
+      // Pass ALL maps data to Phaser (so Preloader can load them all)
+      setAllMapsData(allMaps);
+
+      // Pass selected demo map
       setDemoMapData(demoMap);
 
       game.current = StartGame("game-container");
@@ -56,7 +58,7 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
         }
       }
     };
-  }, [ref, isDataReady, characters, demoMap]);
+  }, [ref, isDataReady, characters, allMaps, demoMap]);
 
   useEffect(() => {
     EventBus.on("current-scene-ready", (scene_instance: Phaser.Scene) => {

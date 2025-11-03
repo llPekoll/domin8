@@ -1,7 +1,5 @@
 import { query } from "./_generated/server";
-import { v } from "convex/values";
 
-// Get all active characters
 export const getActiveCharacters = query({
   args: {},
   handler: async (ctx) => {

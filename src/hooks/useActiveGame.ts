@@ -10,6 +10,7 @@ import { useMemo, useState, useEffect } from "react";
 import { PublicKey, Connection } from "@solana/web3.js";
 import { Program, BN } from "@coral-xyz/anchor";
 import { usePrivyWallet } from "./usePrivyWallet";
+import { useAssets } from "../contexts/AssetsContext";
 import idl from "../../target/idl/domin8_prgm.json";
 import { logger } from "../lib/logger";
 
@@ -50,7 +51,7 @@ export interface ActiveGameState {
 }
 
 // Transform raw game data to include backward-compatible computed properties
-function transformGameData(raw: any): ActiveGameState {
+function transformGameData(raw: any, mapData?: any): ActiveGameState {
   const bets: BetInfo[] = raw.bets || [];
 
   return {
@@ -64,11 +65,14 @@ function transformGameData(raw: any): ActiveGameState {
     betAmounts: bets.map((b: BetInfo) => b.amount),
     betSkin: bets.map((b: BetInfo) => b.skin),
     betPosition: bets.map((b: BetInfo) => b.position),
+    // Override map with full map object if available
+    map: mapData || raw.map,
   };
 }
 
 export function useActiveGame() {
   const { walletAddress, wallet } = usePrivyWallet();
+  const { getMapById } = useAssets();
 
   // Create connection using the same RPC URL
   const connection = useMemo(() => {
@@ -76,6 +80,24 @@ export function useActiveGame() {
     return new Connection(rpcUrl, "confirmed");
   }, []);
   const [activeGame, setActiveGame] = useState<ActiveGameState | null>(null);
+  const [rawGameData, setRawGameData] = useState<any>(null);
+
+  // Client-side map lookup (from shared context, no backend query)
+  const mapData = useMemo(() => {
+    if (rawGameData?.map === undefined) return null;
+    return getMapById(rawGameData.map);
+  }, [rawGameData?.map, getMapById]);
+
+  // Debug log when map lookup changes
+  useEffect(() => {
+    logger.solana.debug("[DOMIN8] 🗺️ Map lookup result changed:", {
+      skipped: rawGameData?.map === undefined,
+      requestedMapId: rawGameData?.map,
+      mapDataReceived: !!mapData,
+      mapData,
+    });
+  }, [mapData, rawGameData?.map]);
+
   const [isLoading, setIsLoading] = useState(false);
 
   // Create Anchor program instance with Privy wallet
@@ -130,6 +152,37 @@ export function useActiveGame() {
     return pda;
   }, [program]);
 
+  // Enrich raw game data with map data from Convex when available
+  useEffect(() => {
+    logger.solana.debug("[DOMIN8] 🔄 Map enrichment effect triggered", {
+      hasRawGameData: !!rawGameData,
+      rawMapValue: rawGameData?.map,
+      mapDataLoading: mapData === undefined,
+      hasMapData: !!mapData,
+      mapData,
+    });
+
+    if (!rawGameData) {
+      logger.solana.debug("[DOMIN8] No raw game data, clearing active game");
+      setActiveGame(null);
+      return;
+    }
+
+    // Transform game data with enriched map (or just the raw map number if map data not loaded yet)
+    const enrichedGame = transformGameData(rawGameData, mapData);
+
+    logger.solana.debug("[DOMIN8] 🎨 Game data enriched with map:", {
+      rawMapNumber: rawGameData.map,
+      hasMapData: !!mapData,
+      mapBackground: mapData?.background,
+      enrichedMapType: typeof enrichedGame.map,
+      enrichedMapValue: enrichedGame.map,
+      fullEnrichedGame: enrichedGame,
+    });
+
+    setActiveGame(enrichedGame);
+  }, [rawGameData, mapData]);
+
   // Fetch and subscribe to active_game
   useEffect(() => {
     if (!program || !activeGamePDA || !connection) {
@@ -138,6 +191,7 @@ export function useActiveGame() {
         hasActiveGamePDA: !!activeGamePDA,
         hasConnection: !!connection,
       });
+      setRawGameData(null);
       setActiveGame(null);
       return;
     }
@@ -177,6 +231,7 @@ export function useActiveGame() {
             logger.solana.debug("[DOMIN8]    1. The smart contract has not been initialized");
             logger.solana.debug("[DOMIN8]    2. You are on the wrong network");
             if (isMounted) {
+              setRawGameData(null);
               setActiveGame(null);
             }
             return;
@@ -188,6 +243,7 @@ export function useActiveGame() {
             logger.solana.warn("[DOMIN8]    Expected owner:", program.programId.toBase58());
             logger.solana.warn("[DOMIN8]    Actual owner:", accountInfo.owner.toBase58());
             if (isMounted) {
+              setRawGameData(null);
               setActiveGame(null);
             }
             return;
@@ -195,14 +251,12 @@ export function useActiveGame() {
 
           // Try to fetch the game data
           logger.solana.debug("[DOMIN8] 🔄 Attempting to fetch game data...");
-          const rawGameData = await (program.account as any).domin8Game.fetch(activeGamePDA);
-          logger.solana.debug("[DOMIN8] ✅ Active game data fetched:", rawGameData);
-
-          // Transform data for backward compatibility
-          const gameData = transformGameData(rawGameData);
+          const fetchedGameData = await (program.account as any).domin8Game.fetch(activeGamePDA);
+          logger.solana.debug("[DOMIN8] ✅ Active game data fetched:", fetchedGameData);
 
           if (isMounted) {
-            setActiveGame(gameData);
+            // Store raw game data to trigger map query
+            setRawGameData(fetchedGameData);
           }
         } catch (fetchError) {
           logger.solana.error("[DOMIN8] ❌ Failed to fetch active game data:", fetchError);
@@ -211,6 +265,7 @@ export function useActiveGame() {
           logger.solana.debug("[DOMIN8]    2. The account type is wrong");
           logger.solana.debug("[DOMIN8]    3. The IDL is incorrect");
           if (isMounted) {
+            setRawGameData(null);
             setActiveGame(null);
           }
         }
@@ -225,19 +280,21 @@ export function useActiveGame() {
 
               try {
                 if (accountInfo.data.length > 0) {
-                  const rawGameData = (program.coder.accounts as any).decode(
+                  const decodedGameData = (program.coder.accounts as any).decode(
                     "domin8Game",
                     accountInfo.data
                   );
-                  const gameData = transformGameData(rawGameData);
-                  setActiveGame(gameData);
-                  logger.solana.debug("[DOMIN8] 🔄 Active game updated:", gameData);
+                  // Store raw game data to trigger map query
+                  setRawGameData(decodedGameData);
+                  logger.solana.debug("[DOMIN8] 🔄 Active game updated:", decodedGameData);
                 } else {
+                  setRawGameData(null);
                   setActiveGame(null);
                   logger.solana.warn("[DOMIN8] ⚠️ Active game account is empty");
                 }
               } catch (decodeError) {
                 logger.solana.error("[DOMIN8] ❌ Failed to decode game data:", decodeError);
+                setRawGameData(null);
                 setActiveGame(null);
               }
             },
@@ -248,6 +305,7 @@ export function useActiveGame() {
       } catch (error) {
         logger.solana.error("[DOMIN8] ❌ Failed to fetch/subscribe to active game:", error);
         if (isMounted) {
+          setRawGameData(null);
           setActiveGame(null);
         }
       } finally {

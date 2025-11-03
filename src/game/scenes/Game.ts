@@ -61,42 +61,8 @@ export class Game extends Scene {
       SoundManager.playInsertCoin(this);
     });
 
-    // Listen for player bet placement to spawn character immediately
-    EventBus.on("player-bet-placed", (data: {
-      characterId: number;
-      characterName: string;
-      position: [number, number];
-      betAmount: number;
-      roundId: number;
-      betIndex: number;
-      walletAddress: string;
-    }) => {
-      logger.game.debug("[Game] 🎯 RECEIVED player-bet-placed EVENT");
-      logger.game.debug("[Game] Event data:", data);
-
-      // Derive character key from character name (e.g., "Warrior" -> "warrior")
-      const characterKey = data.characterName?.toLowerCase().replace(/\s+/g, "-") || "warrior";
-
-      // Transform the data into the format expected by PlayerManager
-      const participant = {
-        _id: `${data.walletAddress}_${data.betIndex}`, // Unique ID combining wallet + bet index
-        playerId: data.walletAddress,
-        displayName: data.characterName || "Player",
-        betAmount: data.betAmount,
-        character: {
-          key: characterKey, // Derived sprite key
-          name: data.characterName,
-          id: data.characterId, // Store blockchain numeric ID for reference
-        },
-        spawnIndex: data.betIndex, // Use bet index as spawn index
-        isBot: false, // This is a real player
-        eliminated: false,
-        colorHue: undefined, // Will be assigned by backend if needed
-      };
-
-      // Spawn the character immediately in the scene
-      this.spawnParticipantImmediately(participant);
-    });
+    // Characters now spawn automatically via blockchain subscription (useActiveGame)
+    // No need for separate event listener - updateGameState handles all spawning
 
     // Play intro sound when real game starts
     this.playIntroSound();
@@ -136,20 +102,50 @@ export class Game extends Scene {
 
   // Update game state from blockchain
   updateGameState(gameState: any) {
+    logger.game.debug("[Game] 🎮 updateGameState called", {
+      hasGameState: !!gameState,
+      hasMap: !!gameState?.map,
+      mapType: typeof gameState?.map,
+      mapValue: gameState?.map,
+      mapBackground: gameState?.map?.background,
+      fullGameState: gameState,
+    });
+
     this.gameState = gameState;
 
-    if (!gameState) return;
+    if (!gameState) {
+      logger.game.warn("[Game] No game state provided to updateGameState");
+      return;
+    }
 
     // Update map background based on game data
-    if (gameState.map && gameState.map.background) {
-      this.backgroundManager.setTexture(gameState.map.background);
+    if (gameState.map) {
+      logger.game.debug("[Game] 🗺️ Processing map data", {
+        isObject: typeof gameState.map === 'object',
+        isNumber: typeof gameState.map === 'number',
+        hasBackground: !!gameState.map.background,
+        map: gameState.map,
+      });
 
-      // Update center position if map specifies it
-      if (gameState.map.centerX && gameState.map.centerY) {
-        this.centerX = gameState.map.centerX;
-        this.centerY = gameState.map.centerY;
-        this.backgroundManager.updateCenter(this.centerX, this.centerY);
+      if (gameState.map.background) {
+        logger.game.debug("[Game] Setting background texture:", gameState.map.background);
+        this.backgroundManager.setTexture(gameState.map.background);
+
+        // Update center position if map specifies it
+        if (gameState.map.centerX && gameState.map.centerY) {
+          logger.game.debug("[Game] Updating center position", {
+            centerX: gameState.map.centerX,
+            centerY: gameState.map.centerY,
+          });
+          this.centerX = gameState.map.centerX;
+          this.centerY = gameState.map.centerY;
+          this.backgroundManager.updateCenter(this.centerX, this.centerY);
+        }
+      } else {
+        logger.game.error("[Game] ❌ Map object exists but has no background property!", gameState.map);
       }
+    } else {
+      logger.game.error("[Game] ❌ No map data in game state!");
     }
 
     // Spawn characters from blockchain bet data
@@ -220,11 +216,6 @@ export class Game extends Scene {
     return skinMap[skinId] || "Warrior";
   }
 
-  // Public method for real-time participant spawning
-  public spawnParticipantImmediately(participant: any) {
-    this.playerManager.spawnParticipantImmediately(participant);
-  }
-
   // Add update method to continuously update the timer
   update() {
     this.uiManager.updateTimer();
@@ -237,15 +228,17 @@ export class Game extends Scene {
     const fx = this.cameras.main.postFX.addWipe();
     logger.game.debug("[Game] Wipe effect created:", fx);
 
+    // Listen for transition complete event
+    this.events.once('transitionout', () => {
+      logger.game.debug("[Game] ✅ Transition to DemoScene complete");
+    });
+
     this.scene.transition({
       target: "DemoScene",
       duration: 1000,
       moveBelow: true,
       onUpdate: (progress: number) => {
         fx.progress = progress;
-      },
-      onComplete: () => {
-        logger.game.debug("[Game] ✅ Transition to DemoScene complete");
       }
     });
   }
@@ -253,7 +246,6 @@ export class Game extends Scene {
   shutdown() {
     // Clean up event listeners to prevent memory leaks
     EventBus.off("play-insert-coin-sound");
-    EventBus.off("player-bet-placed");
   }
 
   changeScene() {

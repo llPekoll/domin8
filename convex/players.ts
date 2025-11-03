@@ -36,7 +36,7 @@ export const getPlayerWithCharacter = query({
       .withIndex("by_active", (q) => q.eq("isActive", true))
       .collect();
 
-    const character = characters.length > 0 
+    const character = characters.length > 0
       ? characters[Math.floor(Math.random() * characters.length)]
       : null;
 

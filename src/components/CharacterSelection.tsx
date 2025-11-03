@@ -14,11 +14,7 @@ import styles from "./ButtonShine.module.css";
 import { Buffer } from "buffer";
 import { EventBus } from "../game/EventBus";
 import { logger } from "../lib/logger";
-
-// Make Buffer available globally for Privy
-if (typeof window !== "undefined") {
-  window.Buffer = Buffer;
-}
+import { useAssets } from "../contexts/AssetsContext";
 
 interface Character {
   _id: Id<"characters">;
@@ -26,6 +22,11 @@ interface Character {
   name: string;
   description?: string;
   nftCollection?: string;
+}
+
+// Make Buffer available globally for Privy
+if (typeof window !== "undefined") {
+  window.Buffer = Buffer;
 }
 
 interface CharacterSelectionProps {
@@ -59,11 +60,8 @@ const CharacterSelection = memo(function CharacterSelection({
   // Get player data - only fetch once
   const playerData = useQuery(api.players.getPlayer, walletAddress ? { walletAddress } : "skip");
 
-  // Get all available characters - only fetch once
-  const allCharacters = useQuery(api.characters.getActiveCharacters);
-
-  // Get all available maps - for selecting random map on game creation
-  const allMaps = useQuery(api.maps.getAllActiveMaps);
+  // Get all available characters and maps from assets context (shared across app)
+  const { characters: allCharacters, maps: allMaps } = useAssets();
 
   // Get current game state directly from blockchain (real-time, no polling lag)
   const { activeGame } = useActiveGame();
@@ -351,7 +349,8 @@ const CharacterSelection = memo(function CharacterSelection({
         duration: 5000,
       });
 
-      // Emit event to Phaser to spawn the player's character
+      // Emit event for DemoScene to handle spawning (demo is client-side only)
+      // Real game (Game.ts) will spawn characters from blockchain subscription
       const eventData = {
         characterId: characterToUse.id, // Use blockchain numeric ID
         characterName: characterToUse.name,
@@ -365,9 +364,6 @@ const CharacterSelection = memo(function CharacterSelection({
       logger.ui.debug("[CharacterSelection] 🎮 EMITTING player-bet-placed EVENT:", eventData);
       EventBus.emit("player-bet-placed", eventData);
       logger.ui.debug("[CharacterSelection] ✅ Event emitted successfully");
-
-      // Character skin and position are now stored directly on-chain
-      // No need for Convex character assignment - blockchain is source of truth
 
       setBetAmount("0.1");
 
