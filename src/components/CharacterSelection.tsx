@@ -127,11 +127,18 @@ const CharacterSelection = memo(function CharacterSelection({
     return currentCharacter; // Fallback to default character
   }, [selectedNFTCharacters, currentCharacter]);
 
-  // Initialize with random character when characters load
+  // Initialize with random character when characters load (regular characters only, not NFT exclusive)
   useEffect(() => {
     if (allCharacters && allCharacters.length > 0 && !currentCharacter) {
-      const randomChar = allCharacters[Math.floor(Math.random() * allCharacters.length)];
-      setCurrentCharacter(randomChar);
+      // Filter to only regular characters (no NFT collection requirement)
+      const regularCharacters = allCharacters.filter(char => 
+        !char.nftCollection || char.nftCollection === null || char.nftCollection === undefined
+      );
+      
+      if (regularCharacters.length > 0) {
+        const randomChar = regularCharacters[Math.floor(Math.random() * regularCharacters.length)];
+        setCurrentCharacter(randomChar);
+      }
     }
   }, [allCharacters, currentCharacter]);
 

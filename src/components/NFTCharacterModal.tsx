@@ -82,7 +82,7 @@ export function NFTCharacterModal({
             Your Exclusive Characters
           </DialogTitle>
           <DialogDescription className="text-amber-300">
-            Select multiple NFT characters for your bet pool. They'll be randomly used for each bet you place.
+            Select one or multiple NFT characters for your bet pool. They'll be randomly used for each bet you place.
           </DialogDescription>
         </DialogHeader>
         

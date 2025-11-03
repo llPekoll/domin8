@@ -38,10 +38,12 @@ export const verifyNFTOwnershipInternal = internalAction({
 async function verifyOwnership(
   args: { walletAddress: string; collectionAddress: string }
 ): Promise<boolean> {
-  const rpcUrl = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
+  const rpcUrl = "https://api.mainnet-beta.solana.com";
   
   try {
     // Get all token accounts owned by the wallet
+    // SPL Token Program ID on Solana: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+    // That give us all SPL tokens (including NFTs, supply of 1) owned by the wallet
     const response = await fetch(rpcUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
