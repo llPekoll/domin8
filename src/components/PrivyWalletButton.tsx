@@ -20,12 +20,14 @@ interface PrivyWalletButtonProps {
   compact?: boolean;
   showDisconnect?: boolean;
   onWalletConnected?: (address: string) => void;
+  onShowProfile?: () => void;
 }
 
 export function PrivyWalletButton({
   className = "",
   compact = false,
   onWalletConnected,
+  onShowProfile,
 }: PrivyWalletButtonProps) {
   const { ready, authenticated, login, logout, user } = usePrivy();
   const { wallets } = useWallets();
@@ -136,7 +138,9 @@ export function PrivyWalletButton({
 
   const handleProfile = () => {
     setDropdownOpen(false);
-    toast.info("Profile page coming soon");
+    if (onShowProfile) {
+      onShowProfile();
+    }
   };
 
   const handleDisconnect = async () => {

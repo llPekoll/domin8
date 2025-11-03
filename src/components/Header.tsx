@@ -185,7 +185,11 @@ export function Header() {
               )}
 
               {/* Privy Wallet Button */}
-              <PrivyWalletButton compact={false} showDisconnect={true} />
+              <PrivyWalletButton 
+                compact={false} 
+                showDisconnect={true} 
+                onShowProfile={() => setShowProfileDialog(true)} 
+              />
             </div>
           </div>
         </div>
