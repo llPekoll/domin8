@@ -1,7 +1,6 @@
 import { query } from "./_generated/server";
-import { v } from "convex/values";
 
-// Get all active maps (for demo mode preloading)
+// Get all active maps (for demo mode preloading and blockchain map enrichment)
 export const getAllActiveMaps = query({
   args: {},
   handler: async (ctx) => {
@@ -14,15 +13,5 @@ export const getAllActiveMaps = query({
   },
 });
 
-// Get map by numeric ID (for blockchain integration)
-export const getMapByNumericId = query({
-  args: { mapId: v.number() },
-  handler: async (ctx, args) => {
-    const map = await ctx.db
-      .query("maps")
-      .filter((q) => q.eq(q.field("id"), args.mapId))
-      .first();
-
-    return map || null;
-  },
-});
+// Note: Map lookup by numeric ID now handled client-side via MapContext.getMapById()
+// This eliminates dynamic backend queries for map enrichment

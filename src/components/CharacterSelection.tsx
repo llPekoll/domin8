@@ -12,17 +12,18 @@ import styles from "./ButtonShine.module.css";
 import { Buffer } from "buffer";
 import { EventBus } from "../game/EventBus";
 import { logger } from "../lib/logger";
-
-// Make Buffer available globally for Privy
-if (typeof window !== "undefined") {
-  window.Buffer = Buffer;
-}
+import { useAssets } from "../contexts/AssetsContext";
 
 interface Character {
   _id: Id<"characters">;
   id?: number; // Blockchain ID
   name: string;
   description?: string;
+}
+
+// Make Buffer available globally for Privy
+if (typeof window !== "undefined") {
+  window.Buffer = Buffer;
 }
 
 interface CharacterSelectionProps {
@@ -48,11 +49,8 @@ const CharacterSelection = memo(function CharacterSelection({
   // Get player data - only fetch once
   const playerData = useQuery(api.players.getPlayer, walletAddress ? { walletAddress } : "skip");
 
-  // Get all available characters - only fetch once
-  const allCharacters = useQuery(api.characters.getActiveCharacters);
-
-  // Get all available maps - for selecting random map on game creation
-  const allMaps = useQuery(api.maps.getAllActiveMaps);
+  // Get all available characters and maps from assets context (shared across app)
+  const { characters: allCharacters, maps: allMaps } = useAssets();
 
   // Get current game state directly from blockchain (real-time, no polling lag)
   const { activeGame } = useActiveGame();

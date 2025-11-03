@@ -1,6 +1,4 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
 import {
   DemoParticipant,
   generateDemoParticipant,
@@ -12,6 +10,7 @@ import { IRefPhaserGame } from "../PhaserGame";
 import { DEMO_TIMINGS } from "../config/demoTimings";
 import { generateRandomEllipsePositions } from "../config/spawnConfig";
 import { logger } from "../lib/logger";
+import { useAssets } from "../contexts/AssetsContext";
 
 export type DemoPhase = "spawning" | "arena" | "results";
 
@@ -43,10 +42,9 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
   const spawnTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
   const spawnCountRef = useRef(0);
 
-  // Get the preloaded demo map and characters from Phaser
+  // Get the preloaded demo map and characters from Phaser (from assets context)
   // These are already loaded in Preloader, so we just fetch them for reference
-  const allMapsQuery = useQuery(api.maps.getAllActiveMaps);
-  const charactersQuery = useQuery(api.characters.getActiveCharacters);
+  const { maps: allMapsQuery, characters: charactersQuery } = useAssets();
 
   // Memoize to prevent reference changes from triggering re-spawns
   const characters = useMemo(() => charactersQuery ?? undefined, [charactersQuery?.length]);

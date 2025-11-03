@@ -104,14 +104,13 @@ export default function App() {
         hasMap: !!currentRoundState.map,
         mapType: typeof currentRoundState.map,
         mapValue: currentRoundState.map,
-        mapBackground: currentRoundState.map?.background,
         fullData: currentRoundState,
       });
 
       logger.ui.debug("[App] 🗺️ Map enrichment status:", {
         rawMapValue: currentRoundState.map,
-        isMapObject: typeof currentRoundState.map === 'object',
-        isMapNumber: typeof currentRoundState.map === 'number',
+        isMapObject: typeof currentRoundState.map === "object",
+        isMapNumber: typeof currentRoundState.map === "number",
         hasBackground: !!(currentRoundState.map as any)?.background,
         mapDetails: currentRoundState.map,
       });

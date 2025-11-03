@@ -8,7 +8,9 @@ import { Preloader } from './scenes/Preloader';
 export let currentMapData: any = null;
 // Global storage for characters data
 export let charactersData: any[] = [];
-// Global storage for demo mode map (single random map)
+// Global storage for all active maps (loaded in Preloader)
+export let allMapsData: any[] = [];
+// Global storage for demo mode map (selected from allMapsData)
 export let demoMapData: any = null;
 
 export const setCurrentMapData = (map: any) => {
@@ -17,6 +19,10 @@ export const setCurrentMapData = (map: any) => {
 
 export const setCharactersData = (characters: any[]) => {
   charactersData = characters;
+};
+
+export const setAllMapsData = (maps: any[]) => {
+  allMapsData = maps;
 };
 
 export const setDemoMapData = (map: any) => {

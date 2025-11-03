@@ -25,9 +25,12 @@ export class BackgroundManager {
     this.centerX = centerX;
     this.centerY = centerY;
 
-    if (this.background) {
+    if (this.background && this.background.scene) {
       this.background.setPosition(this.centerX, this.centerY);
       this.scaleToFit();
+    } else if (this.background) {
+      logger.game.warn("[BackgroundManager] updateCenter: Background exists but scene is null, clearing");
+      this.background = null;
     }
   }
 
@@ -79,7 +82,17 @@ export class BackgroundManager {
    * Scale background to cover entire screen
    */
   private scaleToFit() {
-    if (!this.background) return;
+    if (!this.background) {
+      logger.game.debug("[BackgroundManager] scaleToFit: No background to scale");
+      return;
+    }
+
+    // Check if background still exists and hasn't been destroyed
+    if (!this.background.scene || this.background.width === undefined) {
+      logger.game.warn("[BackgroundManager] scaleToFit: Background destroyed or invalid");
+      this.background = null;
+      return;
+    }
 
     const scaleX = this.scene.cameras.main.width / this.background.width;
     const scaleY = this.scene.cameras.main.height / this.background.height;

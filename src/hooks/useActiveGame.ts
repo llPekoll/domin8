@@ -9,9 +9,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { PublicKey, Connection } from "@solana/web3.js";
 import { Program, BN } from "@coral-xyz/anchor";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
 import { usePrivyWallet } from "./usePrivyWallet";
+import { useAssets } from "../contexts/AssetsContext";
 import idl from "../../target/idl/domin8_prgm.json";
 import { logger } from "../lib/logger";
 
@@ -73,6 +72,7 @@ function transformGameData(raw: any, mapData?: any): ActiveGameState {
 
 export function useActiveGame() {
   const { walletAddress, wallet } = usePrivyWallet();
+  const { getMapById } = useAssets();
 
   // Create connection using the same RPC URL
   const connection = useMemo(() => {
@@ -82,16 +82,16 @@ export function useActiveGame() {
   const [activeGame, setActiveGame] = useState<ActiveGameState | null>(null);
   const [rawGameData, setRawGameData] = useState<any>(null);
 
-  // Query map data from Convex based on the map number from blockchain
-  const mapData = useQuery(
-    api.maps.getMapByNumericId,
-    rawGameData?.map !== undefined ? { mapId: rawGameData.map } : "skip"
-  );
+  // Client-side map lookup (from shared context, no backend query)
+  const mapData = useMemo(() => {
+    if (rawGameData?.map === undefined) return null;
+    return getMapById(rawGameData.map);
+  }, [rawGameData?.map, getMapById]);
 
-  // Debug log when map query changes
+  // Debug log when map lookup changes
   useEffect(() => {
-    logger.solana.debug("[DOMIN8] 🗺️ Map query result changed:", {
-      querySkipped: rawGameData?.map === undefined,
+    logger.solana.debug("[DOMIN8] 🗺️ Map lookup result changed:", {
+      skipped: rawGameData?.map === undefined,
       requestedMapId: rawGameData?.map,
       mapDataReceived: !!mapData,
       mapData,

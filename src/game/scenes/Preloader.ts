@@ -1,5 +1,5 @@
 import { Scene } from "phaser";
-import { currentMapData, charactersData, demoMapData } from "../main";
+import { currentMapData, charactersData, allMapsData, demoMapData } from "../main";
 import { logger } from "../../lib/logger";
 
 export class Preloader extends Scene {
@@ -38,13 +38,14 @@ export class Preloader extends Scene {
       logger.game.error("[Preloader] No characters data available! This should not happen.");
       return;
     }
-    if (!demoMapData) {
-      logger.game.error("[Preloader] No demo map data available!");
+    if (!allMapsData || allMapsData.length === 0) {
+      logger.game.error("[Preloader] No maps data available!");
       return;
     }
 
     logger.game.debug("[Preloader] Data check passed:", {
       charactersCount: charactersData.length,
+      mapsCount: allMapsData.length,
       demoMap: demoMapData?.name,
       currentMap: currentMapData?.name || "none",
     });
@@ -57,15 +58,12 @@ export class Preloader extends Scene {
       this.load.atlas(key, character.assetPath, jsonPath);
     });
 
-    // Load demo map (single random map for demo mode)
-    logger.game.debug("[Preloader] Loading demo map:", demoMapData.background, demoMapData.assetPath);
-    this.load.image(demoMapData.background, demoMapData.assetPath);
-
-    // Load current game map if available (for real games)
-    if (currentMapData && currentMapData.background && currentMapData.assetPath) {
-      logger.game.debug("[Preloader] Loading current game map:", currentMapData.background);
-      this.load.image(currentMapData.background, currentMapData.assetPath);
-    }
+    // Load ALL active maps (so any map can be used for real games)
+    logger.game.debug("[Preloader] Loading all maps:", allMapsData.length);
+    allMapsData.forEach((map) => {
+      logger.game.debug("[Preloader] Loading map:", map.background, map.assetPath);
+      this.load.image(map.background, map.assetPath);
+    });
 
     // Load VFX assets
     this.load.atlas("explosion", "vfx/Explosion.png", "vfx/Explosion.json");
