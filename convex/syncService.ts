@@ -62,15 +62,29 @@ async function syncActiveGame(ctx: any, activeGame: any) {
     }
 
     console.log(
-      `[Sync Service] Found active game: round ${activeGame.roundId}, status: ${activeGame.status}`
+      `[Sync Service] Found active game: round ${activeGame.gameRound}, status: ${activeGame.status}`
     );
 
     // Upsert game state to database
     await ctx.runMutation(internal.syncServiceMutations.upsertGameState, {
-      gameRound: activeGame,
+      gameRound: {
+        roundId: activeGame.gameRound,
+        status: activeGame.status,
+        startTimestamp: activeGame.startDate,
+        endTimestamp: activeGame.endDate,
+        map: activeGame.map,
+        betCount: activeGame.bets?.length,
+        betAmounts: activeGame.bets?.map((b: any) => b.amount),
+        betSkin: activeGame.bets?.map((b: any) => b.skin),
+        betPosition: activeGame.bets?.map((b: any) => b.position),
+        totalPot: activeGame.totalDeposit,
+        winner: activeGame.winner,
+        winningBetIndex: activeGame.winningBetIndex ?? undefined,
+        prizeSent: activeGame.prizeSent,
+      },
     });
 
-    console.log(`[Sync Service] Synced game round ${activeGame.roundId} to database`);
+    console.log(`[Sync Service] Synced game round ${activeGame.gameRound} to database`);
   } catch (error) {
     console.error("[Sync Service] Error syncing active game:", error);
   }
@@ -88,39 +102,39 @@ async function processEndedGames(ctx: any, activeGame: any) {
     }
 
     console.log(
-      `[Sync Service] Found active game: round ${activeGame.roundId}, status: ${activeGame.status}`
+      `[Sync Service] Found active game: round ${activeGame.gameRound}, status: ${activeGame.status}`
     );
 
     // Check if game is still open (status: 0)
     if (activeGame.status !== 0) {
       console.log(
-        `[Sync Service] Game ${activeGame.roundId} already closed (status: ${activeGame.status})`
+        `[Sync Service] Game ${activeGame.gameRound} already closed (status: ${activeGame.status})`
       );
       return;
     }
 
     // Check if game has ended (current time >= endDate)
     const now = Math.floor(Date.now() / 1000);
-    const endTimestamp = activeGame.endTimestamp || activeGame.endDate;
+    const endTimestamp = activeGame.endDate;
 
     if (now < endTimestamp) {
       const remaining = endTimestamp - now;
       console.log(
-        `[Sync Service] Game ${activeGame.roundId} still active (${remaining}s remaining)`
+        `[Sync Service] Game ${activeGame.gameRound} still active (${remaining}s remaining)`
       );
       return;
     }
 
-    console.log(`[Sync Service] Game ${activeGame.roundId} has ended, scheduling endGame action`);
+    console.log(`[Sync Service] Game ${activeGame.gameRound} has ended, scheduling endGame action`);
 
     // Check if endGame action already scheduled
     const alreadyScheduled = await ctx.runQuery(internal.gameSchedulerMutations.isActionScheduled, {
-      roundId: activeGame.roundId,
+      roundId: activeGame.gameRound,
       action: "end_game",
     });
 
     if (alreadyScheduled) {
-      console.log(`[Sync Service] endGame already scheduled for round ${activeGame.roundId}`);
+      console.log(`[Sync Service] endGame already scheduled for round ${activeGame.gameRound}`);
       return;
     }
 
@@ -128,18 +142,18 @@ async function processEndedGames(ctx: any, activeGame: any) {
     const jobId = await ctx.scheduler.runAfter(
       0, // Execute immediately
       internal.gameScheduler.executeEndGame,
-      { roundId: activeGame.roundId }
+      { roundId: activeGame.gameRound }
     );
 
     // Upsert job to database for tracking (avoid duplicates)
     await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
       jobId: jobId.toString(),
-      roundId: activeGame.roundId,
+      roundId: activeGame.gameRound,
       action: "end_game",
       scheduledTime: now,
     });
 
-    console.log(`[Sync Service] Scheduled endGame for round ${activeGame.roundId} (jobId: ${jobId})`);
+    console.log(`[Sync Service] Scheduled endGame for round ${activeGame.gameRound} (jobId: ${jobId})`);
   } catch (error) {
     console.error("[Sync Service] Error processing ended games:", error);
   }

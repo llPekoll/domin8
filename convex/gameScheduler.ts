@@ -291,10 +291,23 @@ export const executeSendPrize = internalAction({
         await new Promise((resolve) => setTimeout(resolve, 1000));
         const updatedGame = await solanaClient.getGameRound(roundId);
 
-        if (updatedGame?.winnerPrize === 0 && updatedGame.roundId !== undefined) {
-          updatedGame.prizeSent = true;
+        if (updatedGame?.winnerPrize === 0) {
           await ctx.runMutation(internal.syncServiceMutations.upsertGameState, {
-            gameRound: updatedGame as Required<typeof updatedGame>,
+            gameRound: {
+              roundId: updatedGame.gameRound,
+              status: updatedGame.status,
+              startTimestamp: updatedGame.startDate,
+              endTimestamp: updatedGame.endDate,
+              map: updatedGame.map,
+              betCount: updatedGame.bets.length,
+              betAmounts: updatedGame.bets.map((b) => b.amount),
+              betSkin: updatedGame.bets.map((b) => b.skin),
+              betPosition: updatedGame.bets.map((b) => b.position),
+              totalPot: updatedGame.totalDeposit,
+              winner: updatedGame.winner,
+              winningBetIndex: updatedGame.winningBetIndex ?? undefined,
+              prizeSent: true,
+            },
           });
           console.log(`Round ${roundId}: ✅ Verified: Prize successfully distributed`);
           console.log(`Round ${roundId}: 🎉 GAME COMPLETE - Ready for next round`);

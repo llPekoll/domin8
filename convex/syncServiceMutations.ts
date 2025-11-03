@@ -11,27 +11,26 @@ import { v } from "convex/values";
 export const upsertGameState = internalMutation({
   args: {
     gameRound: v.object({
+      // Round identification
       roundId: v.number(),
+      status: v.number(), // Blockchain status (0 = waiting, 1 = finished)
+
+      // Timestamps
       startTimestamp: v.number(),
       endTimestamp: v.number(),
-      totalDeposit: v.number(),
-      rand: v.string(),
-      map: v.number(),
-      userCount: v.number(),
-      force: v.array(v.number()),
-      status: v.number(),
-      winner: v.union(v.string(), v.null()),
-      winnerPrize: v.number(),
-      winningBetIndex: v.union(v.number(), v.null()),
-      wallets: v.array(v.string()),
-      bets: v.array(
-        v.object({
-          walletIndex: v.number(),
-          amount: v.number(),
-          skin: v.number(),
-          position: v.array(v.number()),
-        })
-      ),
+
+      // Game configuration
+      map: v.optional(v.number()), // Map ID from blockchain
+
+      // Game state
+      betCount: v.optional(v.number()),
+      betAmounts: v.optional(v.array(v.number())),
+      betSkin: v.optional(v.array(v.number())),
+      betPosition: v.optional(v.array(v.array(v.number()))),
+      totalPot: v.optional(v.number()),
+      winner: v.optional(v.union(v.string(), v.null())),
+      winningBetIndex: v.optional(v.number()),
+
       prizeSent: v.optional(v.boolean()),
     }),
   },
@@ -71,15 +70,15 @@ export const upsertGameState = internalMutation({
         await db.insert("gameRoundStates", {
           roundId,
           status: "waiting",
-          startTimestamp: gameRound.startTimestamp ,
+          startTimestamp: gameRound.startTimestamp,
           endTimestamp: gameRound.endTimestamp,
           capturedAt: gameRound.startTimestamp,
           mapId,
-          betCount: gameRound.bets.length,
-          betAmounts: gameRound.bets.map((b) => b.amount),
-          betSkin: gameRound.bets.map((b) => b.skin),
-          betPosition: gameRound.bets.map((b) => b.position),
-          totalPot: gameRound.totalDeposit,
+          betCount: gameRound.betCount,
+          betAmounts: gameRound.betAmounts,
+          betSkin: gameRound.betSkin,
+          betPosition: gameRound.betPosition,
+          totalPot: gameRound.totalPot,
           winner: null, // No winner during waiting phase
           winningBetIndex: 0,
           prizeSent: false, // No prize sent during waiting phase
@@ -102,11 +101,11 @@ export const upsertGameState = internalMutation({
       endTimestamp: gameRound.endTimestamp,
       capturedAt: Math.floor(Date.now() / 1000),
       mapId, // Map reference from blockchain map field
-      betCount: gameRound.bets.length,
-      betAmounts: gameRound.bets.map((b) => b.amount),
-      betSkin: gameRound.bets.map((b) => b.skin),
-      betPosition:  gameRound.bets.map((b) => b.position),
-      totalPot: gameRound.totalDeposit,
+      betCount: gameRound.betCount,
+      betAmounts: gameRound.betAmounts,
+      betSkin: gameRound.betSkin,
+      betPosition: gameRound.betPosition,
+      totalPot: gameRound.totalPot,
       winner: gameRound.winner,
       winningBetIndex: gameRound.winningBetIndex ?? 0,
       prizeSent: gameRound.prizeSent ?? false, // Use provided value or default to false
