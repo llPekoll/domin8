@@ -1,12 +1,12 @@
-import { EventBus } from '../EventBus';
-import { Scene } from 'phaser';
-import { PlayerManager } from '../managers/PlayerManager';
-import { AnimationManager } from '../managers/AnimationManager';
-import { GamePhaseManager } from '../managers/GamePhaseManager';
-import { UIManager } from '../managers/UIManager';
-import { BackgroundManager } from '../managers/BackgroundManager';
-import { SoundManager } from '../managers/SoundManager';
-import { logger } from '../../lib/logger';
+import { EventBus } from "../EventBus";
+import { Scene } from "phaser";
+import { PlayerManager } from "../managers/PlayerManager";
+import { AnimationManager } from "../managers/AnimationManager";
+import { GamePhaseManager } from "../managers/GamePhaseManager";
+import { UIManager } from "../managers/UIManager";
+import { BackgroundManager } from "../managers/BackgroundManager";
+import { SoundManager } from "../managers/SoundManager";
+import { logger } from "../../lib/logger";
 
 export class Game extends Scene {
   camera!: Phaser.Cameras.Scene2D.Camera;
@@ -24,7 +24,7 @@ export class Game extends Scene {
   private introPlayed: boolean = false;
 
   constructor() {
-    super('RoyalRumble');
+    super("Game");
   }
 
   create() {
@@ -42,8 +42,11 @@ export class Game extends Scene {
     this.uiManager = new UIManager(this, this.centerX);
     this.backgroundManager = new BackgroundManager(this, this.centerX, this.centerY);
 
+    // Connect UIManager to GamePhaseManager for VRF phase triggering
+    this.uiManager.setGamePhaseManager(this.gamePhaseManager);
+
     // Set default background (will be updated when gameState is received)
-    const defaultTexture = 'arena_classic';
+    const defaultTexture = "arena_classic";
     if (this.textures.exists(defaultTexture)) {
       this.backgroundManager.setTexture(defaultTexture);
     }
@@ -52,9 +55,9 @@ export class Game extends Scene {
     this.uiManager.create();
 
     // Handle resize events to keep background centered
-    this.scale.on('resize', () => this.handleResize(), this);
+    this.scale.on("resize", () => this.handleResize(), this);
 
-    EventBus.emit('current-scene-ready', this);
+    EventBus.emit("current-scene-ready", this);
 
     // Listen for insert coin event from React UI
     EventBus.on("play-insert-coin-sound", () => {
@@ -77,13 +80,13 @@ export class Game extends Scene {
         // Unlock audio on first interaction
         void SoundManager.unlockAudio(this).then(() => {
           // Play intro sound if it's loaded
-          if (this.cache.audio.exists('domin8-intro')) {
-            SoundManager.playSound(this, 'domin8-intro', 0.5);
+          if (this.cache.audio.exists("domin8-intro")) {
+            SoundManager.playSound(this, "domin8-intro", 0.5);
             this.introPlayed = true;
           }
         });
       } catch (e) {
-        logger.game.error('[Game] Failed to play intro sound:', e);
+        logger.game.error("[Game] Failed to play intro sound:", e);
       }
     }
   }
@@ -121,8 +124,8 @@ export class Game extends Scene {
     // Update map background based on game data
     if (gameState.map) {
       logger.game.debug("[Game] 🗺️ Processing map data", {
-        isObject: typeof gameState.map === 'object',
-        isNumber: typeof gameState.map === 'number',
+        isObject: typeof gameState.map === "object",
+        isNumber: typeof gameState.map === "number",
         hasBackground: !!gameState.map.background,
         map: gameState.map,
       });
@@ -142,7 +145,10 @@ export class Game extends Scene {
           this.backgroundManager.updateCenter(this.centerX, this.centerY);
         }
       } else {
-        logger.game.error("[Game] ❌ Map object exists but has no background property!", gameState.map);
+        logger.game.error(
+          "[Game] ❌ Map object exists but has no background property!",
+          gameState.map
+        );
       }
     } else {
       logger.game.error("[Game] ❌ No map data in game state!");
@@ -216,9 +222,14 @@ export class Game extends Scene {
     return skinMap[skinId] || "Warrior";
   }
 
-  // Add update method to continuously update the timer
+  // Add update method to continuously update the timer and check game phase
   update() {
     this.uiManager.updateTimer();
+
+    // Continuously check game phase to detect winner during VRF_PENDING
+    if (this.gameState) {
+      this.gamePhaseManager.handleGamePhase(this.gameState);
+    }
   }
 
   public transitionToDemo() {
@@ -229,7 +240,7 @@ export class Game extends Scene {
     logger.game.debug("[Game] Wipe effect created:", fx);
 
     // Listen for transition complete event
-    this.events.once('transitionout', () => {
+    this.events.once("transitionout", () => {
       logger.game.debug("[Game] ✅ Transition to DemoScene complete");
     });
 
@@ -239,7 +250,7 @@ export class Game extends Scene {
       moveBelow: true,
       onUpdate: (progress: number) => {
         fx.progress = progress;
-      }
+      },
     });
   }
 
@@ -249,6 +260,6 @@ export class Game extends Scene {
   }
 
   changeScene() {
-    this.scene.start('GameOver');
+    this.scene.start("GameOver");
   }
 }
