@@ -154,3 +154,78 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(251, 191, 36, 0.6);
 }
+
+/* Domin8 Toast Notifications - Metal Slug Style */
+.domin8-toast {
+  font-family: "metal-slug", "Press Start 2P", monospace, Arial, sans-serif !important;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Success Toast - Green/Golden theme */
+[data-sonner-toast][data-type="success"] {
+  background: linear-gradient(135deg, #1a4d1a 0%, #2c1810 100%) !important;
+  border: 3px solid #58ef50 !important;
+  color: #FFD700 !important;
+  box-shadow: 0 0 20px rgba(88, 239, 80, 0.4), inset 0 0 10px rgba(88, 239, 80, 0.1) !important;
+}
+
+[data-sonner-toast][data-type="success"] [data-icon] {
+  color: #58ef50 !important;
+}
+
+[data-sonner-toast][data-type="success"] [data-description] {
+  color: #FFFFFF !important;
+  font-size: 12px !important;
+  font-family: "metal-slug", monospace, Arial, sans-serif !important;
+}
+
+/* Error Toast - Red/Orange theme */
+[data-sonner-toast][data-type="error"] {
+  background: linear-gradient(135deg, #4d1a1a 0%, #2c1810 100%) !important;
+  border: 3px solid #FF6B6B !important;
+  color: #FFA500 !important;
+  box-shadow: 0 0 20px rgba(255, 107, 107, 0.4), inset 0 0 10px rgba(255, 107, 107, 0.1) !important;
+}
+
+[data-sonner-toast][data-type="error"] [data-icon] {
+  color: #FF6B6B !important;
+}
+
+[data-sonner-toast][data-type="error"] [data-description] {
+  color: #FFFFFF !important;
+  font-size: 12px !important;
+  font-family: "metal-slug", monospace, Arial, sans-serif !important;
+}
+
+/* Info Toast - Blue/Orange theme */
+[data-sonner-toast][data-type="info"] {
+  background: linear-gradient(135deg, #1a3d4d 0%, #2c1810 100%) !important;
+  border: 3px solid #5eb3ef !important;
+  color: #FFD700 !important;
+  box-shadow: 0 0 20px rgba(94, 179, 239, 0.4), inset 0 0 10px rgba(94, 179, 239, 0.1) !important;
+}
+
+/* Warning Toast - Orange theme */
+[data-sonner-toast][data-type="warning"] {
+  background: linear-gradient(135deg, #4d3d1a 0%, #2c1810 100%) !important;
+  border: 3px solid #FFA500 !important;
+  color: #FFD700 !important;
+  box-shadow: 0 0 20px rgba(255, 165, 0, 0.4), inset 0 0 10px rgba(255, 165, 0, 0.1) !important;
+}
+
+/* Pixel-perfect animation for toasts */
+[data-sonner-toast] {
+  animation: pixelSlideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pixelSlideInRight {
+  from {
+    transform: translateX(100%) scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
