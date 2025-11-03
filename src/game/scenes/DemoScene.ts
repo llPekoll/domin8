@@ -42,7 +42,7 @@ export class DemoScene extends Scene {
   private subText!: Phaser.GameObjects.Text;
 
   constructor() {
-    super("DemoScene");
+    super("Demo");
   }
 
   create() {
@@ -78,41 +78,44 @@ export class DemoScene extends Scene {
     });
 
     // Listen for player bet placement to spawn character immediately
-    EventBus.on("player-bet-placed", (data: {
-      characterId: number;
-      characterName: string;
-      position: [number, number];
-      betAmount: number;
-      roundId: number;
-      betIndex: number;
-      walletAddress: string;
-    }) => {
-      logger.game.debug("[DemoScene] 🎯 RECEIVED player-bet-placed EVENT");
-      logger.game.debug("[DemoScene] Event data:", data);
+    EventBus.on(
+      "player-bet-placed",
+      (data: {
+        characterId: number;
+        characterName: string;
+        position: [number, number];
+        betAmount: number;
+        roundId: number;
+        betIndex: number;
+        walletAddress: string;
+      }) => {
+        logger.game.debug("[DemoScene] 🎯 RECEIVED player-bet-placed EVENT");
+        logger.game.debug("[DemoScene] Event data:", data);
 
-      // Derive character key from character name (e.g., "Warrior" -> "warrior")
-      const characterKey = data.characterName?.toLowerCase().replace(/\s+/g, "-") || "warrior";
+        // Derive character key from character name (e.g., "Warrior" -> "warrior")
+        const characterKey = data.characterName?.toLowerCase().replace(/\s+/g, "-") || "warrior";
 
-      // Transform the data into the format expected by PlayerManager
-      const participant = {
-        _id: `${data.walletAddress}_${data.betIndex}`, // Unique ID combining wallet + bet index
-        playerId: data.walletAddress,
-        displayName: data.characterName || "Player",
-        betAmount: data.betAmount,
-        character: {
-          key: characterKey, // Derived sprite key
-          name: data.characterName,
-          id: data.characterId, // Store blockchain numeric ID for reference
-        },
-        spawnIndex: data.betIndex, // Use bet index as spawn index
-        isBot: false, // This is a real player
-        eliminated: false,
-        colorHue: undefined, // Will be assigned by backend if needed
-      };
+        // Transform the data into the format expected by PlayerManager
+        const participant = {
+          _id: `${data.walletAddress}_${data.betIndex}`, // Unique ID combining wallet + bet index
+          playerId: data.walletAddress,
+          displayName: data.characterName || "Player",
+          betAmount: data.betAmount,
+          character: {
+            key: characterKey, // Derived sprite key
+            name: data.characterName,
+            id: data.characterId, // Store blockchain numeric ID for reference
+          },
+          spawnIndex: data.betIndex, // Use bet index as spawn index
+          isBot: false, // This is a real player
+          eliminated: false,
+          colorHue: undefined, // Will be assigned by backend if needed
+        };
 
-      // Spawn the character in the demo scene
-      this.spawnDemoParticipant(participant);
-    });
+        // Spawn the character in the demo scene
+        this.spawnDemoParticipant(participant);
+      }
+    );
 
     // Create demo UI
     this.createDemoUI();
@@ -412,7 +415,7 @@ export class DemoScene extends Scene {
     logger.game.debug("[DemoScene] Wipe effect created:", fx);
 
     // Listen for transition complete event
-    this.events.once('transitionout', () => {
+    this.events.once("transitionout", () => {
       logger.game.debug("[DemoScene] ✅ Transition to RoyalRumble complete");
     });
 
@@ -422,7 +425,7 @@ export class DemoScene extends Scene {
       moveBelow: true,
       onUpdate: (progress: number) => {
         fx.progress = progress;
-      }
+      },
     });
   }
 

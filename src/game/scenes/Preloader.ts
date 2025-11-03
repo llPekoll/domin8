@@ -240,6 +240,6 @@ export class Preloader extends Scene {
     });
 
     // Start with DemoScene by default
-    this.scene.start("DemoScene");
+    this.scene.start("Demo");
   }
 }

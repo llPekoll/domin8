@@ -1,8 +1,10 @@
 import { Scene } from "phaser";
+import { GamePhaseManager } from "./GamePhaseManager";
 
 export class UIManager {
   private scene: Scene;
   private centerX: number;
+  private gamePhaseManager: GamePhaseManager | null = null;
 
   // UI Elements
   public titleLogo!: Phaser.GameObjects.Image;
@@ -25,9 +27,17 @@ export class UIManager {
   private vrfSubText!: Phaser.GameObjects.Text;
   private vrfContainer!: Phaser.GameObjects.Container;
 
+  // VRF phase tracking (triggered by countdown, not blockchain status)
+  private isWaitingForVRF: boolean = false;
+  private lastCountdownSeconds: number = -1;
+
   constructor(scene: Scene, centerX: number) {
     this.scene = scene;
     this.centerX = centerX;
+  }
+
+  setGamePhaseManager(gamePhaseManager: GamePhaseManager) {
+    this.gamePhaseManager = gamePhaseManager;
   }
 
   updateCenter(centerX: number) {
@@ -211,7 +221,21 @@ export class UIManager {
 
   updateGameState(gameState: any) {
     this.gameState = gameState;
-    if (!gameState) return;
+    if (!gameState) {
+      // Reset VRF flag when no game
+      this.isWaitingForVRF = false;
+      this.lastCountdownSeconds = -1;
+      return;
+    }
+
+    // Reset VRF flag when new game starts (status back to waiting)
+    const status = gameState.status;
+    const isWaiting = status === "Waiting" || status === 0 || status === "waiting";
+    if (isWaiting && this.isWaitingForVRF) {
+      console.log("[UIManager] 🔄 New game started - resetting VRF flag");
+      this.isWaitingForVRF = false;
+      this.lastCountdownSeconds = -1;
+    }
 
     this.updatePhaseDisplay(gameState);
   }
@@ -352,41 +376,38 @@ export class UIManager {
     }
 
     // Blockchain status: 0 = Waiting (open), 1 = Finished (closed)
-    // We need to detect VRF phase vs winner celebration within "Finished" status
     const status = this.gameState.status;
-    const hasWinner = !!this.gameState.winnerId || !!this.gameState.winner;
 
-    // Calculate if we're past endDate
-    const endTimestampMs = endTimestamp > 10000000000 ? endTimestamp : endTimestamp * 1000;
-    const now = Date.now();
-    const isPastEndDate = now >= endTimestampMs;
-
-    // Phase detection:
-    // - Waiting: status = "Waiting" OR status = 0
-    // - VRF Phase: status = "Finished" but NO winner yet (VRF in progress)
-    // - Celebration: status = "Finished" AND winner exists
+    // Check for winner - winner field from blockchain (PublicKey or string)
+    let hasWinner = false;
+    if (this.gameState.winner) {
+      // Check if winner is actually set (not null PublicKey or empty string)
+      const winnerStr = typeof this.gameState.winner === 'string'
+        ? this.gameState.winner
+        : this.gameState.winner.toBase58?.();
+      hasWinner = !!winnerStr && winnerStr !== '11111111111111111111111111111111'; // Not null address
+    }
 
     const isWaiting = status === "Waiting" || status === 0 || status === "waiting";
     const isFinished = status === "Finished" || status === 1 || status === "finished";
-    const isVRFPhase = isFinished && !hasWinner && isPastEndDate;
-    const isCelebration = isFinished && hasWinner;
 
-    console.log("[UIManager] Phase detection:", {
-      status,
-      hasWinner,
-      isPastEndDate,
-      isWaiting,
-      isVRFPhase,
-      isCelebration,
-      endTimestamp,
-      now: now / 1000,
-    });
+    // Reset VRF waiting flag when winner is determined
+    if (hasWinner && this.isWaitingForVRF) {
+      console.log("[UIManager] 🎉 Winner detected! Hiding VRF overlay");
+      this.isWaitingForVRF = false;
+    }
 
-    if (isVRFPhase) {
-      // VRF Phase: Game finished but no winner yet (blockchain randomness in progress)
-      console.log("[UIManager] 🎲 VRF Phase - showing countdown + overlay");
+    // If waiting for VRF (countdown ended but no winner yet), show overlay
+    if (this.isWaitingForVRF && !hasWinner) {
+      console.log("=".repeat(60));
+      console.log("[UIManager] 🎲 VRF WAITING ACTIVE (triggered by countdown)");
+      console.log("[UIManager] isWaitingForVRF:", this.isWaitingForVRF);
+      console.log("[UIManager] hasWinner:", hasWinner);
+      console.log("[UIManager] winner:", gameState?.winner);
+      console.log("[UIManager] status:", gameState?.status);
+      console.log("=".repeat(60));
 
-      // Hide top timer during VRF phase
+      // Hide top timer
       this.timerContainer.setVisible(false);
       this.timerBackground.setVisible(false);
 
@@ -396,20 +417,23 @@ export class UIManager {
       // Show VRF overlay
       this.vrfOverlay.setVisible(true);
       this.vrfContainer.setVisible(true);
-      return;
-    } else if (isCelebration) {
-      // Winner announced - hide all timers during celebration
-      console.log("[UIManager] 🎉 Celebration phase - hiding all UI");
 
-      this.timerContainer.setVisible(false);
-      this.timerBackground.setVisible(false);
-      this.demoCountdownContainer.setVisible(false);
+      console.log("[UIManager] VRF Overlay visible:", this.vrfOverlay.visible);
+      console.log("[UIManager] VRF Container visible:", this.vrfContainer.visible);
+      return;
+    }
+
+    // If we were waiting for VRF but now have winner, hide overlay
+    if (this.isWaitingForVRF && hasWinner) {
+      console.log("[UIManager] 🎉 Winner found! Hiding VRF overlay, starting celebration");
+      this.isWaitingForVRF = false;
       this.vrfOverlay.setVisible(false);
       this.vrfContainer.setVisible(false);
-      return;
-    } else if (!isWaiting) {
-      // Unknown phase - hide everything
-      console.log("[UIManager] ❓ Unknown phase - hiding all UI");
+    }
+
+    // Winner celebration - hide everything
+    if (isFinished && hasWinner) {
+      console.log("[UIManager] 🎉 Celebration phase - hiding all UI");
 
       this.timerContainer.setVisible(false);
       this.timerBackground.setVisible(false);
@@ -419,17 +443,27 @@ export class UIManager {
       return;
     }
 
-    // Waiting phase: show demo-style countdown (large, bottom, metal-slug font)
-    console.log("[UIManager] ⏰ Waiting phase - showing demo countdown");
+    // Waiting phase: show demo-style countdown
+    if (isWaiting) {
+      console.log("[UIManager] ⏰ Waiting phase - showing demo countdown");
 
-    // Hide top timer and VRF overlay
+      // Hide VRF overlay
+      this.vrfOverlay.setVisible(false);
+      this.vrfContainer.setVisible(false);
+      this.timerContainer.setVisible(false);
+      this.timerBackground.setVisible(false);
+
+      // Show demo-style countdown at bottom
+      this.updateDemoCountdown(endTimestamp);
+      return;
+    }
+
+    // Unknown phase - hide everything
     this.timerContainer.setVisible(false);
     this.timerBackground.setVisible(false);
+    this.demoCountdownContainer.setVisible(false);
     this.vrfOverlay.setVisible(false);
     this.vrfContainer.setVisible(false);
-
-    // Show demo-style countdown at bottom
-    this.updateDemoCountdown(endTimestamp);
   }
 
   // Update demo-style countdown (large text at bottom)
@@ -442,6 +476,21 @@ export class UIManager {
     const currentTime = Date.now();
     const timeRemaining = Math.max(0, endTimestampMs - currentTime);
     const seconds = Math.ceil(timeRemaining / 1000);
+
+    // Trigger VRF overlay when countdown reaches 0 (just like risk.fun!)
+    if (seconds === 0 && this.lastCountdownSeconds > 0) {
+      console.log("=".repeat(60));
+      console.log("[UIManager] ⏰ COUNTDOWN REACHED 0! Triggering VRF overlay");
+      console.log("=".repeat(60));
+      this.isWaitingForVRF = true;
+
+      // Notify GamePhaseManager to transition to VRF_PENDING phase
+      if (this.gamePhaseManager) {
+        this.gamePhaseManager.triggerVRFPhase();
+      }
+    }
+
+    this.lastCountdownSeconds = seconds;
 
     // Show countdown
     this.demoCountdownContainer.setVisible(true);
