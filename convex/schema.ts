@@ -79,6 +79,7 @@ export default defineSchema({
     id: v.number(),
     assetPath: v.string(), // Path to character spritesheet (e.g., "/characters/orc.png")
     description: v.optional(v.string()), // Character description
+    nftCollection: v.optional(v.string()), // NFT collection program address for special/exclusive characters
     animations: v.optional(
       v.object({
         idle: v.object({
@@ -116,6 +117,7 @@ export default defineSchema({
    */
   players: defineTable({
     walletAddress: v.string(),
+    externalWalletAddress: v.optional(v.string()), // External wallet (e.g., Phantom) for NFT verification
     displayName: v.optional(v.string()),
     lastActive: v.number(),
     totalGamesPlayed: v.number(),

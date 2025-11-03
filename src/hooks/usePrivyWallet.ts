@@ -6,7 +6,7 @@ import { getSolanaRpcUrl } from "../lib/utils";
 import { logger } from "../lib/logger";
 
 export function usePrivyWallet() {
-  const { ready, authenticated } = usePrivy();
+  const { ready, authenticated, user } = usePrivy();
   const { wallets } = useWallets();
   const [solBalance, setSolBalance] = useState<number>(0);
   const [isLoadingBalance, setIsLoadingBalance] = useState<boolean>(false);
@@ -14,6 +14,21 @@ export function usePrivyWallet() {
   const solanaWallet = wallets[0];
   const walletAddress = solanaWallet?.address;
   const connected = ready && authenticated && !!walletAddress;
+
+  // Get external wallet address (non-Privy wallet, e.g., Phantom)
+  const externalWalletAccount = user?.linkedAccounts?.find(
+    (account) =>
+      account.type === "wallet" &&
+      "chainType" in account &&
+      account.chainType === "solana" &&
+      "walletClientType" in account &&
+      account.walletClientType !== "privy" &&
+      account.walletClientType
+  );
+
+  const externalWalletAddress = externalWalletAccount && "address" in externalWalletAccount
+    ? externalWalletAccount.address
+    : null;
 
   // Fetch SOL balance from the Privy embedded wallet
   useEffect(() => {
@@ -72,6 +87,7 @@ export function usePrivyWallet() {
     connected,
     publicKey: walletAddress ? new PublicKey(walletAddress) : null,
     walletAddress,
+    externalWalletAddress, // External wallet (e.g., Phantom) if connected
     wallet: solanaWallet,
     ready,
     solBalance,
