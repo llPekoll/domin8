@@ -11,11 +11,12 @@ import { DEMO_TIMINGS } from "../config/demoTimings";
 import { generateRandomEllipsePositions } from "../config/spawnConfig";
 import { logger } from "../lib/logger";
 import { useAssets } from "../contexts/AssetsContext";
+import { EventBus } from "../game/EventBus";
+import { GamePhase } from "../game/managers/GamePhaseManager";
 
 export type DemoPhase = "spawning" | "arena" | "results";
 
 interface DemoGameManagerProps {
-  isActive: boolean; // True when no real game exists
   phaserRef: React.RefObject<IRefPhaserGame | null>;
 }
 
@@ -33,7 +34,9 @@ export interface DemoStateForUI {
   participantCount: number;
 }
 
-export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
+export function DemoGameManager({ phaserRef }: DemoGameManagerProps) {
+  // Listen to GamePhaseManager for demo mode state
+  const [isActive, setIsActive] = useState(true); // Start with demo active
   const [countdown, setCountdown] = useState(30);
   const [spawnedParticipants, setSpawnedParticipants] = useState<DemoParticipant[]>([]);
   const [phase, setPhase] = useState<DemoPhase>("spawning");
@@ -55,10 +58,28 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
     return allMapsQuery[Math.floor(Math.random() * allMapsQuery.length)];
   }, [allMapsQuery?.length]);
 
+  // Listen to GamePhaseManager events - demo is active when phase is IDLE
+  useEffect(() => {
+    const handlePhaseChange = (phase: GamePhase) => {
+      const shouldBeActive = phase === GamePhase.IDLE;
+      logger.game.debug("[DemoGameManager] Game phase changed:", {
+        phase,
+        isActive: shouldBeActive,
+      });
+      setIsActive(shouldBeActive);
+    };
+
+    EventBus.on("game-phase-changed", handlePhaseChange);
+
+    return () => {
+      EventBus.off("game-phase-changed", handlePhaseChange);
+    };
+  }, []);
+
   // Notify parent of state changes AND update Phaser UI
   useEffect(() => {
     // Update Phaser DemoScene UI
-    if (phaserRef.current?.scene?.scene.key === "DemoScene") {
+    if (phaserRef.current?.scene?.scene.key === "Demo") {
       const scene = phaserRef.current.scene as any;
       if (scene.updateDemoUI) {
         scene.updateDemoUI(phase, countdown, spawnedParticipants.length);
@@ -187,12 +208,15 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
           return;
         }
 
-        logger.game.debug(`[DemoGameManager] 🎯 USING SHUFFLED POSITION - Spawn #${currentSpawnIndex}:`, {
-          arrayIndex: currentSpawnIndex,
-          totalPositions: shuffledPositions.length,
-          position: { x: Math.round(nextPosition.x), y: Math.round(nextPosition.y) },
-          isFromShuffledArray: true,
-        });
+        logger.game.debug(
+          `[DemoGameManager] 🎯 USING SHUFFLED POSITION - Spawn #${currentSpawnIndex}:`,
+          {
+            arrayIndex: currentSpawnIndex,
+            totalPositions: shuffledPositions.length,
+            position: { x: Math.round(nextPosition.x), y: Math.round(nextPosition.y) },
+            isFromShuffledArray: true,
+          }
+        );
 
         const newParticipant = generateDemoParticipant(
           currentSpawnIndex,
@@ -211,8 +235,10 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
         });
 
         // Spawn in Phaser scene first
-        if (phaserRef.current?.scene?.scene.key === "DemoScene") {
-          logger.game.debug(`[DemoGameManager] Calling spawnDemoParticipant for ${newParticipant._id}`);
+        if (phaserRef.current?.scene?.scene.key === "Demo") {
+          logger.game.debug(
+            `[DemoGameManager] Calling spawnDemoParticipant for ${newParticipant._id}`
+          );
           (phaserRef.current.scene as any).spawnDemoParticipant?.(newParticipant);
         }
 
@@ -244,7 +270,7 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
     // Immediately move all participants to center when arena starts
     if (phaserRef.current?.scene) {
       const scene = phaserRef.current.scene;
-      if (scene.scene.key === "DemoScene") {
+      if (scene.scene.key === "Demo") {
         (scene as any).moveParticipantsToCenter?.();
       }
     }
@@ -256,7 +282,7 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
       // Trigger explosion + physics
       if (phaserRef.current?.scene) {
         const scene = phaserRef.current.scene;
-        if (scene.scene.key === "DemoScene") {
+        if (scene.scene.key === "Demo") {
           (scene as any).showDemoWinner?.(winner);
         }
       }
@@ -268,7 +294,7 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
         // Clear participants in DemoScene
         if (phaserRef.current?.scene) {
           const scene = phaserRef.current.scene;
-          if (scene.scene.key === "DemoScene") {
+          if (scene.scene.key === "Demo") {
             (scene as any).clearDemoParticipants?.();
           }
         }
@@ -309,7 +335,7 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
     }
 
     const scene = phaserRef.current.scene;
-    if (scene.scene.key === "DemoScene") {
+    if (scene.scene.key === "Demo") {
       logger.game.debug("[DemoGameManager] Calling setDemoMap on DemoScene with:", {
         mapName: demoMap.name,
         backgroundKey: demoMap.background,

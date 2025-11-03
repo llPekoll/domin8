@@ -2,7 +2,7 @@ import { EventBus } from "../EventBus";
 import { Scene } from "phaser";
 import { PlayerManager } from "../managers/PlayerManager";
 import { AnimationManager } from "../managers/AnimationManager";
-import { GamePhaseManager } from "../managers/GamePhaseManager";
+import { GamePhaseManager, GamePhase } from "../managers/GamePhaseManager";
 import { UIManager } from "../managers/UIManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
@@ -44,6 +44,9 @@ export class Game extends Scene {
 
     // Connect UIManager to GamePhaseManager for VRF phase triggering
     this.uiManager.setGamePhaseManager(this.gamePhaseManager);
+
+    // Listen to GamePhaseManager - transition to Demo when phase becomes IDLE
+    EventBus.on("game-phase-changed", this.handleGamePhaseChange, this);
 
     // Set default background (will be updated when gameState is received)
     const defaultTexture = "arena_classic";
@@ -102,6 +105,20 @@ export class Game extends Scene {
     this.animationManager.updateCenter(this.centerX, this.centerY);
     this.uiManager.updateCenter(this.centerX);
   }
+
+  private handleGamePhaseChange = (phase: GamePhase) => {
+    logger.game.debug("[Game] Game phase changed:", {
+      phase,
+      currentScene: this.scene.key,
+      isSceneActive: this.scene.isActive(),
+    });
+
+    // When phase becomes IDLE (game cleanup complete), transition to Demo
+    if (phase === GamePhase.IDLE && this.scene.isActive()) {
+      logger.game.debug("[Game] Game complete (IDLE phase), transitioning to Demo scene");
+      this.transitionToDemo();
+    }
+  };
 
   // Update game state from blockchain
   updateGameState(gameState: any) {
@@ -233,7 +250,7 @@ export class Game extends Scene {
   }
 
   public transitionToDemo() {
-    logger.game.debug("[Game] 🎬 Starting transition to DemoScene");
+    logger.game.debug("[Game] 🎬 Starting transition to Demo scene");
 
     // Create wipe transition effect
     const fx = this.cameras.main.postFX.addWipe();
@@ -241,11 +258,11 @@ export class Game extends Scene {
 
     // Listen for transition complete event
     this.events.once("transitionout", () => {
-      logger.game.debug("[Game] ✅ Transition to DemoScene complete");
+      logger.game.debug("[Game] ✅ Transition to Demo scene complete");
     });
 
     this.scene.transition({
-      target: "DemoScene",
+      target: "Demo",
       duration: 1000,
       moveBelow: true,
       onUpdate: (progress: number) => {
@@ -257,6 +274,7 @@ export class Game extends Scene {
   shutdown() {
     // Clean up event listeners to prevent memory leaks
     EventBus.off("play-insert-coin-sound");
+    EventBus.off("game-phase-changed", this.handleGamePhaseChange, this);
   }
 
   changeScene() {
