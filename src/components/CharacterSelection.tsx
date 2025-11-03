@@ -25,6 +25,7 @@ interface Character {
   id?: number; // Blockchain ID
   name: string;
   description?: string;
+  nftCollection?: string;
 }
 
 interface CharacterSelectionProps {
@@ -117,10 +118,50 @@ const CharacterSelection = memo(function CharacterSelection({
 
   const playerParticipantCount = 0; // TODO: Track participant count when needed
 
+  // Handle NFT character selection changes
+  const handleNFTCharacterSelected = useCallback((characters: Character[]) => {
+    if (characters.length === 0) {
+      // No characters selected - reset to random regular character
+      if (allCharacters && allCharacters.length > 0) {
+        const regularCharacters = allCharacters.filter(char => 
+          !char.nftCollection || char.nftCollection === null || char.nftCollection === undefined
+        );
+        
+        if (regularCharacters.length > 0) {
+          const randomChar = regularCharacters[Math.floor(Math.random() * regularCharacters.length)];
+          setCurrentCharacter(randomChar);
+          toast.info('Switched back to regular characters', {
+            description: `Now using ${randomChar.name}`,
+            icon: '🎲',
+          });
+        }
+      }
+    } else if (characters.length === 1) {
+      // Single character selected - set as current character
+      setCurrentCharacter(characters[0]);
+      toast.success(`${characters[0].name} is now your active character!`, {
+        description: 'This character will be used for your next bet',
+        icon: '🎯',
+      });
+    } else {
+      // Multiple characters selected - randomly pick one to display
+      const randomIndex = Math.floor(Math.random() * characters.length);
+      const selectedCharacter = characters[randomIndex];
+      setCurrentCharacter(selectedCharacter);
+      toast.success(`${selectedCharacter.name} selected from your pool!`, {
+        description: `${characters.length} characters available, randomly showing ${selectedCharacter.name}`,
+        icon: '🎲',
+      });
+    }
+  }, [allCharacters]);
+
   // Get character for bet (NFT pool or regular)
   const getCharacterForBet = useCallback(() => {
-    if (selectedNFTCharacters.length > 0) {
-      // Randomly pick from selected NFT pool
+    if (selectedNFTCharacters.length === 1) {
+      // Single NFT character selected - should already be set as currentCharacter
+      return currentCharacter;
+    } else if (selectedNFTCharacters.length > 1) {
+      // Multiple NFT characters - randomly pick from pool
       const randomIndex = Math.floor(Math.random() * selectedNFTCharacters.length);
       return selectedNFTCharacters[randomIndex];
     }
@@ -415,9 +456,13 @@ const CharacterSelection = memo(function CharacterSelection({
                   {currentCharacter.name}
                 </p>
                 <p className="text-amber-400 text-base">
-                  {selectedNFTCharacters.length > 0 
-                    ? `Pool: ${selectedNFTCharacters.length} NFT chars` 
-                    : 'Ready for battle'
+                  {selectedNFTCharacters.length === 0
+                    ? (currentCharacter.nftCollection
+                        ? '⭐ Exclusive Character'
+                        : 'Ready for battle')
+                    : selectedNFTCharacters.length === 1
+                      ? '⭐ Exclusive NFT Character'
+                      : `⭐ Pool: ${selectedNFTCharacters.length} NFT chars`
                   }
                 </p>
               </div>
@@ -433,8 +478,8 @@ const CharacterSelection = memo(function CharacterSelection({
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border border-purple-400/50 transition-all shadow-lg ${isLoadingNFTs ? 'opacity-70 cursor-wait bg-gray-700/40' : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/20'}`}
                   title="Select exclusive NFT characters"
                 >
-                  <Star className="w-4 h-4 fill-current" />
-                  <span className="text-sm font-bold">NFT</span>
+                  <Star className="w-4 h-4 fill-amber-200" />
+                  <span className="text-sm text-white font-bold">NFT</span>
                   {isLoadingNFTs && (
                     <span className="text-xs text-amber-200 ml-2">Checking...</span>
                   )}
@@ -530,6 +575,7 @@ const CharacterSelection = memo(function CharacterSelection({
         onOpenChange={setShowNFTModal}
         selectedCharacters={selectedNFTCharacters}
         onSelectCharacters={setSelectedNFTCharacters}
+        onNFTCharacterSelected={handleNFTCharacterSelected}
         unlockedCharacters={unlockedCharacters}
         isLoading={isLoadingNFTs}
         error={nftError}

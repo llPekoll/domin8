@@ -45,11 +45,12 @@ export function useNFTCharacters(externalWalletAddress: string | null) {
         const collections = await getUserNFTCollections(externalWalletAddress, connection);
         
         // Match owned collections with exclusive characters
-        const unlocked = allExclusiveChars.filter(char => 
-          char.nftCollection && collections.includes(char.nftCollection)
-        );
+        // FIXME: for dev only, uncomment for prod 
+        // const unlocked = allExclusiveChars.filter(char => 
+        //   char.nftCollection && collections.includes(char.nftCollection)
+        // );
         
-        setUnlockedCharacters(unlocked);
+        setUnlockedCharacters(allExclusiveChars);
       } catch (err) {
         console.error('Failed to check NFT ownership:', err);
         setError('Failed to load exclusive characters');

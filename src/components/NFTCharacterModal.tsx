@@ -30,6 +30,7 @@ interface NFTCharacterModalProps {
   isLoading?: boolean;
   error?: string | null;
   allExclusiveCharacters: Character[];
+  onNFTCharacterSelected?: (characters: Character[]) => void;
 }
 
 export function NFTCharacterModal({
@@ -41,6 +42,7 @@ export function NFTCharacterModal({
   isLoading,
   error,
   allExclusiveCharacters,
+  onNFTCharacterSelected,
 }: NFTCharacterModalProps) {
   const [tempSelected, setTempSelected] = useState<Character[]>(selectedCharacters);
   
@@ -57,16 +59,30 @@ export function NFTCharacterModal({
   
   const handleSave = () => {
     onSelectCharacters(tempSelected);
+    
+    // Notify parent about character selection changes (all scenarios)
+    if (onNFTCharacterSelected) {
+      onNFTCharacterSelected(tempSelected);
+    }
+    
     onOpenChange(false);
     
-    if (tempSelected.length > 0) {
-      toast.success(`${tempSelected.length} exclusive character(s) selected!`, {
-        description: 'These will be randomly used for your bets',
-        icon: '⭐',
-      });
-    } else {
-      toast.info('Using regular characters for bets');
-    }
+    // Commented to avoid toast spam (as we already have one in CharacterSelection.tsx)
+    // if (tempSelected.length > 0) {
+    //   if (tempSelected.length === 1) {
+    //     toast.success(`Exclusive character selected!`, {
+    //       description: `${tempSelected[0].name} will be used for your next bet`,
+    //       icon: '⭐',
+    //     });
+    //   } else {
+    //     toast.success(`${tempSelected.length} exclusive characters selected!`, {
+    //       description: 'These will be randomly used for your bets',
+    //       icon: '⭐',
+    //     });
+    //   }
+    // } else {
+    //   toast.info('Using regular characters for bets');
+    // }
   };
   
   const lockedCharacters = allExclusiveCharacters.filter(
@@ -75,14 +91,14 @@ export function NFTCharacterModal({
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto bg-gradient-to-b from-amber-950/98 to-amber-900/98 border-2 border-purple-500/50 backdrop-blur-sm">
+      <DialogContent className="max-w-lvw max-h-[85vh] overflow-y-auto bg-gradient-to-b from-amber-950/98 to-amber-900/98 border-1 border-purple-500/50 backdrop-blur-sm [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-amber-950/30 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gradient-to-b [&::-webkit-scrollbar-thumb]:from-purple-600 [&::-webkit-scrollbar-thumb]:to-purple-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border [&::-webkit-scrollbar-thumb]:border-purple-500/30 hover:[&::-webkit-scrollbar-thumb]:from-purple-500 hover:[&::-webkit-scrollbar-thumb]:to-purple-600 [&::-webkit-scrollbar-corner]:bg-amber-950/30">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-amber-100 flex items-center gap-2">
             <Star className="w-6 h-6 text-purple-400 fill-current" />
             Your Exclusive Characters
           </DialogTitle>
           <DialogDescription className="text-amber-300">
-            Select one or multiple NFT characters for your bet pool. They'll be randomly used for each bet you place.
+            Select characters for your exclusive pool. One character will be displayed and used for bets, or select none to use regular characters.
           </DialogDescription>
         </DialogHeader>
         
