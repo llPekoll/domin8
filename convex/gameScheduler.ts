@@ -292,6 +292,10 @@ export const executeSendPrize = internalAction({
         const updatedGame = await solanaClient.getGameRound(roundId);
 
         if (updatedGame?.winnerPrize === 0) {
+          updatedGame.prizeSent = true;
+          await ctx.runMutation(internal.syncServiceMutations.upsertGameState, {
+            gameRound: updatedGame,
+          });
           console.log(`Round ${roundId}: ✅ Verified: Prize successfully distributed`);
           console.log(`Round ${roundId}: 🎉 GAME COMPLETE - Ready for next round`);
         } else {

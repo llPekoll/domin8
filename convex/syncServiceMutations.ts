@@ -11,9 +11,9 @@ import { v } from "convex/values";
 export const upsertGameState = internalMutation({
   args: {
     gameRound: v.object({
-      gameRound: v.number(),
-      startDate: v.number(),
-      endDate: v.number(),
+      roundId: v.number(),
+      startTimestamp: v.number(),
+      endTimestamp: v.number(),
       totalDeposit: v.number(),
       rand: v.string(), // Changed to string to avoid BN overflow
       map: v.number(), // Map/background ID (0-255)
@@ -32,21 +32,13 @@ export const upsertGameState = internalMutation({
           position: v.array(v.number()),
         })
       ),
-      // Computed properties for backward compatibility
-      roundId: v.optional(v.number()),
-      startTimestamp: v.optional(v.number()),
-      endTimestamp: v.optional(v.number()),
-      totalPot: v.optional(v.number()),
-      betCount: v.optional(v.number()),
-      betAmounts: v.optional(v.array(v.number())),
-      betSkin: v.optional(v.array(v.number())),
-      betPosition: v.optional(v.array(v.array(v.number()))),
+      prizeSent: v.boolean(),
     }),
   },
   handler: async (ctx, { gameRound }) => {
     const { db } = ctx;
 
-    const roundId = gameRound.roundId || gameRound.gameRound;
+    const roundId = gameRound.roundId;
 
     // Convert status: 0 = "waiting" (open), 1 = "finished" (closed)
     const status = gameRound.status === 0 ? "waiting" : "finished";
@@ -79,20 +71,18 @@ export const upsertGameState = internalMutation({
         await db.insert("gameRoundStates", {
           roundId,
           status: "waiting",
-          startTimestamp: gameRound.startTimestamp || gameRound.startDate,
-          endTimestamp: gameRound.endTimestamp || gameRound.endDate,
-          totalPot: gameRound.totalPot || gameRound.totalDeposit,
-          betCount: gameRound.betCount || gameRound.bets.length,
+          startTimestamp: gameRound.startTimestamp ,
+          endTimestamp: gameRound.endTimestamp,
+          capturedAt: gameRound.startTimestamp,
           mapId,
+          betCount: gameRound.bets.length,
+          betAmounts: gameRound.bets.map((b) => b.amount),
+          betSkin: gameRound.bets.map((b) => b.skin),
+          betPosition: gameRound.bets.map((b) => b.position),
+          totalPot: gameRound.totalDeposit,
           winner: null, // No winner during waiting phase
           winningBetIndex: 0,
-          betAmounts: gameRound.betAmounts || gameRound.bets.map((b) => b.amount),
-          betSkin: gameRound.betSkin || gameRound.bets.map((b) => b.skin),
-          betPosition: gameRound.betPosition || gameRound.bets.map((b) => b.position),
-          vrfRequestPubkey: null,
-          vrfSeed: [],
-          randomnessFulfilled: false, // Not fulfilled during waiting
-          capturedAt: gameRound.startTimestamp || gameRound.startDate, // Use start time
+          prizeSent: false, // No prize sent during waiting phase
         });
 
         console.log(`[Sync Mutations] ✅ Created backfilled "waiting" state for round ${roundId}`);
@@ -108,22 +98,18 @@ export const upsertGameState = internalMutation({
     const gameData = {
       roundId,
       status,
-      startTimestamp: gameRound.startTimestamp || gameRound.startDate,
-      endTimestamp: gameRound.endTimestamp || gameRound.endDate,
-      totalPot: gameRound.totalPot || gameRound.totalDeposit,
-      betCount: gameRound.betCount || gameRound.bets.length,
-      mapId, // Map reference from blockchain map field
-      winner: gameRound.winner,
-      winningBetIndex: gameRound.winningBetIndex || 0,
-      // Store bets data
-      betAmounts: gameRound.betAmounts || gameRound.bets.map((b) => b.amount),
-      betSkin: gameRound.betSkin || gameRound.bets.map((b) => b.skin),
-      betPosition: gameRound.betPosition || gameRound.bets.map((b) => b.position),
-      // VRF data (simplified for risk architecture)
-      vrfRequestPubkey: null,
-      vrfSeed: [],
-      randomnessFulfilled: gameRound.status === 1, // True if game is closed
+      startTimestamp: gameRound.startTimestamp,
+      endTimestamp: gameRound.endTimestamp,
       capturedAt: Math.floor(Date.now() / 1000),
+      mapId, // Map reference from blockchain map field
+      betCount: gameRound.bets.length,
+      betAmounts: gameRound.bets.map((b) => b.amount),
+      betSkin: gameRound.bets.map((b) => b.skin),
+      betPosition:  gameRound.bets.map((b) => b.position),
+      totalPot: gameRound.totalDeposit,
+      winner: gameRound.winner,
+      winningBetIndex: gameRound.winningBetIndex ?? 0,
+      prizeSent: false, // Default to false; update when prize is sent
     };
 
     // Do not update if the existing state is finished as the data is final

@@ -33,13 +33,7 @@ export default defineSchema({
     winner: v.union(v.string(), v.null()), // Winner wallet (base58), null if not determined
     winningBetIndex: v.number(), // Index of winning bet
 
-    // VRF data (simplified for risk architecture)
-    vrfRequestPubkey: v.union(v.string(), v.null()), // Always null (not used)
-    vrfSeed: v.array(v.number()), // Empty array (not used)
-    randomnessFulfilled: v.boolean(), // True when game is finished
-
-    // Prize tracking
-    winnerPrizeUnclaimed: v.optional(v.number()), // Unclaimed prize amount
+    prizeSent: v.boolean(), // Whether prize has been sent to winner
   })
     .index("by_round_and_status", ["roundId", "status"]) // Prevent duplicate states (PRIMARY)
     .index("by_round_id", ["roundId"]) // Query all states for a round
