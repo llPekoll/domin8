@@ -157,7 +157,7 @@ async function processPastEndedGames(ctx: any, solanaClient: SolanaClient) {
 
     // Query database for "finished" games that need prize distribution
     const finishedGames = await ctx.runQuery(internal.syncServiceMutations.getFinishedGamesNeedingPrize, {
-      limit: 10, // Only check last 10 games for rate limiting
+      limit: 5, // Only check last 5 games for rate limiting
     });
 
     if (finishedGames.length === 0) {

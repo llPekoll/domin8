@@ -3,7 +3,6 @@
  */
 import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
-import { type GameRound } from "./lib/types";
 
 /**
  * Upsert game state from blockchain to database
