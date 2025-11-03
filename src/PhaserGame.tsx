@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useLayoutEffect, useRef } from "react";
+import { forwardRef, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import StartGame, { setCharactersData, setDemoMapData } from "./game/main";
@@ -19,11 +19,15 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
 ) {
   const game = useRef<Phaser.Game | null>(null);
 
-  // TODO: Fetch current game state from Solana blockchain
-  // For now in demo mode, use random map
-
+  // Fetch data for demo mode
   const characters = useQuery(api.characters.getActiveCharacters);
-  const demoMap = useQuery(api.maps.getRandomMap); // Fetch single random map for demo mode
+  const allMaps = useQuery(api.maps.getAllActiveMaps);
+
+  // Select random map client-side (only recalculate when map count changes)
+  const demoMap = useMemo(() => {
+    if (!allMaps || allMaps.length === 0) return null;
+    return allMaps[Math.floor(Math.random() * allMaps.length)];
+  }, [allMaps?.length]);
 
   // Check if all required data is loaded
   const isDataReady = characters && characters.length > 0 && demoMap;

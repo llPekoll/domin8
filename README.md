@@ -283,7 +283,7 @@ VITE_PRIVY_APP_ID=your-privy-app-id
 - [SINGLE_PLAYER_LOGIC.md](./SINGLE_PLAYER_LOGIC.md) - Single player mode details
 - [ROADMAP.md](./ROADMAP.md) - Development roadmap
 
-## 🤝 Contributis
+## 🤝 Contributing
 
 1. Check existing issues and documentation
 2. Follow the code style in existing files

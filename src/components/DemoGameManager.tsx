@@ -45,12 +45,17 @@ export function DemoGameManager({ isActive, phaserRef }: DemoGameManagerProps) {
 
   // Get the preloaded demo map and characters from Phaser
   // These are already loaded in Preloader, so we just fetch them for reference
-  const demoMapQuery = useQuery(api.maps.getRandomMap);
+  const allMapsQuery = useQuery(api.maps.getAllActiveMaps);
   const charactersQuery = useQuery(api.characters.getActiveCharacters);
 
   // Memoize to prevent reference changes from triggering re-spawns
   const characters = useMemo(() => charactersQuery ?? undefined, [charactersQuery?.length]);
-  const demoMap = useMemo(() => demoMapQuery ?? undefined, [demoMapQuery?._id]);
+
+  // Select random map client-side (only recalculate when map count changes)
+  const demoMap = useMemo(() => {
+    if (!allMapsQuery || allMapsQuery.length === 0) return undefined;
+    return allMapsQuery[Math.floor(Math.random() * allMapsQuery.length)];
+  }, [allMapsQuery?.length]);
 
   // Notify parent of state changes AND update Phaser UI
   useEffect(() => {
