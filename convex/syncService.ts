@@ -147,7 +147,7 @@ async function processEndedGames(ctx: any, solanaClient: SolanaClient) {
  * 1. Are in "waiting" status (open)
  * 2. Have passed their endTimestamp
  * 3. Haven't been scheduled for ending yet
- * 
+ *
  * Similar to risk.fun's processEndedGames() but for historical games
  */
 async function processPastEndedGames(ctx: any, solanaClient: SolanaClient) {

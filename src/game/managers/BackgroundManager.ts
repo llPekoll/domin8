@@ -25,9 +25,12 @@ export class BackgroundManager {
     this.centerX = centerX;
     this.centerY = centerY;
 
-    if (this.background) {
+    if (this.background && this.background.scene) {
       this.background.setPosition(this.centerX, this.centerY);
       this.scaleToFit();
+    } else if (this.background) {
+      logger.game.warn("[BackgroundManager] updateCenter: Background exists but scene is null, clearing");
+      this.background = null;
     }
   }
 
@@ -35,30 +38,61 @@ export class BackgroundManager {
    * Set background from texture key (texture must already be loaded in Preloader)
    */
   setTexture(textureKey: string) {
+    logger.game.debug("[BackgroundManager] 🎨 setTexture called", {
+      textureKey,
+      sceneKey: this.scene.scene.key,
+      textureExists: this.scene.textures.exists(textureKey),
+      availableTextures: this.scene.textures.getTextureKeys(),
+    });
+
     if (!this.scene.textures.exists(textureKey)) {
-      logger.game.warn("[BackgroundManager] Texture not found:", textureKey);
+      logger.game.error("[BackgroundManager] ❌ Texture not found:", textureKey);
+      logger.game.debug("[BackgroundManager] Available textures:", this.scene.textures.getTextureKeys());
       return;
     }
 
     // Destroy old background if exists
     if (this.background) {
+      logger.game.debug("[BackgroundManager] Destroying old background");
       this.background.destroy();
     }
 
     // Create new background
+    logger.game.debug("[BackgroundManager] Creating new background", {
+      centerX: this.centerX,
+      centerY: this.centerY,
+    });
     this.background = this.scene.add.image(this.centerX, this.centerY, textureKey);
     this.background.setOrigin(0.5, 0.5);
     this.background.setDepth(0);
     // Keep pixel art crisp when scaling
     this.background.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.scaleToFit();
+
+    logger.game.debug("[BackgroundManager] ✅ Background created successfully", {
+      width: this.background.width,
+      height: this.background.height,
+      scale: this.background.scale,
+      depth: this.background.depth,
+      visible: this.background.visible,
+    });
   }
 
   /**
    * Scale background to cover entire screen
    */
   private scaleToFit() {
-    if (!this.background) return;
+    if (!this.background) {
+      logger.game.debug("[BackgroundManager] scaleToFit: No background to scale");
+      return;
+    }
+
+    // Check if background still exists and hasn't been destroyed
+    if (!this.background.scene || this.background.width === undefined) {
+      logger.game.warn("[BackgroundManager] scaleToFit: Background destroyed or invalid");
+      this.background = null;
+      return;
+    }
 
     const scaleX = this.scene.cameras.main.width / this.background.width;
     const scaleY = this.scene.cameras.main.height / this.background.height;
