@@ -121,7 +121,7 @@ const CharacterSelection = memo(function CharacterSelection({
     if (characters.length === 0) {
       // No characters selected - reset to random regular character
       if (allCharacters && allCharacters.length > 0) {
-        const regularCharacters = allCharacters.filter(char => 
+        const regularCharacters = allCharacters.filter((char: { nftCollection: null | undefined; }) => 
           !char.nftCollection || char.nftCollection === null || char.nftCollection === undefined
         );
         
@@ -170,7 +170,7 @@ const CharacterSelection = memo(function CharacterSelection({
   useEffect(() => {
     if (allCharacters && allCharacters.length > 0 && !currentCharacter) {
       // Filter to only regular characters (no NFT collection requirement)
-      const regularCharacters = allCharacters.filter(char => 
+      const regularCharacters = allCharacters.filter((char: { nftCollection: null | undefined; }) => 
         !char.nftCollection || char.nftCollection === null || char.nftCollection === undefined
       );
       
@@ -187,7 +187,7 @@ const CharacterSelection = memo(function CharacterSelection({
       return;
     }
 
-    const availableCharacters = allCharacters.filter((c) => c._id !== currentCharacter?._id);
+    const availableCharacters = allCharacters.filter((c: { _id: Id<"characters"> | undefined; }) => c._id !== currentCharacter?._id);
     if (availableCharacters.length === 0) {
       toast.error("No other characters available");
       return;
@@ -281,7 +281,7 @@ const CharacterSelection = memo(function CharacterSelection({
       }
       
       // SECURITY CHECK: Verify NFT ownership if character requires it
-      const characterRequirements = allCharacters?.find(c => c._id === characterToUse._id);
+      const characterRequirements = allCharacters?.find((c: { _id: Id<"characters">; }) => c._id === characterToUse._id);
       const requiresNFT = characterRequirements && 'nftCollection' in characterRequirements && characterRequirements.nftCollection;
       
       if (requiresNFT) {
