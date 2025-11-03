@@ -22,6 +22,19 @@ export const getMap = query({
   },
 });
 
+// Get map by numeric ID (for blockchain integration)
+export const getMapByNumericId = query({
+  args: { mapId: v.number() },
+  handler: async (ctx, args) => {
+    const map = await ctx.db
+      .query("maps")
+      .filter((q) => q.eq(q.field("id"), args.mapId))
+      .first();
+
+    return map || null;
+  },
+});
+
 // Get a random map for demo mode (client-side only, nothing stored)
 export const getRandomMap = query({
   args: {},

@@ -9,7 +9,7 @@
       "walk": { "start": 6, "end": 13 }
     },
     "isActive": true
-  },
+  }
   {
     "id": 2,
     "name": "Soldier",

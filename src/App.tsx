@@ -96,12 +96,24 @@ export default function App() {
 
     // Update game scene with real blockchain game state
     if (hasRealGame && scene.scene.key === "RoyalRumble") {
-      logger.ui.debug("[App] Updating game state with blockchain data:", {
+      logger.ui.debug("[App] 🎮 Updating game state with blockchain data:", {
         hasBets: !!currentRoundState.bets,
         betCount: currentRoundState.bets?.length || 0,
         hasWallets: !!currentRoundState.wallets,
         walletCount: currentRoundState.wallets?.length || 0,
+        hasMap: !!currentRoundState.map,
+        mapType: typeof currentRoundState.map,
+        mapValue: currentRoundState.map,
+        mapBackground: currentRoundState.map?.background,
         fullData: currentRoundState,
+      });
+
+      logger.ui.debug("[App] 🗺️ Map enrichment status:", {
+        rawMapValue: currentRoundState.map,
+        isMapObject: typeof currentRoundState.map === 'object',
+        isMapNumber: typeof currentRoundState.map === 'number',
+        hasBackground: !!(currentRoundState.map as any)?.background,
+        mapDetails: currentRoundState.map,
       });
 
       (scene as any).updateGameState?.(currentRoundState);

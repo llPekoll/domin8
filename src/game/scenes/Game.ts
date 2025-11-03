@@ -102,20 +102,50 @@ export class Game extends Scene {
 
   // Update game state from blockchain
   updateGameState(gameState: any) {
+    logger.game.debug("[Game] 🎮 updateGameState called", {
+      hasGameState: !!gameState,
+      hasMap: !!gameState?.map,
+      mapType: typeof gameState?.map,
+      mapValue: gameState?.map,
+      mapBackground: gameState?.map?.background,
+      fullGameState: gameState,
+    });
+
     this.gameState = gameState;
 
-    if (!gameState) return;
+    if (!gameState) {
+      logger.game.warn("[Game] No game state provided to updateGameState");
+      return;
+    }
 
     // Update map background based on game data
-    if (gameState.map && gameState.map.background) {
-      this.backgroundManager.setTexture(gameState.map.background);
+    if (gameState.map) {
+      logger.game.debug("[Game] 🗺️ Processing map data", {
+        isObject: typeof gameState.map === 'object',
+        isNumber: typeof gameState.map === 'number',
+        hasBackground: !!gameState.map.background,
+        map: gameState.map,
+      });
 
-      // Update center position if map specifies it
-      if (gameState.map.centerX && gameState.map.centerY) {
-        this.centerX = gameState.map.centerX;
-        this.centerY = gameState.map.centerY;
-        this.backgroundManager.updateCenter(this.centerX, this.centerY);
+      if (gameState.map.background) {
+        logger.game.debug("[Game] Setting background texture:", gameState.map.background);
+        this.backgroundManager.setTexture(gameState.map.background);
+
+        // Update center position if map specifies it
+        if (gameState.map.centerX && gameState.map.centerY) {
+          logger.game.debug("[Game] Updating center position", {
+            centerX: gameState.map.centerX,
+            centerY: gameState.map.centerY,
+          });
+          this.centerX = gameState.map.centerX;
+          this.centerY = gameState.map.centerY;
+          this.backgroundManager.updateCenter(this.centerX, this.centerY);
+        }
+      } else {
+        logger.game.error("[Game] ❌ Map object exists but has no background property!", gameState.map);
       }
+    } else {
+      logger.game.error("[Game] ❌ No map data in game state!");
     }
 
     // Spawn characters from blockchain bet data
