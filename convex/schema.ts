@@ -33,7 +33,7 @@ export default defineSchema({
     winner: v.union(v.string(), v.null()), // Winner wallet (base58), null if not determined
     winningBetIndex: v.number(), // Index of winning bet
 
-    prizeSent: v.boolean(), // Whether prize has been sent to winner
+    prizeSent: v.optional(v.boolean()), // Whether prize has been sent to winner
   })
     .index("by_round_and_status", ["roundId", "status"]) // Prevent duplicate states (PRIMARY)
     .index("by_round_id", ["roundId"]) // Query all states for a round

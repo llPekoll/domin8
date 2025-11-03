@@ -28,14 +28,19 @@ export const syncBlockchainState = internalAction({
     try {
       const solanaClient = new SolanaClient(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
 
+      // Fetch active game from blockchain
+      console.log("cabrimol");
+      const activeGame = await solanaClient.getActiveGame();
+      console.log({ activeGame });
+
       // 1. Sync active game to database
-      await syncActiveGame(ctx, solanaClient);
+      await syncActiveGame(ctx, activeGame);
 
       // 2. Check if the active game needs to be ended
-      await processEndedGames(ctx, solanaClient);
+      await processEndedGames(ctx, activeGame);
 
       // 3. Check for past ended games that need to be processed
-      await processPastEndedGames(ctx, solanaClient);
+      await processPastEndedGames(ctx);
 
       console.log("[Sync Service] Sync complete");
     } catch (error) {
@@ -48,12 +53,8 @@ export const syncBlockchainState = internalAction({
  * Sync active game from blockchain to Convex database
  * Similar to risk.fun's syncActiveGames()
  */
-async function syncActiveGame(ctx: any, solanaClient: SolanaClient) {
+async function syncActiveGame(ctx: any, activeGame: any) {
   try {
-    // Fetch active game from blockchain
-    console.log("cabrimol");
-    const activeGame = await solanaClient.getActiveGame();
-    console.log({ activeGame });
 
     if (!activeGame) {
       console.log("[Sync Service] No active game on blockchain");
@@ -79,14 +80,16 @@ async function syncActiveGame(ctx: any, solanaClient: SolanaClient) {
  * Check if the active game has ended and needs to be processed
  * This only checks the current active_game PDA
  */
-async function processEndedGames(ctx: any, solanaClient: SolanaClient) {
+async function processEndedGames(ctx: any, activeGame: any) {
   try {
-    // Fetch active game
-    const activeGame = await solanaClient.getActiveGame();
-
     if (!activeGame) {
-      return; // No active game
+      console.log("[Sync Service] No active game on blockchain");
+      return;
     }
+
+    console.log(
+      `[Sync Service] Found active game: round ${activeGame.roundId}, status: ${activeGame.status}`
+    );
 
     // Check if game is still open (status: 0)
     if (activeGame.status !== 0) {
@@ -151,7 +154,7 @@ async function processEndedGames(ctx: any, solanaClient: SolanaClient) {
  *
  * Rate limiting: Only processes last 10 games with 500ms delay between checks
  */
-async function processPastEndedGames(ctx: any, solanaClient: SolanaClient) {
+async function processPastEndedGames(ctx: any) {
   try {
     const now = Math.floor(Date.now() / 1000);
 
