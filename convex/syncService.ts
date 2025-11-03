@@ -11,6 +11,7 @@
 "use node";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { v } from "convex/values";
 import { SolanaClient } from "./lib/solana";
 
 const RPC_ENDPOINT = process.env.SOLANA_RPC_ENDPOINT || "http://127.0.0.1:8899";
@@ -142,34 +143,34 @@ async function processEndedGames(ctx: any, solanaClient: SolanaClient) {
 }
 
 /**
- * Check for past ended games that need to be processed
+ * Check for finished games that need prize distribution
  * This scans historical game rounds in the database to find games that:
- * 1. Are in "waiting" status (open)
- * 2. Have passed their endTimestamp
- * 3. Haven't been scheduled for ending yet
+ * 1. Are in "finished" status (closed)
+ * 2. Have winner_prize > 0 (prize not yet sent)
+ * 3. Haven't been scheduled for prize distribution yet
  *
- * Similar to risk.fun's processEndedGames() but for historical games
+ * Rate limiting: Only processes last 10 games with 500ms delay between checks
  */
 async function processPastEndedGames(ctx: any, solanaClient: SolanaClient) {
   try {
     const now = Math.floor(Date.now() / 1000);
 
-    // Query database for all "waiting" games that have passed their end time
-    const endedGames = await ctx.runQuery(internal.syncServiceMutations.getEndedWaitingGames, {
-      currentTime: now,
+    // Query database for all "finished" games
+    const finishedGames = await ctx.runQuery(internal.syncServiceMutations.getFinishedGames, {
+      limit: 10, // Only check last 10 games for rate limiting
     });
 
-    if (endedGames.length === 0) {
-      console.log("[Sync Service] No past ended games found in database");
+    if (finishedGames.length === 0) {
+      console.log("[Sync Service] No finished games found in database");
       return;
     }
 
-    console.log(`[Sync Service] Found ${endedGames.length} past ended games to process`);
+    console.log(`[Sync Service] Found ${finishedGames.length} finished games to check for prize distribution`);
 
-    // Process each ended game
-    for (const game of endedGames) {
+    // Process each finished game with rate limiting
+    for (const game of finishedGames) {
       try {
-        // Fetch the game from blockchain to verify it still exists and check status
+        // Fetch the game from blockchain to check winner_prize
         const blockchainGame = await solanaClient.getGameRound(game.roundId);
 
         if (!blockchainGame) {
@@ -177,40 +178,43 @@ async function processPastEndedGames(ctx: any, solanaClient: SolanaClient) {
           continue;
         }
 
-        // Skip if already closed on blockchain
-        if (blockchainGame.status !== 0) {
+        // Skip if not finished
+        if (blockchainGame.status !== 1) {
           console.log(
-            `[Sync Service] Game ${game.roundId} already closed on blockchain (status: ${blockchainGame.status})`
+            `[Sync Service] Game ${game.roundId} not finished yet (status: ${blockchainGame.status})`
           );
-          // Sync the closed state to database
-          await ctx.runMutation(internal.syncServiceMutations.upsertGameState, {
-            gameRound: blockchainGame,
-          });
           continue;
         }
 
-        // Check if endGame action already scheduled
+        // Check if prize already sent (winnerPrize will be 0 after sending)
+        if (blockchainGame.winnerPrize === 0) {
+          console.log(`[Sync Service] Game ${game.roundId} prize already sent, skipping`);
+          continue;
+        }
+
+        // Prize needs to be sent!
+        console.log(
+          `[Sync Service] Game ${game.roundId} has unclaimed prize: ${blockchainGame.winnerPrize} lamports to ${blockchainGame.winner}`
+        );
+
+        // Check if sendPrize action already scheduled
         const alreadyScheduled = await ctx.runQuery(
           internal.gameSchedulerMutations.isActionScheduled,
           {
             roundId: game.roundId,
-            action: "end_game",
+            action: "send_prize",
           }
         );
 
         if (alreadyScheduled) {
-          console.log(`[Sync Service] endGame already scheduled for round ${game.roundId}`);
+          console.log(`[Sync Service] sendPrize already scheduled for round ${game.roundId}`);
           continue;
         }
 
-        console.log(
-          `[Sync Service] Game ${game.roundId} ended ${now - game.endTimestamp}s ago, scheduling endGame action`
-        );
-
-        // Schedule endGame action
+        // Schedule sendPrize action
         const jobId = await ctx.scheduler.runAfter(
           0, // Execute immediately
-          internal.gameScheduler.executeEndGame,
+          internal.gameScheduler.executeSendPrize,
           { roundId: game.roundId }
         );
 
@@ -218,15 +222,18 @@ async function processPastEndedGames(ctx: any, solanaClient: SolanaClient) {
         await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
           jobId: jobId.toString(),
           roundId: game.roundId,
-          action: "end_game",
+          action: "send_prize",
           scheduledTime: now,
         });
 
         console.log(
-          `[Sync Service] Scheduled endGame for past round ${game.roundId} (jobId: ${jobId})`
+          `[Sync Service] Scheduled sendPrize for round ${game.roundId} (jobId: ${jobId})`
         );
+
+        // Rate limiting: 500ms delay between blockchain checks
+        await new Promise((resolve) => setTimeout(resolve, 500));
       } catch (error) {
-        console.error(`[Sync Service] Error processing past game ${game.roundId}:`, error);
+        console.error(`[Sync Service] Error processing finished game ${game.roundId}:`, error);
         // Continue with next game
       }
     }
@@ -234,3 +241,145 @@ async function processPastEndedGames(ctx: any, solanaClient: SolanaClient) {
     console.error("[Sync Service] Error in processPastEndedGames:", error);
   }
 }
+
+/**
+ * Manual bulk prize distribution for historical games
+ * This is a manually-triggered action to process prize distribution for older game rounds
+ *
+ * Use this for:
+ * - Backfilling prize distribution for historical games
+ * - Recovery after system downtime
+ * - Batch processing specific round ranges
+ *
+ * @param startRound - Starting round ID (inclusive)
+ * @param count - Number of rounds to process
+ *
+ * Rate limiting: 500ms delay between blockchain checks to avoid RPC rate limits
+ */
+export const bulkSendPrizes = internalAction({
+  args: {
+    startRound: v.number(),
+    count: v.number(),
+  },
+  handler: async (ctx, { startRound, count }) => {
+    console.log(`\n[Bulk Prize Distribution] Starting bulk prize send from round ${startRound}, count: ${count}`);
+
+    try {
+      const solanaClient = new SolanaClient(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
+      const now = Math.floor(Date.now() / 1000);
+
+      const results = {
+        processed: 0,
+        scheduled: 0,
+        alreadySent: 0,
+        notFinished: 0,
+        notFound: 0,
+        errors: [] as string[],
+      };
+
+      // Process each round in the range
+      for (let roundId = startRound; roundId < startRound + count; roundId++) {
+        try {
+          console.log(`\n[Bulk Prize] Checking round ${roundId}...`);
+
+          // Fetch game from blockchain
+          const blockchainGame = await solanaClient.getGameRound(roundId);
+
+          if (!blockchainGame) {
+            console.log(`[Bulk Prize] Round ${roundId}: Not found on blockchain`);
+            results.notFound++;
+            // Rate limiting even for not found
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            continue;
+          }
+
+          results.processed++;
+
+          // Check if game is finished
+          if (blockchainGame.status !== 1) {
+            console.log(`[Bulk Prize] Round ${roundId}: Not finished yet (status: ${blockchainGame.status})`);
+            results.notFinished++;
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            continue;
+          }
+
+          // Check if prize already sent
+          if (blockchainGame.winnerPrize === 0) {
+            console.log(`[Bulk Prize] Round ${roundId}: Prize already sent`);
+            results.alreadySent++;
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            continue;
+          }
+
+          // Prize needs to be sent!
+          console.log(
+            `[Bulk Prize] Round ${roundId}: Found unclaimed prize: ${blockchainGame.winnerPrize} lamports to ${blockchainGame.winner}`
+          );
+
+          // Check if sendPrize action already scheduled
+          const alreadyScheduled = await ctx.runQuery(
+            internal.gameSchedulerMutations.isActionScheduled,
+            {
+              roundId,
+              action: "send_prize",
+            }
+          );
+
+          if (alreadyScheduled) {
+            console.log(`[Bulk Prize] Round ${roundId}: Already scheduled, skipping`);
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            continue;
+          }
+
+          // Schedule sendPrize action
+          const jobId = await ctx.scheduler.runAfter(
+            0, // Execute immediately
+            internal.gameScheduler.executeSendPrize,
+            { roundId }
+          );
+
+          // Save job to database
+          await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
+            jobId: jobId.toString(),
+            roundId,
+            action: "send_prize",
+            scheduledTime: now,
+          });
+
+          console.log(`[Bulk Prize] Round ${roundId}: ✅ Scheduled prize distribution (jobId: ${jobId})`);
+          results.scheduled++;
+
+          // Rate limiting: 500ms delay between blockchain checks
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        } catch (error) {
+          const errorMsg = `Round ${roundId}: ${error instanceof Error ? error.message : String(error)}`;
+          console.error(`[Bulk Prize] Error processing round ${roundId}:`, error);
+          results.errors.push(errorMsg);
+          // Continue with next round even on error
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      }
+
+      // Summary
+      console.log(`\n[Bulk Prize Distribution] SUMMARY:`);
+      console.log(`  Total processed: ${results.processed}`);
+      console.log(`  Scheduled: ${results.scheduled}`);
+      console.log(`  Already sent: ${results.alreadySent}`);
+      console.log(`  Not finished: ${results.notFinished}`);
+      console.log(`  Not found: ${results.notFound}`);
+      console.log(`  Errors: ${results.errors.length}`);
+
+      if (results.errors.length > 0) {
+        console.log(`\n[Bulk Prize Distribution] Errors:`);
+        results.errors.forEach((err) => console.log(`  - ${err}`));
+      }
+
+      console.log(`\n[Bulk Prize Distribution] Complete`);
+
+      return results;
+    } catch (error) {
+      console.error("[Bulk Prize Distribution] Fatal error:", error);
+      throw error;
+    }
+  },
+});

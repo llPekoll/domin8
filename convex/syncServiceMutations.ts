@@ -168,3 +168,34 @@ export const getEndedWaitingGames = internalQuery({
     }));
   },
 });
+
+/**
+ * Query to find finished games (for prize distribution check)
+ * Returns games in "finished" status, ordered by most recent first
+ */
+export const getFinishedGames = internalQuery({
+  args: {
+    limit: v.number(),
+  },
+  handler: async (ctx, { limit }) => {
+    const { db } = ctx;
+
+    // Find all games in "finished" status, ordered by roundId descending (most recent first)
+    const finishedGames = await db
+      .query("gameRoundStates")
+      .withIndex("by_status", (q) => q.eq("status", "finished"))
+      .order("desc")
+      .take(limit);
+
+    // Return simplified game data
+    return finishedGames.map((game) => ({
+      _id: game._id,
+      roundId: game.roundId,
+      endTimestamp: game.endTimestamp,
+      startTimestamp: game.startTimestamp,
+      betCount: game.betCount,
+      totalPot: game.totalPot,
+      winner: game.winner,
+    }));
+  },
+});
