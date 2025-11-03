@@ -25,13 +25,13 @@ export default defineSchema({
     mapId: v.optional(v.id("maps")), // Which map/arena this round uses (all players see same map)
 
     // Game state (snapshot from blockchain)
-    betCount: v.number(), // Number of bets placed
-    betAmounts: v.array(v.number()), // Array of bet amounts
-    betSkin: v.array(v.number()), // Array of skin IDs (u8) - character customization
-    betPosition: v.array(v.array(v.number())), // Array of [x, y] positions (u16)
-    totalPot: v.number(), // Total accumulated pot in lamports
-    winner: v.union(v.string(), v.null()), // Winner wallet (base58), null if not determined
-    winningBetIndex: v.number(), // Index of winning bet
+    betCount: v.optional(v.number()), // Number of bets placed
+    betAmounts: v.optional(v.array(v.number())), // Array of bet amounts
+    betSkin: v.optional(v.array(v.number())), // Array of skin IDs (u8) - character customization
+    betPosition: v.optional(v.array(v.array(v.number()))), // Array of [x, y] positions (u16)
+    totalPot: v.optional(v.number()), // Total accumulated pot in lamports
+    winner: v.optional(v.union(v.string(), v.null())), // Winner wallet (base58), null if not determined
+    winningBetIndex: v.optional(v.number()), // Index of winning bet
 
     prizeSent: v.optional(v.boolean()), // Whether prize has been sent to winner
   })

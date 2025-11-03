@@ -32,7 +32,7 @@ export const upsertGameState = internalMutation({
           position: v.array(v.number()),
         })
       ),
-      prizeSent: v.boolean(),
+      prizeSent: v.optional(v.boolean()),
     }),
   },
   handler: async (ctx, { gameRound }) => {
