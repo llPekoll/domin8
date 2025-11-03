@@ -144,9 +144,9 @@ async function processEndedGames(ctx: any, solanaClient: SolanaClient) {
 
 /**
  * Check for finished games that need prize distribution
- * This scans historical game rounds in the database to find games that:
+ * This scans the gameRoundStates table to find games that:
  * 1. Are in "finished" status (closed)
- * 2. Have winner_prize > 0 (prize not yet sent)
+ * 2. Have prizeSent = false (prize not yet sent)
  * 3. Haven't been scheduled for prize distribution yet
  *
  * Rate limiting: Only processes last 10 games with 500ms delay between checks
@@ -155,46 +155,23 @@ async function processPastEndedGames(ctx: any, solanaClient: SolanaClient) {
   try {
     const now = Math.floor(Date.now() / 1000);
 
-    // Query database for all "finished" games
-    const finishedGames = await ctx.runQuery(internal.syncServiceMutations.getFinishedGames, {
+    // Query database for "finished" games that need prize distribution
+    const finishedGames = await ctx.runQuery(internal.syncServiceMutations.getFinishedGamesNeedingPrize, {
       limit: 10, // Only check last 10 games for rate limiting
     });
 
     if (finishedGames.length === 0) {
-      console.log("[Sync Service] No finished games found in database");
+      console.log("[Sync Service] No finished games needing prize distribution found in database");
       return;
     }
 
-    console.log(`[Sync Service] Found ${finishedGames.length} finished games to check for prize distribution`);
+    console.log(`[Sync Service] Found ${finishedGames.length} finished games needing prize distribution`);
 
     // Process each finished game with rate limiting
     for (const game of finishedGames) {
       try {
-        // Fetch the game from blockchain to check winner_prize
-        const blockchainGame = await solanaClient.getGameRound(game.roundId);
-
-        if (!blockchainGame) {
-          console.log(`[Sync Service] Game ${game.roundId} not found on blockchain, skipping`);
-          continue;
-        }
-
-        // Skip if not finished
-        if (blockchainGame.status !== 1) {
-          console.log(
-            `[Sync Service] Game ${game.roundId} not finished yet (status: ${blockchainGame.status})`
-          );
-          continue;
-        }
-
-        // Check if prize already sent (winnerPrize will be 0 after sending)
-        if (blockchainGame.winnerPrize === 0) {
-          console.log(`[Sync Service] Game ${game.roundId} prize already sent, skipping`);
-          continue;
-        }
-
-        // Prize needs to be sent!
         console.log(
-          `[Sync Service] Game ${game.roundId} has unclaimed prize: ${blockchainGame.winnerPrize} lamports to ${blockchainGame.winner}`
+          `[Sync Service] Game ${game.roundId} needs prize distribution (winner: ${game.winner})`
         );
 
         // Check if sendPrize action already scheduled
@@ -230,7 +207,7 @@ async function processPastEndedGames(ctx: any, solanaClient: SolanaClient) {
           `[Sync Service] Scheduled sendPrize for round ${game.roundId} (jobId: ${jobId})`
         );
 
-        // Rate limiting: 500ms delay between blockchain checks
+        // Rate limiting: 500ms delay between checks
         await new Promise((resolve) => setTimeout(resolve, 500));
       } catch (error) {
         console.error(`[Sync Service] Error processing finished game ${game.roundId}:`, error);

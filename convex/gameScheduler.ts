@@ -287,7 +287,7 @@ export const executeSendPrize = internalAction({
           action: "send_prize",
         });
 
-        // 4. Verify prize was sent
+        // 4. Verify prize was sent and update database
         await new Promise((resolve) => setTimeout(resolve, 1000));
         const updatedGame = await solanaClient.getGameRound(roundId);
 

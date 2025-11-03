@@ -3,6 +3,7 @@
  */
 import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+import { type GameRound } from "./lib/types";
 
 /**
  * Upsert game state from blockchain to database
@@ -15,8 +16,8 @@ export const upsertGameState = internalMutation({
       startTimestamp: v.number(),
       endTimestamp: v.number(),
       totalDeposit: v.number(),
-      rand: v.string(), // Changed to string to avoid BN overflow
-      map: v.number(), // Map/background ID (0-255)
+      rand: v.string(),
+      map: v.number(),
       userCount: v.number(),
       force: v.array(v.number()),
       status: v.number(),
@@ -109,7 +110,7 @@ export const upsertGameState = internalMutation({
       totalPot: gameRound.totalDeposit,
       winner: gameRound.winner,
       winningBetIndex: gameRound.winningBetIndex ?? 0,
-      prizeSent: false, // Default to false; update when prize is sent
+      prizeSent: gameRound.prizeSent ?? false, // Use provided value or default to false
     };
 
     // Do not update if the existing state is finished as the data is final
@@ -182,6 +183,39 @@ export const getFinishedGames = internalQuery({
       betCount: game.betCount,
       totalPot: game.totalPot,
       winner: game.winner,
+    }));
+  },
+});
+
+/**
+ * Query to find finished games that need prize distribution
+ * Returns games in "finished" status with prizeSent = false
+ */
+export const getFinishedGamesNeedingPrize = internalQuery({
+  args: {
+    limit: v.number(),
+  },
+  handler: async (ctx, { limit }) => {
+    const { db } = ctx;
+
+    // Find all games in "finished" status with prizeSent = false
+    const finishedGames = await db
+      .query("gameRoundStates")
+      .withIndex("by_status", (q) => q.eq("status", "finished"))
+      .filter((q) => q.eq(q.field("prizeSent"), false))
+      .order("desc")
+      .take(limit);
+
+    // Return simplified game data
+    return finishedGames.map((game) => ({
+      _id: game._id,
+      roundId: game.roundId,
+      endTimestamp: game.endTimestamp,
+      startTimestamp: game.startTimestamp,
+      betCount: game.betCount,
+      totalPot: game.totalPot,
+      winner: game.winner,
+      prizeSent: game.prizeSent,
     }));
   },
 });
