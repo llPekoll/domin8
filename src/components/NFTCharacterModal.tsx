@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { Star } from 'lucide-react';
-import { toast } from 'sonner';
+import { useState } from "react";
+import { Star } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -8,10 +7,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from './ui/dialog';
-import { Button } from './ui/button';
-import { NFTCharacterCard } from './NFTCharacterCard';
-import type { Id } from '../../convex/_generated/dataModel';
+} from "./ui/dialog";
+import { Button } from "./ui/button";
+import { NFTCharacterCard } from "./NFTCharacterCard";
+import type { Id } from "../../convex/_generated/dataModel";
 
 interface Character {
   _id: Id<"characters">;
@@ -45,28 +44,28 @@ export function NFTCharacterModal({
   onNFTCharacterSelected,
 }: NFTCharacterModalProps) {
   const [tempSelected, setTempSelected] = useState<Character[]>(selectedCharacters);
-  
+
   const toggleCharacter = (character: Character) => {
-    setTempSelected(prev => {
-      const exists = prev.find(c => c._id === character._id);
+    setTempSelected((prev) => {
+      const exists = prev.find((c) => c._id === character._id);
       if (exists) {
-        return prev.filter(c => c._id !== character._id);
+        return prev.filter((c) => c._id !== character._id);
       } else {
         return [...prev, character];
       }
     });
   };
-  
+
   const handleSave = () => {
     onSelectCharacters(tempSelected);
-    
+
     // Notify parent about character selection changes (all scenarios)
     if (onNFTCharacterSelected) {
       onNFTCharacterSelected(tempSelected);
     }
-    
+
     onOpenChange(false);
-    
+
     // Commented to avoid toast spam (as we already have one in CharacterSelection.tsx)
     // if (tempSelected.length > 0) {
     //   if (tempSelected.length === 1) {
@@ -84,11 +83,11 @@ export function NFTCharacterModal({
     //   toast.info('Using regular characters for bets');
     // }
   };
-  
+
   const lockedCharacters = allExclusiveCharacters.filter(
-    c => !unlockedCharacters.find(u => u._id === c._id)
+    (c) => !unlockedCharacters.find((u) => u._id === c._id)
   );
-  
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lvw max-h-[85vh] overflow-y-auto bg-gradient-to-b from-amber-950/98 to-amber-900/98 border-1 border-purple-500/50 backdrop-blur-sm [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-amber-950/30 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gradient-to-b [&::-webkit-scrollbar-thumb]:from-purple-600 [&::-webkit-scrollbar-thumb]:to-purple-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border [&::-webkit-scrollbar-thumb]:border-purple-500/30 hover:[&::-webkit-scrollbar-thumb]:from-purple-500 hover:[&::-webkit-scrollbar-thumb]:to-purple-600 [&::-webkit-scrollbar-corner]:bg-amber-950/30">
@@ -98,10 +97,11 @@ export function NFTCharacterModal({
             Your Exclusive Characters
           </DialogTitle>
           <DialogDescription className="text-amber-300">
-            Select characters for your exclusive pool. One character will be displayed and used for bets, or select none to use regular characters.
+            Select characters for your exclusive pool. One character will be displayed and used for
+            bets, or select none to use regular characters.
           </DialogDescription>
         </DialogHeader>
-        
+
         {/* Unlocked Characters Grid */}
         {isLoading ? (
           <div className="text-center py-12">
@@ -119,11 +119,11 @@ export function NFTCharacterModal({
               Unlocked Characters ({unlockedCharacters.length})
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-              {unlockedCharacters.map(character => (
+              {unlockedCharacters.map((character) => (
                 <NFTCharacterCard
                   key={character._id}
                   character={character}
-                  isSelected={tempSelected.some(c => c._id === character._id)}
+                  isSelected={tempSelected.some((c) => c._id === character._id)}
                   onSelect={() => toggleCharacter(character)}
                 />
               ))}
@@ -137,7 +137,7 @@ export function NFTCharacterModal({
             </p>
           </div>
         )}
-        
+
         {/* Locked Characters Grid (preview to encourage purchases) */}
         {lockedCharacters.length > 0 && (
           <div className="mt-6 border-t border-amber-800/50 pt-6">
@@ -148,7 +148,7 @@ export function NFTCharacterModal({
               Own these NFT collections to unlock exclusive characters
             </p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {lockedCharacters.map(character => (
+              {lockedCharacters.map((character) => (
                 <NFTCharacterCard
                   key={character._id}
                   character={character}
@@ -160,16 +160,16 @@ export function NFTCharacterModal({
             </div>
           </div>
         )}
-        
+
         <DialogFooter className="flex gap-2 mt-6">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => onOpenChange(false)}
             className="border-amber-600 text-amber-300 hover:bg-amber-900/50"
           >
             Cancel
           </Button>
-          <Button 
+          <Button
             onClick={handleSave}
             className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold"
           >

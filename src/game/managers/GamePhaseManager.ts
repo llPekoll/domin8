@@ -187,7 +187,9 @@ export class GamePhaseManager {
                 this.setPhase(GamePhase.CELEBRATING);
               });
             } else {
-              logger.game.warn("[GamePhaseManager] ⚠️ No participants for battle, skipping to celebration");
+              logger.game.warn(
+                "[GamePhaseManager] ⚠️ No participants for battle, skipping to celebration"
+              );
               this.setPhase(GamePhase.CELEBRATING);
             }
           }
@@ -203,9 +205,7 @@ export class GamePhaseManager {
           // Find winner participant data
           const participants = Array.from(this.playerManager.getParticipants().values());
           const winnerStr =
-            typeof gameState.winner === "string"
-              ? gameState.winner
-              : gameState.winner.toBase58?.();
+            typeof gameState.winner === "string" ? gameState.winner : gameState.winner.toBase58?.();
 
           const winner = participants.find((p) => p.id === winnerStr || p.playerId === winnerStr);
 

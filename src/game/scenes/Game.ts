@@ -2,7 +2,7 @@ import { EventBus } from "../EventBus";
 import { Scene } from "phaser";
 import { PlayerManager } from "../managers/PlayerManager";
 import { AnimationManager } from "../managers/AnimationManager";
-import { GamePhaseManager, GamePhase } from "../managers/GamePhaseManager";
+import { GamePhaseManager } from "../managers/GamePhaseManager";
 import { UIManager } from "../managers/UIManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";

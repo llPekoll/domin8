@@ -237,7 +237,7 @@ export class DemoScene extends Scene {
     const spawnIntervals = generateRandomSpawnIntervals(DEMO_PARTICIPANT_COUNT);
 
     let cumulativeTime = 0;
-    spawnIntervals.forEach((interval, index) => {
+    spawnIntervals.forEach((interval) => {
       cumulativeTime += interval;
 
       const timeout = setTimeout(() => {
@@ -268,8 +268,8 @@ export class DemoScene extends Scene {
     // Use shared battle phase animation sequence
     this.animationManager.startBattlePhaseSequence(this.playerManager);
 
-    // After 3 seconds, show results
-    this.time.delayedCall(DEMO_TIMINGS.ARENA_PHASE_DURATION, () => {
+    // After 3 seconds, show results (using max duration)
+    this.time.delayedCall(DEMO_TIMINGS.ARENA_PHASE_MAX_DURATION, () => {
       this.transitionToResultsPhase();
     });
   }
