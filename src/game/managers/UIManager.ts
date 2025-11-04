@@ -117,22 +117,23 @@ export class UIManager {
 
     // Create VRF waiting overlay (pop-up style)
     const centerY = this.scene.cameras.main.height / 2;
+    const topThirdY = this.scene.cameras.main.height * 0.25; // 25% down from top
 
-    // Dark overlay background
+    // Dark overlay background (semi-transparent so explosions show through)
     this.vrfOverlay = this.scene.add.rectangle(
       this.centerX,
       centerY,
       this.scene.cameras.main.width,
       this.scene.cameras.main.height,
       0x000000,
-      0.85
+      0.4 // Reduced from 0.85 to 0.4 so animations are visible
     );
     this.vrfOverlay.setDepth(2000);
     this.vrfOverlay.setScrollFactor(0);
     this.vrfOverlay.setVisible(false);
 
-    // VRF Container for text elements
-    this.vrfContainer = this.scene.add.container(this.centerX, centerY);
+    // VRF Container for text elements (positioned higher up)
+    this.vrfContainer = this.scene.add.container(this.centerX, topThirdY);
     this.vrfContainer.setDepth(2001);
     this.vrfContainer.setScrollFactor(0);
     this.vrfContainer.setVisible(false);
@@ -268,6 +269,23 @@ export class UIManager {
     const isWaiting = status === "Waiting" || status === 0 || status === "waiting";
     const isFinished = status === "Finished" || status === 1 || status === "finished";
 
+    // Detect VRF phase from blockchain state (not just local flag)
+    // VRF phase = game ended but not closed yet and no winner
+    const endTimestampMs = endTimestamp > 10000000000 ? endTimestamp : endTimestamp * 1000;
+    const currentTime = Date.now();
+    const gameHasEnded = currentTime >= endTimestampMs;
+    const isInVRFPhase = gameHasEnded && isWaiting && !hasWinner;
+
+    // Update local flag to match blockchain state
+    if (isInVRFPhase && !this.isWaitingForVRF) {
+      console.log("[UIManager] 🔄 Detected VRF phase from blockchain state (e.g., after refresh)");
+      this.isWaitingForVRF = true;
+      // Notify GamePhaseManager
+      if (this.gamePhaseManager) {
+        this.gamePhaseManager.triggerVRFPhase();
+      }
+    }
+
     // Reset VRF waiting flag when winner is determined
     if (hasWinner && this.isWaitingForVRF) {
       console.log("[UIManager] 🎉 Winner detected! Hiding VRF overlay");
@@ -275,7 +293,7 @@ export class UIManager {
     }
 
     // If waiting for VRF (countdown ended but no winner yet), show overlay
-    if (this.isWaitingForVRF && !hasWinner) {
+    if (isInVRFPhase) {
       console.log("=".repeat(60));
       console.log("[UIManager] 🎲 VRF WAITING ACTIVE (triggered by countdown)");
       console.log("[UIManager] isWaitingForVRF:", this.isWaitingForVRF);
@@ -318,8 +336,8 @@ export class UIManager {
       return;
     }
 
-    // Waiting phase: show demo-style countdown
-    if (isWaiting) {
+    // Waiting phase: show demo-style countdown (but only if game hasn't ended yet)
+    if (isWaiting && !gameHasEnded) {
       console.log("[UIManager] ⏰ Waiting phase - showing demo countdown");
 
       // Hide VRF overlay
