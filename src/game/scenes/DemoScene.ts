@@ -405,13 +405,11 @@ export class DemoScene extends Scene {
       this.subText.setVisible(true);
       this.subText.setText(`${participantCount} bots fighting for victory`);
     } else if (phase === "results") {
-      // Show Winner Crowned
+      // Hide all UI in results phase - no need to show anything in demo mode
       this.insertCoinText.setVisible(false);
       this.countdownText.setVisible(false);
-      this.phaseText.setVisible(true);
-      this.phaseText.setText("🏆 WINNER CROWNED!");
-      this.subText.setVisible(true);
-      this.subText.setText("Restarting in 5s...");
+      this.phaseText.setVisible(false);
+      this.subText.setVisible(false);
     }
   }
 

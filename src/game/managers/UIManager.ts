@@ -23,6 +23,11 @@ export class UIManager {
   private vrfSubText!: Phaser.GameObjects.Text;
   private vrfContainer!: Phaser.GameObjects.Container;
 
+  // Winner phase UI (large, centered)
+  private phaseText!: Phaser.GameObjects.Text;
+  private subText!: Phaser.GameObjects.Text;
+  private winnerContainer!: Phaser.GameObjects.Container;
+
   constructor(scene: Scene, centerX: number) {
     this.scene = scene;
     this.centerX = centerX;
@@ -74,9 +79,9 @@ export class UIManager {
         break;
 
       case GamePhase.CELEBRATING:
-        // Winner celebration - hide all UI
-        console.log("[UIManager] 🎉 Hiding all UI for celebration");
-        this.hideAllUI();
+        // Winner celebration - show winner UI
+        console.log("[UIManager] 🎉 Showing winner UI for celebration");
+        this.showWinnerUI();
         break;
 
       case GamePhase.CLEANUP:
@@ -92,7 +97,8 @@ export class UIManager {
       this.vrfContainer &&
       this.timerContainer &&
       this.timerBackground &&
-      this.demoCountdownText
+      this.demoCountdownText &&
+      this.winnerContainer
     );
   }
 
@@ -105,6 +111,26 @@ export class UIManager {
     this.demoCountdownText.setVisible(false);
     this.vrfOverlay.setVisible(false);
     this.vrfContainer.setVisible(false);
+    this.winnerContainer.setVisible(false);
+  }
+
+  private showWinnerUI() {
+    // Guard: Don't try to show UI before it's created
+    if (!this.isUIReady()) return;
+
+    // Hide other UI elements
+    this.timerContainer.setVisible(false);
+    this.timerBackground.setVisible(false);
+    this.demoCountdownText.setVisible(false);
+    this.vrfOverlay.setVisible(false);
+    this.vrfContainer.setVisible(false);
+
+    // Show winner UI
+    this.winnerContainer.setVisible(true);
+    this.phaseText.setVisible(true);
+    this.phaseText.setText("🏆 WINNER CROWNED!");
+    this.subText.setVisible(true);
+    this.subText.setText("Restarting in 5s...");
   }
 
   updateCenter(centerX: number) {
@@ -127,6 +153,9 @@ export class UIManager {
     }
     if (this.vrfOverlay) {
       this.vrfOverlay.setX(centerX);
+    }
+    if (this.winnerContainer) {
+      this.winnerContainer.setX(centerX);
     }
   }
 
@@ -152,9 +181,20 @@ export class UIManager {
       },
     });
 
+    // Create timer container and background (placeholder for future use)
+    this.timerContainer = this.scene.add.container(this.centerX, 50);
+    this.timerContainer.setDepth(1000);
+    this.timerContainer.setScrollFactor(0);
+    this.timerContainer.setVisible(false);
+
+    this.timerBackground = this.scene.add.rectangle(this.centerX, 50, 200, 50, 0x000000, 0.5);
+    this.timerBackground.setDepth(999);
+    this.timerBackground.setScrollFactor(0);
+    this.timerBackground.setVisible(false);
+
     // Create demo-style countdown (large, centered at bottom like demo mode)
-    const bottomThirdY = this.scene.cameras.main.height * 0.75 + 110; // 75% down screen + 110 offset
-    this.demoCountdownText = this.scene.add.text(this.centerX, bottomThirdY, "60", {
+    const demoCountdownY = this.scene.cameras.main.height * 0.75 + 110; // 75% down screen + 110 offset
+    this.demoCountdownText = this.scene.add.text(this.centerX, demoCountdownY, "60", {
       fontFamily: "metal-slug, Arial, sans-serif",
       fontSize: "96px",
       color: "#FF4444",
@@ -220,6 +260,36 @@ export class UIManager {
       yoyo: true,
       repeat: -1,
     });
+
+    // Create winner UI container (bottom 1/3 of screen, like demo mode)
+    const bottomThirdY = this.scene.cameras.main.height * 0.75; // 75% down the screen
+    this.winnerContainer = this.scene.add.container(this.centerX, bottomThirdY);
+    this.winnerContainer.setDepth(1000);
+    this.winnerContainer.setScrollFactor(0);
+    this.winnerContainer.setVisible(false);
+
+    // Phase text (Winner Crowned) - bigger and centered
+    this.phaseText = this.scene.add.text(0, 0, "", {
+      fontFamily: "metal-slug, Arial, sans-serif",
+      fontSize: "48px",
+      color: "#FFD700",
+      stroke: "#000000",
+      strokeThickness: 5,
+    });
+    this.phaseText.setOrigin(0.5);
+
+    // Sub text (restarting info) - bigger and centered
+    this.subText = this.scene.add.text(0, 70, "", {
+      fontFamily: "metal-slug, Arial, sans-serif",
+      fontSize: "28px",
+      color: "#FFFFFF",
+      stroke: "#000000",
+      strokeThickness: 3,
+    });
+    this.subText.setOrigin(0.5);
+
+    // Add to container
+    this.winnerContainer.add([this.phaseText, this.subText]);
   }
 
   updateGameState(gameState: any) {
