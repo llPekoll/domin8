@@ -368,14 +368,38 @@ const CharacterSelection = memo(function CharacterSelection({
       setBetAmount("0.1");
 
       // Auto-reroll to a new character for the next participant
-      if (allCharacters && allCharacters.length > 0) {
-        const availableCharacters = allCharacters.filter(
+      if (selectedNFTCharacters.length === 1) {
+        // Single NFT character selected - don't reroll, keep the same character
+        logger.ui.debug("[CharacterSelection] Single NFT character selected, keeping same character");
+      } else if (selectedNFTCharacters.length > 1) {
+        // Multiple NFT characters selected - reroll from the selected NFT pool
+        const availableNFTCharacters = selectedNFTCharacters.filter(
+          (c: any) => c._id !== characterToUse._id
+        );
+        if (availableNFTCharacters.length > 0) {
+          const randomChar =
+            availableNFTCharacters[Math.floor(Math.random() * availableNFTCharacters.length)];
+          setCurrentCharacter(randomChar);
+          logger.ui.debug("[CharacterSelection] Rerolled to another NFT character:", randomChar.name);
+        } else {
+          // All NFT characters exhausted, pick randomly from pool again
+          const randomChar =
+            selectedNFTCharacters[Math.floor(Math.random() * selectedNFTCharacters.length)];
+          setCurrentCharacter(randomChar);
+        }
+      } else if (allCharacters && allCharacters.length > 0) {
+        // No NFT characters selected - reroll from regular characters only
+        const regularCharacters = allCharacters.filter((char: any) => 
+          !char.nftCollection || char.nftCollection === null || char.nftCollection === undefined
+        );
+        const availableCharacters = regularCharacters.filter(
           (c: any) => c._id !== characterToUse._id
         );
         if (availableCharacters.length > 0) {
           const randomChar =
             availableCharacters[Math.floor(Math.random() * availableCharacters.length)];
           setCurrentCharacter(randomChar);
+          logger.ui.debug("[CharacterSelection] Rerolled to another regular character:", randomChar.name);
         }
       }
 
