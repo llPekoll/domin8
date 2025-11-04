@@ -1,12 +1,13 @@
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useActiveGame } from "../hooks/useActiveGame";
-import { Users, Swords } from "lucide-react";
-import { useMemo } from "react";
+import { Users, Swords, ChevronDown, ChevronUp } from "lucide-react";
+import { useMemo, useState } from "react";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 export function MultiParticipantPanel() {
   const { walletAddress } = usePrivyWallet();
   const { activeGame, isLoading } = useActiveGame();
+  const [isExpanded, setIsExpanded] = useState(true);
 
   // Transform blockchain bet data into participant format
   const participants = useMemo(() => {
@@ -52,13 +53,26 @@ export function MultiParticipantPanel() {
                 <Users className="w-3 h-3 inline mr-1" />
                 {currentParticipantCount}/{maxParticipants}
               </div>
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="text-amber-400 hover:text-amber-300 transition-colors"
+                aria-label={isExpanded ? "Collapse panel" : "Expand panel"}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="w-5 h-5" />
+                ) : (
+                  <ChevronUp className="w-5 h-5" />
+                )}
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="max-h-96 overflow-y-auto custom-scrollbar">
-          <div className="p-3 space-y-2">
-            {participants.map((participant) => {
+        {isExpanded && (
+          <>
+            <div className="max-h-96 overflow-y-auto custom-scrollbar">
+              <div className="p-3 space-y-2">
+                {participants.map((participant) => {
               const isOwn = participant.walletAddress === walletAddress;
               const isEliminated = participant.isEliminated;
               // Calculate win percentage based on bet amount
@@ -153,6 +167,8 @@ export function MultiParticipantPanel() {
             </span>
           </div>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

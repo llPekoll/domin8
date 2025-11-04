@@ -264,6 +264,26 @@ export const executeSendPrize = internalAction({
           action: "send_prize",
         });
 
+        // mark game as complete in database
+        await ctx.runMutation(internal.syncServiceMutations.upsertGameState, {
+            gameRound: {
+              roundId: gameRound.gameRound,
+              status: gameRound.status,
+              startTimestamp: gameRound.startDate,
+              endTimestamp: gameRound.endDate,
+              map: gameRound.map,
+              betCount: gameRound.bets.length,
+              betAmounts: gameRound.bets.map((b) => b.amount),
+              betSkin: gameRound.bets.map((b) => b.skin),
+              betPosition: gameRound.bets.map((b) => b.position),
+              totalPot: gameRound.totalDeposit,
+              winner: gameRound.winner,
+              winningBetIndex: gameRound.winningBetIndex ?? undefined,
+              prizeSent: true,
+            },
+          });
+
+
         console.log(`Round ${roundId}: 🎉 GAME COMPLETE - System ready for next game`);
         return;
       }

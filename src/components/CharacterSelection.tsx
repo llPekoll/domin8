@@ -130,7 +130,7 @@ const CharacterSelection = memo(function CharacterSelection({
           setCurrentCharacter(randomChar);
           toast.info('Switched back to regular characters', {
             description: `Now using ${randomChar.name}`,
-            icon: '🎲',
+            icon: '⭐',
           });
         }
       }
@@ -139,7 +139,7 @@ const CharacterSelection = memo(function CharacterSelection({
       setCurrentCharacter(characters[0]);
       toast.success(`${characters[0].name} is now your active character!`, {
         description: 'This character will be used for your next bet',
-        icon: '🎯',
+        icon: '⭐',
       });
     } else {
       // Multiple characters selected - randomly pick one to display
@@ -148,13 +148,14 @@ const CharacterSelection = memo(function CharacterSelection({
       setCurrentCharacter(selectedCharacter);
       toast.success(`${selectedCharacter.name} selected from your pool!`, {
         description: `${characters.length} characters available, randomly showing ${selectedCharacter.name}`,
-        icon: '🎲',
+        icon: '⭐',
       });
     }
   }, [allCharacters]);
 
   // Get character for bet (NFT pool or regular)
   const getCharacterForBet = useCallback(() => {
+    logger.ui.debug("[getCharacterForBet] Selected NFT characters:", selectedNFTCharacters);
     if (selectedNFTCharacters.length === 1) {
       // Single NFT character selected - should already be set as currentCharacter
       return currentCharacter;
