@@ -113,20 +113,6 @@ async function processEndedGames(ctx: any, activeGame: any) {
       return;
     }
 
-    // Check if game has ended (current time >= endDate)
-    const now = Math.floor(Date.now() / 1000);
-    const endTimestamp = activeGame.endDate;
-
-    if (now < endTimestamp) {
-      const remaining = endTimestamp - now;
-      console.log(
-        `[Sync Service] Game ${activeGame.gameRound} still active (${remaining}s remaining)`
-      );
-      return;
-    }
-
-    console.log(`[Sync Service] Game ${activeGame.gameRound} has ended, scheduling endGame action`);
-
     // Check if endGame action already scheduled
     const alreadyScheduled = await ctx.runQuery(internal.gameSchedulerMutations.isActionScheduled, {
       roundId: activeGame.gameRound,
@@ -138,9 +124,19 @@ async function processEndedGames(ctx: any, activeGame: any) {
       return;
     }
 
-    // Schedule endGame action
+    // Calculate delay: schedule for endTimestamp + 1 second
+    const now = Math.floor(Date.now() / 1000);
+    const endTimestamp = activeGame.endDate;
+    const targetTime = endTimestamp + 1;
+    const delayMs = Math.max(0, (targetTime - now) * 1000);
+
+    console.log(
+      `[Sync Service] Scheduling endGame for round ${activeGame.gameRound} at ${new Date(targetTime * 1000).toISOString()} (${delayMs}ms from now)`
+    );
+
+    // Schedule endGame action for endTimestamp + 1 second
     const jobId = await ctx.scheduler.runAfter(
-      0, // Execute immediately
+      delayMs,
       internal.gameScheduler.executeEndGame,
       { roundId: activeGame.gameRound }
     );
@@ -150,7 +146,7 @@ async function processEndedGames(ctx: any, activeGame: any) {
       jobId: jobId.toString(),
       roundId: activeGame.gameRound,
       action: "end_game",
-      scheduledTime: now,
+      scheduledTime: targetTime,
     });
 
     console.log(`[Sync Service] Scheduled endGame for round ${activeGame.gameRound} (jobId: ${jobId})`);
