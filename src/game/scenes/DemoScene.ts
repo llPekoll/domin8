@@ -99,6 +99,19 @@ export class DemoScene extends Scene {
       SoundManager.playInsertCoin(this);
     });
 
+    // Listen for game-started event from GamePhaseManager to stop demo
+    EventBus.on("game-started", () => {
+      logger.game.debug("[DemoScene] 🛑 Real game starting, stopping demo mode");
+      this.stopDemoMode();
+    });
+
+    // Listen for game-ended event from GamePhaseManager to restart demo
+    EventBus.on("game-ended", () => {
+      logger.game.debug("[DemoScene] 🔄 Game ended, restarting demo mode");
+      this.clearDemoParticipants();
+      this.startDemoMode();
+    });
+
     // Listen for player bet placement to spawn character immediately
     EventBus.on(
       "player-bet-placed",
@@ -510,9 +523,6 @@ export class DemoScene extends Scene {
   }
 
   public clearDemoParticipants() {
-    logger.game.debug("[DemoScene] Clearing demo participants", {
-      count: this.participants.length,
-    });
     this.playerManager.clearParticipants();
     this.animationManager.clearCelebration();
     this.participants = [];
@@ -521,6 +531,8 @@ export class DemoScene extends Scene {
   shutdown() {
     // Clean up event listeners to prevent memory leaks
     EventBus.off("play-insert-coin-sound");
+    EventBus.off("game-started");
+    EventBus.off("game-ended");
     EventBus.off("player-bet-placed");
     this.events.off("transitioncomplete");
 

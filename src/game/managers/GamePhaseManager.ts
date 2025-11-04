@@ -143,6 +143,8 @@ export class GamePhaseManager {
       case GamePhase.IDLE:
         // Demo mode → Real game starts
         if (isWaiting) {
+          logger.game.debug("[GamePhaseManager] 🎮 Real game starting, stopping demo");
+          EventBus.emit("game-started"); // Stop demo mode
           this.setPhase(GamePhase.WAITING);
         }
         break;
@@ -258,6 +260,9 @@ export class GamePhaseManager {
       this.playerManager.clearParticipants();
       this.setPhase(GamePhase.IDLE);
       logger.game.debug("[GamePhaseManager] ✅ Cleanup complete, returning to IDLE");
+
+      // Emit event to notify other systems (e.g., DemoScene) that we're back to IDLE
+      EventBus.emit("game-ended");
     });
   }
 
