@@ -41,11 +41,14 @@ export class GamePhaseManager {
   private setPhase(newPhase: GamePhase) {
     if (this.currentPhase === newPhase) return;
 
+    console.log(`📢 [GamePhaseManager] Phase transition: ${this.currentPhase} → ${newPhase}`);
+    console.log(`   Emitting 'game-phase-changed' event with phase: ${newPhase}`);
     logger.game.debug(`[GamePhaseManager] Phase transition: ${this.currentPhase} → ${newPhase}`);
     this.currentPhase = newPhase;
 
-    // Emit event for App.tsx to listen
+    // Emit event for SceneManager to listen
     EventBus.emit("game-phase-changed", newPhase);
+    console.log(`   ✅ Event emitted`);
   }
 
   handleGamePhase(gameState: any) {
@@ -56,8 +59,39 @@ export class GamePhaseManager {
 
     // Detect blockchain state
     const status = gameState.status;
-    const hasWinner = !!gameState.winnerId || !!gameState.winner;
+
+    // Check for winner - winner field from blockchain (PublicKey or string)
+    // Must match UIManager logic to stay in sync
+    let hasWinner = false;
+    if (gameState.winner) {
+      // Check if winner is actually set (not null PublicKey, empty string, or system program)
+      const winnerStr = typeof gameState.winner === 'string'
+        ? gameState.winner
+        : gameState.winner.toBase58?.();
+      hasWinner = !!winnerStr &&
+                  winnerStr !== '11111111111111111111111111111111' && // Not null address
+                  winnerStr !== 'SystemProgram11111111111111111111111111111'; // Not system program
+    }
+
     const isWaiting = status === "Waiting" || status === 0 || status === "waiting";
+
+    // Extra detailed logging for debugging
+    if (this.currentPhase === GamePhase.VRF_PENDING) {
+      const winnerStr = typeof gameState.winner === 'string'
+        ? gameState.winner
+        : gameState.winner?.toBase58?.();
+
+      console.log("🎲 [GamePhaseManager] VRF Phase - checking winner:", {
+        status: status,
+        statusType: typeof status,
+        winner: gameState.winner,
+        winnerType: typeof gameState.winner,
+        winnerString: winnerStr,
+        hasWinner: hasWinner,
+        isNullAddress: winnerStr === '11111111111111111111111111111111',
+        isSystemProgram: winnerStr === 'SystemProgram11111111111111111111111111111',
+      });
+    }
 
     logger.game.debug(`[GamePhaseManager] State check:`, {
       blockchainStatus: status,
@@ -107,7 +141,7 @@ export class GamePhaseManager {
         }
         break;
 
-      case GamePhase.CELEBRATING:
+      case GamePhase.CELEBRATING: {
         // Check if 15 seconds elapsed
         const celebrationElapsed = Date.now() - this.celebrationStartTime;
         if (celebrationElapsed >= this.CELEBRATION_DURATION) {
@@ -116,6 +150,7 @@ export class GamePhaseManager {
           this.handleGameCleanup();
         }
         break;
+      }
 
       case GamePhase.CLEANUP:
         // Cleanup complete, return to idle
@@ -206,7 +241,7 @@ export class GamePhaseManager {
         logger.game.debug("[GamePhaseManager] Found winner participant, showing celebration");
         // Create winner object for animation
         const winner = {
-          _id: winnerParticipant._id,
+          _id: winnerParticipant.id,
           playerId: winnerParticipant.playerId,
           displayName: winnerParticipant.displayName,
           betAmount: winnerParticipant.betAmount,

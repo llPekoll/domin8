@@ -8,7 +8,6 @@ export class UIManager {
 
   // UI Elements
   public titleLogo!: Phaser.GameObjects.Image;
-  public phaseText!: Phaser.GameObjects.Text;
   public timerText!: Phaser.GameObjects.Text;
   public timerBackground!: Phaser.GameObjects.Rectangle;
 
@@ -45,9 +44,6 @@ export class UIManager {
     // Update positions of UI elements that use centerX
     if (this.titleLogo) {
       this.titleLogo.setX(centerX);
-    }
-    if (this.phaseText) {
-      this.phaseText.setX(centerX);
     }
     if (this.timerContainer) {
       this.timerContainer.setX(centerX);
@@ -87,20 +83,6 @@ export class UIManager {
         this.titleLogo.setVisible(false);
       },
     });
-
-    // Phase indicator (always visible after title)
-    this.phaseText = this.scene.add
-      .text(this.centerX, 120, "", {
-        fontFamily: "Arial Black",
-        fontSize: 28,
-        color: "#FFA500",
-        stroke: "#4B2F20",
-        strokeThickness: 4,
-        align: "center",
-        shadow: { offsetX: 1, offsetY: 1, color: "#000000", blur: 3, fill: true },
-      })
-      .setOrigin(0.5)
-      .setDepth(150);
 
     // Timer background with gradient-like effect
     this.timerBackground = this.scene.add.rectangle(this.centerX, 180, 160, 60, 0x2c1810, 0.8);
@@ -236,43 +218,6 @@ export class UIManager {
       this.isWaitingForVRF = false;
       this.lastCountdownSeconds = -1;
     }
-
-    this.updatePhaseDisplay(gameState);
-  }
-
-  private updatePhaseDisplay(gameState: any) {
-    // Detect phase based on blockchain status and winner existence
-    const status = gameState.status;
-    const hasWinner = !!gameState.winnerId || !!gameState.winner;
-    const isWaiting = status === "Waiting" || status === 0 || status === "waiting";
-    const isFinished = status === "Finished" || status === 1 || status === "finished";
-
-    let phaseName = "GAME PHASE";
-    let displayPhase = 1;
-    const maxPhases = 3;
-
-    if (isWaiting) {
-      phaseName = "PLACE YOUR BETS";
-      displayPhase = 1;
-    } else if (isFinished && !hasWinner) {
-      phaseName = "DRAWING WINNER";
-      displayPhase = 2;
-    } else if (isFinished && hasWinner) {
-      phaseName = "WINNER DECLARED";
-      displayPhase = 3;
-    }
-
-    // Display phase counter
-    let displayText = `${phaseName} (${displayPhase}/${maxPhases})`;
-
-    // Add player count for waiting phase (if available)
-    if (isWaiting && gameState.playersCount !== undefined) {
-      displayText = `${phaseName} (${gameState.playersCount}/5)`;
-    } else if (isWaiting && gameState.bets) {
-      displayText = `${phaseName} (${gameState.bets.length}/5)`;
-    }
-
-    this.phaseText.setText(displayText);
   }
 
   private createDigitText(char: string, color: string): Phaser.GameObjects.Text {
@@ -287,75 +232,6 @@ export class UIManager {
         shadow: { offsetX: 2, offsetY: 2, color: "#000000", blur: 4, fill: true },
       })
       .setOrigin(0.5);
-  }
-
-  private animateDigitChange(
-    position: number,
-    newChar: string,
-    color: string,
-    totalLength: number
-  ) {
-    // Calculate centering offset based on total string length
-    const charWidth = 22;
-    const totalWidth = totalLength * charWidth;
-    const startOffset = -totalWidth / 2 + charWidth / 2;
-    const xOffset = startOffset + position * charWidth;
-
-    // Get or create container for this position
-    let container = this.digitContainers.get(position);
-    if (!container) {
-      container = this.scene.add.container(xOffset, 0);
-      this.timerContainer.add(container);
-      this.digitContainers.set(position, container);
-
-      // Create mask for this digit position
-      const maskGraphics = this.scene.add.graphics();
-      maskGraphics.fillRect(this.centerX + xOffset - 15, 180 - 25, 30, 50);
-      const mask = maskGraphics.createGeometryMask();
-      container.setMask(mask);
-    } else {
-      // Update position if length changed
-      container.setX(xOffset);
-    }
-
-    // Clear old digits that are off-screen
-    const toRemove: Phaser.GameObjects.Text[] = [];
-    container.each((child: any) => {
-      if (child.y > 40 || child.y < -40) {
-        toRemove.push(child);
-      }
-    });
-    toRemove.forEach((child) => container.remove(child, true));
-
-    // Create new digit coming from top
-    const newDigit = this.createDigitText(newChar, color);
-    newDigit.setY(-40); // Start above visible area
-    container.add(newDigit);
-
-    // Animate existing digits down and new digit into place
-    container.each((child: any) => {
-      if (child === newDigit) {
-        // New digit slides in from top
-        this.scene.tweens.add({
-          targets: child,
-          y: 0,
-          duration: 200,
-          ease: "Power2",
-        });
-      } else {
-        // Old digits slide down and fade out
-        this.scene.tweens.add({
-          targets: child,
-          y: child.y + 40,
-          alpha: 0,
-          duration: 200,
-          ease: "Power2",
-          onComplete: () => {
-            container.remove(child, true);
-          },
-        });
-      }
-    });
   }
 
   updateTimer() {
@@ -382,10 +258,11 @@ export class UIManager {
     let hasWinner = false;
     if (this.gameState.winner) {
       // Check if winner is actually set (not null PublicKey or empty string)
-      const winnerStr = typeof this.gameState.winner === 'string'
-        ? this.gameState.winner
-        : this.gameState.winner.toBase58?.();
-      hasWinner = !!winnerStr && winnerStr !== '11111111111111111111111111111111'; // Not null address
+      const winnerStr =
+        typeof this.gameState.winner === "string"
+          ? this.gameState.winner
+          : this.gameState.winner.toBase58?.();
+      hasWinner = !!winnerStr && winnerStr !== "11111111111111111111111111111111"; // Not null address
     }
 
     const isWaiting = status === "Waiting" || status === 0 || status === "waiting";
@@ -403,8 +280,6 @@ export class UIManager {
       console.log("[UIManager] 🎲 VRF WAITING ACTIVE (triggered by countdown)");
       console.log("[UIManager] isWaitingForVRF:", this.isWaitingForVRF);
       console.log("[UIManager] hasWinner:", hasWinner);
-      console.log("[UIManager] winner:", gameState?.winner);
-      console.log("[UIManager] status:", gameState?.status);
       console.log("=".repeat(60));
 
       // Hide top timer
@@ -469,8 +344,7 @@ export class UIManager {
   // Update demo-style countdown (large text at bottom)
   private updateDemoCountdown(endTimestamp: number) {
     // Convert blockchain timestamp from seconds to milliseconds if needed
-    const endTimestampMs =
-      endTimestamp > 10000000000 ? endTimestamp : endTimestamp * 1000;
+    const endTimestampMs = endTimestamp > 10000000000 ? endTimestamp : endTimestamp * 1000;
 
     // Calculate time remaining
     const currentTime = Date.now();

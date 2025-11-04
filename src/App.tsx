@@ -1,40 +1,33 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import { IRefPhaserGame, PhaserGame } from "./PhaserGame";
 import { Header } from "./components/Header";
 import { GameLobby } from "./components/GameLobby";
 import { BlockchainDebugDialog } from "./components/BlockchainDebugDialog";
 import { MultiParticipantPanel } from "./components/MultiParticipantPanel";
 import { useActiveGame } from "./hooks/useActiveGame";
+import { EventBus } from "./game/EventBus";
 
 export default function App() {
-  const [sceneReady, setSceneReady] = useState(false); // Track when Phaser scene is ready
-
   const phaserRef = useRef<IRefPhaserGame | null>(null);
 
   // Get current game state directly from blockchain (no Convex, <1s updates)
   const { activeGame: currentRoundState } = useActiveGame();
 
-  const currentScene = () => {
-    setSceneReady(true); // Mark scene as ready to trigger effect
-  };
-
-  // Update Game scene with blockchain game state
+  // Simple: Just pipe blockchain data to Phaser via EventBus
+  // SceneManager handles all the logic (phase detection, scene updates, transitions)
   useEffect(() => {
-    if (!phaserRef.current?.scene || !sceneReady || !currentRoundState) {
-      return;
-    }
-    const scene = phaserRef.current.scene;
+    console.log("📡 [App] Emitting blockchain state to Phaser:", {
+      hasGameState: !!currentRoundState,
+      status: currentRoundState?.status,
+    });
 
-    // Update game scene with blockchain data (scene handles phase logic internally)
-    if (scene.scene.key === "Game") {
-      (scene as any).updateGameState?.(currentRoundState);
-    }
-  }, [currentRoundState, sceneReady]);
+    EventBus.emit("blockchain-state-update", currentRoundState);
+  }, [currentRoundState]);
 
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="fixed inset-0 w-full h-full">
-        <PhaserGame ref={phaserRef} currentActiveScene={currentScene} />
+        <PhaserGame ref={phaserRef} />
       </div>
 
       <div className="relative z-10">

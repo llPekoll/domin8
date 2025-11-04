@@ -4,7 +4,6 @@ import { PlayerManager } from "../managers/PlayerManager";
 import { AnimationManager } from "../managers/AnimationManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
-import { GamePhase } from "../managers/GamePhaseManager";
 import { demoMapData, charactersData } from "../main";
 import { logger } from "../../lib/logger";
 import {
@@ -143,37 +142,9 @@ export class DemoScene extends Scene {
     // Create demo UI
     this.createDemoUI();
 
-    // Listen to GamePhaseManager - demo is active when phase === IDLE
-    EventBus.on("game-phase-changed", this.handleGamePhaseChange, this);
-
     // Start demo mode
     this.startDemoMode();
   }
-
-  private handleGamePhaseChange = (phase: GamePhase) => {
-    const shouldBeActive = phase === GamePhase.IDLE;
-    logger.game.debug("[DemoScene] Game phase changed:", {
-      phase,
-      wasActive: this.isActive,
-      willBeActive: shouldBeActive,
-      currentScene: this.scene.key,
-      isSceneActive: this.scene.isActive(),
-    });
-
-    // If real game starts (phase moves to WAITING from IDLE), transition to Game scene
-    if (phase === GamePhase.WAITING && this.scene.isActive()) {
-      logger.game.debug("[DemoScene] Real game starting (WAITING phase), transitioning to Game scene");
-      this.transitionToRealGame();
-      return;
-    }
-
-    // If we're back in Demo scene and should be active, restart demo
-    if (shouldBeActive && !this.isActive && this.scene.isActive()) {
-      this.startDemoMode();
-    } else if (!shouldBeActive && this.isActive) {
-      this.stopDemoMode();
-    }
-  };
 
   private startDemoMode() {
     logger.game.debug("[DemoScene] 🎮 Starting demo mode");
@@ -608,47 +579,13 @@ export class DemoScene extends Scene {
     this.participants = [];
   }
 
-  public transitionToRealGame() {
-    logger.game.debug("[DemoScene] 🎬 Starting transition to Game scene");
-
-    // Stop demo mode
-    this.stopDemoMode();
-
-    this.clearDemoParticipants();
-    // Hide demo UI
-    if (this.demoUIContainer) {
-      this.demoUIContainer.setVisible(false);
-    }
-    // Stop battle music when transitioning to real game
-    if (this.battleMusic) {
-      this.battleMusic.stop();
-      this.battleMusic = null;
-    }
-
-    // Create wipe transition effect
-    const fx = this.cameras.main.postFX.addWipe();
-    logger.game.debug("[DemoScene] Wipe effect created:", fx);
-
-    // Listen for transition complete event
-    this.events.once("transitionout", () => {
-      logger.game.debug("[DemoScene] ✅ Transition to Game scene complete");
-    });
-
-    this.scene.transition({
-      target: "Game",
-      duration: 1000,
-      moveBelow: true,
-      onUpdate: (progress: number) => {
-        fx.progress = progress;
-      },
-    });
-  }
-
   shutdown() {
     // Clean up event listeners to prevent memory leaks
     EventBus.off("play-insert-coin-sound");
     EventBus.off("player-bet-placed");
-    EventBus.off("game-phase-changed", this.handleGamePhaseChange, this);
+
+    // Stop demo mode when scene is shut down
+    this.stopDemoMode();
 
     // Clean up demo state
     this.clearAllDemoState();

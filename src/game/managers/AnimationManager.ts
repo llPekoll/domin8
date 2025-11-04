@@ -38,7 +38,10 @@ export class AnimationManager {
   private celebrationObjects: Phaser.GameObjects.GameObject[] = [];
 
   clearCelebration() {
-    logger.game.debug("[AnimationManager] Clearing celebration objects:", this.celebrationObjects.length);
+    logger.game.debug(
+      "[AnimationManager] Clearing celebration objects:",
+      this.celebrationObjects.length
+    );
     this.celebrationObjects.forEach((obj) => {
       if (obj && obj.active) {
         obj.destroy();
@@ -196,38 +199,17 @@ export class AnimationManager {
       .setOrigin(0.5)
       .setDepth(200);
 
-    // Bet amount text at bottom
-    const betText = this.scene.add
-      .text(this.centerX, screenHeight - 40, `Bet: ${winner.betAmount} coins`, {
-        fontFamily: "Arial",
-        fontSize: 20,
-        color: "#00ff00",
-        stroke: "#000000",
-        strokeThickness: 3,
-        align: "center",
-      })
-      .setOrigin(0.5)
-      .setDepth(200);
-
     // Track all celebration objects for cleanup
-    this.celebrationObjects.push(backgroundOverlay, throne, nameText, betText);
+    this.celebrationObjects.push(backgroundOverlay, throne, nameText);
 
     // Animate name and bet text
     nameText.setAlpha(0);
-    betText.setAlpha(0);
 
     this.scene.tweens.add({
       targets: nameText,
       alpha: 1,
       duration: 500,
       delay: 300,
-    });
-
-    this.scene.tweens.add({
-      targets: betText,
-      alpha: 1,
-      duration: 500,
-      delay: 500,
     });
 
     // Bounce animation is now handled in PlayerManager.showResults()
