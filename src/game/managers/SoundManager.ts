@@ -1,4 +1,5 @@
 import { Scene } from "phaser";
+import { logger } from "~/lib/logger";
 
 /**
  * SoundManager - Centralized sound management
@@ -69,14 +70,14 @@ export class SoundManager {
       // Only play if not muted
       if (!this.isMuted) {
         sound.play();
-        console.log(`[SoundManager] Playing "${key}" at volume ${finalVolume.toFixed(2)}`);
+        logger.ui.debug(`[SoundManager] Playing "${key}" at volume ${finalVolume.toFixed(2)}`);
       } else {
-        console.log(`[SoundManager] Sound "${key}" created but not played (muted)`);
+        logger.ui.debug(`[SoundManager] Sound "${key}" created but not played (muted)`);
       }
 
       return sound;
     } catch (error) {
-      console.error(`[SoundManager] Failed to create sound "${key}":`, error);
+      logger.ui.error(`[SoundManager] Failed to create sound "${key}":`, error);
       return null;
     }
   }
@@ -97,9 +98,9 @@ export class SoundManager {
 
     try {
       scene.sound.play(key, { volume: finalVolume });
-      console.log(`[SoundManager] Playing sound "${key}" at volume ${finalVolume.toFixed(2)}`);
+      logger.ui.debug(`[SoundManager] Playing sound "${key}" at volume ${finalVolume.toFixed(2)}`);
     } catch (error) {
-      console.error(`[SoundManager] Failed to play sound "${key}":`, error);
+      logger.ui.error(`[SoundManager] Failed to play sound "${key}":`, error);
     }
   }
 
@@ -191,7 +192,7 @@ export class SoundManager {
       } else {
         this.battleMusic.resume();
       }
-      console.log(`[SoundManager] Sound ${muted ? "muted" : "unmuted"}`);
+      logger.ui.debug(`[SoundManager] Sound ${muted ? "muted" : "unmuted"}`);
     }
   }
 

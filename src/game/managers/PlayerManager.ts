@@ -143,7 +143,7 @@ export class PlayerManager {
     // Apply base 3x multiplier + bet scaling FIRST
     const betScale = participant.size || this.calculateParticipantScale(participant.betAmount);
     const scale = betScale * this.BASE_SCALE_MULTIPLIER;
-    console.log(`[PlayerManager] Character scale calculated:`, {
+    logger.ui.debug(`[PlayerManager] Character scale calculated:`, {
       participantId,
       betAmount: participant.betAmount,
       betScale,
