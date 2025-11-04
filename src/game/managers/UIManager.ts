@@ -16,7 +16,6 @@ export class UIManager {
 
   // Demo-style countdown (large, bottom center)
   private demoCountdownText!: Phaser.GameObjects.Text;
-  private demoCountdownContainer!: Phaser.GameObjects.Container;
 
   // VRF waiting overlay
   private vrfOverlay!: Phaser.GameObjects.Rectangle;
@@ -93,7 +92,7 @@ export class UIManager {
       this.vrfContainer &&
       this.timerContainer &&
       this.timerBackground &&
-      this.demoCountdownContainer
+      this.demoCountdownText
     );
   }
 
@@ -103,7 +102,7 @@ export class UIManager {
 
     this.timerContainer.setVisible(false);
     this.timerBackground.setVisible(false);
-    this.demoCountdownContainer.setVisible(false);
+    this.demoCountdownText.setVisible(false);
     this.vrfOverlay.setVisible(false);
     this.vrfContainer.setVisible(false);
   }
@@ -120,8 +119,8 @@ export class UIManager {
     if (this.timerBackground) {
       this.timerBackground.setX(centerX);
     }
-    if (this.demoCountdownContainer) {
-      this.demoCountdownContainer.setX(centerX);
+    if (this.demoCountdownText) {
+      this.demoCountdownText.setX(centerX);
     }
     if (this.vrfContainer) {
       this.vrfContainer.setX(centerX);
@@ -154,14 +153,8 @@ export class UIManager {
     });
 
     // Create demo-style countdown (large, centered at bottom like demo mode)
-    const bottomThirdY = this.scene.cameras.main.height * 0.75; // 75% down screen
-    this.demoCountdownContainer = this.scene.add.container(this.centerX, bottomThirdY);
-    this.demoCountdownContainer.setDepth(1000);
-    this.demoCountdownContainer.setScrollFactor(0);
-    this.demoCountdownContainer.setVisible(false); // Hidden by default
-
-    // Countdown text positioned at (0, 110) to match demo exactly
-    this.demoCountdownText = this.scene.add.text(0, 110, "30", {
+    const bottomThirdY = this.scene.cameras.main.height * 0.75 + 110; // 75% down screen + 110 offset
+    this.demoCountdownText = this.scene.add.text(this.centerX, bottomThirdY, "60", {
       fontFamily: "metal-slug, Arial, sans-serif",
       fontSize: "96px",
       color: "#FF4444",
@@ -169,7 +162,9 @@ export class UIManager {
       strokeThickness: 8,
     });
     this.demoCountdownText.setOrigin(0.5);
-    this.demoCountdownContainer.add(this.demoCountdownText);
+    this.demoCountdownText.setDepth(1000);
+    this.demoCountdownText.setScrollFactor(0);
+    this.demoCountdownText.setVisible(false); // Hidden by default
 
     // Create VRF waiting overlay (pop-up style)
     const centerY = this.scene.cameras.main.height / 2;
@@ -239,14 +234,6 @@ export class UIManager {
 
     const endTimestamp = this.gameState.endTimestamp || this.gameState.endDate;
 
-    if (!endTimestamp || endTimestamp === 0) {
-      // No countdown to show yet
-      this.demoCountdownContainer.setVisible(false);
-      return;
-    }
-
-    // Just display the countdown value
-    // Phase-based visibility is handled by onPhaseChanged
     this.updateDemoCountdown(endTimestamp);
   }
 
@@ -256,16 +243,22 @@ export class UIManager {
     // Convert blockchain timestamp from seconds to milliseconds if needed
     const endTimestampMs = endTimestamp > 10000000000 ? endTimestamp : endTimestamp * 1000;
 
-    // Calculate time remaining
+    // Calculate time remaining (allow negative values)
     const currentTime = Date.now();
-    const timeRemaining = Math.max(0, endTimestampMs - currentTime);
+    const timeRemaining = endTimestampMs - currentTime;
     const seconds = Math.ceil(timeRemaining / 1000);
 
-    // Show countdown
-    this.demoCountdownContainer.setVisible(true);
-    this.demoCountdownText.setText(seconds.toString());
+    // Show countdown (including 0)
+    this.demoCountdownText.setVisible(true);
+    this.demoCountdownText.setText(Math.max(0, seconds).toString()); // Display 0 instead of negative
 
-    // Color changes based on urgency (same as demo)
+    // Hide countdown only after it goes negative (below 0)
+    if (seconds < 0) {
+      this.demoCountdownText.setVisible(false);
+      return;
+    }
+
+    // Color changes based on urgency
     if (seconds <= 5) {
       this.demoCountdownText.setColor("#FF4444"); // Red
       // Pulse effect for last 5 seconds - scale text (not container) so it scales from center
