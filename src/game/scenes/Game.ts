@@ -42,9 +42,6 @@ export class Game extends Scene {
     this.uiManager = new UIManager(this, this.centerX);
     this.backgroundManager = new BackgroundManager(this, this.centerX, this.centerY);
 
-    // Connect UIManager to GamePhaseManager for VRF phase triggering
-    this.uiManager.setGamePhaseManager(this.gamePhaseManager);
-
     // Set default background (will be updated when gameState is received)
     const defaultTexture = "arena_classic";
     if (this.textures.exists(defaultTexture)) {
@@ -235,6 +232,11 @@ export class Game extends Scene {
   shutdown() {
     // Clean up event listeners to prevent memory leaks
     EventBus.off("play-insert-coin-sound");
+
+    // Clean up UIManager event listeners
+    if (this.uiManager) {
+      this.uiManager.destroy();
+    }
   }
 
   changeScene() {

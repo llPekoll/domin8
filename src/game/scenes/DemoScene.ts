@@ -68,7 +68,6 @@ export class DemoScene extends Scene {
   }
 
   create() {
-    logger.game.debug("[DemoScene] 🎮 DemoScene created and ready");
     this.camera = this.cameras.main;
     this.centerX = this.camera.centerX;
     this.centerY = this.camera.centerY;
@@ -79,14 +78,15 @@ export class DemoScene extends Scene {
 
     // Initialize background immediately with preloaded demo map
     if (demoMapData?.background) {
-      logger.game.debug("[DemoScene] Initializing background with:", demoMapData.background);
       this.backgroundManager.setTexture(demoMapData.background);
-    } else {
-      logger.game.warn("[DemoScene] No demo map data available!");
     }
-
     this.scale.on("resize", () => this.handleResize(), this);
     EventBus.emit("current-scene-ready", this);
+
+    // Listen for when scene becomes active again after Game scene (restart fresh demo)
+    this.events.on("transitioncomplete", () => {
+      this.startDemoMode();
+    });
 
     // Initialize SoundManager
     SoundManager.initialize();
@@ -111,9 +111,6 @@ export class DemoScene extends Scene {
         betIndex: number;
         walletAddress: string;
       }) => {
-        logger.game.debug("[DemoScene] 🎯 RECEIVED player-bet-placed EVENT");
-        logger.game.debug("[DemoScene] Event data:", data);
-
         // Derive character key from character name (e.g., "Warrior" -> "warrior")
         const characterKey = data.characterName?.toLowerCase().replace(/\s+/g, "-") || "warrior";
 
@@ -147,7 +144,6 @@ export class DemoScene extends Scene {
   }
 
   private startDemoMode() {
-    logger.game.debug("[DemoScene] 🎮 Starting demo mode");
     this.isActive = true;
     this.countdown = DEMO_TIMINGS.SPAWNING_PHASE_DURATION / 1000;
     this.demoPhase = "spawning";
@@ -165,8 +161,6 @@ export class DemoScene extends Scene {
       this.centerY
     );
 
-    logger.game.debug("[DemoScene] Positions generated:", this.shuffledPositions.length);
-
     // Update UI
     this.updateDemoUI(this.demoPhase, this.countdown, 0);
 
@@ -178,7 +172,6 @@ export class DemoScene extends Scene {
   }
 
   private stopDemoMode() {
-    logger.game.debug("[DemoScene] 🛑 Stopping demo mode");
     this.isActive = false;
     this.clearAllDemoState();
 
@@ -256,11 +249,7 @@ export class DemoScene extends Scene {
           return;
         }
 
-        const participant = generateDemoParticipant(
-          this.spawnCount,
-          charactersData,
-          position
-        );
+        const participant = generateDemoParticipant(this.spawnCount, charactersData, position);
 
         this.spawnDemoParticipant(participant);
         this.spawnCount++;
@@ -276,8 +265,8 @@ export class DemoScene extends Scene {
     this.demoPhase = "arena";
     this.updateDemoUI(this.demoPhase, 0, this.participants.length);
 
-    // Move participants to center for battle
-    this.moveParticipantsToCenter();
+    // Use shared battle phase animation sequence
+    this.animationManager.startBattlePhaseSequence(this.playerManager);
 
     // After 3 seconds, show results
     this.time.delayedCall(DEMO_TIMINGS.ARENA_PHASE_DURATION, () => {
@@ -290,10 +279,10 @@ export class DemoScene extends Scene {
     this.demoPhase = "results";
     this.updateDemoUI(this.demoPhase, 0, this.participants.length);
 
-    // Pick random winner
+    // Pick random winner and use shared results phase animation sequence
     const winner = generateDemoWinner(this.participants);
     if (winner) {
-      this.showDemoWinner(winner);
+      this.animationManager.startResultsPhaseSequence(this.playerManager, winner);
     }
 
     // After 5 seconds, restart demo
@@ -520,56 +509,6 @@ export class DemoScene extends Scene {
     logger.game.debug(`[DemoScene] Participant ${participantId} added successfully`);
   }
 
-  public moveParticipantsToCenter() {
-    this.playerManager.moveParticipantsToCenter();
-
-    // After 2 seconds of running, start continuous explosions
-    this.time.delayedCall(500, () => {
-      logger.game.debug("[DemoScene] 💥 Starting continuous explosions after 2 seconds of running");
-      this.animationManager.createContinuousExplosions();
-    });
-  }
-
-  public showDemoWinner(winner: any) {
-    // Mark all non-winners as eliminated
-    const participants = this.playerManager.getParticipants();
-    participants.forEach((participant) => {
-      if (participant.id !== winner._id && participant.id !== winner.id) {
-        participant.eliminated = true;
-      } else {
-        participant.eliminated = false; // Winner stays
-      }
-    });
-
-    // Explode losers outward with physics (includes explosions, blood, shake)
-    this.animationManager.explodeParticipantsOutward(participants);
-
-    // After 3 seconds: Show winner celebration
-    this.time.delayedCall(3000, () => {
-      logger.game.debug("[DemoScene] 🎉 Starting winner celebration for:", winner);
-
-      const demoGameState = {
-        status: "results",
-        winnerId: winner._id || winner.id,
-        participants: Array.from(participants.values()),
-        isDemo: true,
-      };
-
-      // Show winner with PlayerManager (scales up, golden tint, etc.)
-      const winnerParticipant = this.playerManager.showResults(demoGameState);
-
-      logger.game.debug("[DemoScene] Winner participant from showResults:", winnerParticipant);
-
-      // Add celebration animations (confetti, text, bounce)
-      if (winnerParticipant) {
-        logger.game.debug("[DemoScene] 🏆 Calling addWinnerCelebration");
-        this.animationManager.addWinnerCelebration(winnerParticipant, winner);
-      } else {
-        logger.game.error("[DemoScene] ❌ No winner participant returned!");
-      }
-    });
-  }
-
   public clearDemoParticipants() {
     logger.game.debug("[DemoScene] Clearing demo participants", {
       count: this.participants.length,
@@ -583,6 +522,7 @@ export class DemoScene extends Scene {
     // Clean up event listeners to prevent memory leaks
     EventBus.off("play-insert-coin-sound");
     EventBus.off("player-bet-placed");
+    this.events.off("transitioncomplete");
 
     // Stop demo mode when scene is shut down
     this.stopDemoMode();

@@ -12,11 +12,12 @@ import { EventBus } from "../EventBus";
  */
 
 export enum GamePhase {
-  IDLE = "idle",              // No game, show demo
-  WAITING = "waiting",         // Accepting bets (blockchain status = 0)
+  IDLE = "idle", // No game, show demo
+  WAITING = "waiting", // Accepting bets (blockchain status = 0)
   VRF_PENDING = "vrf_pending", // Countdown ended, waiting for winner determination
   CELEBRATING = "celebrating", // Winner determined, 15s celebration
-  CLEANUP = "cleanup"          // Fading out, preparing for next game
+  FIGHTING = "fighting", // Winner determined, 15s celebration
+  CLEANUP = "cleanup", // Fading out, preparing for next game
 }
 
 export class GamePhaseManager {
@@ -27,6 +28,9 @@ export class GamePhaseManager {
   private celebrationStartTime: number = 0;
   private readonly CELEBRATION_DURATION = 15000; // 15 seconds
   private vrfCheckCounter: number = 0; // Counter for throttling VRF phase logs
+  private battleSequenceStarted: boolean = false; // Track if battle sequence has been triggered
+  private resultsSequenceStarted: boolean = false; // Track if results sequence has been triggered
+  private lastCountdownSeconds: number = -1; // Track countdown to detect when it reaches 0
 
   constructor(scene: Scene, playerManager: PlayerManager, animationManager: AnimationManager) {
     this.scene = scene;
@@ -41,19 +45,47 @@ export class GamePhaseManager {
   private setPhase(newPhase: GamePhase) {
     if (this.currentPhase === newPhase) return;
 
-    console.log(`📢 [GamePhaseManager] Phase transition: ${this.currentPhase} → ${newPhase}`);
-    console.log(`   Emitting 'game-phase-changed' event with phase: ${newPhase}`);
     logger.game.debug(`[GamePhaseManager] Phase transition: ${this.currentPhase} → ${newPhase}`);
+
+    const oldPhase = this.currentPhase;
     this.currentPhase = newPhase;
 
-    // Emit event for SceneManager to listen
+    // Reset phase-specific state when leaving phases
+    if (oldPhase === GamePhase.VRF_PENDING) {
+      this.vrfCheckCounter = 0;
+    }
+    if (oldPhase === GamePhase.FIGHTING) {
+      this.battleSequenceStarted = false;
+    }
+    if (oldPhase === GamePhase.CELEBRATING) {
+      this.resultsSequenceStarted = false;
+      this.celebrationStartTime = 0;
+    }
+
+    // Emit event for SceneManager and UIManager to listen
     EventBus.emit("game-phase-changed", newPhase);
-    console.log(`   ✅ Event emitted`);
+  }
+
+  /**
+   * Trigger VRF phase when countdown reaches 0
+   * Called internally by handleGamePhase()
+   */
+  private triggerVRFPhase() {
+    logger.game.debug("[GamePhaseManager] 🎲 Triggering VRF_PENDING phase (countdown ended)");
+    if (this.currentPhase === GamePhase.WAITING) {
+      this.setPhase(GamePhase.VRF_PENDING);
+    } else {
+      logger.game.warn(
+        "[GamePhaseManager] ⚠️ triggerVRFPhase called but not in WAITING phase:",
+        this.currentPhase
+      );
+    }
   }
 
   handleGamePhase(gameState: any) {
     if (!gameState) {
       this.setPhase(GamePhase.IDLE);
+      this.lastCountdownSeconds = -1;
       return;
     }
 
@@ -61,43 +93,50 @@ export class GamePhaseManager {
     const status = gameState.status;
 
     // Check for winner - winner field from blockchain (PublicKey or string)
-    // Must match UIManager logic to stay in sync
     let hasWinner = false;
     if (gameState.winner) {
       // Check if winner is actually set (not null PublicKey, empty string, or system program)
-      const winnerStr = typeof gameState.winner === 'string'
-        ? gameState.winner
-        : gameState.winner.toBase58?.();
-      hasWinner = !!winnerStr &&
-                  winnerStr !== '11111111111111111111111111111111' && // Not null address
-                  winnerStr !== 'SystemProgram11111111111111111111111111111'; // Not system program
+      const winnerStr =
+        typeof gameState.winner === "string" ? gameState.winner : gameState.winner.toBase58?.();
+      hasWinner =
+        !!winnerStr &&
+        winnerStr !== "11111111111111111111111111111111" && // Not null address
+        winnerStr !== "SystemProgram11111111111111111111111111111"; // Not system program
     }
 
     const isWaiting = status === "Waiting" || status === 0 || status === "waiting";
 
-    // Extra detailed logging for debugging
-    if (this.currentPhase === GamePhase.VRF_PENDING) {
-      const winnerStr = typeof gameState.winner === 'string'
-        ? gameState.winner
-        : gameState.winner?.toBase58?.();
+    // Get countdown info
+    const endTimestamp = gameState.endTimestamp || gameState.endDate;
+    let countdownSeconds = 0;
+    let gameHasEnded = false;
 
-      console.log("🎲 [GamePhaseManager] VRF Phase - checking winner:", {
-        status: status,
-        statusType: typeof status,
-        winner: gameState.winner,
-        winnerType: typeof gameState.winner,
-        winnerString: winnerStr,
-        hasWinner: hasWinner,
-        isNullAddress: winnerStr === '11111111111111111111111111111111',
-        isSystemProgram: winnerStr === 'SystemProgram11111111111111111111111111111',
-      });
+    if (endTimestamp && endTimestamp !== 0) {
+      const endTimestampMs = endTimestamp > 10000000000 ? endTimestamp : endTimestamp * 1000;
+      const currentTime = Date.now();
+      const timeRemaining = Math.max(0, endTimestampMs - currentTime);
+      countdownSeconds = Math.ceil(timeRemaining / 1000);
+      gameHasEnded = currentTime >= endTimestampMs;
     }
 
-    logger.game.debug(`[GamePhaseManager] State check:`, {
-      blockchainStatus: status,
-      hasWinner,
-      currentPhase: this.currentPhase,
-    });
+    // Detect countdown ending (transition from >0 to 0)
+    if (countdownSeconds === 0 && this.lastCountdownSeconds > 0) {
+      logger.game.debug("=".repeat(60));
+      logger.game.debug("[GamePhaseManager] ⏰ COUNTDOWN REACHED 0! Triggering VRF phase");
+      logger.game.debug("=".repeat(60));
+      this.triggerVRFPhase();
+    }
+    this.lastCountdownSeconds = countdownSeconds;
+
+    // Detect VRF phase from blockchain state (e.g., after page refresh)
+    // VRF phase = game ended, still waiting status, no winner yet
+    const isInVRFPhase = gameHasEnded && isWaiting && !hasWinner;
+    if (isInVRFPhase && this.currentPhase === GamePhase.WAITING) {
+      logger.game.debug(
+        "[GamePhaseManager] 🔄 Detected VRF phase from blockchain (e.g., after refresh)"
+      );
+      this.triggerVRFPhase();
+    }
 
     // State machine transitions
     switch (this.currentPhase) {
@@ -109,153 +148,90 @@ export class GamePhaseManager {
         break;
 
       case GamePhase.WAITING:
-        // Waiting for countdown → VRF triggered by UIManager countdown = 0
-        // UIManager will emit event to trigger VRF_PENDING phase
-        // Don't check blockchain status here, it changes too fast
         break;
 
       case GamePhase.VRF_PENDING:
-        // Waiting for winner → Celebration starts
-        // Only log occasionally (every 60 frames = 1 second at 60fps)
-        if (!this.vrfCheckCounter) this.vrfCheckCounter = 0;
-        this.vrfCheckCounter++;
-
-        if (this.vrfCheckCounter % 60 === 0 || hasWinner) {
-          logger.game.debug("[GamePhaseManager] 🎲 VRF_PENDING - checking for winner", {
-            hasWinner,
-            winnerId: gameState.winnerId,
-            winner: gameState.winner,
-            status: gameState.status,
-            checkCount: this.vrfCheckCounter,
-          });
-        }
-
+        // Wait for winner to be determined by blockchain VRF
+        // When winner is detected, transition to FIGHTING phase
         if (hasWinner) {
-          logger.game.debug("=".repeat(60));
-          logger.game.debug("[GamePhaseManager] ✅ Winner detected! Transitioning to CELEBRATING");
-          logger.game.debug("=".repeat(60));
-          this.setPhase(GamePhase.CELEBRATING);
-          this.celebrationStartTime = Date.now();
-          this.vrfCheckCounter = 0; // Reset counter
-          this.handleCelebrationStart(gameState);
+          logger.game.debug(
+            "[GamePhaseManager] 🎯 Winner determined! Transitioning to FIGHTING phase"
+          );
+          this.setPhase(GamePhase.FIGHTING);
+        } else {
+          // Throttle VRF pending logs (only show every 60 checks to reduce spam)
+          this.vrfCheckCounter++;
+          if (this.vrfCheckCounter % 60 === 0) {
+            logger.game.debug(
+              "[GamePhaseManager] ⏳ Still waiting for VRF winner determination..."
+            );
+          }
+        }
+        break;
+
+      case GamePhase.FIGHTING:
+        {
+          // Start battle sequence once
+          if (!this.battleSequenceStarted) {
+            const participantsMap = this.playerManager.getParticipants();
+            if (participantsMap.size > 0) {
+              logger.game.debug("[GamePhaseManager] ⚔️ Starting battle phase sequence");
+              this.animationManager.startBattlePhaseSequence(this.playerManager);
+              this.battleSequenceStarted = true;
+
+              // Transition to CELEBRATING phase after battle animations complete
+              // Battle sequence: moveToCenter (instant) + explosions start after 500ms
+              // Total battle duration from DEMO_TIMINGS.ARENA_PHASE_DURATION = 3000ms
+              this.scene.time.delayedCall(3000, () => {
+                logger.game.debug("[GamePhaseManager] ⚔️ Battle complete, starting celebration");
+                this.setPhase(GamePhase.CELEBRATING);
+              });
+            } else {
+              logger.game.warn("[GamePhaseManager] ⚠️ No participants for battle, skipping to celebration");
+              this.setPhase(GamePhase.CELEBRATING);
+            }
+          }
         }
         break;
 
       case GamePhase.CELEBRATING: {
-        // Check if 15 seconds elapsed
-        const celebrationElapsed = Date.now() - this.celebrationStartTime;
-        if (celebrationElapsed >= this.CELEBRATION_DURATION) {
-          logger.game.debug("[GamePhaseManager] 🎉 Celebration complete, starting cleanup");
-          this.setPhase(GamePhase.CLEANUP);
-          this.handleGameCleanup();
+        // Initialize celebration and start results sequence once
+        if (!this.resultsSequenceStarted && hasWinner) {
+          logger.game.debug("[GamePhaseManager] 🎉 Starting celebration phase with winner");
+          this.celebrationStartTime = Date.now();
+
+          // Find winner participant data
+          const participants = Array.from(this.playerManager.getParticipants().values());
+          const winnerStr =
+            typeof gameState.winner === "string"
+              ? gameState.winner
+              : gameState.winner.toBase58?.();
+
+          const winner = participants.find((p) => p.id === winnerStr || p.playerId === winnerStr);
+
+          if (winner) {
+            this.animationManager.startResultsPhaseSequence(this.playerManager, winner);
+            this.resultsSequenceStarted = true;
+          } else {
+            logger.game.warn("[GamePhaseManager] ⚠️ Winner not found in participants:", winnerStr);
+          }
+        }
+
+        // Check if 15 seconds elapsed (only if celebration has started)
+        if (this.celebrationStartTime > 0) {
+          const celebrationElapsed = Date.now() - this.celebrationStartTime;
+          if (celebrationElapsed >= this.CELEBRATION_DURATION) {
+            logger.game.debug("[GamePhaseManager] 🎉 Celebration complete, starting cleanup");
+            this.setPhase(GamePhase.CLEANUP);
+            this.handleGameCleanup();
+          }
         }
         break;
       }
 
       case GamePhase.CLEANUP:
-        // Cleanup complete, return to idle
-        // This phase is brief (2 seconds), automatic transition
         break;
     }
-
-    // Handle phase-specific animations
-    // NOTE: Participant spawning handled by Game.ts from gameState.bets
-    if (this.currentPhase === GamePhase.WAITING) {
-      this.handleWaitingPhase();
-    }
-  }
-
-  // Called by UIManager when countdown reaches 0
-  triggerVRFPhase() {
-    logger.game.debug("[GamePhaseManager] 🎲 triggerVRFPhase called", {
-      currentPhase: this.currentPhase,
-      willTransition: this.currentPhase === GamePhase.WAITING,
-    });
-
-    if (this.currentPhase === GamePhase.WAITING) {
-      logger.game.debug("[GamePhaseManager] ✅ Countdown ended, entering VRF phase");
-      this.setPhase(GamePhase.VRF_PENDING);
-
-      // Move participants to center for battle
-      const participantsMap = this.playerManager.getParticipants();
-      logger.game.debug("[GamePhaseManager] Moving participants to center", {
-        participantCount: participantsMap.size,
-      });
-      this.playerManager.moveParticipantsToCenter();
-
-      // UIManager shows VRF overlay automatically
-      logger.game.debug("[GamePhaseManager] VRF phase setup complete, waiting for winner...");
-    } else {
-      logger.game.warn("[GamePhaseManager] ⚠️ triggerVRFPhase called but not in WAITING phase!");
-    }
-  }
-
-  private handleWaitingPhase() {
-    // Nothing to do during waiting phase
-    // Characters spawn automatically via Game.ts updateGameState()
-    // Just wait for countdown to reach 0
-  }
-
-  private handleCelebrationStart(gameState: any) {
-    logger.game.debug("=".repeat(60));
-    logger.game.debug("[GamePhaseManager] 🎉 Starting celebration phase");
-    logger.game.debug("=".repeat(60));
-
-    // Verify winner exists (blockchain uses 'winner' field, not 'winnerId')
-    const hasWinner = !!gameState.winner;
-    logger.game.debug("[GamePhaseManager] Winner check:", {
-      hasWinner,
-      winner: gameState.winner,
-      winnerId: gameState.winnerId,
-      winnerType: typeof gameState.winner,
-    });
-
-    if (!hasWinner) {
-      logger.game.warn("⚠️ Cannot show results - no winner determined");
-      this.setPhase(GamePhase.CLEANUP);
-      this.handleGameCleanup();
-      return;
-    }
-
-    // Get winner wallet address
-    const winnerAddress = typeof gameState.winner === 'string'
-      ? gameState.winner
-      : gameState.winner?.toBase58?.();
-
-    logger.game.debug("[GamePhaseManager] Winner address:", winnerAddress);
-    logger.game.debug("[GamePhaseManager] About to explode participants...");
-
-    // Explode eliminated participants, winner stays in center
-    const participantsMap = this.playerManager.getParticipants();
-    const participants = Array.from(participantsMap.values());
-    this.animationManager.explodeParticipantsOutward(participantsMap);
-
-    // Show winner celebration after explosions
-    this.scene.time.delayedCall(1000, () => {
-      // Find winner participant by wallet address
-      const winnerParticipant = participants.find(p =>
-        p.playerId === winnerAddress
-      );
-
-      if (winnerParticipant) {
-        logger.game.debug("[GamePhaseManager] Found winner participant, showing celebration");
-        // Create winner object for animation
-        const winner = {
-          _id: winnerParticipant.id,
-          playerId: winnerParticipant.playerId,
-          displayName: winnerParticipant.displayName,
-          betAmount: winnerParticipant.betAmount,
-        };
-        this.animationManager.addWinnerCelebration(winnerParticipant, winner);
-      } else {
-        logger.game.warn("[GamePhaseManager] Winner participant not found!", {
-          winnerAddress,
-          participantIds: participants.map(p => p.playerId),
-        });
-      }
-    });
-
-    // Note: 15-second celebration duration managed by handleGamePhase() switch statement
   }
 
   private handleGameCleanup() {
@@ -285,10 +261,18 @@ export class GamePhaseManager {
     });
   }
 
-  // Reset manager state for new game
+  /**
+   * Reset manager state for new game or scene restart
+   * Note: Most state is auto-reset by setPhase() transitions
+   */
   reset() {
+    // Transition to IDLE (this auto-resets all phase-specific state via setPhase)
     this.setPhase(GamePhase.IDLE);
-    this.celebrationStartTime = 0;
+
+    // Reset countdown tracker
+    this.lastCountdownSeconds = -1;
+
+    // Clean up scene state
     this.scene.tweens.killAll();
     this.scene.time.removeAllEvents();
     this.playerManager.clearParticipants();

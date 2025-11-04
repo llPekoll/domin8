@@ -113,8 +113,8 @@ async function processEndedGames(ctx: any, activeGame: any) {
     }
 
     // Check if game has ended (current time >= endDate)
-    const now = Math.floor(Date.now() / 1000);
-    const endTimestamp = activeGame.endDate;
+    let now = Math.floor(Date.now() / 1000);
+    let endTimestamp = activeGame.endDate;
 
     if (now < endTimestamp) {
       const remaining = endTimestamp - now;
@@ -139,8 +139,8 @@ async function processEndedGames(ctx: any, activeGame: any) {
     }
 
     // Calculate delay: schedule for endTimestamp + 1 second
-    const now = Math.floor(Date.now() / 1000);
-    const endTimestamp = activeGame.endDate;
+    now = Math.floor(Date.now() / 1000);
+    endTimestamp = activeGame.endDate;
     const targetTime = endTimestamp + 1;
     const delayMs = Math.max(0, (targetTime - now) * 1000);
 
