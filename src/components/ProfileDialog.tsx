@@ -13,7 +13,7 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { toast } from "sonner";
-import { User } from "lucide-react";
+import { User, Copy, Check } from "lucide-react";
 import { logger } from "../lib/logger";
 
 interface ProfileDialogProps {
@@ -31,6 +31,7 @@ export function ProfileDialog({
 }: ProfileDialogProps) {
   const [displayName, setDisplayName] = useState(currentName || "");
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   const updateDisplayName = useMutation(api.players.updateDisplayName);
 
@@ -72,6 +73,18 @@ export function ProfileDialog({
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
+  const handleCopyAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(walletAddress);
+      setIsCopied(true);
+      toast.success("Wallet address copied to clipboard!");
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (error) {
+      logger.ui.error("Failed to copy address:", error);
+      toast.error("Failed to copy address");
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px] bg-gradient-to-b from-amber-900/95 to-amber-950/95 backdrop-blur-sm border-2 border-amber-600/60">
@@ -90,8 +103,24 @@ export function ProfileDialog({
             <Label htmlFor="wallet" className="text-amber-300">
               Wallet Address
             </Label>
-            <div className="px-3 py-2 bg-black/30 rounded-md text-amber-400 font-mono text-sm border border-amber-700/50">
-              {truncateAddress(walletAddress)}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 px-3 py-2 bg-black/30 rounded-md text-amber-400 font-mono text-sm border border-amber-700/50">
+                {truncateAddress(walletAddress)}
+              </div>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                onClick={() => void handleCopyAddress()}
+                className="border-amber-700/50 text-amber-300 hover:bg-amber-700/40 bg-amber-800/30 transition-all"
+                title="Copy full address"
+              >
+                {isCopied ? (
+                  <Check className="w-4 h-4 text-green-400" />
+                ) : (
+                  <Copy className="w-4 h-4" />
+                )}
+              </Button>
             </div>
           </div>
 

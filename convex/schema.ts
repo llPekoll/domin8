@@ -25,21 +25,15 @@ export default defineSchema({
     mapId: v.optional(v.id("maps")), // Which map/arena this round uses (all players see same map)
 
     // Game state (snapshot from blockchain)
-    betCount: v.number(), // Number of bets placed
-    betAmounts: v.array(v.number()), // Array of bet amounts
-    betSkin: v.array(v.number()), // Array of skin IDs (u8) - character customization
-    betPosition: v.array(v.array(v.number())), // Array of [x, y] positions (u16)
-    totalPot: v.number(), // Total accumulated pot in lamports
-    winner: v.union(v.string(), v.null()), // Winner wallet (base58), null if not determined
-    winningBetIndex: v.number(), // Index of winning bet
+    betCount: v.optional(v.number()), // Number of bets placed
+    betAmounts: v.optional(v.array(v.number())), // Array of bet amounts
+    betSkin: v.optional(v.array(v.number())), // Array of skin IDs (u8) - character customization
+    betPosition: v.optional(v.array(v.array(v.number()))), // Array of [x, y] positions (u16)
+    totalPot: v.optional(v.number()), // Total accumulated pot in lamports
+    winner: v.optional(v.union(v.string(), v.null())), // Winner wallet (base58), null if not determined
+    winningBetIndex: v.optional(v.number()), // Index of winning bet
 
-    // VRF data (simplified for risk architecture)
-    vrfRequestPubkey: v.union(v.string(), v.null()), // Always null (not used)
-    vrfSeed: v.array(v.number()), // Empty array (not used)
-    randomnessFulfilled: v.boolean(), // True when game is finished
-
-    // Prize tracking
-    winnerPrizeUnclaimed: v.optional(v.number()), // Unclaimed prize amount
+    prizeSent: v.optional(v.boolean()), // Whether prize has been sent to winner
   })
     .index("by_round_and_status", ["roundId", "status"]) // Prevent duplicate states (PRIMARY)
     .index("by_round_id", ["roundId"]) // Query all states for a round
