@@ -108,7 +108,7 @@ const { phase, timeRemaining, description, isDemo } = useGamePhase();
 
 // Pass to Phaser scene
 useEffect(() => {
-  if (hasRealGame && scene.scene.key === "RoyalRumble") {
+  if (hasRealGame && scene.scene.key === "Game") {
     scene.updateGameState(gameData.game);
     scene.updateGamePhase(phase, timeRemaining);
   }

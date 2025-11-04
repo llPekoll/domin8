@@ -305,3 +305,5 @@ VITE_PRIVY_APP_ID=your-privy-app-id
   https://aspecsgaming.itch.io/pixel-art-cursors/download/eyJleHBpcmVzIjoxNzYxNzU1NDU5LCJpZCI6Mjc1MDYyOX0%3d.6PqdH7xtvE7mIDdAY4NOXhcY8NM%3d
   // last blade
   https://downloads.khinsider.com/game-soundtracks/album/the-last-blade-original-soundtrack-1997
+  // loader
+  https://phaser.io/examples/v3.85.0/game-objects/nine-slice/view/progress-bar

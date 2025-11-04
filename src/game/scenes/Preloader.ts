@@ -116,7 +116,7 @@ export class Preloader extends Scene {
     // Safety check before creating animations
     if (!charactersData || charactersData.length === 0) {
       logger.game.error("[Preloader] No characters data for animations, starting DemoScene anyway");
-      this.scene.start("DemoScene");
+      this.scene.start("Demo");
       return;
     }
 
@@ -240,6 +240,6 @@ export class Preloader extends Scene {
     });
 
     // Start with DemoScene by default
-    this.scene.start("DemoScene");
+    this.scene.start("Demo");
   }
 }

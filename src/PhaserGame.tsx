@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import StartGame, { setCharactersData, setAllMapsData, setDemoMapData } from "./game/main";
 import { EventBus } from "./game/EventBus";
 import { useAssets } from "./contexts/AssetsContext";
+import { SceneManager } from "./game/managers/SceneManager";
 
 export interface IRefPhaserGame {
   game: Phaser.Game | null;
@@ -17,6 +18,7 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
   ref
 ) {
   const game = useRef<Phaser.Game | null>(null);
+  const sceneManager = useRef<SceneManager | null>(null);
 
   // Fetch all data from assets context (shared across app)
   const { characters, maps: allMaps } = useAssets();
@@ -28,29 +30,51 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
   }, [allMaps?.length]);
 
   // Check if all required data is loaded
-  const isDataReady = characters && characters.length > 0 && allMaps && allMaps.length > 0 && demoMap;
+  const isDataReady =
+    characters && characters.length > 0 && allMaps && allMaps.length > 0 && demoMap;
 
   useLayoutEffect(() => {
-    if (game.current === null && isDataReady) {
-      // Pass characters data to Phaser
-      setCharactersData(characters);
+    if (!isDataReady) {
+      // Assets not ready yet, wait for them to load
+      return;
+    }
 
-      // Pass ALL maps data to Phaser (so Preloader can load them all)
-      setAllMapsData(allMaps);
+    if (game.current !== null) {
+      // Game already initialized
+      return;
+    }
 
-      // Pass selected demo map
-      setDemoMapData(demoMap);
+    // Pass characters data to Phaser
+    setCharactersData(characters);
 
-      game.current = StartGame("game-container");
+    // Pass ALL maps data to Phaser (so Preloader can load them all)
+    setAllMapsData(allMaps);
 
-      if (typeof ref === "function") {
-        ref({ game: game.current, scene: null });
-      } else if (ref) {
-        ref.current = { game: game.current, scene: null };
-      }
+    // Pass selected demo map
+    setDemoMapData(demoMap);
+
+    game.current = StartGame("game-container");
+
+    // Initialize SceneManager ONCE with Phaser game lifecycle
+    if (game.current) {
+      sceneManager.current = new SceneManager(game.current);
+      console.log("✅ [PhaserGame] SceneManager initialized with Phaser lifecycle");
+    }
+
+    if (typeof ref === "function") {
+      ref({ game: game.current, scene: null });
+    } else if (ref) {
+      ref.current = { game: game.current, scene: null };
     }
 
     return () => {
+      // Cleanup SceneManager before destroying game
+      if (sceneManager.current) {
+        sceneManager.current.destroy();
+        sceneManager.current = null;
+        console.log("🗑️ [PhaserGame] SceneManager destroyed");
+      }
+
       if (game.current) {
         game.current.destroy(true);
         if (game.current !== null) {
@@ -76,6 +100,18 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
       EventBus.removeListener("current-scene-ready");
     };
   }, [currentActiveScene, ref]);
+
+  // Show loading state while assets are being fetched
+  if (!isDataReady) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-black">
+        <div className="text-center">
+          <div className="text-white text-2xl mb-4">Loading...</div>
+          <div className="text-gray-400 text-sm">Preparing game assets</div>
+        </div>
+      </div>
+    );
+  }
 
   return <div id="game-container" className="w-full h-full"></div>;
 });

@@ -270,25 +270,6 @@ export function BlockchainDebugDialog() {
               />
             </Section>
           )}
-
-          {/* Actions */}
-          {!activeGame && (
-            <div className="bg-yellow-900/20 border border-yellow-500 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-yellow-400 font-semibold mb-2">No Active Game</p>
-                  <p className="text-yellow-300/80 text-sm mb-3">
-                    You need to create a game before players can place bets.
-                  </p>
-                  <code className="block bg-black/30 p-2 rounded text-xs text-yellow-200 overflow-x-auto">
-                    ANCHOR_PROVIDER_URL=https://api.devnet.solana.com
-                    ANCHOR_WALLET=./solana/wallet.json npx ts-node scripts/create-game.ts
-                  </code>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
