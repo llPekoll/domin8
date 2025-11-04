@@ -13,6 +13,7 @@ import { usePrivyWallet } from "./usePrivyWallet";
 import { useAssets } from "../contexts/AssetsContext";
 import idl from "../../target/idl/domin8_prgm.json";
 import { logger } from "../lib/logger";
+import { getSharedGameSubscription } from "../lib/sharedGameSubscription";
 
 // Bet info structure from smart contract
 export interface BetInfo {
@@ -184,7 +185,7 @@ export function useActiveGame() {
     setActiveGame(enrichedGame);
   }, [rawGameData, mapData]);
 
-  // Fetch and subscribe to active_game
+  // Fetch and subscribe to active_game using shared WebSocket
   useEffect(() => {
     if (!program || !activeGamePDA || !connection) {
       logger.solana.debug("[DOMIN8] ⚠️ Missing dependencies for game fetch", {
@@ -197,134 +198,56 @@ export function useActiveGame() {
       return;
     }
 
-    logger.solana.debug("[DOMIN8] 🚀 Starting active_game subscription", {
+    logger.solana.debug("[DOMIN8] 🚀 Starting active_game subscription (shared)", {
       programId: program.programId.toBase58(),
       activeGamePDA: activeGamePDA.toBase58(),
       connectionEndpoint: connection.rpcEndpoint,
     });
 
-    let subscriptionId: number | null = null;
-    let isMounted = true;
+    setIsLoading(true);
 
-    const fetchAndSubscribe = async () => {
+    // Get shared subscription manager
+    const sharedSubscription = getSharedGameSubscription(connection, activeGamePDA, program);
+
+    // Check for cached data for instant display
+    const cachedData = sharedSubscription.getCurrentData();
+    if (cachedData) {
       try {
-        setIsLoading(true);
+        logger.solana.debug("[DOMIN8] 💾 Using cached data from shared subscription");
+        const decodedGameData = (program.coder.accounts as any).decode("domin8Game", cachedData.data);
+        setRawGameData(decodedGameData);
+        setIsLoading(false);
+      } catch (err) {
+        logger.solana.error("[DOMIN8] Failed to decode cached data:", err);
+      }
+    }
 
-        // First, check if the account exists
-        try {
-          logger.solana.debug("[DOMIN8] 🔍 Checking active_game account", {
-            activeGamePDA: activeGamePDA.toBase58(),
-            programId: program.programId.toBase58(),
-          });
-
-          const accountInfo = await connection.getAccountInfo(activeGamePDA);
-          logger.solana.debug("[DOMIN8] 📊 Account info result", {
-            exists: !!accountInfo,
-            dataLength: accountInfo?.data.length || 0,
-            owner: accountInfo?.owner?.toBase58(),
-            executable: accountInfo?.executable,
-            lamports: accountInfo?.lamports,
-          });
-
-          if (!accountInfo) {
-            logger.solana.debug("[DOMIN8] ❌ Active game account does not exist");
-            logger.solana.debug("[DOMIN8] 💡 This means either:");
-            logger.solana.debug("[DOMIN8]    1. The smart contract has not been initialized");
-            logger.solana.debug("[DOMIN8]    2. You are on the wrong network");
-            if (isMounted) {
-              setRawGameData(null);
-              setActiveGame(null);
-            }
-            return;
-          }
-
-          // Check if the account is owned by our program
-          if (accountInfo.owner.toBase58() !== program.programId.toBase58()) {
-            logger.solana.warn("[DOMIN8] ⚠️ Account exists but is not owned by our program!");
-            logger.solana.warn("[DOMIN8]    Expected owner:", program.programId.toBase58());
-            logger.solana.warn("[DOMIN8]    Actual owner:", accountInfo.owner.toBase58());
-            if (isMounted) {
-              setRawGameData(null);
-              setActiveGame(null);
-            }
-            return;
-          }
-
-          // Try to fetch the game data
-          logger.solana.debug("[DOMIN8] 🔄 Attempting to fetch game data...");
-          const fetchedGameData = await (program.account as any).domin8Game.fetch(activeGamePDA);
-          logger.solana.debug("[DOMIN8] ✅ Active game data fetched:", fetchedGameData);
-
-          if (isMounted) {
-            // Store raw game data to trigger map query
-            setRawGameData(fetchedGameData);
-          }
-        } catch (fetchError) {
-          logger.solana.error("[DOMIN8] ❌ Failed to fetch active game data:", fetchError);
-          logger.solana.debug("[DOMIN8] 💡 This could mean:");
-          logger.solana.debug("[DOMIN8]    1. The account data is corrupted");
-          logger.solana.debug("[DOMIN8]    2. The account type is wrong");
-          logger.solana.debug("[DOMIN8]    3. The IDL is incorrect");
-          if (isMounted) {
-            setRawGameData(null);
-            setActiveGame(null);
-          }
-        }
-
-        // Then subscribe to real-time changes
-        if (isMounted) {
-          logger.solana.debug("[DOMIN8] 📡 Setting up real-time subscription...");
-          subscriptionId = connection.onAccountChange(
-            activeGamePDA,
-            (accountInfo) => {
-              if (!isMounted) return;
-
-              try {
-                if (accountInfo.data.length > 0) {
-                  const decodedGameData = (program.coder.accounts as any).decode(
-                    "domin8Game",
-                    accountInfo.data
-                  );
-                  // Store raw game data to trigger map query
-                  setRawGameData(decodedGameData);
-                  logger.solana.debug("[DOMIN8] 🔄 Active game updated:", decodedGameData);
-                } else {
-                  setRawGameData(null);
-                  setActiveGame(null);
-                  logger.solana.warn("[DOMIN8] ⚠️ Active game account is empty");
-                }
-              } catch (decodeError) {
-                logger.solana.error("[DOMIN8] ❌ Failed to decode game data:", decodeError);
-                setRawGameData(null);
-                setActiveGame(null);
-              }
-            },
-            "confirmed"
-          );
-          logger.solana.debug("[DOMIN8] ✅ Subscription active (ID:", subscriptionId, ")");
-        }
-      } catch (error) {
-        logger.solana.error("[DOMIN8] ❌ Failed to fetch/subscribe to active game:", error);
-        if (isMounted) {
+    // Subscribe to updates via shared manager
+    const unsubscribe = sharedSubscription.subscribe((accountInfo) => {
+      try {
+        if (accountInfo.data.length > 0) {
+          const decodedGameData = (program.coder.accounts as any).decode("domin8Game", accountInfo.data);
+          setRawGameData(decodedGameData);
+          setIsLoading(false);
+          logger.solana.debug("[DOMIN8] 🔄 Active game updated (via shared subscription):", decodedGameData);
+        } else {
           setRawGameData(null);
           setActiveGame(null);
-        }
-      } finally {
-        if (isMounted) {
           setIsLoading(false);
+          logger.solana.warn("[DOMIN8] ⚠️ Active game account is empty");
         }
+      } catch (decodeError) {
+        logger.solana.error("[DOMIN8] ❌ Failed to decode game data:", decodeError);
+        setRawGameData(null);
+        setActiveGame(null);
+        setIsLoading(false);
       }
-    };
+    });
 
-    void fetchAndSubscribe();
-
-    // Cleanup subscription on unmount or dependency change
+    // Cleanup on unmount
     return () => {
-      isMounted = false;
-      if (subscriptionId !== null) {
-        logger.solana.debug("[DOMIN8] 🛑 Removing subscription (ID:", subscriptionId, ")");
-        void connection.removeAccountChangeListener(subscriptionId);
-      }
+      logger.solana.debug("[DOMIN8] 🛑 Unsubscribing from shared subscription");
+      unsubscribe();
     };
   }, [program?.programId.toString(), activeGamePDA?.toString(), connection?.rpcEndpoint]);
 
