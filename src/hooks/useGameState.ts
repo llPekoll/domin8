@@ -23,9 +23,7 @@ export interface GameState {
   bets: BetEntry[];
   initialPot: number;
   winner: string | null;
-  vrfRequestPubkey: string;
-  vrfSeed: number[];
-  randomnessFulfilled: boolean;
+  prizeSent: boolean;
   gameRoundPda: string;
   vaultPda: string;
 }
@@ -72,10 +70,8 @@ export function useGameState() {
       })) || [],
       initialPot: activeGame.totalDeposit.toNumber() / 1_000_000_000, // Convert lamports to SOL
       winner: activeGame.winner?.toString() || '',
-      vrfRequestPubkey: '', // VRF request not stored directly in game account
-      vrfSeed: activeGame.rand ? [activeGame.rand.toNumber()] : [], // Using rand field as seed
-      randomnessFulfilled: activeGame.status === 1, // Game is finished when status = 1
       gameRoundPda: activeGamePDA?.toString() || "Unknown",
+      prizeSent: activeGame.prizeSent || false,
       vaultPda: "Derived from seeds",
     };
   }, [activeGame, activeGamePDA]);

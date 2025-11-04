@@ -46,6 +46,7 @@ export interface GameRound {
   winningBetIndex: number | null; // Index of the winning bet
   wallets: string[]; // NEW: Array of unique wallet addresses
   bets: BetInfoStruct[]; // NEW: Array of bet info structs
+  prizeSent?: boolean; // Flag to track if prize has been sent (used in Convex)
 
   // Computed properties for backward compatibility
   roundId?: number;

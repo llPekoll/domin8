@@ -103,8 +103,8 @@ export function GameStatePage() {
                 }
               />
               <InfoRow
-                label="VRF Fulfilled"
-                value={gameState?.randomnessFulfilled ? "Yes ✓" : "No ✗"}
+                label="Prize Sent"
+                value={gameState?.prizeSent ? "Yes ✓" : "No ✗"}
               />
               <InfoRow
                 label="Winner"
@@ -158,7 +158,6 @@ export function GameStatePage() {
           <div className="space-y-3">
             <PDARow label="Game Round PDA" address={gameState?.gameRoundPda || "N/A"} />
             <PDARow label="Vault PDA" address={gameState?.vaultPda || "N/A"} />
-            <PDARow label="VRF Request" address={gameState?.vrfRequestPubkey || "N/A"} />
           </div>
         </div>
 
