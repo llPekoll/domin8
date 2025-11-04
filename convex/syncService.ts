@@ -55,7 +55,6 @@ export const syncBlockchainState = internalAction({
  */
 async function syncActiveGame(ctx: any, activeGame: any) {
   try {
-
     if (!activeGame) {
       console.log("[Sync Service] No active game on blockchain");
       return;
@@ -113,6 +112,21 @@ async function processEndedGames(ctx: any, activeGame: any) {
       return;
     }
 
+    // Check if game has ended (current time >= endDate)
+    let now = Math.floor(Date.now() / 1000);
+    let endTimestamp = activeGame.endDate;
+
+    if (now < endTimestamp) {
+      const remaining = endTimestamp - now;
+      const endTime = new Date(endTimestamp * 1000).toLocaleString();
+      console.log(
+        `[Sync Service] Game ${activeGame.gameRound} still active (${remaining}s remaining) until ${endTime}`
+      );
+      return;
+    }
+
+    console.log(`[Sync Service] Game ${activeGame.gameRound} has ended, scheduling endGame action`);
+
     // Check if endGame action already scheduled
     const alreadyScheduled = await ctx.runQuery(internal.gameSchedulerMutations.isActionScheduled, {
       roundId: activeGame.gameRound,
@@ -125,8 +139,8 @@ async function processEndedGames(ctx: any, activeGame: any) {
     }
 
     // Calculate delay: schedule for endTimestamp + 1 second
-    const now = Math.floor(Date.now() / 1000);
-    const endTimestamp = activeGame.endDate;
+    now = Math.floor(Date.now() / 1000);
+    endTimestamp = activeGame.endDate;
     const targetTime = endTimestamp + 1;
     const delayMs = Math.max(0, (targetTime - now) * 1000);
 
@@ -135,11 +149,9 @@ async function processEndedGames(ctx: any, activeGame: any) {
     );
 
     // Schedule endGame action for endTimestamp + 1 second
-    const jobId = await ctx.scheduler.runAfter(
-      delayMs,
-      internal.gameScheduler.executeEndGame,
-      { roundId: activeGame.gameRound }
-    );
+    const jobId = await ctx.scheduler.runAfter(delayMs, internal.gameScheduler.executeEndGame, {
+      roundId: activeGame.gameRound,
+    });
 
     // Upsert job to database for tracking (avoid duplicates)
     await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
@@ -149,7 +161,9 @@ async function processEndedGames(ctx: any, activeGame: any) {
       scheduledTime: targetTime,
     });
 
-    console.log(`[Sync Service] Scheduled endGame for round ${activeGame.gameRound} (jobId: ${jobId})`);
+    console.log(
+      `[Sync Service] Scheduled endGame for round ${activeGame.gameRound} (jobId: ${jobId})`
+    );
   } catch (error) {
     console.error("[Sync Service] Error processing ended games:", error);
   }
@@ -169,16 +183,21 @@ async function processPastEndedGames(ctx: any) {
     const now = Math.floor(Date.now() / 1000);
 
     // Query database for "finished" games that need prize distribution
-    const finishedGames = await ctx.runQuery(internal.syncServiceMutations.getFinishedGamesNeedingPrize, {
-      limit: 5, // Only check last 5 games for rate limiting
-    });
+    const finishedGames = await ctx.runQuery(
+      internal.syncServiceMutations.getFinishedGamesNeedingPrize,
+      {
+        limit: 5, // Only check last 5 games for rate limiting
+      }
+    );
 
     if (finishedGames.length === 0) {
       console.log("[Sync Service] No finished games needing prize distribution found in database");
       return;
     }
 
-    console.log(`[Sync Service] Found ${finishedGames.length} finished games needing prize distribution`);
+    console.log(
+      `[Sync Service] Found ${finishedGames.length} finished games needing prize distribution`
+    );
 
     // Process each finished game with rate limiting
     for (const game of finishedGames) {
@@ -252,7 +271,9 @@ export const bulkSendPrizes = internalAction({
     count: v.number(),
   },
   handler: async (ctx, { startRound, count }) => {
-    console.log(`\n[Bulk Prize Distribution] Starting bulk prize send from round ${startRound}, count: ${count}`);
+    console.log(
+      `\n[Bulk Prize Distribution] Starting bulk prize send from round ${startRound}, count: ${count}`
+    );
 
     try {
       const solanaClient = new SolanaClient(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
@@ -287,7 +308,9 @@ export const bulkSendPrizes = internalAction({
 
           // Check if game is finished
           if (blockchainGame.status !== 1) {
-            console.log(`[Bulk Prize] Round ${roundId}: Not finished yet (status: ${blockchainGame.status})`);
+            console.log(
+              `[Bulk Prize] Round ${roundId}: Not finished yet (status: ${blockchainGame.status})`
+            );
             results.notFinished++;
             await new Promise((resolve) => setTimeout(resolve, 500));
             continue;
@@ -336,7 +359,9 @@ export const bulkSendPrizes = internalAction({
             scheduledTime: now,
           });
 
-          console.log(`[Bulk Prize] Round ${roundId}: ✅ Scheduled prize distribution (jobId: ${jobId})`);
+          console.log(
+            `[Bulk Prize] Round ${roundId}: ✅ Scheduled prize distribution (jobId: ${jobId})`
+          );
           results.scheduled++;
 
           // Rate limiting: 500ms delay between blockchain checks

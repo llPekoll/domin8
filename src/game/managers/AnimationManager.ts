@@ -576,7 +576,7 @@ export class AnimationManager {
 
         const explosion = this.scene.add.sprite(x, y, "explosion");
         explosion.setScale(1.5);
-        explosion.setDepth(500); // On top of everything
+        explosion.setDepth(1500); // In front of all characters (characters are ~100-900)
         // Keep pixel art crisp when scaling
         explosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
 
@@ -734,7 +734,7 @@ export class AnimationManager {
           );
 
           bloodSprite.setScale(2 + Math.random() * 2);
-          bloodSprite.setDepth(300);
+          bloodSprite.setDepth(1500); // In front of all characters
           bloodSprite.setAlpha(0.8);
           bloodSprite.setRotation(Math.random() * Math.PI * 2);
           // Keep pixel art crisp when scaling
@@ -765,7 +765,7 @@ export class AnimationManager {
       );
 
       bloodSprite.setScale(0.8 + Math.random() * 1.2);
-      bloodSprite.setDepth(115);
+      bloodSprite.setDepth(1500); // In front of all characters
       bloodSprite.setAlpha(0.9);
       bloodSprite.setRotation(Math.random() * Math.PI * 2);
       // Keep pixel art crisp when scaling
@@ -852,5 +852,87 @@ export class AnimationManager {
       explosionCount,
       "explosions"
     );
+  }
+
+  /**
+   * Shared battle phase animation sequence
+   * Moves participants to center, starts explosions after delay
+   * @param playerManager - PlayerManager instance to move participants
+   * @param onComplete - Callback when sequence completes
+   */
+  startBattlePhaseSequence(playerManager: any, onComplete?: () => void) {
+    logger.game.debug("[AnimationManager] ⚔️ Starting battle phase sequence");
+
+    // Move participants to center
+    playerManager.moveParticipantsToCenter();
+
+    // After 500ms of running, start continuous explosions
+    this.scene.time.delayedCall(500, () => {
+      logger.game.debug("[AnimationManager] 💥 Starting continuous explosions after 500ms");
+      this.createContinuousExplosions();
+    });
+
+    // Call onComplete callback if provided
+    if (onComplete) {
+      onComplete();
+    }
+  }
+
+  /**
+   * Shared results phase animation sequence
+   * Marks eliminated participants, explodes losers, shows winner celebration
+   * @param playerManager - PlayerManager instance
+   * @param winner - Winner participant data
+   * @param onComplete - Callback when sequence completes (after celebration delay)
+   */
+  startResultsPhaseSequence(
+    playerManager: any,
+    winner: any,
+    onComplete?: () => void
+  ) {
+    logger.game.debug("[AnimationManager] 🏆 Starting results phase sequence for winner:", winner);
+
+    // Mark all non-winners as eliminated
+    const participants = playerManager.getParticipants();
+    participants.forEach((participant: any) => {
+      if (participant.id !== winner._id && participant.id !== winner.id) {
+        participant.eliminated = true;
+      } else {
+        participant.eliminated = false; // Winner stays
+      }
+    });
+
+    // Explode losers outward with physics (includes explosions, blood, shake)
+    this.explodeParticipantsOutward(participants);
+
+    // After 3 seconds: Show winner celebration
+    this.scene.time.delayedCall(3000, () => {
+      logger.game.debug("[AnimationManager] 🎉 Starting winner celebration");
+
+      const gameState = {
+        status: "results",
+        winnerId: winner._id || winner.id,
+        participants: Array.from(participants.values()),
+        isDemo: true,
+      };
+
+      // Show winner with PlayerManager (scales up, golden tint, etc.)
+      const winnerParticipant = playerManager.showResults(gameState);
+
+      logger.game.debug("[AnimationManager] Winner participant from showResults:", winnerParticipant);
+
+      // Add celebration animations (confetti, text, bounce)
+      if (winnerParticipant) {
+        logger.game.debug("[AnimationManager] 🏆 Calling addWinnerCelebration");
+        this.addWinnerCelebration(winnerParticipant, winner);
+      } else {
+        logger.game.error("[AnimationManager] ❌ No winner participant returned!");
+      }
+
+      // Call onComplete callback if provided
+      if (onComplete) {
+        onComplete();
+      }
+    });
   }
 }
