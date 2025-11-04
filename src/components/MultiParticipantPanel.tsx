@@ -26,7 +26,6 @@ export function MultiParticipantPanel() {
     });
   }, [activeGame]);
 
-  const maxParticipants = 64; // From smart contract limit
   const currentParticipantCount = participants.length;
 
   const totalPot = useMemo(() => {
@@ -51,7 +50,7 @@ export function MultiParticipantPanel() {
             <div className="flex items-center gap-3">
               <div className="text-xs text-amber-400">
                 <Users className="w-3 h-3 inline mr-1" />
-                {currentParticipantCount}/{maxParticipants}
+                {currentParticipantCount}
               </div>
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
@@ -73,22 +72,22 @@ export function MultiParticipantPanel() {
             <div className="max-h-96 overflow-y-auto custom-scrollbar">
               <div className="p-3 space-y-2">
                 {participants.map((participant) => {
-              const isOwn = participant.walletAddress === walletAddress;
-              const isEliminated = participant.isEliminated;
-              // Calculate win percentage based on bet amount
-              const winPercentage =
-                totalPot > 0 ? ((participant.amount / totalPot) * 100).toFixed(1) : "0.0";
+                  const isOwn = participant.walletAddress === walletAddress;
+                  const isEliminated = participant.isEliminated;
+                  // Calculate win percentage based on bet amount
+                  const winPercentage =
+                    totalPot > 0 ? ((participant.amount / totalPot) * 100).toFixed(1) : "0.0";
 
-              // Format wallet address for display
-              const displayAddress =
-                participant.walletAddress.slice(0, 4) +
-                "..." +
-                participant.walletAddress.slice(-4);
+                  // Format wallet address for display
+                  const displayAddress =
+                    participant.walletAddress.slice(0, 4) +
+                    "..." +
+                    participant.walletAddress.slice(-4);
 
-              return (
-                <div
-                  key={participant.id}
-                  className={`
+                  return (
+                    <div
+                      key={participant.id}
+                      className={`
                       ${
                         isOwn
                           ? "bg-gradient-to-r from-green-900/40 to-emerald-900/40 border-green-600/60"
@@ -98,11 +97,11 @@ export function MultiParticipantPanel() {
                       }
                       border rounded-lg p-2.5 transition-all hover:border-amber-500/50
                     `}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className={`
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className={`
                           w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold
                           ${
                             isOwn
@@ -112,61 +111,63 @@ export function MultiParticipantPanel() {
                                 : "bg-gradient-to-br from-amber-600 to-amber-800 text-amber-100"
                           }
                         `}
-                      >
-                        {participant.skin}
-                      </div>
+                          >
+                            {participant.skin}
+                          </div>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1">
-                          <span
-                            className={`
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1">
+                              <span
+                                className={`
                               font-semibold text-xs truncate
                               ${isOwn ? "text-green-100" : isEliminated ? "text-red-200" : "text-amber-100"}
                             `}
-                          >
-                            {displayAddress}
-                          </span>
-                          {isOwn && <span className="text-green-400 text-xs">(You)</span>}
-                        </div>
-                        <span
-                          className={`
+                              >
+                                {displayAddress}
+                              </span>
+                              {isOwn && <span className="text-green-400 text-xs">(You)</span>}
+                            </div>
+                            <span
+                              className={`
                             text-xs block truncate
                             ${isOwn ? "text-green-400" : isEliminated ? "text-red-400" : "text-amber-500"}
                           `}
-                        >
-                          Character #{participant.skin}
-                        </span>
-                      </div>
-                    </div>
+                            >
+                              Character #{participant.skin}
+                            </span>
+                          </div>
+                        </div>
 
-                    <div className="text-right">
-                      <div
-                        className={`
+                        <div className="text-right">
+                          <div
+                            className={`
                           font-bold text-sm
                           ${isOwn ? "text-green-300" : isEliminated ? "text-red-300" : "text-amber-300"}
                         `}
-                      >
-                        {(participant.amount / LAMPORTS_PER_SOL).toFixed(2)} SOL
-                      </div>
-                      <div className={`text-xs ${isEliminated ? "text-red-500" : "text-amber-500"}`}>
-                        {!isEliminated ? `${winPercentage}% win` : "Eliminated"}
+                          >
+                            {(participant.amount / LAMPORTS_PER_SOL).toFixed(2)} SOL
+                          </div>
+                          <div
+                            className={`text-xs ${isEliminated ? "text-red-500" : "text-amber-500"}`}
+                          >
+                            {!isEliminated ? `${winPercentage}% win` : "Eliminated"}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                  );
+                })}
+              </div>
+            </div>
 
-        <div className="p-3 border-t border-amber-700/50">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-amber-400 uppercase tracking-wide">Total Pot</span>
-            <span className="text-amber-300 font-bold text-sm">
-              {(totalPot / LAMPORTS_PER_SOL).toFixed(2)} SOL
-            </span>
-          </div>
-        </div>
+            <div className="p-3 border-t border-amber-700/50">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-amber-400 uppercase tracking-wide">Total Pot</span>
+                <span className="text-amber-300 font-bold text-sm">
+                  {(totalPot / LAMPORTS_PER_SOL).toFixed(2)} SOL
+                </span>
+              </div>
+            </div>
           </>
         )}
       </div>
