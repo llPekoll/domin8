@@ -51,15 +51,6 @@ export function Header() {
   // Get current game state directly from blockchain (not Convex)
   const { activeGame: currentRoundState } = useActiveGame();
 
-  // Debug: log when game status changes
-  useEffect(() => {
-    if (currentRoundState) {
-      logger.ui.debug(
-        `[Header] Game status update - Round ${currentRoundState.roundId}: ${currentRoundState.status}`
-      );
-    }
-  }, [currentRoundState?.status, currentRoundState?.roundId]);
-
   // Fetch ONLY Privy embedded wallet balance via direct RPC
   useEffect(() => {
     if (!authenticated || !privyWalletAddress) {
@@ -134,7 +125,10 @@ export function Header() {
                   <div className="flex items-center gap-2">
                     <Map className="w-4 h-4 text-amber-400" />
                     <div className="font-bold text-amber-300 text-lg uppercase tracking-wide">
-                      Round #{currentRoundState.roundId?.toString() || currentRoundState.gameRound?.toString() || "?"}
+                      Round #
+                      {currentRoundState.roundId?.toString() ||
+                        currentRoundState.gameRound?.toString() ||
+                        "?"}
                     </div>
                   </div>
                   <div className="text-amber-300 text-sm flex items-center gap-1 mt-1">
@@ -142,7 +136,8 @@ export function Header() {
                     {currentRoundState.status === 0 && "Waiting for players"}
                     {currentRoundState.status === 1 && "Game Over - Place bet for new round"}
                     {/* Debug: show status if unexpected */}
-                    {![0, 1].includes(currentRoundState.status as number) && `Status: ${currentRoundState.status}`}
+                    {![0, 1].includes(currentRoundState.status) &&
+                      `Status: ${currentRoundState.status}`}
                   </div>
                 </div>
               )}
@@ -185,10 +180,10 @@ export function Header() {
               )}
 
               {/* Privy Wallet Button */}
-              <PrivyWalletButton 
-                compact={false} 
-                showDisconnect={true} 
-                onShowProfile={() => setShowProfileDialog(true)} 
+              <PrivyWalletButton
+                compact={false}
+                showDisconnect={true}
+                onShowProfile={() => setShowProfileDialog(true)}
               />
             </div>
           </div>
