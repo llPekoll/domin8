@@ -503,7 +503,7 @@ const CharacterSelection = memo(function CharacterSelection({
                   title="Select exclusive NFT characters"
                 >
                   {selectedNFTCharacters.length === 0 && <Star className="w-4 h-4 fill-yellow-400" />}
-                  {selectedNFTCharacters.length > 0 && <BadgeCheck className="w-4 h-4 fill-yellow-400" />}
+                  {selectedNFTCharacters.length > 0 && <BadgeCheck className="w-4 h-4 fill-purple-600 text-yellow-400" />}
                   <span className="text-sm text-white font-bold">NFT</span>
                   {isLoadingNFTs && (
                     <span className="text-xs text-amber-200 ml-2">Checking...</span>
