@@ -141,7 +141,8 @@ async function processEndedGames(ctx: any, activeGame: any) {
     // Calculate delay: schedule for endTimestamp + 1 second
     now = Math.floor(Date.now() / 1000);
     endTimestamp = activeGame.endDate;
-    const targetTime = endTimestamp + 1;
+    const BLOCKCHAIN_CLOCK_BUFFER = 1; // seconds
+    const targetTime = endTimestamp + BLOCKCHAIN_CLOCK_BUFFER;
     const delayMs = Math.max(0, (targetTime - now) * 1000);
 
     console.log(
