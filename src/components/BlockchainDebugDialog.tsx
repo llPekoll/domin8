@@ -201,7 +201,7 @@ export function BlockchainDebugDialog() {
           {/* Connection Info - Minimal */}
           <details className="bg-gray-800/30 rounded-lg border border-gray-700/50">
             <summary className="p-3 cursor-pointer hover:bg-gray-700/30 rounded-lg transition-colors">
-              <span className="text-sm font-medium text-gray-400">Connection Details</span>
+              <span className="text-sm font-medium text-gray-400">Program Details</span>
             </summary>
             <div className="p-3 pt-0 space-y-2 text-xs">
                 <div className="flex justify-between items-center gap-2">
