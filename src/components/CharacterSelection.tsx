@@ -348,6 +348,10 @@ const CharacterSelection = memo(function CharacterSelection({
           ? `Transaction: ${signatureHex.slice(0, 8)}...${signatureHex.slice(-8)}`
           : `Round ${roundId}, Bet ${betIndex}`,
         duration: 5000,
+        action: hasRealSignature ? {
+          label: "View",
+          onClick: () => window.open(`https://solscan.io/tx/${signatureHex}`, '_blank')
+        } : undefined,
       });
 
       // Emit event for DemoScene to handle spawning (demo is client-side only)
