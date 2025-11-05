@@ -95,11 +95,26 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
       } else if (ref) {
         ref.current = { game: game.current, scene: scene_instance };
       }
+
+      // Pass characters data to Game scene when it's ready
+      if (scene_instance.scene.key === "Game" && characters) {
+        (scene_instance as any).setCharacters?.(characters);
+      }
     });
     return () => {
       EventBus.removeListener("current-scene-ready");
     };
-  }, [currentActiveScene, ref]);
+  }, [currentActiveScene, ref, characters]);
+
+  // Update characters in Game scene when they change
+  useEffect(() => {
+    if (!game.current || !characters) return;
+
+    const gameScene = game.current.scene.getScene("Game");
+    if (gameScene && gameScene.scene.isActive()) {
+      (gameScene as any).setCharacters?.(characters);
+    }
+  }, [characters]);
 
   // Show loading state while assets are being fetched
   if (!isDataReady) {
