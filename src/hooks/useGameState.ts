@@ -23,7 +23,7 @@ export interface GameState {
   bets: BetEntry[];
   initialPot: number;
   winner: string | null;
-  prizeSent: boolean;
+  prizeSent: boolean; // Computed: true if winner exists and winner_prize === 0
   gameRoundPda: string;
   vaultPda: string;
 }
@@ -71,7 +71,8 @@ export function useGameState() {
       initialPot: activeGame.totalDeposit.toNumber() / 1_000_000_000, // Convert lamports to SOL
       winner: activeGame.winner?.toString() || '',
       gameRoundPda: activeGamePDA?.toString() || "Unknown",
-      prizeSent: activeGame.prizeSent || false,
+      // Prize is sent if winner exists and winner_prize is 0 (send_prize_winner sets it to 0)
+      prizeSent: activeGame.winner !== null && activeGame.winnerPrize.toNumber() === 0,
       vaultPda: "Derived from seeds",
     };
   }, [activeGame, activeGamePDA]);

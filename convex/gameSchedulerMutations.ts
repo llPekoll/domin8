@@ -57,6 +57,33 @@ export const upsertScheduledJob = internalMutation({
 });
 
 /**
+ * Update the scheduled time for a pending job
+ */
+export const updateScheduledJobTime = internalMutation({
+  args: {
+    roundId: v.number(),
+    action: v.string(),
+    scheduledTime: v.number(),
+  },
+  handler: async (ctx, args) => {
+    // Find the pending job
+    const job = await ctx.db
+      .query("scheduledJobs")
+      .withIndex("by_round_and_status", (q) =>
+        q.eq("roundId", args.roundId).eq("status", "pending")
+      )
+      .filter((q) => q.eq(q.field("action"), args.action))
+      .first();
+
+    if (job) {
+      await ctx.db.patch(job._id, {
+        scheduledTime: args.scheduledTime,
+      });
+    }
+  },
+});
+
+/**
  * Mark a job as completed
  */
 export const markJobCompleted = internalMutation({

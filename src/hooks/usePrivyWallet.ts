@@ -1,8 +1,8 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { useWallets } from "@privy-io/react-auth/solana";
-import { PublicKey, Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useState, useEffect } from "react";
-import { getSolanaRpcUrl } from "../lib/utils";
+import { getSharedConnection } from "../lib/sharedConnection";
 import { logger } from "../lib/logger";
 
 export function usePrivyWallet() {
@@ -40,8 +40,8 @@ export function usePrivyWallet() {
     const fetchBalance = async () => {
       setIsLoadingBalance(true);
       try {
-        // Get RPC endpoint based on network environment
-        const connection = new Connection(getSolanaRpcUrl(), "confirmed");
+        // Use shared connection instance
+        const connection = getSharedConnection();
 
         // Fetch balance in lamports
         const publicKey = new PublicKey(walletAddress);
@@ -71,7 +71,7 @@ export function usePrivyWallet() {
 
     setIsLoadingBalance(true);
     try {
-      const connection = new Connection(getSolanaRpcUrl(), "confirmed");
+      const connection = getSharedConnection();
       const publicKey = new PublicKey(walletAddress);
       const balanceLamports = await connection.getBalance(publicKey);
       const balanceSOL = balanceLamports / LAMPORTS_PER_SOL;

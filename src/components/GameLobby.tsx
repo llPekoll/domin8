@@ -5,7 +5,6 @@ import { api } from "../../convex/_generated/api";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { toast } from "sonner";
-import { MultiParticipantPanel } from "./MultiParticipantPanel";
 import { CharacterSelection } from "./CharacterSelection";
 import { generateRandomName } from "../lib/nameGenerator";
 import { Users, Gamepad2 } from "lucide-react";
@@ -115,9 +114,6 @@ export function GameLobby() {
     <div className="space-y-4">
       {/* Character Selection - allows player to place bets */}
       <CharacterSelection onParticipantAdded={handleParticipantAdded} />
-
-      {/* Multi-Participant Control */}
-      <MultiParticipantPanel />
     </div>
   );
 
@@ -127,7 +123,6 @@ export function GameLobby() {
     return (
       <div className="space-y-4">
         <CharacterSelection onParticipantAdded={handleParticipantAdded} />
-        <MultiParticipantPanel />
       </div>
     );
   }
@@ -136,7 +131,6 @@ export function GameLobby() {
     <div className="space-y-4">
       {currentGame?.status === "waiting" && (
         <>
-          <MultiParticipantPanel />
           <CharacterSelection onParticipantAdded={handleParticipantAdded} />
         </>
       )}

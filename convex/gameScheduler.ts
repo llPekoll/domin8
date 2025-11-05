@@ -101,13 +101,24 @@ export const executeEndGame = internalAction({
 
       // 2. Verify time window has closed (with buffer for blockchain clock)
       const currentTime = Math.floor(Date.now() / 1000);
-      const BLOCKCHAIN_CLOCK_BUFFER = 2; // seconds to account for blockchain clock drift
+      const BLOCKCHAIN_CLOCK_BUFFER = 1; // seconds to account for blockchain clock drift
 
       if (currentTime < activeGame.endDate + BLOCKCHAIN_CLOCK_BUFFER) {
         const remaining = activeGame.endDate + BLOCKCHAIN_CLOCK_BUFFER - currentTime;
         console.log(
           `Round ${roundId}: Waiting for time window (${remaining}s remaining), skipping`
         );
+        
+        // Update the scheduled job to execute at the correct time
+        const newScheduledTime = currentTime + remaining;
+        await ctx.runMutation(internal.gameSchedulerMutations.updateScheduledJobTime, {
+          roundId,
+          action: "end_game",
+          scheduledTime: newScheduledTime,
+        });
+        
+        console.log(`Round ${roundId}: Updated job to execute at ${new Date(newScheduledTime * 1000).toISOString()}`);
+        
         return;
       }
 
