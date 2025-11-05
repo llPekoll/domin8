@@ -7,13 +7,14 @@
  * Based on risk.fun pattern: useJackpot.ts (lines 108-273)
  */
 import { useMemo, useState, useEffect } from "react";
-import { PublicKey, Connection } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import { Program, BN } from "@coral-xyz/anchor";
 import { usePrivyWallet } from "./usePrivyWallet";
 import { useAssets } from "../contexts/AssetsContext";
 import idl from "../../target/idl/domin8_prgm.json";
 import { logger } from "../lib/logger";
 import { getSharedGameSubscription } from "../lib/sharedGameSubscription";
+import { getSharedConnection } from "../lib/sharedConnection";
 
 // Bet info structure from smart contract
 export interface BetInfo {
@@ -36,7 +37,6 @@ export interface ActiveGameState {
   winner: PublicKey | null;
   winnerPrize: BN;
   winningBetIndex: BN | null;
-  prizeSent: boolean;
   wallets: PublicKey[]; // NEW: Unique wallet addresses
   bets: BetInfo[]; // NEW: Array of bet info structs
   map: number; // Map/background ID (0-255)
@@ -76,11 +76,8 @@ export function useActiveGame() {
   const { walletAddress, wallet } = usePrivyWallet();
   const { getMapById } = useAssets();
 
-  // Create connection using the same RPC URL
-  const connection = useMemo(() => {
-    const rpcUrl = import.meta.env.VITE_SOLANA_RPC_URL || "https://api.devnet.solana.com";
-    return new Connection(rpcUrl, "confirmed");
-  }, []);
+  // Use shared connection instance
+  const connection = useMemo(() => getSharedConnection(), []);
   const [activeGame, setActiveGame] = useState<ActiveGameState | null>(null);
   const [rawGameData, setRawGameData] = useState<any>(null);
 

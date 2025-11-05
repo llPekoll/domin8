@@ -10,9 +10,8 @@ import { toast } from "sonner";
 import { User, Map } from "lucide-react";
 import { generateRandomName } from "../lib/nameGenerator";
 import { usePrivy } from "@privy-io/react-auth";
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { getSolanaRpcUrl } from "../lib/utils";
 import { useActiveGame } from "../hooks/useActiveGame";
+import { useWalletBalance } from "../hooks/useWalletBalance";
 import { logger } from "../lib/logger";
 
 export function Header() {
@@ -20,8 +19,6 @@ export function Header() {
   const { user, authenticated } = usePrivy();
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [hasAttemptedCreation, setHasAttemptedCreation] = useState(false);
-  const [balance, setBalance] = useState<number | null>(null);
-  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
   const createPlayer = useMutation(api.players.createPlayer);
 
@@ -51,35 +48,12 @@ export function Header() {
   // Get current game state directly from blockchain (not Convex)
   const { activeGame: currentRoundState } = useActiveGame();
 
-  // Fetch ONLY Privy embedded wallet balance via direct RPC
-  useEffect(() => {
-    if (!authenticated || !privyWalletAddress) {
-      setBalance(null);
-      setIsLoadingBalance(false);
-      return;
-    }
-
-    const fetchBalance = async () => {
-      setIsLoadingBalance(true);
-      try {
-        const connection = new Connection(getSolanaRpcUrl(), "confirmed");
-        const publicKey = new PublicKey(privyWalletAddress);
-        const lamports = await connection.getBalance(publicKey);
-        setBalance(lamports / LAMPORTS_PER_SOL);
-      } catch (error) {
-        logger.ui.error("Failed to fetch Privy wallet balance:", error);
-        setBalance(null);
-      } finally {
-        setIsLoadingBalance(false);
-      }
-    };
-
-    void fetchBalance();
-
-    // Refresh balance every 10 seconds
-    const interval = setInterval(() => void fetchBalance(), 10000);
-    return () => clearInterval(interval);
-  }, [authenticated, privyWalletAddress]);
+  // Optimized wallet balance with smart updates (triggers on prize distribution)
+  const { balance, isLoadingBalance } = useWalletBalance({
+    walletAddress: authenticated ? privyWalletAddress : null,
+    activeGame: currentRoundState,
+    refreshInterval: 30000, // 30 seconds fallback for other balance changes
+  });
 
   // Create player with random name on first connect
   useEffect(() => {
