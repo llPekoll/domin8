@@ -90,6 +90,53 @@ async function syncActiveGame(ctx: any, activeGame: any) {
 }
 
 /**
+ * Schedule endGame action for a specific round
+ * Checks if already scheduled and calculates proper delay with blockchain clock buffer
+ */
+async function scheduleEndGameAction(ctx: any, roundId: number, endTimestamp: number) {
+  try {
+    // Check if endGame action already scheduled
+    const alreadyScheduled = await ctx.runQuery(internal.gameSchedulerMutations.isActionScheduled, {
+      roundId,
+      action: "end_game",
+    });
+
+    if (alreadyScheduled) {
+      console.log(`[Sync Service] endGame already scheduled for round ${roundId}`);
+      return;
+    }
+
+    // Calculate delay: schedule for endTimestamp + 1 second
+    const now = Math.floor(Date.now() / 1000);
+    const BLOCKCHAIN_CLOCK_BUFFER = 1; // seconds
+    const targetTime = endTimestamp + BLOCKCHAIN_CLOCK_BUFFER;
+    const delayMs = Math.max(0, (targetTime - now) * 1000);
+
+    console.log(
+      `[Sync Service] Scheduling endGame for round ${roundId} at ${new Date(targetTime * 1000).toISOString()} (${delayMs}ms from now)`
+    );
+
+    // Schedule endGame action for endTimestamp + 1 second
+    const jobId = await ctx.scheduler.runAfter(delayMs, internal.gameScheduler.executeEndGame, {
+      roundId,
+    });
+
+    // Upsert job to database for tracking (avoid duplicates)
+    await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
+      jobId: jobId.toString(),
+      roundId,
+      action: "end_game",
+      scheduledTime: targetTime,
+    });
+
+    console.log(`[Sync Service] Scheduled endGame for round ${roundId} (jobId: ${jobId})`);
+  } catch (error) {
+    console.error(`[Sync Service] Error scheduling endGame for round ${roundId}:`, error);
+    throw error;
+  }
+}
+
+/**
  * Check if the active game has ended and needs to be processed
  * This only checks the current active_game PDA
  */
@@ -112,59 +159,7 @@ async function processEndedGames(ctx: any, activeGame: any) {
       return;
     }
 
-    // Check if game has ended (current time >= endDate)
-    let now = Math.floor(Date.now() / 1000);
-    let endTimestamp = activeGame.endDate;
-
-    if (now < endTimestamp) {
-      const remaining = endTimestamp - now;
-      const endTime = new Date(endTimestamp * 1000).toLocaleString();
-      console.log(
-        `[Sync Service] Game ${activeGame.gameRound} still active (${remaining}s remaining) until ${endTime}`
-      );
-      return;
-    }
-
-    console.log(`[Sync Service] Game ${activeGame.gameRound} has ended, scheduling endGame action`);
-
-    // Check if endGame action already scheduled
-    const alreadyScheduled = await ctx.runQuery(internal.gameSchedulerMutations.isActionScheduled, {
-      roundId: activeGame.gameRound,
-      action: "end_game",
-    });
-
-    if (alreadyScheduled) {
-      console.log(`[Sync Service] endGame already scheduled for round ${activeGame.gameRound}`);
-      return;
-    }
-
-    // Calculate delay: schedule for endTimestamp + 1 second
-    now = Math.floor(Date.now() / 1000);
-    endTimestamp = activeGame.endDate;
-    const BLOCKCHAIN_CLOCK_BUFFER = 1; // seconds
-    const targetTime = endTimestamp + BLOCKCHAIN_CLOCK_BUFFER;
-    const delayMs = Math.max(0, (targetTime - now) * 1000);
-
-    console.log(
-      `[Sync Service] Scheduling endGame for round ${activeGame.gameRound} at ${new Date(targetTime * 1000).toISOString()} (${delayMs}ms from now)`
-    );
-
-    // Schedule endGame action for endTimestamp + 1 second
-    const jobId = await ctx.scheduler.runAfter(delayMs, internal.gameScheduler.executeEndGame, {
-      roundId: activeGame.gameRound,
-    });
-
-    // Upsert job to database for tracking (avoid duplicates)
-    await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
-      jobId: jobId.toString(),
-      roundId: activeGame.gameRound,
-      action: "end_game",
-      scheduledTime: targetTime,
-    });
-
-    console.log(
-      `[Sync Service] Scheduled endGame for round ${activeGame.gameRound} (jobId: ${jobId})`
-    );
+    await scheduleEndGameAction(ctx, activeGame.gameRound, activeGame.endDate);
   } catch (error) {
     console.error("[Sync Service] Error processing ended games:", error);
   }
