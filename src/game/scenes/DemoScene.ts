@@ -76,9 +76,12 @@ export class DemoScene extends Scene {
     this.animationManager = new AnimationManager(this, this.centerX, this.centerY);
     this.backgroundManager = new BackgroundManager(this, this.centerX, this.centerY);
 
-    // Initialize background with new config system (default to bg1)
-    // Use bg1 (Arena Classic animated) as default demo background
-    this.backgroundManager.setBackgroundById(1);
+    // Initialize background with random selection between available backgrounds
+    // Available backgrounds: bg1 (Arena Classic), bg2 (Secte Arena)
+    const availableBackgrounds = [1, 2];
+    const randomBgId = availableBackgrounds[Math.floor(Math.random() * availableBackgrounds.length)];
+    logger.game.debug("[DemoScene] Randomly selected background ID:", randomBgId);
+    this.backgroundManager.setBackgroundById(randomBgId);
     this.scale.on("resize", () => this.handleResize(), this);
     EventBus.emit("current-scene-ready", this);
 

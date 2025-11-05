@@ -1,26 +1,21 @@
 import { BackgroundConfig } from "./types";
 
 /**
- * Background 2 - Animated Arena (Animated + Clickable)
+ * Background 2 - Secte Arena (Animated)
  */
 export const bg2: BackgroundConfig = {
   id: 2,
-  name: "Animated Arena",
-  textureKey: "animated_arena",
-  assetPath: "maps/animated_arena.png", // Will also load .json automatically
+  name: "Secte Arena",
+  textureKey: "bg_secte_animated",
+  assetPath: "maps/secte/bg.png", // Will also load bg.json automatically
   type: "animated",
   animations: {
     idle: {
-      prefix: "background ",
+      prefix: "bg ",
       suffix: ".aseprite",
       start: 0,
-      end: 20,
+      end: 46,
       frameRate: 10,
     },
-  },
-  clickable: {
-    enabled: true,
-    action: "url",
-    url: "https://example.com",
   },
 };

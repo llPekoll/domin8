@@ -67,11 +67,11 @@ export class Preloader extends Scene {
     });
 
     // Load background configs (animated/static backgrounds)
-    // Add background IDs here as you create new bg{N}.ts files with actual assets
-    const backgroundIds = [1]; // Only bg1.ts has real assets for now
+    // Dynamically load backgrounds based on map IDs from database
+    const backgroundIds = allMapsData.map((map) => map.id);
 
     console.log("🎨🎨🎨 PRELOADER: About to load backgrounds, IDs:", backgroundIds);
-    logger.game.debug("[Preloader] 🎨 Starting to load background configs...");
+    logger.game.debug("[Preloader] 🎨 Starting to load background configs from maps...");
 
     backgroundIds.forEach((id) => {
       console.log(`🔍 PRELOADER: Loading background ID ${id}...`);
