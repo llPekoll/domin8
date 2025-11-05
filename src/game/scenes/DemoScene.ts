@@ -4,7 +4,7 @@ import { PlayerManager } from "../managers/PlayerManager";
 import { AnimationManager } from "../managers/AnimationManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
-import { demoMapData, charactersData } from "../main";
+import { charactersData } from "../main";
 import { logger } from "../../lib/logger";
 import {
   generateDemoParticipant,
@@ -74,12 +74,11 @@ export class DemoScene extends Scene {
 
     this.playerManager = new PlayerManager(this, this.centerX, this.centerY);
     this.animationManager = new AnimationManager(this, this.centerX, this.centerY);
-    this.backgroundManager = new BackgroundManager(this, this.centerX, this.centerY + 200);
+    this.backgroundManager = new BackgroundManager(this, this.centerX, this.centerY);
 
-    // Initialize background immediately with preloaded demo map
-    if (demoMapData?.background) {
-      this.backgroundManager.setTexture(demoMapData.background);
-    }
+    // Initialize background with new config system (default to bg1)
+    // Use bg1 (Arena Classic animated) as default demo background
+    this.backgroundManager.setBackgroundById(1);
     this.scale.on("resize", () => this.handleResize(), this);
     EventBus.emit("current-scene-ready", this);
 

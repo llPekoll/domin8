@@ -1,0 +1,72 @@
+{ "frames": [
+   {
+    "filename": "Arena 0.ase",
+    "frame": { "x": 0, "y": 0, "w": 396, "h": 180 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+    "sourceSize": { "w": 396, "h": 180 },
+    "duration": 200
+   },
+   {
+    "filename": "Arena 1.ase",
+    "frame": { "x": 396, "y": 0, "w": 396, "h": 180 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+    "sourceSize": { "w": 396, "h": 180 },
+    "duration": 200
+   },
+   {
+    "filename": "Arena 2.ase",
+    "frame": { "x": 792, "y": 0, "w": 396, "h": 180 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+    "sourceSize": { "w": 396, "h": 180 },
+    "duration": 200
+   },
+   {
+    "filename": "Arena 3.ase",
+    "frame": { "x": 1188, "y": 0, "w": 396, "h": 180 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+    "sourceSize": { "w": 396, "h": 180 },
+    "duration": 200
+   },
+   {
+    "filename": "Arena 4.ase",
+    "frame": { "x": 1584, "y": 0, "w": 396, "h": 180 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+    "sourceSize": { "w": 396, "h": 180 },
+    "duration": 200
+   },
+   {
+    "filename": "Arena 5.ase",
+    "frame": { "x": 1980, "y": 0, "w": 396, "h": 180 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+    "sourceSize": { "w": 396, "h": 180 },
+    "duration": 200
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3.15.2-arm64",
+  "image": "Arena.png",
+  "format": "RGBA8888",
+  "size": { "w": 2376, "h": 180 },
+  "scale": "1",
+  "frameTags": [
+  ],
+  "layers": [
+   { "name": "Arena", "opacity": 255, "blendMode": "normal" }
+  ],
+  "slices": [
+  ]
+ }
+}

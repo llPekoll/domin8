@@ -43,10 +43,8 @@ export class Game extends Scene {
     this.backgroundManager = new BackgroundManager(this, this.centerX, this.centerY);
 
     // Set default background (will be updated when gameState is received)
-    const defaultTexture = "arena_classic";
-    if (this.textures.exists(defaultTexture)) {
-      this.backgroundManager.setTexture(defaultTexture);
-    }
+    // Use bg1 (Arena Classic) as default
+    this.backgroundManager.setBackgroundById(1);
 
     // Create UI elements
     this.uiManager.create();
@@ -119,16 +117,20 @@ export class Game extends Scene {
     }
 
     // Update map background based on game data
-    if (gameState.map) {
+    if (gameState.map !== undefined && gameState.map !== null) {
       logger.game.debug("[Game] 🗺️ Processing map data", {
-        isObject: typeof gameState.map === "object",
-        isNumber: typeof gameState.map === "number",
-        hasBackground: !!gameState.map.background,
-        map: gameState.map,
+        mapType: typeof gameState.map,
+        mapValue: gameState.map,
       });
 
-      if (gameState.map.background) {
-        logger.game.debug("[Game] Setting background texture:", gameState.map.background);
+      // If map is a number (ID), load background config
+      if (typeof gameState.map === "number") {
+        logger.game.debug("[Game] Setting background by ID:", gameState.map);
+        this.backgroundManager.setBackgroundById(gameState.map);
+      }
+      // If map is an object with background property (legacy)
+      else if (typeof gameState.map === "object" && gameState.map.background) {
+        logger.game.debug("[Game] Setting background texture (legacy):", gameState.map.background);
         this.backgroundManager.setTexture(gameState.map.background);
 
         // Update center position if map specifies it
@@ -142,10 +144,7 @@ export class Game extends Scene {
           this.backgroundManager.updateCenter(this.centerX, this.centerY);
         }
       } else {
-        logger.game.error(
-          "[Game] ❌ Map object exists but has no background property!",
-          gameState.map
-        );
+        logger.game.error("[Game] ❌ Invalid map data format!", gameState.map);
       }
     } else {
       logger.game.error("[Game] ❌ No map data in game state!");

@@ -1,6 +1,7 @@
 import { Scene } from "phaser";
 import { currentMapData, charactersData, allMapsData, demoMapData } from "../main";
 import { logger } from "../../lib/logger";
+import { loadBackgroundConfig } from "../config/backgrounds";
 
 export class Preloader extends Scene {
   constructor() {
@@ -65,8 +66,57 @@ export class Preloader extends Scene {
       this.load.image(map.background, map.assetPath);
     });
 
+    // Load background configs (animated/static backgrounds)
+    // Add background IDs here as you create new bg{N}.ts files with actual assets
+    const backgroundIds = [1]; // Only bg1.ts has real assets for now
+
+    console.log("🎨🎨🎨 PRELOADER: About to load backgrounds, IDs:", backgroundIds);
+    logger.game.debug("[Preloader] 🎨 Starting to load background configs...");
+
+    backgroundIds.forEach((id) => {
+      console.log(`🔍 PRELOADER: Loading background ID ${id}...`);
+      const bgConfig = loadBackgroundConfig(id);
+
+      if (!bgConfig) {
+        console.error(`❌ PRELOADER: Failed to load config for ID ${id}`);
+        logger.game.error(`[Preloader] ❌ Failed to load config for background ID ${id}`);
+        return;
+      }
+
+      console.log(`✅ PRELOADER: Config loaded for bg${id}:`, bgConfig);
+      logger.game.debug(`[Preloader] ✅ Config loaded for bg${id}:`, {
+        name: bgConfig.name,
+        textureKey: bgConfig.textureKey,
+        assetPath: bgConfig.assetPath,
+        type: bgConfig.type,
+      });
+
+      if (bgConfig.type === "animated") {
+        // Load as atlas for animated backgrounds
+        const jsonPath = bgConfig.assetPath.replace(".png", ".json");
+
+        logger.game.debug(`[Preloader] 📦 Loading animated atlas:`, {
+          textureKey: bgConfig.textureKey,
+          pngPath: bgConfig.assetPath,
+          jsonPath: jsonPath,
+          fullPngPath: `assets/${bgConfig.assetPath}`,
+          fullJsonPath: `assets/${jsonPath}`,
+        });
+
+        this.load.atlas(bgConfig.textureKey, bgConfig.assetPath, jsonPath);
+        console.log(`📦 PRELOADER: load.atlas() called for '${bgConfig.textureKey}'`);
+      } else {
+        // Load as image for static backgrounds
+        logger.game.debug(`[Preloader] 🖼️ Loading static image:`, bgConfig.textureKey, bgConfig.assetPath);
+        this.load.image(bgConfig.textureKey, bgConfig.assetPath);
+      }
+    });
+
+    logger.game.debug("[Preloader] 🎨 Background configs queued for loading");
+
     // Load VFX assets
     this.load.atlas("explosion", "vfx/Explosion.png", "vfx/Explosion.json");
+    this.load.atlas("explosion-fullscreen", "vfx/fight-effect.png", "vfx/fight-effect.json");
     this.load.atlas("blood", "vfx/blood_spritesheet.png", "vfx/blood_spritesheet.json");
     this.load.atlas("dust", "dust_char.png", "dust_char.json");
     this.load.image("logo", "logo.webp");
@@ -108,6 +158,7 @@ export class Preloader extends Scene {
 
     // Log load errors for debugging
     this.load.on("loaderror", (file: any) => {
+      console.error("❌❌❌ PRELOADER LOAD ERROR:", file.key, file.src, file);
       logger.game.error("[Preloader] Failed to load file:", file.key, file.src);
     });
   }
@@ -183,6 +234,19 @@ export class Preloader extends Scene {
         suffix: ".png",
         start: 0,
         end: 17,
+      }),
+      frameRate: 18,
+      repeat: 0,
+    });
+
+    // Create fullscreen explosion animation
+    this.anims.create({
+      key: "explosion-fullscreen",
+      frames: this.anims.generateFrameNames("explosion-fullscreen", {
+        prefix: "fight-effect ",
+        suffix: ".ase",
+        start: 0,
+        end: 40,
       }),
       frameRate: 18,
       repeat: 0,

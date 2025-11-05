@@ -2,6 +2,7 @@ import { Scene } from "phaser";
 import { GameParticipant } from "./PlayerManager";
 import { SoundManager } from "./SoundManager";
 import { logger } from "../../lib/logger";
+import { STAGE_WIDTH, STAGE_HEIGHT } from "../main";
 
 export class AnimationManager {
   private scene: Scene;
@@ -97,56 +98,6 @@ export class AnimationManager {
   addWinnerCelebration(winnerPlayer: GameParticipant, winner: any) {
     // Play victory sound when winner celebration starts
     SoundManager.playVictory(this.scene, 0.6);
-
-    // DEBUG: Show sprite anchor point visualization
-    const debugAnchor = this.scene.add.graphics();
-    debugAnchor.setDepth(1000); // On top of everything
-
-    // Draw a crosshair at the anchor point
-    const anchorWorldX = winnerPlayer.container.x + winnerPlayer.sprite.x;
-    const anchorWorldY = winnerPlayer.container.y + winnerPlayer.sprite.y;
-
-    // Red circle at anchor point
-    // debugAnchor.fillStyle(0xff0000, 1);
-    // debugAnchor.fillCircle(anchorWorldX, anchorWorldY, 8);
-
-    // // Yellow crosshair
-    // debugAnchor.lineStyle(3, 0xffff00, 1);
-    // debugAnchor.beginPath();
-    // debugAnchor.moveTo(anchorWorldX - 20, anchorWorldY);
-    // debugAnchor.lineTo(anchorWorldX + 20, anchorWorldY);
-    // debugAnchor.moveTo(anchorWorldX, anchorWorldY - 20);
-    // debugAnchor.lineTo(anchorWorldX, anchorWorldY + 20);
-    // debugAnchor.strokePath();
-
-    // Add label showing anchor coordinates
-    // const anchorLabel = this.scene.add.text(
-    //   anchorWorldX + 25,
-    //   anchorWorldY - 10,
-    //   `Anchor: (${winnerPlayer.sprite.originX.toFixed(2)}, ${winnerPlayer.sprite.originY.toFixed(2)})`,
-    //   {
-    //     fontFamily: "Arial",
-    //     fontSize: "14px",
-    //     color: "#ffff00",
-    //     backgroundColor: "#000000",
-    //     padding: { x: 5, y: 5 },
-    //   }
-    // );
-    // anchorLabel.setDepth(1000);
-
-    // Track for cleanup
-    // this.celebrationObjects.push(debugAnchor, anchorLabel);
-
-    logger.game.debug("[AnimationManager] 🎯 DEBUG: Winner sprite anchor at", {
-      originX: winnerPlayer.sprite.originX,
-      originY: winnerPlayer.sprite.originY,
-      worldX: anchorWorldX,
-      worldY: anchorWorldY,
-      spriteX: winnerPlayer.sprite.x,
-      spriteY: winnerPlayer.sprite.y,
-      containerX: winnerPlayer.container.x,
-      containerY: winnerPlayer.container.y,
-    });
 
     // Create dark background overlay for focus
     const backgroundOverlay = this.scene.add.rectangle(
@@ -863,12 +814,44 @@ export class AnimationManager {
   startBattlePhaseSequence(playerManager: any, onComplete?: () => void) {
     logger.game.debug("[AnimationManager] ⚔️ Starting battle phase sequence");
 
+    // Play fullscreen explosion animation at the start
+    const gameWidth = this.scene.game.config.width as number;
+    const gameHeight = this.scene.game.config.height as number;
+
+    const fullscreenExplosion = this.scene.add.sprite(
+      gameWidth / 2,
+      gameHeight / 2,
+      "explosion-fullscreen"
+    );
+
+    // TODO: this can be remove later on when the whole app it going to be at the correct size
+    const scaleX = gameWidth / STAGE_WIDTH;
+    const scaleY = gameHeight / STAGE_HEIGHT;
+    const scale = Math.max(scaleX, scaleY);
+
+    fullscreenExplosion.setScale(scale);
+    fullscreenExplosion.setDepth(1550); // Between characters and continuous explosions
+    // Keep pixel art crisp when scaling
+    fullscreenExplosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+
+    if (this.scene.anims.exists("explosion-fullscreen")) {
+      this.scene.time.delayedCall(200, () => {
+        fullscreenExplosion.play("explosion-fullscreen");
+      });
+    }
+
+    fullscreenExplosion.once("animationcomplete", () => {
+      fullscreenExplosion.destroy();
+    });
+
+    // Screen shake for dramatic impact
+    this.scene.cameras.main.shake(400, 0.015);
+
     // Move participants to center
     playerManager.moveParticipantsToCenter();
 
     // After 500ms of running, start continuous explosions
-    this.scene.time.delayedCall(500, () => {
-      logger.game.debug("[AnimationManager] 💥 Starting continuous explosions after 500ms");
+    this.scene.time.delayedCall(200, () => {
       this.createContinuousExplosions();
     });
 
@@ -885,11 +868,7 @@ export class AnimationManager {
    * @param winner - Winner participant data
    * @param onComplete - Callback when sequence completes (after celebration delay)
    */
-  startResultsPhaseSequence(
-    playerManager: any,
-    winner: any,
-    onComplete?: () => void
-  ) {
+  startResultsPhaseSequence(playerManager: any, winner: any, onComplete?: () => void) {
     logger.game.debug("[AnimationManager] 🏆 Starting results phase sequence for winner:", winner);
 
     // Mark all non-winners as eliminated
@@ -919,7 +898,10 @@ export class AnimationManager {
       // Show winner with PlayerManager (scales up, golden tint, etc.)
       const winnerParticipant = playerManager.showResults(gameState);
 
-      logger.game.debug("[AnimationManager] Winner participant from showResults:", winnerParticipant);
+      logger.game.debug(
+        "[AnimationManager] Winner participant from showResults:",
+        winnerParticipant
+      );
 
       // Add celebration animations (confetti, text, bounce)
       if (winnerParticipant) {
