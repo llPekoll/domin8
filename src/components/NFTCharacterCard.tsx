@@ -41,8 +41,7 @@ export function NFTCharacterCard({
       {/* NFT Badge */}
       <div className="absolute top-2 right-2 z-10">
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg">
-          <Star className="w-3 h-3 fill-current" />
-          <span>NFT</span>
+          <span>{character.nftCollectionName ?? 'Special Character'}</span>
         </div>
       </div>
       

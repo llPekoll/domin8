@@ -515,15 +515,7 @@ const CharacterSelection = memo(function CharacterSelection({
                   )}
                 </button>
               )}
-              
-              {/* Reroll Button */}
-              <button
-                onClick={handleReroll}
-                className="p-2 bg-amber-800/50 hover:bg-amber-700/50 rounded-lg border border-amber-600/50 transition-colors"
-                disabled={!allCharacters || allCharacters.length <= 1}
-              >
-                <Shuffle className="w-4 h-4 text-amber-300" />
-              </button>
+            
             </div>
           </div>
         </div>
