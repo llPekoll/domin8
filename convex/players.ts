@@ -18,6 +18,31 @@ export const getPlayer = query({
   },
 });
 
+/**
+ * Get multiple players by wallet addresses
+ * Returns a map of wallet address -> display name for quick lookups
+ */
+export const getPlayersByWallets = query({
+  args: { walletAddresses: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    const players = await Promise.all(
+      args.walletAddresses.map(async (walletAddress) => {
+        const player = await ctx.db
+          .query("players")
+          .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
+          .first();
+        
+        return {
+          walletAddress,
+          displayName: player?.displayName || null,
+        };
+      })
+    );
+
+    return players;
+  },
+});
+
 export const getPlayerWithCharacter = query({
   args: { walletAddress: v.string() },
   handler: async (ctx, args) => {

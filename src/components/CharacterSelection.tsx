@@ -7,7 +7,7 @@ import { useNFTCharacters } from "../hooks/useNFTCharacters";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { toast } from "sonner";
-import { Shuffle, Star } from "lucide-react";
+import { BadgeCheck, Check, Shuffle, Star } from "lucide-react";
 import { CharacterPreviewScene } from "./CharacterPreviewScene";
 import { NFTCharacterModal } from "./NFTCharacterModal";
 import styles from "./ButtonShine.module.css";
@@ -130,7 +130,6 @@ const CharacterSelection = memo(function CharacterSelection({
           setCurrentCharacter(randomChar);
           toast.info('Switched back to regular characters', {
             description: `Now using ${randomChar.name}`,
-            icon: '⭐',
           });
         }
       }
@@ -472,6 +471,7 @@ const CharacterSelection = memo(function CharacterSelection({
                 <CharacterPreviewScene
                   characterId={currentCharacter._id}
                   characterName={currentCharacter.name}
+                  isSpecial={!!currentCharacter.nftCollection}
                   width={64}
                   height={64}
                 />
@@ -480,18 +480,17 @@ const CharacterSelection = memo(function CharacterSelection({
                 <p className="text-amber-100 font-bold text-xl uppercase tracking-wide">
                   {currentCharacter.name}
                 </p>
-                <p className="text-amber-400 text-base">
-                  {selectedNFTCharacters.length === 0
-                    ? (currentCharacter.nftCollection
-                        ? '⭐ Exclusive Character'
-                        : 'Ready for battle')
-                    : selectedNFTCharacters.length === 1
-                      ? '⭐ Exclusive NFT Character'
-                      : `⭐ Pool: ${selectedNFTCharacters.length} NFT chars`
-                  }
-                </p>
               </div>
             </div>
+
+            {/* Reroll Button */}
+            <button
+              onClick={handleReroll}
+              className="p-2 mr-1 bg-amber-800/50 hover:bg-amber-700/50 rounded-lg border border-amber-600/50 transition-colors"
+              disabled={!allCharacters || allCharacters.length <= 1}
+            >
+              <Shuffle className="w-4 h-4 text-amber-300" />
+            </button>
             
             <div className="flex items-center gap-2">
               {/* NFT Character Button */}
@@ -500,16 +499,17 @@ const CharacterSelection = memo(function CharacterSelection({
                 <button
                   onClick={() => setShowNFTModal(true)}
                   disabled={isLoadingNFTs}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border border-purple-400/50 transition-all shadow-lg ${isLoadingNFTs ? 'opacity-70 cursor-wait bg-gray-700/40' : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/20'}`}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${selectedNFTCharacters.length > 0 ? 'border-purple-400/50' : 'border-transparent'} transition-all shadow-lg ${isLoadingNFTs ? 'opacity-70 cursor-wait bg-gray-700/40' : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/20'}`}
                   title="Select exclusive NFT characters"
                 >
-                  <Star className="w-4 h-4 fill-amber-200" />
+                  {selectedNFTCharacters.length === 0 && <Star className="w-4 h-4 fill-yellow-400" />}
+                  {selectedNFTCharacters.length > 0 && <BadgeCheck className="w-4 h-4 fill-yellow-400" />}
                   <span className="text-sm text-white font-bold">NFT</span>
                   {isLoadingNFTs && (
                     <span className="text-xs text-amber-200 ml-2">Checking...</span>
                   )}
                   {selectedNFTCharacters.length > 0 && (
-                    <span className="bg-purple-900/50 px-2 py-0.5 rounded-full text-xs font-bold">
+                    <span className="bg-purple-900/50 px-2 py-0.5 rounded-full text-xs font-bold text-white">
                       {selectedNFTCharacters.length}
                     </span>
                   )}

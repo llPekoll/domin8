@@ -6,6 +6,7 @@ import { charactersData } from '../game/main';
 interface CharacterPreviewSceneProps {
   characterId?: string;
   characterName?: string;
+  isSpecial?: boolean;
   width?: number;
   height?: number;
 }
@@ -13,6 +14,7 @@ interface CharacterPreviewSceneProps {
 export const CharacterPreviewScene: React.FC<CharacterPreviewSceneProps> = ({
   characterId,
   characterName,
+  isSpecial,
   width = 120,
   height = 120
 }) => {
@@ -163,7 +165,7 @@ export const CharacterPreviewScene: React.FC<CharacterPreviewSceneProps> = ({
   return (
     <div
       ref={containerRef}
-      className="character-preview-container rounded-lg overflow-hidden border-2 border-amber-600/60"
+      className={`character-preview-container rounded-lg overflow-hidden  ${isSpecial ? 'border-3 border-purple-600' : 'border-2border-amber-600/60' }`}
       style={{ width, height }}
     />
   );

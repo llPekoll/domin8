@@ -23,6 +23,7 @@ export class Game extends Scene {
 
   private introPlayed: boolean = false;
   private characters: any[] = [];
+  private playerNames: Map<string, string> = new Map(); // wallet -> displayName
 
   constructor() {
     super("Game");
@@ -31,6 +32,17 @@ export class Game extends Scene {
   // Set characters data from AssetsContext
   setCharacters(characters: any[]) {
     this.characters = characters || [];
+  }
+
+  // Set player names mapping (wallet address -> display name)
+  setPlayerNames(playerNames: Array<{ walletAddress: string; displayName: string | null }>) {
+    this.playerNames.clear();
+    playerNames.forEach(({ walletAddress, displayName }) => {
+      if (displayName) {
+        this.playerNames.set(walletAddress, displayName);
+      }
+    });
+    logger.game.debug("[Game] Player names updated:", this.playerNames.size);
   }
 
   create() {
@@ -177,15 +189,14 @@ export class Game extends Scene {
           return;
         }
 
-        // TODO: Map skin ID to character name/key
-        // For now, use a default mapping
         const characterName = this.getSkinName(bet.skin);
         const characterKey = characterName.toLowerCase().replace(/\s+/g, "-");
+        const participantName = this.getParticipantName(walletAddress);
 
         const participant = {
           _id: participantId,
           playerId: walletAddress,
-          displayName: characterName,
+          displayName: participantName,
           betAmount: Number(bet.amount.toString()) / 1_000_000_000, // Convert lamports to SOL
           character: {
             key: characterKey,
@@ -219,14 +230,25 @@ export class Game extends Scene {
     
     // Fallback to default mapping if character not found
     const skinMap: { [key: number]: string } = {
-      0: "Warrior",
-      1: "Mage",
-      2: "Archer",
-      3: "Orc",
-      4: "Male",
-      5: "Soldier",
+      1: "Orc",
+      2: "Soldier",
+      3: "Male",
+      4: "Sam",
+      5: "Warrior",
     };
     return skinMap[skinId] || "Warrior";
+  }
+
+  // Helper to get participant display name from wallet address
+  private getParticipantName(walletAddress: string): string {
+    // Try to get display name from playerNames mapping
+    const displayName = this.playerNames.get(walletAddress);
+    if (displayName) {
+      return displayName;
+    }
+    
+    // Fallback to truncated wallet address
+    return `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`;
   }
 
   // Add update method to continuously update the timer and check game phase
