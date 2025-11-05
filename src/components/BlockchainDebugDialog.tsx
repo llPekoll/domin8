@@ -79,8 +79,7 @@ export function BlockchainDebugDialog() {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800">
           <div className="flex items-center gap-3">
-            <CircleHelp className="w-6 h-6 text-purple-400" />
-            <h2 className="text-xl font-bold text-white">Game Debug Panel</h2>
+            <h2 className="text-xl font-bold text-white">Game Details</h2>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -205,14 +204,36 @@ export function BlockchainDebugDialog() {
               <span className="text-sm font-medium text-gray-400">Connection Details</span>
             </summary>
             <div className="p-3 pt-0 space-y-2 text-xs">
-              <div className="flex justify-between">
+                <div className="flex justify-between items-center gap-2">
                 <span className="text-gray-500">Program ID:</span>
-                <span className="text-gray-400 font-mono">{import.meta.env.VITE_GAME_PROGRAM_ID?.slice(0, 12)}...</span>
-              </div>
-              <div className="flex justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400 font-mono text-xs break-all">{import.meta.env.VITE_GAME_PROGRAM_ID}</span>
+                  <button
+                  onClick={() => {
+                    void navigator.clipboard.writeText(import.meta.env.VITE_GAME_PROGRAM_ID || '');
+                  }}
+                  className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors flex-shrink-0"
+                  title="Copy Program ID"
+                  >
+                  📋
+                  </button>
+                </div>
+                </div>
+                <div className="flex justify-between items-center gap-2">
                 <span className="text-gray-500">Game PDA:</span>
-                <span className="text-gray-400 font-mono">{activeGamePDA?.toBase58().slice(0, 12)}...</span>
-              </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400 font-mono text-xs break-all">{activeGamePDA?.toBase58()}</span>
+                  <button
+                  onClick={() => {
+                    void navigator.clipboard.writeText(activeGamePDA?.toBase58() || '');
+                  }}
+                  className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors flex-shrink-0"
+                  title="Copy Game PDA"
+                  >
+                  📋
+                  </button>
+                </div>
+                </div>
             </div>
           </details>
         </div>
