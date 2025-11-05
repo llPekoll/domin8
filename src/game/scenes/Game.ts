@@ -22,9 +22,15 @@ export class Game extends Scene {
   private backgroundManager!: BackgroundManager;
 
   private introPlayed: boolean = false;
+  private characters: any[] = [];
 
   constructor() {
     super("Game");
+  }
+
+  // Set characters data from AssetsContext
+  setCharacters(characters: any[]) {
+    this.characters = characters || [];
   }
 
   create() {
@@ -205,7 +211,13 @@ export class Game extends Scene {
 
   // Helper to map skin ID to character name
   private getSkinName(skinId: number): string {
-    // TODO: Load this mapping from Convex characters table
+    // Load this mapping from Convex characters table via AssetsContext
+    const character = this.characters.find((char) => char.id === skinId);
+    if (character) {
+      return character.name;
+    }
+    
+    // Fallback to default mapping if character not found
     const skinMap: { [key: number]: string } = {
       0: "Warrior",
       1: "Mage",
@@ -213,7 +225,6 @@ export class Game extends Scene {
       3: "Orc",
       4: "Male",
       5: "Soldier",
-      // Add more mappings as needed
     };
     return skinMap[skinId] || "Warrior";
   }
