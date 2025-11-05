@@ -103,8 +103,8 @@ export class AnimationManager {
     const backgroundOverlay = this.scene.add.rectangle(
       this.centerX,
       this.centerY,
-      this.scene.game.config.width as number,
-      this.scene.game.config.height as number,
+      this.scene.scale.width,
+      this.scene.scale.height,
       0x000000
     );
     backgroundOverlay.setDepth(85); // Behind throne (throne is at 90)
@@ -135,7 +135,7 @@ export class AnimationManager {
     // Apply pixelated rendering - render at lower resolution for crisp pixel art look
 
     // Get screen height for positioning at bottom
-    const screenHeight = this.scene.game.config.height as number;
+    const screenHeight = this.scene.scale.height;
 
     // Winner name at bottom of screen
     const nameText = this.scene.add
@@ -173,8 +173,13 @@ export class AnimationManager {
     // Create confetti particle effect
     const colors = [0xffd700, 0xff0000, 0x00ff00, 0x0000ff, 0xff00ff, 0xffff00];
 
-    for (let i = 0; i < 50; i++) {
-      const x = Math.random() * (this.scene.game.config.width as number);
+    // Use scale manager for actual scene dimensions (respects RESIZE mode)
+    const sceneWidth = this.scene.scale.width;
+    const sceneHeight = this.scene.scale.height;
+
+    // Increase particle count for more dramatic full-screen effect
+    for (let i = 0; i < 100; i++) {
+      const x = Math.random() * sceneWidth;
       const startY = -50;
       const color = colors[Math.floor(Math.random() * colors.length)];
 
@@ -187,8 +192,8 @@ export class AnimationManager {
       // Animate confetti falling
       this.scene.tweens.add({
         targets: confetti,
-        y: (this.scene.game.config.height as number) + 50,
-        x: x + (Math.random() - 0.5) * 200,
+        y: sceneHeight + 50,
+        x: x + (Math.random() - 0.5) * 300, // More horizontal drift
         angle: Math.random() * 720,
         duration: 2000 + Math.random() * 2000,
         ease: "Linear",
@@ -410,8 +415,8 @@ export class AnimationManager {
           // participant.container.alpha stays at 1
 
           // Remove when off screen or after max lifetime
-          const gameWidth = this.scene.game.config.width as number;
-          const gameHeight = this.scene.game.config.height as number;
+          const gameWidth = this.scene.scale.width;
+          const gameHeight = this.scene.scale.height;
 
           const isOffScreen =
             participant.container.x < -100 ||
@@ -555,8 +560,8 @@ export class AnimationManager {
 
   checkScreenEdgeCollision(participant: any) {
     // Get screen dimensions
-    const screenWidth = this.scene.game.config.width as number;
-    const screenHeight = this.scene.game.config.height as number;
+    const screenWidth = this.scene.scale.width;
+    const screenHeight = this.scene.scale.height;
 
     // Monitor participant position over time
     const checkCollision = () => {
@@ -638,8 +643,8 @@ export class AnimationManager {
     const flash = this.scene.add.rectangle(
       this.centerX,
       this.centerY,
-      this.scene.game.config.width as number,
-      this.scene.game.config.height as number,
+      this.scene.scale.width,
+      this.scene.scale.height,
       0x8b0000 // Dark red
     );
     flash.setDepth(340);
@@ -772,8 +777,8 @@ export class AnimationManager {
         }
 
         // Random position across the entire screen
-        const gameWidth = this.scene.game.config.width as number;
-        const gameHeight = this.scene.game.config.height as number;
+        const gameWidth = this.scene.scale.width;
+        const gameHeight = this.scene.scale.height;
 
         const explosion = this.scene.add.sprite(gameWidth / 2, gameHeight / 2 - 100, "explosion");
 
@@ -815,8 +820,8 @@ export class AnimationManager {
     logger.game.debug("[AnimationManager] ⚔️ Starting battle phase sequence");
 
     // Play fullscreen explosion animation at the start
-    const gameWidth = this.scene.game.config.width as number;
-    const gameHeight = this.scene.game.config.height as number;
+    const gameWidth = this.scene.scale.width;
+    const gameHeight = this.scene.scale.height;
 
     const fullscreenExplosion = this.scene.add.sprite(
       gameWidth / 2,
