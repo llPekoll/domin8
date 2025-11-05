@@ -9,36 +9,15 @@ import { SoundControl } from "./SoundControl";
 import { toast } from "sonner";
 import { User, Map } from "lucide-react";
 import { generateRandomName } from "../lib/nameGenerator";
-import { usePrivy } from "@privy-io/react-auth";
 import { useActiveGame } from "../hooks/useActiveGame";
-import { useWalletBalance } from "../hooks/useWalletBalance";
 import { logger } from "../lib/logger";
 
 export function Header() {
-  const { connected, publicKey, externalWalletAddress } = usePrivyWallet();
-  const { user, authenticated } = usePrivy();
+  const { connected, publicKey, externalWalletAddress, solBalance, isLoadingBalance } = usePrivyWallet();
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [hasAttemptedCreation, setHasAttemptedCreation] = useState(false);
 
   const createPlayer = useMutation(api.players.createPlayer);
-
-  // Get ONLY Privy embedded wallet ADDRESS (not external wallets)
-  const getPrivyEmbeddedWalletAddress = () => {
-    if (!user) return null;
-
-    // Look for Privy embedded Solana wallet in linkedAccounts
-    const embeddedWallet = user.linkedAccounts?.find(
-      (account) =>
-        account.type === "wallet" &&
-        "chainType" in account &&
-        account.chainType === "solana" &&
-        (!("walletClientType" in account) || account.walletClientType === "privy")
-    );
-
-    return embeddedWallet && "address" in embeddedWallet ? embeddedWallet.address : null;
-  };
-
-  const privyWalletAddress = getPrivyEmbeddedWalletAddress();
 
   const playerData = useQuery(
     api.players.getPlayer,
@@ -47,13 +26,6 @@ export function Header() {
 
   // Get current game state directly from blockchain (not Convex)
   const { activeGame: currentRoundState } = useActiveGame();
-
-  // Optimized wallet balance with smart updates (triggers on prize distribution)
-  const { balance, isLoadingBalance } = useWalletBalance({
-    walletAddress: authenticated ? privyWalletAddress : null,
-    activeGame: currentRoundState,
-    refreshInterval: 30000, // 30 seconds fallback for other balance changes
-  });
 
   // Create player with random name on first connect
   useEffect(() => {
@@ -139,9 +111,9 @@ export function Header() {
                       <div className="text-indigo-300 font-bold text-xl flex items-center justify-end">
                         {isLoadingBalance ? (
                           <span className="text-lg">Loading...</span>
-                        ) : balance !== null ? (
+                        ) : solBalance !== null ? (
                           <>
-                            {balance.toFixed(4)}{" "}
+                            {solBalance.toFixed(4)}{" "}
                             <span className="text-indigo-400 ml-1 text-lg">SOL</span>
                           </>
                         ) : (
