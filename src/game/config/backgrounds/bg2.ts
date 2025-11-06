@@ -164,5 +164,29 @@ export const bg2: BackgroundConfig = {
       clickable: true,
       depth: 1, // Above background
     },
+    {
+      textureKey: "secte_stone",
+      assetPath: "maps/secte/stone.png",
+      animations: {
+        idle: {
+          prefix: "stone ",
+          suffix: ".aseprite",
+          start: 0,
+          end: 0,
+          frameRate: 10,
+          repeat: -1, // Static frame (frame 0 only)
+        },
+        click: {
+          prefix: "stone ",
+          suffix: ".aseprite",
+          start: 1,
+          end: 7,
+          frameRate: 10,
+          repeat: 0, // Play once
+        },
+      },
+      clickable: true,
+      depth: 1, // Above background
+    },
   ],
 };

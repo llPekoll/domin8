@@ -4,17 +4,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 // import { getUserNFTCollections } from "../lib/nft-service";
 // import { getSolanaRpcUrl } from "../lib/utils";
-import type { Id } from "../../convex/_generated/dataModel";
-
-interface Character {
-  _id: Id<"characters">;
-  id?: number;
-  name: string;
-  description?: string;
-  nftCollection?: string;
-  assetPath: string;
-  isActive: boolean;
-}
+import type { Character } from "../types/character";
 
 /**
  * Hook to check NFT ownership and return unlocked exclusive characters
@@ -50,7 +40,7 @@ export function useNFTCharacters(externalWalletAddress: string | null) {
         //   char.nftCollection && collections.includes(char.nftCollection)
         // );
 
-        setUnlockedCharacters(allExclusiveChars);
+        setUnlockedCharacters(allExclusiveChars as Character[]);
       } catch (err) {
         console.error("Failed to check NFT ownership:", err);
         setError("Failed to load exclusive characters");

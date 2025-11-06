@@ -10,15 +10,7 @@ import {
 } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { NFTCharacterCard } from "./NFTCharacterCard";
-import type { Id } from "../../convex/_generated/dataModel";
-
-interface Character {
-  _id: Id<"characters">;
-  id?: number;
-  name: string;
-  description?: string;
-  nftCollection?: string;
-}
+import type { Character } from "../types/character";
 
 interface NFTCharacterModalProps {
   open: boolean;
