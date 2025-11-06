@@ -15,14 +15,7 @@ import { Buffer } from "buffer";
 import { EventBus } from "../game/EventBus";
 import { logger } from "../lib/logger";
 import { useAssets } from "../contexts/AssetsContext";
-
-interface Character {
-  _id: Id<"characters">;
-  id?: number; // Blockchain ID
-  name: string;
-  description?: string;
-  nftCollection?: string;
-}
+import type { Character } from "../types/character";
 
 // Make Buffer available globally for Privy
 if (typeof window !== "undefined") {
@@ -638,10 +631,10 @@ const CharacterSelection = memo(function CharacterSelection({
         selectedCharacters={selectedNFTCharacters}
         onSelectCharacters={setSelectedNFTCharacters}
         onNFTCharacterSelected={handleNFTCharacterSelected}
-        unlockedCharacters={unlockedCharacters}
+        unlockedCharacters={unlockedCharacters as Character[]}
         isLoading={isLoadingNFTs}
         error={nftError}
-        allExclusiveCharacters={allExclusiveChars || []}
+        allExclusiveCharacters={(allExclusiveChars || []) as Character[]}
       />
     </div>
   );

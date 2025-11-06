@@ -1,13 +1,6 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import { Metaplex } from '@metaplex-foundation/js';
-import type { Id } from '../../convex/_generated/dataModel';
-
-interface Character {
-  _id: Id<"characters">;
-  name: string;
-  description?: string;
-  nftCollection?: string;
-}
+import type { Character } from '../types/character';
 
 /**
  * Client-side NFT checking (for UX only, NOT security)
