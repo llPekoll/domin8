@@ -101,7 +101,7 @@ export class AnimationManager {
     createExplosion(1200);
   }
 
-  addWinnerCelebration(winnerAddress: any) {
+  addWinnerCelebration(winnerParticipant: any) {
     // Play victory sound when winner celebration starts
     SoundManager.playVictory(this.scene, 0.6);
 
@@ -143,8 +143,25 @@ export class AnimationManager {
     // Get screen height for positioning at bottom
     const screenHeight = this.scene.scale.height;
 
-    // Get the displayName from the player address using the player context
-    const winnerDisplayName = this.playerNamesMap.get(winnerAddress) || winnerAddress.slice(0, 8) + "...";
+    // Get the displayName - first try from playerNamesMap using playerId, then fall back to participant.displayName
+    let winnerDisplayName = "Champion";
+    
+    if (winnerParticipant?.playerId) {
+      // Try to get display name from playerNamesMap using the wallet address (playerId)
+      const mappedName = this.playerNamesMap.get(winnerParticipant.playerId);
+      if (mappedName) {
+        winnerDisplayName = mappedName;
+        logger.game.debug("[AnimationManager] Found winner display name in map:", mappedName);
+      } else {
+        // Fall back to participant's displayName property
+        winnerDisplayName = winnerParticipant.displayName || "Champion";
+        logger.game.debug("[AnimationManager] Using participant.displayName:", winnerParticipant.displayName);
+      }
+    } else {
+      winnerDisplayName = winnerParticipant?.displayName || "Champion";
+    }
+    
+    logger.game.debug("[AnimationManager] Final winner display name:", winnerDisplayName);
 
     // Winner name at bottom of screen
     const nameText = this.scene.add
