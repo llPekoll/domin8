@@ -43,6 +43,35 @@ export class Game extends Scene {
       }
     });
     logger.game.debug("[Game] Player names updated:", this.playerNames.size);
+    
+    // Pass updated player names to AnimationManager
+    if (this.animationManager) {
+      this.animationManager.setPlayerNames(this.playerNames);
+    }
+    
+    // Update existing participants with new display names
+    if (this.playerManager) {
+      this.updateParticipantDisplayNames();
+    }
+  }
+  
+  // Update display names for all existing participants
+  private updateParticipantDisplayNames() {
+    const participants = this.playerManager.getParticipants();
+    participants.forEach((participant) => {
+      if (participant.playerId) {
+        const displayName = this.playerNames.get(participant.playerId);
+        if (displayName && displayName !== participant.displayName) {
+          logger.game.debug("[Game] Updating participant display name:", {
+            participantId: participant.id,
+            oldName: participant.displayName,
+            newName: displayName,
+          });
+          participant.displayName = displayName;
+          participant.nameText.setText(displayName);
+        }
+      }
+    });
   }
 
   create() {
@@ -243,6 +272,14 @@ export class Game extends Scene {
   private getParticipantName(walletAddress: string): string {
     // Try to get display name from playerNames mapping
     const displayName = this.playerNames.get(walletAddress);
+    
+    logger.game.debug("[Game] getParticipantName lookup:", {
+      walletAddress: walletAddress.slice(0, 8) + "...",
+      foundDisplayName: displayName,
+      playerNamesSize: this.playerNames.size,
+      allKeys: Array.from(this.playerNames.keys()).map(k => k.slice(0, 8) + "..."),
+    });
+    
     if (displayName) {
       return displayName;
     }
