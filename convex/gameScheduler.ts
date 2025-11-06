@@ -172,6 +172,48 @@ export const executeEndGame = internalAction({
           console.log(`Round ${roundId}: Winner selected: ${updatedGame.winner}`);
           console.log(`Round ${roundId}: Prize amount: ${updatedGame.winnerPrize} lamports`);
 
+          // Send webhook notification for winner
+          try {
+            // Calculate winner prize (total pot minus house fee)
+            const totalPot = updatedGame.totalDeposit || 0;
+            const houseFee = totalPot * 0.05; // 5% house fee
+            const winnerPrize = updatedGame.winnerPrize || 0;
+
+            // Get winner bet details
+            const winningBetIndex = updatedGame.winningBetIndex ?? -1;
+            const winnerBet = winningBetIndex >= 0 && updatedGame.bets?.[winningBetIndex] 
+              ? updatedGame.bets[winningBetIndex] 
+              : null;
+
+            const webhookData = {
+              eventType: "game_winner",
+              roundId: roundId,
+              winner: {
+                walletAddress: updatedGame.winner.toString(),
+                betAmount: winnerBet?.amount || 0,
+              },
+              prize: {
+                totalPot: totalPot / 1e9, // Convert lamports to SOL
+                houseFee: houseFee / 1e9,
+                winnerAmount: winnerPrize / 1e9,
+              },
+              participantCount: updatedGame.bets?.length || 0,
+              timestamp: Date.now(),
+            };
+
+            console.log(`Round ${roundId}: Sending webhook for winner:`, webhookData);
+
+            // Send webhook (non-blocking)
+            await fetch("https://n8n.gravity5.pro/webhook/a57222b5-41ad-4d23-8c05-2e82164a6f15", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(webhookData),
+            }).catch((err) => console.error(`Round ${roundId}: Webhook error:`, err));
+          } catch (webhookError) {
+            // Don't fail the game if webhook fails
+            console.error(`Round ${roundId}: Failed to send webhook:`, webhookError);
+          }
+
           // Schedule sendPrizeWinner
           const jobId = await ctx.scheduler.runAfter(
             1000, // 1 second delay
