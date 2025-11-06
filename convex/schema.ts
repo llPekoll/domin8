@@ -74,6 +74,7 @@ export default defineSchema({
     assetPath: v.string(), // Path to character spritesheet (e.g., "/characters/orc.png")
     description: v.optional(v.string()), // Character description
     nftCollection: v.optional(v.string()), // NFT collection program address for special/exclusive characters
+    nftCollectionName: v.optional(v.string()), // Human-readable name of the NFT collection
     animations: v.optional(
       v.object({
         idle: v.object({

@@ -8,6 +8,7 @@ import { PrivyProvider } from "@privy-io/react-auth";
 import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
 import { AssetsProvider } from "./contexts/AssetsContext";
+import { PlayerNamesProvider } from "./contexts/PlayerNamesContext";
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
 
@@ -75,7 +76,9 @@ createRoot(document.getElementById("root")!).render(
             // },
           }}
         >
-          <Root />
+          <PlayerNamesProvider>
+            <Root />
+          </PlayerNamesProvider>
         </PrivyProvider>
       </AssetsProvider>
       <Toaster
