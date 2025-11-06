@@ -29,6 +29,8 @@
 import { useCallback, useMemo } from "react";
 import { usePrivyWallet } from "./usePrivyWallet";
 import { useWallets } from "@privy-io/react-auth/solana";
+import { useAction } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import {
   Connection,
   PublicKey,
@@ -178,6 +180,9 @@ export interface GameCounter {
 export const useGameContract = () => {
   const { connected, publicKey, walletAddress } = usePrivyWallet();
   const { wallets } = useWallets();
+  
+  // Convex action for webhook notifications
+  const notifyGameCreated = useAction(api.webhooks.notifyGameCreated);
 
   // Get selected wallet (first Solana wallet from Privy)
   const selectedWallet = useMemo(() => {
@@ -744,6 +749,33 @@ export const useGameContract = () => {
           betIndex,
           roundId: activeRoundId,
         });
+
+        // Send webhook notification if this was a game creation (first bet)
+        if (shouldCreateNewGame) {
+          try {
+            // Fetch the newly created game data
+            const gameAccount = await program.account.domin8Game.fetch(activeGamePda);
+            
+            logger.solana.debug("[placeBet] Calling webhook notification for game creation");
+            
+            // Call Convex action to send webhook (keeps webhook URL secure in backend)
+            await notifyGameCreated({
+              roundId: activeRoundId,
+              transactionSignature: actualSignature,
+              startTimestamp: gameAccount.startDate.toNumber(),
+              endTimestamp: gameAccount.endDate.toNumber(),
+              totalPot: gameAccount.totalDeposit.toNumber(),
+              creator: publicKey.toString(),
+              map: gameAccount.map,
+            });
+            
+            logger.solana.debug("[placeBet] Webhook notification sent successfully");
+          } catch (webhookError) {
+            // Don't fail the bet if webhook fails
+            logger.solana.error("[placeBet] Failed to send webhook notification:", webhookError);
+          }
+        }
+
         logger.solana.groupEnd();
 
         return {
