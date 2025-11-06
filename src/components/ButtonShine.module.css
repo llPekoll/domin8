@@ -13,6 +13,7 @@
 }
 
 .shineButton {
+  cursor: pointer;
   position: relative;
   overflow: hidden;
 }
@@ -20,6 +21,7 @@
 .shineButton::before,
 .shineButton::after {
   content: "";
+  cursor: pointer;
   display: block;
   position: absolute;
   height: 100%;

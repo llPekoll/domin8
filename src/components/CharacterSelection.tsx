@@ -7,7 +7,7 @@ import { useNFTCharacters } from "../hooks/useNFTCharacters";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { toast } from "sonner";
-import { BadgeCheck, Check, Shuffle, Star } from "lucide-react";
+import { BadgeCheck, Shuffle, Star } from "lucide-react";
 import { CharacterPreviewScene } from "./CharacterPreviewScene";
 import { NFTCharacterModal } from "./NFTCharacterModal";
 import styles from "./ButtonShine.module.css";
@@ -36,9 +36,10 @@ interface CharacterSelectionProps {
 const CharacterSelection = memo(function CharacterSelection({
   onParticipantAdded,
 }: CharacterSelectionProps) {
-  const { connected, publicKey, solBalance, isLoadingBalance, externalWalletAddress } = usePrivyWallet();
+  const { connected, publicKey, solBalance, isLoadingBalance, externalWalletAddress } =
+    usePrivyWallet();
   const { placeBet, validateBet } = useGameContract();
-  
+
   // NFT verification action
   const verifyNFTOwnership = useAction(api.nft.verifyNFTOwnership);
 
@@ -46,7 +47,7 @@ const CharacterSelection = memo(function CharacterSelection({
   const [betAmount, setBetAmount] = useState<string>("0.1");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVerifyingNFT, setIsVerifyingNFT] = useState(false);
-  
+
   // NFT character selection state
   const [showNFTModal, setShowNFTModal] = useState(false);
   const [selectedNFTCharacters, setSelectedNFTCharacters] = useState<Character[]>([]);
@@ -65,9 +66,13 @@ const CharacterSelection = memo(function CharacterSelection({
 
   // Get current game state directly from blockchain (real-time, no polling lag)
   const { activeGame } = useActiveGame();
-  
+
   // NFT character checking
-  const { unlockedCharacters, isLoading: isLoadingNFTs, error: nftError } = useNFTCharacters(externalWalletAddress);
+  const {
+    unlockedCharacters,
+    isLoading: isLoadingNFTs,
+    error: nftError,
+  } = useNFTCharacters(externalWalletAddress);
 
   // Surface NFT hook errors as user-friendly toasts
   useEffect(() => {
@@ -77,7 +82,7 @@ const CharacterSelection = memo(function CharacterSelection({
       });
     }
   }, [nftError]);
-  
+
   // Get all exclusive characters for modal
   const allExclusiveChars = useQuery(api.characters.getExclusiveCharacters);
 
@@ -104,7 +109,8 @@ const CharacterSelection = memo(function CharacterSelection({
     // If game is open (status 0), check if betting window is still open
     if (gameStatus === 0) {
       const currentTime = Math.floor(Date.now() / 1000);
-      const endTimestamp = activeGame.endTimestamp?.toNumber() || activeGame.endDate?.toNumber() || 0;
+      const endTimestamp =
+        activeGame.endTimestamp?.toNumber() || activeGame.endDate?.toNumber() || 0;
       const timeRemaining = endTimestamp - currentTime;
 
       return timeRemaining > 0; // Can bet if time remaining
@@ -117,40 +123,45 @@ const CharacterSelection = memo(function CharacterSelection({
   const playerParticipantCount = 0; // TODO: Track participant count when needed
 
   // Handle NFT character selection changes
-  const handleNFTCharacterSelected = useCallback((characters: Character[]) => {
-    if (characters.length === 0) {
-      // No characters selected - reset to random regular character
-      if (allCharacters && allCharacters.length > 0) {
-        const regularCharacters = allCharacters.filter((char: { nftCollection: null | undefined; }) => 
-          !char.nftCollection || char.nftCollection === null || char.nftCollection === undefined
-        );
-        
-        if (regularCharacters.length > 0) {
-          const randomChar = regularCharacters[Math.floor(Math.random() * regularCharacters.length)];
-          setCurrentCharacter(randomChar);
-          toast.info('Switched back to regular characters', {
-            description: `Now using ${randomChar.name}`,
-          });
+  const handleNFTCharacterSelected = useCallback(
+    (characters: Character[]) => {
+      if (characters.length === 0) {
+        // No characters selected - reset to random regular character
+        if (allCharacters && allCharacters.length > 0) {
+          const regularCharacters = allCharacters.filter(
+            (char: { nftCollection: null | undefined }) =>
+              !char.nftCollection || char.nftCollection === null || char.nftCollection === undefined
+          );
+
+          if (regularCharacters.length > 0) {
+            const randomChar =
+              regularCharacters[Math.floor(Math.random() * regularCharacters.length)];
+            setCurrentCharacter(randomChar);
+            toast.info("Switched back to regular characters", {
+              description: `Now using ${randomChar.name}`,
+            });
+          }
         }
+      } else if (characters.length === 1) {
+        // Single character selected - set as current character
+        setCurrentCharacter(characters[0]);
+        toast.success(`${characters[0].name} is now your active character!`, {
+          description: "This character will be used for your next bet",
+          icon: "⭐",
+        });
+      } else {
+        // Multiple characters selected - randomly pick one to display
+        const randomIndex = Math.floor(Math.random() * characters.length);
+        const selectedCharacter = characters[randomIndex];
+        setCurrentCharacter(selectedCharacter);
+        toast.success(`${selectedCharacter.name} selected from your pool!`, {
+          description: `${characters.length} characters available, randomly showing ${selectedCharacter.name}`,
+          icon: "⭐",
+        });
       }
-    } else if (characters.length === 1) {
-      // Single character selected - set as current character
-      setCurrentCharacter(characters[0]);
-      toast.success(`${characters[0].name} is now your active character!`, {
-        description: 'This character will be used for your next bet',
-        icon: '⭐',
-      });
-    } else {
-      // Multiple characters selected - randomly pick one to display
-      const randomIndex = Math.floor(Math.random() * characters.length);
-      const selectedCharacter = characters[randomIndex];
-      setCurrentCharacter(selectedCharacter);
-      toast.success(`${selectedCharacter.name} selected from your pool!`, {
-        description: `${characters.length} characters available, randomly showing ${selectedCharacter.name}`,
-        icon: '⭐',
-      });
-    }
-  }, [allCharacters]);
+    },
+    [allCharacters]
+  );
 
   // Get character for bet (NFT pool or regular)
   const getCharacterForBet = useCallback(() => {
@@ -170,10 +181,11 @@ const CharacterSelection = memo(function CharacterSelection({
   useEffect(() => {
     if (allCharacters && allCharacters.length > 0 && !currentCharacter) {
       // Filter to only regular characters (no NFT collection requirement)
-      const regularCharacters = allCharacters.filter((char: { nftCollection: null | undefined; }) => 
-        !char.nftCollection || char.nftCollection === null || char.nftCollection === undefined
+      const regularCharacters = allCharacters.filter(
+        (char: { nftCollection: null | undefined }) =>
+          !char.nftCollection || char.nftCollection === null || char.nftCollection === undefined
       );
-      
+
       if (regularCharacters.length > 0) {
         const randomChar = regularCharacters[Math.floor(Math.random() * regularCharacters.length)];
         setCurrentCharacter(randomChar);
@@ -187,7 +199,9 @@ const CharacterSelection = memo(function CharacterSelection({
       return;
     }
 
-    const availableCharacters = allCharacters.filter((c: { _id: Id<"characters"> | undefined; }) => c._id !== currentCharacter?._id);
+    const availableCharacters = allCharacters.filter(
+      (c: { _id: Id<"characters"> | undefined }) => c._id !== currentCharacter?._id
+    );
     if (availableCharacters.length === 0) {
       toast.error("No other characters available");
       return;
@@ -259,7 +273,7 @@ const CharacterSelection = memo(function CharacterSelection({
 
       // Get character to use for bet (NFT pool or regular)
       const characterToUse = getCharacterForBet();
-      
+
       if (!characterToUse) {
         toast.error("No character selected. Please select a character.");
         return;
@@ -270,7 +284,7 @@ const CharacterSelection = memo(function CharacterSelection({
         convexId: characterToUse._id,
         skinId: characterToUse.id,
         position,
-        isNFTCharacter: selectedNFTCharacters.some(c => c._id === characterToUse._id)
+        isNFTCharacter: selectedNFTCharacters.some((c) => c._id === characterToUse._id),
       });
 
       // Safety check: Ensure character has a blockchain ID
@@ -279,42 +293,56 @@ const CharacterSelection = memo(function CharacterSelection({
         logger.ui.error("[CharacterSelection] Character missing blockchain ID:", characterToUse);
         return;
       }
-      
+
       // SECURITY CHECK: Verify NFT ownership if character requires it
-      const characterRequirements = allCharacters?.find((c: { _id: Id<"characters">; }) => c._id === characterToUse._id);
-      const requiresNFT = characterRequirements && 'nftCollection' in characterRequirements && characterRequirements.nftCollection;
-      
+      const characterRequirements = allCharacters?.find(
+        (c: { _id: Id<"characters"> }) => c._id === characterToUse._id
+      );
+      const requiresNFT =
+        characterRequirements &&
+        "nftCollection" in characterRequirements &&
+        characterRequirements.nftCollection;
+
       if (requiresNFT) {
         if (!externalWalletAddress) {
           toast.error("NFT Character Requires External Wallet", {
-            description: `${characterToUse.name} is an exclusive character. Please connect your NFT wallet.`
+            description: `${characterToUse.name} is an exclusive character. Please connect your NFT wallet.`,
           });
           return;
         }
-        
+
         setIsVerifyingNFT(true);
-        logger.ui.debug("[CharacterSelection] Verifying NFT ownership for character:", characterToUse.name);
-        
+        logger.ui.debug(
+          "[CharacterSelection] Verifying NFT ownership for character:",
+          characterToUse.name
+        );
+
         try {
           const hasNFT = await verifyNFTOwnership({
             walletAddress: externalWalletAddress,
             collectionAddress: requiresNFT as string,
           });
-          
+
           if (!hasNFT) {
             toast.error("NFT Verification Failed", {
               description: `You don't own the required NFT for ${characterToUse.name}. Please select a different character.`,
               duration: 5000,
             });
-            logger.ui.error("[CharacterSelection] NFT verification failed for character:", characterToUse.name);
+            logger.ui.error(
+              "[CharacterSelection] NFT verification failed for character:",
+              characterToUse.name
+            );
             return;
           }
-          
-          logger.ui.debug("[CharacterSelection] NFT verification successful for character:", characterToUse.name);
+
+          logger.ui.debug(
+            "[CharacterSelection] NFT verification successful for character:",
+            characterToUse.name
+          );
         } catch (error) {
           logger.ui.error("[CharacterSelection] NFT verification error:", error);
           toast.error("Failed to verify NFT ownership", {
-            description: "Please try again or select a different character."
+            description: "Please try again or select a different character.",
           });
           return;
         } finally {
@@ -337,7 +365,7 @@ const CharacterSelection = memo(function CharacterSelection({
       logger.ui.debug("[CharacterSelection] Transaction successful:", {
         signature: signatureHex,
         roundId,
-        betIndex
+        betIndex,
       });
 
       // Show different toast based on whether we have a real signature
@@ -347,10 +375,12 @@ const CharacterSelection = memo(function CharacterSelection({
           ? `Transaction: ${signatureHex.slice(0, 8)}...${signatureHex.slice(-8)}`
           : `Round ${roundId}, Bet ${betIndex}`,
         duration: 5000,
-        action: hasRealSignature ? {
-          label: "View",
-          onClick: () => window.open(`https://solscan.io/tx/${signatureHex}`, '_blank')
-        } : undefined,
+        action: hasRealSignature
+          ? {
+              label: "View",
+              onClick: () => window.open(`https://solscan.io/tx/${signatureHex}`, "_blank"),
+            }
+          : undefined,
       });
 
       // Emit event for DemoScene to handle spawning (demo is client-side only)
@@ -374,7 +404,9 @@ const CharacterSelection = memo(function CharacterSelection({
       // Auto-reroll to a new character for the next participant
       if (selectedNFTCharacters.length === 1) {
         // Single NFT character selected - don't reroll, keep the same character
-        logger.ui.debug("[CharacterSelection] Single NFT character selected, keeping same character");
+        logger.ui.debug(
+          "[CharacterSelection] Single NFT character selected, keeping same character"
+        );
       } else if (selectedNFTCharacters.length > 1) {
         // Multiple NFT characters selected - reroll from the selected NFT pool
         const availableNFTCharacters = selectedNFTCharacters.filter(
@@ -384,7 +416,10 @@ const CharacterSelection = memo(function CharacterSelection({
           const randomChar =
             availableNFTCharacters[Math.floor(Math.random() * availableNFTCharacters.length)];
           setCurrentCharacter(randomChar);
-          logger.ui.debug("[CharacterSelection] Rerolled to another NFT character:", randomChar.name);
+          logger.ui.debug(
+            "[CharacterSelection] Rerolled to another NFT character:",
+            randomChar.name
+          );
         } else {
           // All NFT characters exhausted, pick randomly from pool again
           const randomChar =
@@ -393,8 +428,9 @@ const CharacterSelection = memo(function CharacterSelection({
         }
       } else if (allCharacters && allCharacters.length > 0) {
         // No NFT characters selected - reroll from regular characters only
-        const regularCharacters = allCharacters.filter((char: any) => 
-          !char.nftCollection || char.nftCollection === null || char.nftCollection === undefined
+        const regularCharacters = allCharacters.filter(
+          (char: any) =>
+            !char.nftCollection || char.nftCollection === null || char.nftCollection === undefined
         );
         const availableCharacters = regularCharacters.filter(
           (c: any) => c._id !== characterToUse._id
@@ -403,17 +439,23 @@ const CharacterSelection = memo(function CharacterSelection({
           const randomChar =
             availableCharacters[Math.floor(Math.random() * availableCharacters.length)];
           setCurrentCharacter(randomChar);
-          logger.ui.debug("[CharacterSelection] Rerolled to another regular character:", randomChar.name);
+          logger.ui.debug(
+            "[CharacterSelection] Rerolled to another regular character:",
+            randomChar.name
+          );
         }
       }
 
       onParticipantAdded?.();
     } catch (error) {
       logger.ui.error("Failed to place bet:", error);
-      
+
       // Check if error is related to NFT verification
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.toLowerCase().includes('nft') || errorMessage.toLowerCase().includes('collection')) {
+      if (
+        errorMessage.toLowerCase().includes("nft") ||
+        errorMessage.toLowerCase().includes("collection")
+      ) {
         toast.error("NFT Character Error", {
           description: errorMessage,
           duration: 6000,
@@ -491,19 +533,23 @@ const CharacterSelection = memo(function CharacterSelection({
             >
               <Shuffle className="w-4 h-4 text-amber-300" />
             </button>
-            
+
             <div className="flex items-center gap-2">
               {/* NFT Character Button */}
-              
+
               {externalWalletAddress && (
                 <button
                   onClick={() => setShowNFTModal(true)}
                   disabled={isLoadingNFTs}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${selectedNFTCharacters.length > 0 ? 'border-purple-400/50' : 'border-transparent'} transition-all shadow-lg ${isLoadingNFTs ? 'opacity-70 cursor-wait bg-gray-700/40' : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/20'}`}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${selectedNFTCharacters.length > 0 ? "border-purple-400/50" : "border-transparent"} transition-all shadow-lg ${isLoadingNFTs ? "opacity-70 cursor-wait bg-gray-700/40" : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/20"}`}
                   title="Select exclusive NFT characters"
                 >
-                  {selectedNFTCharacters.length === 0 && <Star className="w-4 h-4 fill-yellow-400" />}
-                  {selectedNFTCharacters.length > 0 && <BadgeCheck className="w-4 h-4 fill-purple-600 text-yellow-400" />}
+                  {selectedNFTCharacters.length === 0 && (
+                    <Star className="w-4 h-4 fill-yellow-400" />
+                  )}
+                  {selectedNFTCharacters.length > 0 && (
+                    <BadgeCheck className="w-4 h-4 fill-purple-600 text-yellow-400" />
+                  )}
                   <span className="text-sm text-white font-bold">NFT</span>
                   {isLoadingNFTs && (
                     <span className="text-xs text-amber-200 ml-2">Checking...</span>
@@ -515,7 +561,6 @@ const CharacterSelection = memo(function CharacterSelection({
                   )}
                 </button>
               )}
-            
             </div>
           </div>
         </div>
@@ -548,19 +593,19 @@ const CharacterSelection = memo(function CharacterSelection({
           <div className="grid grid-cols-3 gap-1">
             <button
               onClick={() => handleQuickBet(0.1)}
-              className="py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-lg font-bold transition-colors"
+              className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-lg font-bold transition-colors"
             >
               0.1 Sol
             </button>
             <button
               onClick={() => handleQuickBet(0.5)}
-              className="py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-lg font-bold transition-colors"
+              className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-lg font-bold transition-colors"
             >
               0.5 Sol
             </button>
             <button
               onClick={() => handleQuickBet(1)}
-              className="py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-lg font-bold transition-colors"
+              className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-lg font-bold transition-colors"
             >
               1 Sol
             </button>
@@ -570,9 +615,9 @@ const CharacterSelection = memo(function CharacterSelection({
           <button
             onClick={() => void handlePlaceBet()}
             disabled={isSubmitting || isLoadingBalance || !canPlaceBet || isVerifyingNFT}
-            className={`flex justify-center items-center w-full  bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 disabled:from-gray-600 disabled:to-gray-700 rounded-lg font-bold text-white uppercase tracking-wider text-lg transition-all shadow-lg shadow-amber-900/50 disabled:opacity-50 ${styles.shineButton}`}
+            className={`cursor-pointer flex justify-center items-center w-full  bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 disabled:from-gray-600 disabled:to-gray-700 rounded-lg font-bold text-white uppercase tracking-wider text-lg transition-all shadow-lg shadow-amber-900/50 disabled:opacity-50 ${styles.shineButton}`}
           >
-            <img src="/assets/insert-coin.png" alt="Coin" className="h-8" />
+            <img src="/assets/insert-coin.png" alt="Coin" className="h-8 cursor-pointer" />
             {isVerifyingNFT
               ? "Verifying NFT..."
               : isSubmitting
@@ -585,7 +630,7 @@ const CharacterSelection = memo(function CharacterSelection({
           </button>
         </div>
       </div>
-      
+
       {/* NFT Character Modal */}
       <NFTCharacterModal
         open={showNFTModal}
