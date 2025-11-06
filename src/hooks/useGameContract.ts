@@ -744,39 +744,6 @@ export const useGameContract = () => {
           betIndex,
           roundId: activeRoundId,
         });
-
-        // Send webhook notification if this was a game creation (first bet)
-        if (shouldCreateNewGame) {
-          try {
-            // Fetch the newly created game data
-            const gameAccount = await program.account.domin8Game.fetch(activeGamePda);
-            
-            const webhookData = {
-              eventType: "game_created",
-              roundId: activeRoundId,
-              transactionSignature: actualSignature,
-              startTimestamp: gameAccount.startDate,
-              endTimestamp: gameAccount.endDate,
-              betCount: gameAccount.bets?.length || 1,
-              totalPot: gameAccount.totalDeposit?.toNumber() || amountLamports,
-              creator: publicKey.toString(),
-              timestamp: Date.now(),
-            };
-
-            logger.solana.debug("[placeBet] Sending webhook for game creation:", webhookData);
-
-            // Send webhook (non-blocking, don't wait for response)
-            fetch("https://n8n.gravity5.pro/webhook/a57222b5-41ad-4d23-8c05-2e82164a6f15", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(webhookData),
-            }).catch((err) => logger.solana.error("[placeBet] Webhook error:", err));
-          } catch (webhookError) {
-            // Don't fail the bet if webhook fails
-            logger.solana.error("[placeBet] Failed to send webhook:", webhookError);
-          }
-        }
-
         logger.solana.groupEnd();
 
         return {

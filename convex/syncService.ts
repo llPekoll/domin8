@@ -64,6 +64,20 @@ async function syncActiveGame(ctx: any, activeGame: any) {
       `[Sync Service] Found active game: round ${activeGame.gameRound}, status: ${activeGame.status}`
     );
 
+    // Check if this is a newly created game (first sync with betCount = 1)
+    // We track this by checking if the game exists in DB and had 0 bets before
+    let isNewGame = false;
+    try {
+      const existingGames = await ctx.runQuery(internal.syncServiceMutations.getEndedWaitingGames);
+      const existingGame = existingGames?.find((g: any) => g.roundId === activeGame.gameRound);
+      
+      // New game detection: if doesn't exist in DB, it's new
+      isNewGame = !existingGame;
+    } catch (queryError) {
+      // If query fails, assume it's a new game if it has exactly 1 bet
+      isNewGame = activeGame.bets?.length === 1;
+    }
+
     // Upsert game state to database
     await ctx.runMutation(internal.syncServiceMutations.upsertGameState, {
       gameRound: {
@@ -84,6 +98,37 @@ async function syncActiveGame(ctx: any, activeGame: any) {
     });
 
     console.log(`[Sync Service] Synced game round ${activeGame.gameRound} to database`);
+
+    // Send webhook notification for new game creation
+    if (isNewGame && activeGame.bets?.length > 0) {
+      try {
+        const firstBet = activeGame.bets[0];
+        
+        const webhookData = {
+          eventType: "game_created",
+          roundId: activeGame.gameRound,
+          startTimestamp: activeGame.startDate,
+          endTimestamp: activeGame.endDate,
+          betCount: activeGame.bets?.length || 1,
+          totalPot: activeGame.totalDeposit / 1e9, // Convert lamports to SOL
+          creator: firstBet?.wallet?.toString() || "Unknown",
+          map: activeGame.map,
+          timestamp: Date.now(),
+        };
+
+        console.log(`[Sync Service] Sending webhook for new game creation (round ${activeGame.gameRound}):`, webhookData);
+
+        // Send webhook (non-blocking)
+        await fetch("https://n8n.gravity5.pro/webhook/a57222b5-41ad-4d23-8c05-2e82164a6f15", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(webhookData),
+        }).catch((err) => console.error(`[Sync Service] Webhook error:`, err));
+      } catch (webhookError) {
+        // Don't fail the sync if webhook fails
+        console.error("[Sync Service] Failed to send webhook:", webhookError);
+      }
+    }
   } catch (error) {
     console.error("[Sync Service] Error syncing active game:", error);
   }
