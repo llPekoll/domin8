@@ -38,7 +38,6 @@ import {
   TransactionSignature,
   Transaction,
   VersionedTransaction,
-  Keypair,
 } from "@solana/web3.js";
 import { SystemProgram } from "@solana/web3.js";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
