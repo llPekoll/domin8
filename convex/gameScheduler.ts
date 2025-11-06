@@ -185,18 +185,22 @@ export const executeEndGame = internalAction({
               ? updatedGame.bets[winningBetIndex] 
               : null;
 
+            // Get winner display name from players table
+            const winnerWalletAddress = updatedGame.winner.toString();
+            const winnerDisplayName = await ctx.runQuery(
+              internal.players.getPlayerDisplayNameInternal,
+              { walletAddress: winnerWalletAddress }
+            );
+
             const webhookData = {
               eventType: "game_winner",
               roundId: roundId,
               winner: {
-                walletAddress: updatedGame.winner.toString(),
+                walletAddress: winnerWalletAddress,
+                displayName: winnerDisplayName,
                 betAmount: winnerBet?.amount || 0,
               },
-              prize: {
-                totalPot: totalPot / 1e9, // Convert lamports to SOL
-                houseFee: houseFee / 1e9,
-                winnerAmount: winnerPrize / 1e9,
-              },
+              prize: totalPot / 1e9, // in SOL
               participantCount: updatedGame.bets?.length || 0,
               timestamp: Date.now(),
             };

@@ -1,4 +1,4 @@
-import { mutation, query, action } from "./_generated/server";
+import { mutation, query, action, internalQuery } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 
@@ -15,6 +15,22 @@ export const getPlayer = query({
     }
 
     return player;
+  },
+});
+
+/**
+ * Internal query to get player display name by wallet address
+ * Can be called from internal actions
+ */
+export const getPlayerDisplayNameInternal = internalQuery({
+  args: { walletAddress: v.string() },
+  handler: async (ctx, args) => {
+    const player = await ctx.db
+      .query("players")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", args.walletAddress))
+      .first();
+
+    return player?.displayName || null;
   },
 });
 
