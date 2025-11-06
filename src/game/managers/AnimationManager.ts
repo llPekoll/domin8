@@ -1,5 +1,4 @@
 import { Scene } from "phaser";
-import { GameParticipant } from "./PlayerManager";
 import { SoundManager } from "./SoundManager";
 import { logger } from "../../lib/logger";
 import { STAGE_WIDTH, STAGE_HEIGHT } from "../main";
@@ -95,7 +94,7 @@ export class AnimationManager {
     createExplosion(1200);
   }
 
-  addWinnerCelebration(winnerPlayer: GameParticipant, winner: any) {
+  addWinnerCelebration(winner: any) {
     // Play victory sound when winner celebration starts
     SoundManager.playVictory(this.scene, 0.6);
 
@@ -911,7 +910,7 @@ export class AnimationManager {
       // Add celebration animations (confetti, text, bounce)
       if (winnerParticipant) {
         logger.game.debug("[AnimationManager] 🏆 Calling addWinnerCelebration");
-        this.addWinnerCelebration(winnerParticipant, winner);
+        this.addWinnerCelebration(winnerParticipant);
       } else {
         logger.game.error("[AnimationManager] ❌ No winner participant returned!");
       }

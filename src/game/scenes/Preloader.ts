@@ -110,6 +110,20 @@ export class Preloader extends Scene {
         logger.game.debug(`[Preloader] 🖼️ Loading static image:`, bgConfig.textureKey, bgConfig.assetPath);
         this.load.image(bgConfig.textureKey, bgConfig.assetPath);
       }
+
+      // Load overlays if configured
+      if (bgConfig.overlays && bgConfig.overlays.length > 0) {
+        bgConfig.overlays.forEach((overlay) => {
+          const overlayJsonPath = overlay.assetPath.replace(".png", ".json");
+          logger.game.debug(`[Preloader] 🎭 Loading overlay atlas:`, {
+            textureKey: overlay.textureKey,
+            pngPath: overlay.assetPath,
+            jsonPath: overlayJsonPath,
+          });
+          this.load.atlas(overlay.textureKey, overlay.assetPath, overlayJsonPath);
+          console.log(`🎭 PRELOADER: load.atlas() called for overlay '${overlay.textureKey}'`);
+        });
+      }
     });
 
     logger.game.debug("[Preloader] 🎨 Background configs queued for loading");
