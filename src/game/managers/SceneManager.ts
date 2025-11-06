@@ -26,6 +26,7 @@ export class SceneManager {
     logger.game.debug("[SceneManager] 🎬 Initialized");
     this.listenToPhaseChanges();
     this.listenToBlockchainUpdates();
+    this.listenToPlayerNamesUpdates();
   }
 
   private listenToPhaseChanges() {
@@ -90,6 +91,20 @@ export class SceneManager {
     });
 
     console.log("✅ [SceneManager] Now listening to 'blockchain-state-update' events");
+  }
+
+  private listenToPlayerNamesUpdates() {
+    EventBus.on("player-names-update", (playerNames: Array<{ walletAddress: string; displayName: string | null }>) => {
+      logger.game.debug("[SceneManager] Player names update received:", playerNames?.length || 0);
+
+      // Update Game scene with player names
+      const gameScene = this.game.scene.getScene("Game");
+      if (gameScene && gameScene.scene.isActive()) {
+        (gameScene as any).setPlayerNames?.(playerNames);
+      }
+    });
+
+    console.log("✅ [SceneManager] Now listening to 'player-names-update' events");
   }
 
   private updateActiveScene(gameState: any) {

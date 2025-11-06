@@ -5,7 +5,7 @@
 
 import { useState, useMemo } from "react";
 import { useActiveGame } from "../hooks/useActiveGame";
-import { CircleHelp, X, Trophy, TrendingUp, Users, Clock, Coins } from "lucide-react";
+import { CircleHelp, X, Trophy, TrendingUp, Users, Clock, Coins, Share2 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
@@ -73,6 +73,22 @@ export function BlockchainDebugDialog() {
     setTimeout(() => setJsonCopied(false), 2000);
   };
 
+  const shareWinnerOnX = () => {
+    if (!hasWinner) return;
+    
+    const gameUrl = window.location.origin;
+    const tweetText = `🏆 ${winnerDisplayName} just won ${winnerPrizeSOL} SOL in Royal Rumble! 
+
+    Think you can be the next champion? Join the battle now! 👑
+
+    ${gameUrl}
+
+    #RoyalRumble #Solana #Web3Gaming`;
+    
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+    window.open(twitterUrl, '_blank', 'width=550,height=420');
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-gray-900 rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-purple-500/30">
@@ -108,9 +124,19 @@ export function BlockchainDebugDialog() {
           {/* Last Winner - Primary Section */}
           {hasWinner ? (
             <div className="bg-gradient-to-br from-yellow-500/20 to-amber-600/20 rounded-lg p-5 border-2 border-yellow-500/50 shadow-lg">
-              <div className="flex items-center gap-2 mb-4">
-                <Trophy className="w-6 h-6 text-yellow-400" />
-                <h3 className="text-xl font-bold text-yellow-400">Last Winner</h3>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-6 h-6 text-yellow-400" />
+                  <h3 className="text-xl font-bold text-yellow-400">Last Winner</h3>
+                </div>
+                <button
+                  onClick={shareWinnerOnX}
+                  className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all text-sm font-semibold shadow-lg shadow-purple-500/30"
+                  title="Share winner on X"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share on X
+                </button>
               </div>
               
               <div className="space-y-3">
