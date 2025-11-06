@@ -32,7 +32,7 @@ export const notifyGameCreated = action({
     creator: v.string(),
     map: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     console.log(`[Webhook] Sending game creation notification for round ${args.roundId}`);
 
     try {
