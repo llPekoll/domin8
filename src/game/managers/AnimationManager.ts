@@ -7,6 +7,7 @@ export class AnimationManager {
   private scene: Scene;
   private centerX: number;
   private centerY: number;
+  private playerNamesMap: Map<string, string> = new Map();
 
   // Physics configuration for explosion - TWEAK THESE VALUES
   private readonly EXPLOSION_CONFIG = {
@@ -32,6 +33,12 @@ export class AnimationManager {
   updateCenter(centerX: number, centerY: number) {
     this.centerX = centerX;
     this.centerY = centerY;
+  }
+
+  // Update player names mapping
+  setPlayerNames(playerNames: Map<string, string>) {
+    this.playerNamesMap = playerNames;
+    logger.game.debug("[AnimationManager] Player names map updated:", this.playerNamesMap.size);
   }
 
   // Store celebration objects for cleanup
@@ -94,7 +101,7 @@ export class AnimationManager {
     createExplosion(1200);
   }
 
-  addWinnerCelebration(winner: any) {
+  addWinnerCelebration(winnerAddress: any) {
     // Play victory sound when winner celebration starts
     SoundManager.playVictory(this.scene, 0.6);
 
@@ -136,9 +143,12 @@ export class AnimationManager {
     // Get screen height for positioning at bottom
     const screenHeight = this.scene.scale.height;
 
+    // Get the displayName from the player address using the player context
+    const winnerDisplayName = this.playerNamesMap.get(winnerAddress) || winnerAddress.slice(0, 8) + "...";
+
     // Winner name at bottom of screen
     const nameText = this.scene.add
-      .text(this.centerX, screenHeight - 80, winner.displayName, {
+      .text(this.centerX, screenHeight - 80, winnerDisplayName, {
         fontFamily: "Arial Black",
         fontSize: 32,
         color: "#ffffff",

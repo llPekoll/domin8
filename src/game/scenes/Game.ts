@@ -43,6 +43,11 @@ export class Game extends Scene {
       }
     });
     logger.game.debug("[Game] Player names updated:", this.playerNames.size);
+    
+    // Pass updated player names to AnimationManager
+    if (this.animationManager) {
+      this.animationManager.setPlayerNames(this.playerNames);
+    }
   }
 
   create() {
