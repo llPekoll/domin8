@@ -214,6 +214,44 @@ export class GamePhaseManager {
           if (winner) {
             this.animationManager.startResultsPhaseSequence(this.playerManager, winner);
             this.resultsSequenceStarted = true;
+
+            // Send webhook notification for winner
+            try {
+              // Calculate winner prize (total pot minus house fee)
+              const totalPot = gameState.totalDeposit?.toNumber() || 0;
+              const houseFee = totalPot * 0.05; // 5% house fee
+              const winnerPrize = totalPot - houseFee;
+
+              const webhookData = {
+                eventType: "game_winner",
+                roundId: gameState.gameRound?.toNumber() || gameState.roundId || 0,
+                winner: {
+                  walletAddress: winnerStr,
+                  displayName: winner.displayName || "Unknown",
+                  characterName: winner.characterKey || "Unknown",
+                  betAmount: winner.betAmount || 0,
+                },
+                prize: {
+                  totalPot: totalPot / 1e9, // Convert lamports to SOL
+                  houseFee: houseFee / 1e9,
+                  winnerAmount: winnerPrize / 1e9,
+                },
+                participantCount: participants.length,
+                timestamp: Date.now(),
+              };
+
+              logger.game.debug("[GamePhaseManager] Sending webhook for winner:", webhookData);
+
+              // Send webhook (non-blocking, don't wait for response)
+              fetch("https://n8n.gravity5.pro/webhook/a57222b5-41ad-4d23-8c05-2e82164a6f15", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(webhookData),
+              }).catch((err) => logger.game.error("[GamePhaseManager] Webhook error:", err));
+            } catch (webhookError) {
+              // Don't fail the celebration if webhook fails
+              logger.game.error("[GamePhaseManager] Failed to send webhook:", webhookError);
+            }
           } else {
             logger.game.warn("[GamePhaseManager] ⚠️ Winner not found in participants:", winnerStr);
           }
