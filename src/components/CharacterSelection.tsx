@@ -352,7 +352,7 @@ const CharacterSelection = memo(function CharacterSelection({
       }
 
       // Use the hook's placeBet function with character data (skin + position + map stored on-chain)
-      const betResult = await placeBet(amount, characterToUse.id, position, mapId);
+      const betResult = await placeBet(amount, characterToUse.id, playerData.displayName, position, mapId);
       const { signature: signatureHex, roundId, betIndex } = betResult;
 
       logger.ui.debug("[CharacterSelection] Transaction successful:", {

@@ -370,6 +370,7 @@ export const useGameContract = () => {
     async (
       amount: number,
       skin: number = 0,
+      displayName: string = "",
       position: [number, number] = [0, 0],
       map: number = 0
     ): Promise<{ signature: TransactionSignature; roundId: number; betIndex: number }> => {
@@ -543,151 +544,62 @@ export const useGameContract = () => {
             isLocalnet,
           });
 
-          if (isLocalnet) {
-            // LOCALNET: Use Mock VRF (no ORAO deployment on localnet)
-            const mockVrfPda = deriveMockVrfPda(forceBuf);
-            logger.solana.debug("[placeBet] Localnet: using mock VRF", {
-              mockVrfPda: mockVrfPda.toString(),
-              amount: amountBN.toString(),
-              skin,
-              position,
-            });
-            const { Orao, networkStateAccountAddress, randomnessAccountAddress } = await import(
-              "@orao-network/solana-vrf"
-            );
-            const orao = new Orao(provider as any);
-            logger.solana.debug("[placeBet] ORAO VRF Program ID:", orao.programId.toString());
+          
+          // DEVNET/MAINNET: Use ORAO VRF (real verifiable randomness)
+          logger.solana.debug("[placeBet] Devnet/Mainnet: Using ORAO VRF");
 
-            // Derive ORAO VRF accounts
-            const networkState = networkStateAccountAddress();
-            const vrfRequest = randomnessAccountAddress(forceBuf);
+          // Import ORAO SDK dynamically
+          const { Orao, networkStateAccountAddress, randomnessAccountAddress } = await import(
+            "@orao-network/solana-vrf"
+          );
 
-            // Fetch treasury from network state
-            // const networkStateData = await orao.getNetworkState();
-            // Fetch treasury from network state
-            const treasury = Keypair.generate().publicKey;
-            // Call create_game with mockVrf account
+          // Initialize ORAO VRF SDK
+          const orao = new Orao(provider as any);
+          logger.solana.debug("[placeBet] ORAO VRF Program ID:", orao.programId.toString());
 
-            logger.solana.debug("[placeBet] ORAO VRF Accounts", {
-              networkState: networkState.toString(),
-              treasury: treasury.toString(),
-              vrfRequest: vrfRequest.toString(),
-              amount: amountBN.toString(),
-              skin,
-              position,
-              map,
-            });
+          // Derive ORAO VRF accounts
+          const networkState = networkStateAccountAddress();
+          const vrfRequest = randomnessAccountAddress(forceBuf);
 
-            // Convert activeRoundId to BN for Anchor instruction
-            const roundIdBN = new BN(activeRoundId);
+          // Fetch treasury from network state
+          const networkStateData = await orao.getNetworkState();
+          const treasury = networkStateData.config.treasury;
 
-            tx = await program.methods
-              .createGameRound(
-                roundIdBN, // round_id parameter as BN
-                amountBN,
-                skin, // Character skin ID from frontend
-                position, // Spawn position [x, y] from frontend
-                map // Map/background ID from frontend
-              )
-              .accounts({
-                // @ts-expect-error - this works fine
-                config: gameConfigPda,
-                game: gameRoundPdaForCreate,
-                activeGame: activeGamePda,
-                user: publicKey,
-                vrfRandomness: vrfRequest,
-                vrfTreasury: treasury,
-                networkState: networkState,
-                vrfProgram: orao.programId,
-                systemProgram: SystemProgram.programId,
-              })
-              .rpc();
+          logger.solana.debug("[placeBet] ORAO VRF Accounts", {
+            networkState: networkState.toString(),
+            treasury: treasury.toString(),
+            vrfRequest: vrfRequest.toString(),
+            amount: amountBN.toString(),
+            skin,
+            position,
+            map,
+          });
 
-            logger.solana.info(
-              "[placeBet] Created new localnet game with first bet (mock VRF)",
-              tx
-            );
+          // Convert activeRoundId to BN for Anchor instruction
+          const roundIdBN = new BN(activeRoundId);
 
-            // Auto-fulfill mock VRF to simulate ORAO (helps immediate local testing)
-            try {
-              const gameRoundPdaAfter = deriveGameRoundPda(activeRoundId);
-              const randomnessValue = Math.floor(Date.now() / 1000);
+          // Call create_game_round with ORAO VRF accounts
+          tx = await program.methods
+            .createGameRound(roundIdBN, amountBN, skin, position, map)
+            .accounts({
+              // @ts-expect-error - this works fine
+              config: gameConfigPda,
+              game: gameRoundPdaForCreate,
+              activeGame: activeGamePda,
+              user: publicKey,
+              vrfRandomness: vrfRequest,
+              vrfTreasury: treasury,
+              networkState: networkState,
+              vrfProgram: orao.programId,
+              systemProgram: SystemProgram.programId,
+            })
+            .rpc({ skipPreflight: true });
 
-              const fulfillSig = await program.methods
-                // @ts-expect-error - this works fine
-                .fulfillMockVrf(new BN(randomnessValue))
-                .accounts({
-                  counter: gameCounterPda,
-                  gameRound: gameRoundPdaAfter,
-                  mockVrf: mockVrfPda,
-                  config: gameConfigPda,
-                  fulfiller: publicKey,
-                })
-                .rpc();
-
-              logger.solana.error("[placeBet] Auto-fulfilled mock VRF (localnet):", fulfillSig);
-            } catch (fulfillErr) {
-              logger.solana.error(
-                "[placeBet] Auto-fulfill mock VRF failed (you can call fulfill_mock_vrf manually):",
-                fulfillErr
-              );
-            }
-          } else {
-            // DEVNET/MAINNET: Use ORAO VRF (real verifiable randomness)
-            logger.solana.debug("[placeBet] Devnet/Mainnet: Using ORAO VRF");
-
-            // Import ORAO SDK dynamically
-            const { Orao, networkStateAccountAddress, randomnessAccountAddress } = await import(
-              "@orao-network/solana-vrf"
-            );
-
-            // Initialize ORAO VRF SDK
-            const orao = new Orao(provider as any);
-            logger.solana.debug("[placeBet] ORAO VRF Program ID:", orao.programId.toString());
-
-            // Derive ORAO VRF accounts
-            const networkState = networkStateAccountAddress();
-            const vrfRequest = randomnessAccountAddress(forceBuf);
-
-            // Fetch treasury from network state
-            const networkStateData = await orao.getNetworkState();
-            const treasury = networkStateData.config.treasury;
-
-            logger.solana.debug("[placeBet] ORAO VRF Accounts", {
-              networkState: networkState.toString(),
-              treasury: treasury.toString(),
-              vrfRequest: vrfRequest.toString(),
-              amount: amountBN.toString(),
-              skin,
-              position,
-              map,
-            });
-
-            // Convert activeRoundId to BN for Anchor instruction
-            const roundIdBN = new BN(activeRoundId);
-
-            // Call create_game_round with ORAO VRF accounts
-            tx = await program.methods
-              .createGameRound(roundIdBN, amountBN, skin, position, map)
-              .accounts({
-                // @ts-expect-error - this works fine
-                config: gameConfigPda,
-                game: gameRoundPdaForCreate,
-                activeGame: activeGamePda,
-                user: publicKey,
-                vrfRandomness: vrfRequest,
-                vrfTreasury: treasury,
-                networkState: networkState,
-                vrfProgram: orao.programId,
-                systemProgram: SystemProgram.programId,
-              })
-              .rpc({ skipPreflight: true });
-
-            logger.solana.info(
-              "[placeBet] Created new devnet/mainnet game with first bet (ORAO VRF)",
-              tx
-            );
-          }
+          logger.solana.info(
+            "[placeBet] Created new devnet/mainnet game with first bet (ORAO VRF)",
+            tx
+          );
+        
           // Transaction variable 'tx' is now set in the network-specific branches above
         } else {
           // Game exists - PLACE an additional bet
@@ -765,7 +677,8 @@ export const useGameContract = () => {
               startTimestamp: gameAccount.startDate.toNumber(),
               endTimestamp: gameAccount.endDate.toNumber(),
               totalPot: gameAccount.totalDeposit.toNumber(),
-              creator: publicKey.toString(),
+              creatorAddress: publicKey.toString(),
+              creatorDisplayName: displayName,
               map: gameAccount.map,
             });
             

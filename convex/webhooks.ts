@@ -8,8 +8,9 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 
-const WEBHOOK_URL = "https://n8n.gravity5.pro/webhook/a57222b5-41ad-4d23-8c05-2e82164a6f15";
+const WEBHOOK_WINNER_URL = "https://n8n.gravity5.pro/webhook/a57222b5-41ad-4d23-8c05-2e82164a6f15";
 
+const WEBHOOK_GAME_CREATED_URL = "https://n8n.gravity5.pro/webhook/prochain-combat";
 /**
  * Send game creation webhook notification
  * Called by frontend immediately after successful game creation transaction
@@ -29,7 +30,8 @@ export const notifyGameCreated = action({
     startTimestamp: v.number(),
     endTimestamp: v.number(),
     totalPot: v.number(),
-    creator: v.string(),
+    creatorAddress: v.string(),
+    creatorDisplayName: v.string(),
     map: v.optional(v.number()),
   },
   handler: async (_ctx, args) => {
@@ -44,14 +46,15 @@ export const notifyGameCreated = action({
         endTimestamp: args.endTimestamp,
         betCount: 1, // First bet always creates the game
         totalPot: args.totalPot / 1e9, // Convert lamports to SOL
-        creator: args.creator,
+        creatorAddress: args.creatorAddress,
+        creatorDisplayName: args.creatorDisplayName,
         map: args.map ?? 0,
         timestamp: Date.now(),
       };
 
       console.log(`[Webhook] Payload:`, webhookData);
 
-      const response = await fetch(WEBHOOK_URL, {
+      const response = await fetch(WEBHOOK_GAME_CREATED_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(webhookData),
