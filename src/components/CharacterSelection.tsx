@@ -352,7 +352,7 @@ const CharacterSelection = memo(function CharacterSelection({
       }
 
       // Use the hook's placeBet function with character data (skin + position + map stored on-chain)
-      const betResult = await placeBet(amount, characterToUse.id, position, mapId);
+      const betResult = await placeBet(amount, characterToUse.id, playerData.displayName, position, mapId);
       const { signature: signatureHex, roundId, betIndex } = betResult;
 
       logger.ui.debug("[CharacterSelection] Transaction successful:", {
@@ -534,7 +534,7 @@ const CharacterSelection = memo(function CharacterSelection({
                 <button
                   onClick={() => setShowNFTModal(true)}
                   disabled={isLoadingNFTs}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${selectedNFTCharacters.length > 0 ? "border-purple-400/50" : "border-transparent"} transition-all shadow-lg ${isLoadingNFTs ? "opacity-70 cursor-wait bg-gray-700/40" : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/20"}`}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${selectedNFTCharacters.length > 0 ? "border-purple-400/50" : "border-amber-600/50"} transition-all shadow-lg ${isLoadingNFTs ? "opacity-70 cursor-wait bg-gray-700/40" : selectedNFTCharacters.length > 0 ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/20" : "bg-amber-800/30 hover:bg-amber-700/40 shadow-amber-900/20"}`}
                   title="Select exclusive NFT characters"
                 >
                   {selectedNFTCharacters.length === 0 && (

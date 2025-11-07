@@ -2,7 +2,6 @@ import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useState, useEffect } from "react";
-import { Button } from "./ui/button";
 import { ProfileDialog } from "./ProfileDialog";
 import { PrivyWalletButton } from "./PrivyWalletButton";
 import { SoundControl } from "./SoundControl";
@@ -57,80 +56,75 @@ export function Header() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 ">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-20">
-            <div className="flex items-center space-x-6">
-              <img src="/assets/logo.webp" alt="Enrageded" className="h-22 w-auto" />
-            </div>
+      <header className="fixed top-0 left-0 right-0 z-50">
+        <div className="container mx-auto px-4 py-3">
+          {/* Single unified header bar */}
+          <div className="bg-gradient-to-r from-indigo-900/30 to-indigo-800/30 rounded-lg px-6 py-3 border border-indigo-600/50 backdrop-blur-sm shadow-lg shadow-indigo-500/20">
+            <div className="flex items-center justify-between gap-6">
+              {/* Logo */}
+              <div className="flex items-center flex-shrink-0">
+                <img src="/assets/logo.webp" alt="Enrageded" className="h-12 w-auto" />
+              </div>
 
-            <div className="flex items-center space-x-4">
-              {/* Game Status Display */}
-              {currentRoundState && (
-                <div className="flex flex-col items-center text-amber-300">
-                  <div className="flex items-center gap-2">
-                    <Map className="w-4 h-4 text-amber-400" />
-                    <div className="font-bold text-amber-300 text-lg uppercase tracking-wide">
-                      Round #
-                      {currentRoundState.roundId?.toString() ||
-                        currentRoundState.gameRound?.toString() ||
-                        "?"}
+              {/* Center - Game Status */}
+              <div className="flex-1 flex justify-center">
+                {currentRoundState && (
+                  <div className="flex items-center gap-3 xl:ml-60">
+                    
+                    <div className="text-amber-400 text-3xl font-bold flex items-center gap-2 leading-tight animate-pulse">
+                      {currentRoundState.status === 0 && "Waiting for Players to Join"}
+                      {currentRoundState.status === 1 && "Place Your Bet Now!"}
+                    
                     </div>
+                    
                   </div>
-                  <div className="text-amber-300 text-sm flex items-center gap-1 mt-1">
-                    <span className="text-yellow-300">⚡</span>
-                    {currentRoundState.status === 0 && "Waiting for players"}
-                    {currentRoundState.status === 1 && "Game Over - Place bet for new round"}
-                    {/* Debug: show status if unexpected */}
-                    {![0, 1].includes(currentRoundState.status) &&
-                      `Status: ${currentRoundState.status}`}
-                  </div>
+                )}
+              </div>
+
+              {/* Right Side - User Controls */}
+              <div className="flex items-center gap-4 flex-shrink-0">
+                {/* Sound Control */}
+                <div className="flex items-center">
+                  <SoundControl />
                 </div>
-              )}
 
-              {/* Sound Control */}
-              <SoundControl />
+                {connected && (
+                  <>
 
-              {connected && (
-                <>
-                  <Button
-                    onClick={() => setShowProfileDialog(true)}
-                    variant="ghost"
-                    className="text-gray-300 hover:text-white hover:bg-gray-800"
-                    title={playerData?.displayName || "Profile"}
-                  >
-                    <User className="h-5 w-5" />
-                    <span className="ml-2 hidden sm:inline text-lg">
-                      {playerData?.displayName || "Profile"}
-                    </span>
-                  </Button>
+                    {/* Divider */}
+                    <div className="h-8 w-px bg-indigo-500/30"></div>
 
-                  <div className="bg-gradient-to-r from-indigo-900/30 to-indigo-800/30 rounded-lg px-4 py-2 border border-indigo-600/50 backdrop-blur-sm shadow-lg shadow-indigo-500/20">
-                    <div className="text-right">
-                      <div className="text-sm text-gray-400 mb-0.5">Wallet Balance</div>
-                      <div className="text-indigo-300 font-bold text-xl flex items-center justify-end">
+                    {/* Wallet Balance */}
+                    <div className="flex flex-col">
+                      <div className="text-xs text-indigo-400/80 leading-tight">Balance</div>
+                      <div className="text-indigo-200 font-bold text-base flex items-center leading-tight">
                         {isLoadingBalance ? (
-                          <span className="text-lg">Loading...</span>
+                          <span className="text-sm">Loading...</span>
                         ) : solBalance !== null ? (
                           <>
                             {solBalance.toFixed(4)}{" "}
-                            <span className="text-indigo-400 ml-1 text-lg">SOL</span>
+                            <span className="text-indigo-300 ml-1 text-sm">SOL</span>
                           </>
                         ) : (
-                          <span className="text-lg">--</span>
+                          <span className="text-sm">--</span>
                         )}
                       </div>
                     </div>
-                  </div>
-                </>
-              )}
 
-              {/* Privy Wallet Button */}
-              <PrivyWalletButton
-                compact={false}
-                showDisconnect={true}
-                onShowProfile={() => setShowProfileDialog(true)}
-              />
+                    {/* Divider */}
+                    <div className="h-8 w-px bg-indigo-500/30"></div>
+                  </>
+                )}
+
+                {/* Wallet Connect Button */}
+                <div className="flex items-center">
+                  <PrivyWalletButton
+                    compact={false}
+                    showDisconnect={true}
+                    onShowProfile={() => setShowProfileDialog(true)}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
