@@ -192,7 +192,8 @@ export const useGameContract = () => {
   // RPC connection (use env variable)
   const connection = useMemo(() => {
     const rpcUrl = import.meta.env.VITE_SOLANA_RPC_URL || "http://127.0.0.1:8899";
-    return new Connection(rpcUrl, "confirmed");
+    // return new Connection(rpcUrl, "confirmed");
+    return new Connection(rpcUrl, "processed");
   }, []);
 
   // Network configuration

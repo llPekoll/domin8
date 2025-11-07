@@ -363,9 +363,9 @@ const CharacterSelection = memo(function CharacterSelection({
 
       // Show different toast based on whether we have a real signature
       const hasRealSignature = signatureHex && !signatureHex.startsWith("transaction_");
-      toast.success(`Bet placed! 🎲 Game starting!`, {
+      toast.success(`Tx placed!`, {
         description: hasRealSignature
-          ? `Transaction: ${signatureHex.slice(0, 8)}...${signatureHex.slice(-8)}`
+          ? `${signatureHex.slice(0, 3)}...${signatureHex.slice(-3)}`
           : `Round ${roundId}, Bet ${betIndex}`,
         duration: 5000,
         action: hasRealSignature
