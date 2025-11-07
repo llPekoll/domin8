@@ -115,6 +115,7 @@ export class DemoScene extends Scene {
     });
 
     // Listen for player bet placement to spawn character immediately
+    // CRITICAL: Only spawn if demo is active, not during real game
     EventBus.on(
       "player-bet-placed",
       (data: {
@@ -126,6 +127,14 @@ export class DemoScene extends Scene {
         betIndex: number;
         walletAddress: string;
       }) => {
+        // GUARD: Only spawn characters in demo scene if demo is actually active
+        if (!this.isActive) {
+          logger.game.debug("[DemoScene] Ignoring player-bet-placed event (demo not active)");
+          return;
+        }
+
+        logger.game.debug("[DemoScene] Spawning player character in demo mode", data);
+
         // Derive character key from character name (e.g., "Warrior" -> "warrior")
         const characterKey = data.characterName?.toLowerCase().replace(/\s+/g, "-") || "warrior";
 

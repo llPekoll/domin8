@@ -94,15 +94,18 @@ export class SceneManager {
   }
 
   private listenToPlayerNamesUpdates() {
-    EventBus.on("player-names-update", (playerNames: Array<{ walletAddress: string; displayName: string | null }>) => {
-      logger.game.debug("[SceneManager] Player names update received:", playerNames?.length || 0);
+    EventBus.on(
+      "player-names-update",
+      (playerNames: Array<{ walletAddress: string; displayName: string | null }>) => {
+        logger.game.debug("[SceneManager] Player names update received:", playerNames?.length || 0);
 
-      // Update Game scene with player names
-      const gameScene = this.game.scene.getScene("Game");
-      if (gameScene && gameScene.scene.isActive()) {
-        (gameScene as any).setPlayerNames?.(playerNames);
+        // Update Game scene with player names
+        const gameScene = this.game.scene.getScene("Game");
+        if (gameScene && gameScene.scene.isActive()) {
+          (gameScene as any).setPlayerNames?.(playerNames);
+        }
       }
-    });
+    );
 
     console.log("✅ [SceneManager] Now listening to 'player-names-update' events");
   }
@@ -122,33 +125,18 @@ export class SceneManager {
   }
 
   private handleSceneTransition(oldPhase: GamePhase, newPhase: GamePhase) {
-    console.log(`🔄 [SceneManager] handleSceneTransition called`);
-    console.log(`   Old: ${oldPhase} → New: ${newPhase}`);
-    console.log(`   isTransitioning: ${this.isTransitioning}`);
-
     // Prevent overlapping transitions
     if (this.isTransitioning) {
-      console.log("   ⚠️ Already transitioning, skipping");
-      logger.game.warn("[SceneManager] ⚠️ Already transitioning, skipping");
       return;
     }
 
     // Demo → Game (Real game starts)
     if (oldPhase === GamePhase.IDLE && newPhase === GamePhase.WAITING) {
-      console.log("   ✅ Condition matched: IDLE → WAITING");
-      console.log("   🎮 Starting Demo → Game transition");
-      logger.game.debug("[SceneManager] 🎮 Transitioning: Demo → Game");
       this.transitionToGame();
     }
     // Game → Demo (Game cleanup complete)
     else if (oldPhase === GamePhase.CLEANUP && newPhase === GamePhase.IDLE) {
-      console.log("   ✅ Condition matched: CLEANUP → IDLE");
-      console.log("   🎮 Starting Game → Demo transition");
-      logger.game.debug("[SceneManager] 🎮 Transitioning: Game → Demo");
       this.transitionToDemo();
-    }
-    else {
-      console.log(`   ℹ️ No transition needed for ${oldPhase} → ${newPhase}`);
     }
   }
 
@@ -156,17 +144,14 @@ export class SceneManager {
     const demoScene = this.game.scene.getScene("Demo");
 
     if (!demoScene) {
-      logger.game.error("[SceneManager] ❌ Demo scene not found!");
       return;
     }
 
     if (!demoScene.scene.isActive()) {
-      logger.game.warn("[SceneManager] ⚠️ Demo scene not active, cannot transition");
       return;
     }
 
     this.isTransitioning = true;
-    logger.game.debug("[SceneManager] Starting Demo → Game transition with wipe effect");
 
     // Create wipe transition effect
     const camera = demoScene.cameras.main;
@@ -174,17 +159,14 @@ export class SceneManager {
 
     // Listen for transition complete
     demoScene.events.once("transitionout", () => {
-      logger.game.debug("[SceneManager] ✅ Demo → Game transition complete");
       this.isTransitioning = false;
-
       // Notify App.tsx that transition is complete so it can update Game scene
-      console.log("   → Emitting 'scene-transition-complete' event");
       EventBus.emit("scene-transition-complete", "Game");
     });
 
     demoScene.scene.transition({
       target: "Game",
-      duration: 1000,
+      duration: 700,
       moveBelow: true,
       onUpdate: (progress: number) => {
         fx.progress = progress;
@@ -196,45 +178,25 @@ export class SceneManager {
     const gameScene = this.game.scene.getScene("Game") as any;
 
     if (!gameScene) {
-      logger.game.error("[SceneManager] ❌ Game scene not found!");
       return;
     }
 
     if (!gameScene.scene.isActive()) {
-      logger.game.warn("[SceneManager] ⚠️ Game scene not active, cannot transition");
       return;
     }
 
     this.isTransitioning = true;
-    logger.game.debug("[CLEANUP] SceneManager.transitionToDemo() - Preparing transition");
-
-    // CRITICAL: Force clear all participants BEFORE transition starts
-    // This ensures Game scene containers are destroyed before Demo scene shows
     if (gameScene.playerManager) {
-      logger.game.debug("[CLEANUP] Force clearing Game scene participants before transition");
-      const participantCount = gameScene.playerManager.getParticipants().size;
-      logger.game.debug(`[CLEANUP] Game scene has ${participantCount} participants to clear`);
       gameScene.playerManager.clearParticipants();
-      logger.game.debug(`[CLEANUP] Game scene participants cleared, remaining: ${gameScene.playerManager.getParticipants().size}`);
     }
-
     // Also clear all tweens and game objects to be safe
     gameScene.tweens.killAll();
 
-    // FORCE CLEAR: Destroy ALL children in the Game scene (nuclear option)
-    // This catches any lingering containers that weren't in the participants Map
-    const childrenCount = gameScene.children.list.length;
-    logger.game.debug(`[CLEANUP] Game scene has ${childrenCount} total children before force clear`);
-
     // Get all containers in the scene and destroy them
-    const containers = gameScene.children.list.filter((child: any) => child.type === 'Container');
-    logger.game.debug(`[CLEANUP] Found ${containers.length} containers to force destroy`);
-    containers.forEach((container: any, index: number) => {
-      logger.game.debug(`[CLEANUP]   Force destroying container ${index}: depth=${container.depth}, alpha=${container.alpha}`);
+    const containers = gameScene.children.list.filter((child: any) => child.type === "Container");
+    containers.forEach((container: any) => {
       container.destroy();
     });
-
-    logger.game.debug(`[CLEANUP] Game scene children after force clear: ${gameScene.children.list.length}`);
 
     // Create wipe transition effect
     const camera = gameScene.cameras.main;
@@ -242,11 +204,9 @@ export class SceneManager {
 
     // Listen for transition complete
     gameScene.events.once("transitionout", () => {
-      logger.game.debug("[CLEANUP] Game → Demo transition complete");
       this.isTransitioning = false;
 
       // Notify App.tsx that transition is complete
-      console.log("   → Emitting 'scene-transition-complete' event");
       EventBus.emit("scene-transition-complete", "Demo");
     });
 

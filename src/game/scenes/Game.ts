@@ -302,8 +302,4 @@ export class Game extends Scene {
     this.gameState = null;
     this.introPlayed = false;
   }
-
-  changeScene() {
-    this.scene.start("GameOver");
-  }
 }
