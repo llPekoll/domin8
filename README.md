@@ -307,3 +307,6 @@ VITE_PRIVY_APP_ID=your-privy-app-id
   https://downloads.khinsider.com/game-soundtracks/album/the-last-blade-original-soundtrack-1997
   // loader
   https://phaser.io/examples/v3.85.0/game-objects/nine-slice/view/progress-bar
+  // the music
+  https://opengameart.org/content/battle-theme-a#
+  https://www.patreon.com/cynicmusic

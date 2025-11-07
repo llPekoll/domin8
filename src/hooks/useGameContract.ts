@@ -180,7 +180,7 @@ export interface GameCounter {
 export const useGameContract = () => {
   const { connected, publicKey, walletAddress } = usePrivyWallet();
   const { wallets } = useWallets();
-  
+
   // Convex action for webhook notifications
   const notifyGameCreated = useAction(api.webhooks.notifyGameCreated);
 
@@ -213,7 +213,8 @@ export const useGameContract = () => {
     try {
       const wallet = new PrivyWalletAdapter(publicKey, selectedWallet, network);
       const provider = new AnchorProvider(connection, wallet, {
-        commitment: "confirmed",
+        // commitment: "confirmed",
+        commitment: "processed",
       });
 
       const program = new Program<Domin8Prgm>(Domin8PrgmIDL as any, provider);
@@ -755,9 +756,9 @@ export const useGameContract = () => {
           try {
             // Fetch the newly created game data
             const gameAccount = await program.account.domin8Game.fetch(activeGamePda);
-            
+
             logger.solana.debug("[placeBet] Calling webhook notification for game creation");
-            
+
             // Call Convex action to send webhook (keeps webhook URL secure in backend)
             await notifyGameCreated({
               roundId: activeRoundId,
@@ -768,7 +769,7 @@ export const useGameContract = () => {
               creator: publicKey.toString(),
               map: gameAccount.map,
             });
-            
+
             logger.solana.debug("[placeBet] Webhook notification sent successfully");
           } catch (webhookError) {
             // Don't fail the bet if webhook fails
