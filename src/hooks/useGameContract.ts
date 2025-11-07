@@ -414,71 +414,41 @@ export const useGameContract = () => {
 
         let tx: string;
 
-        // STEP 1: Check active_game first to see if there's an open game
-        logger.solana.debug("[placeBet] Checking active_game for open game...");
-        const activeGameInfo = await connection.getAccountInfo(activeGamePda);
+        // OPTIMIZATION: Fetch both active game AND config in parallel (saves ~200-300ms)
+        logger.solana.debug("[placeBet] Fetching game state in parallel...");
+        const [activeGameAccount, configAccount] = await Promise.all([
+          program.account.domin8Game.fetch(activeGamePda).catch(() => null),
+          program.account.domin8Config.fetch(gameConfigPda)
+        ]);
 
-        if (activeGameInfo) {
-          try {
-            const activeGameAccount = await program.account.domin8Game.fetch(activeGamePda);
-            // Status is a number: 0 = GAME_STATUS_OPEN, 1 = GAME_STATUS_CLOSED
-            const gameStatus = activeGameAccount.status;
-            logger.solana.debug("[placeBet] Active game found", {
-              status: gameStatus,
-              statusText: gameStatus === 0 ? "open" : "closed",
-              round: activeGameAccount.gameRound.toNumber(),
-            });
+        // STEP 1: Determine game state and bet strategy
+        if (activeGameAccount && activeGameAccount.status === 0) {
+          // Game is open - check if betting window is still open
+          const endTimestamp = activeGameAccount.endDate.toNumber();
+          const currentTime = Math.floor(Date.now() / 1000);
+          const betCount = activeGameAccount.bets?.length || 0;
 
-            if (gameStatus === 0) {
-              // Game is open - check if betting window is still open
-              const endTimestamp = activeGameAccount.endDate.toNumber();
-              const currentTime = Math.floor(Date.now() / 1000);
-              const betCount = activeGameAccount.bets?.length || 0;
-
-              if (currentTime < endTimestamp) {
-                // Active game is open and accepting bets!
-                logger.solana.debug("[placeBet] Found open game, placing bet");
-                shouldCreateNewGame = false;
-                activeRoundId = activeGameAccount.gameRound.toNumber();
-              } else {
-                // Game expired
-                if (betCount === 0) {
-                  logger.solana.debug("[placeBet] Empty expired game, creating new one");
-                  shouldCreateNewGame = true;
-                } else {
-                  throw new Error(
-                    "Betting window closed. Please wait for the current game to finish."
-                  );
-                }
-              }
-            } else {
-              // Game is closed (status=1) - need new game
-              logger.solana.debug("[placeBet] Active game is closed, need new game");
-              shouldCreateNewGame = true;
-            }
-          } catch (fetchError: any) {
-            if (fetchError.message?.includes("Betting window")) {
-              throw fetchError;
-            }
-            logger.solana.debug(
-              "[placeBet] Error fetching active game, will try to create new one"
-            );
+          if (currentTime < endTimestamp) {
+            // Active game is open and accepting bets!
+            logger.solana.debug("[placeBet] Found open game, placing bet");
+            shouldCreateNewGame = false;
+            activeRoundId = activeGameAccount.gameRound.toNumber();
+            betIndex = betCount; // Set betIndex here for existing game
+          } else if (betCount === 0) {
+            // Empty expired game
+            logger.solana.debug("[placeBet] Empty expired game, creating new one");
             shouldCreateNewGame = true;
+            activeRoundId = configAccount.gameRound.toNumber();
+          } else {
+            throw new Error(
+              "Betting window closed. Please wait for the current game to finish."
+            );
           }
         } else {
-          // No active game exists
-          logger.solana.debug("[placeBet] No active game found, creating new game");
+          // No active game or game is closed - create new game
+          logger.solana.debug("[placeBet] No active game found or game closed, creating new game");
           shouldCreateNewGame = true;
-        }
-
-        // STEP 2: If we need to create a new game, get the next round ID from config
-        if (shouldCreateNewGame) {
-          const nextRoundId = await fetchCurrentRoundId();
-          logger.solana.debug("[placeBet] Next round ID from config:", nextRoundId);
-          activeRoundId = nextRoundId;
-
-          // Note: We don't check config.lock here - let the smart contract enforce it
-          // This prevents race conditions between frontend and backend (endGame unlocks)
+          activeRoundId = configAccount.gameRound.toNumber();
         }
 
         logger.solana.debug("[placeBet] Decision", { shouldCreateNewGame, activeRoundId });
@@ -486,35 +456,9 @@ export const useGameContract = () => {
         if (shouldCreateNewGame) {
           // Creating new game means this is the first bet (index 0)
           betIndex = 0;
-          // activeRoundId already set above from config.game_round
 
-          // Check what network you're actually using
-          logger.solana.debug("[placeBet] Network configuration", {
-            network: import.meta.env.VITE_SOLANA_NETWORK,
-            rpcUrl: import.meta.env.VITE_SOLANA_RPC_URL,
-            programId: import.meta.env.VITE_GAME_PROGRAM_ID,
-          });
-          // No game exists OR game is finished - CREATE a new game with this bet
-          logger.solana.debug("[placeBet] Creating new game for round", activeRoundId);
-          logger.solana.debug("[placeBet] Available methods:", Object.keys(program.methods));
-
-          // Get config to fetch VRF force field
-          logger.solana.debug("[placeBet] Game config details", {
-            gameConfigPda: gameConfigPda.toString(),
-            rpcEndpoint: connection.rpcEndpoint,
-            envRpcUrl: import.meta.env.VITE_SOLANA_RPC_URL,
-          });
-          const configInfo = await connection.getAccountInfo(gameConfigPda);
-          if (!configInfo) {
-            throw new Error("Game config not found. Please contact support.");
-          }
-          // Parse force field from config using Anchor deserialization
-          // const configAccountParsed = await program.account.domin8Config.fetch(gameConfigPda);
-          // const force = Buffer.from(configAccountParsed.force);
-
-          // Use Anchor to fetch the Domin8Config (has `force: [u8;32]`)
-          const configAccount = await program.account.domin8Config.fetch(gameConfigPda);
-          const forceArr = configAccount.force; // usually Uint8Array or number[]
+          // OPTIMIZATION: Use configAccount already fetched above (no extra RPC call)
+          const forceArr = configAccount.force;
           const forceBuf = Buffer.from(forceArr);
 
           // Derive all required PDAs for createGame
@@ -608,14 +552,8 @@ export const useGameContract = () => {
             `[placeBet] Game exists (round ${activeRoundId}), placing additional bet`
           );
 
-          // Fetch fresh game state using Anchor (more reliable than manual parsing)
-          const activeGameAccount = await program.account.domin8Game.fetch(activeGamePda);
-          logger.solana.debug("[placeBet] Active game account:", activeGameAccount);
-          const betCount = activeGameAccount.bets?.length || 0;
-          logger.solana.debug("[placeBet] Current bet count:", betCount);
-
-          // The bet index for this new bet will be the current bet count
-          betIndex = betCount;
+          // OPTIMIZATION: Use activeGameAccount already fetched above (no extra RPC call)
+          // betIndex was already set in the initial decision logic
 
           // Derive all required PDAs for placeBet
           const gameRoundPda = deriveGameRoundPda(activeRoundId);
