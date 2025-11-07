@@ -75,18 +75,6 @@ export default defineSchema({
     description: v.optional(v.string()), // Character description
     nftCollection: v.optional(v.string()), // NFT collection program address for special/exclusive characters
     nftCollectionName: v.optional(v.string()), // Human-readable name of the NFT collection
-    animations: v.optional(
-      v.object({
-        idle: v.object({
-          start: v.number(),
-          end: v.number(),
-        }),
-        walk: v.object({
-          start: v.number(),
-          end: v.number(),
-        }),
-      })
-    ),
     isActive: v.boolean(),
   }).index("by_active", ["isActive"]),
 
@@ -96,8 +84,6 @@ export default defineSchema({
   maps: defineTable({
     name: v.string(),
     id: v.number(),
-    background: v.optional(v.string()), // Background identifier (e.g., "arena_classic")
-    assetPath: v.optional(v.string()), // Path to map asset (e.g., "/maps/arena_classic.png")
     description: v.optional(v.string()), // Map description
     spawnConfiguration: v.object({
       maxPlayers: v.number(), // Maximum players for this map

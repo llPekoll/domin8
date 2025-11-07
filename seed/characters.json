@@ -4,10 +4,6 @@
     "name": "Orc",
     "assetPath": "/characters/orc.png",
     "description": "A mighty fighter with high power and defense",
-    "animations": {
-      "idle": { "start": 0, "end": 5 },
-      "walk": { "start": 6, "end": 13 }
-    },
     "isActive": true
   },
   {
@@ -15,10 +11,6 @@
     "name": "Soldier",
     "assetPath": "/characters/Soldier.png",
     "description": "A holy knight with exceptional power and defense",
-    "animations": {
-      "idle": { "start": 0, "end": 5 },
-      "walk": { "start": 6, "end": 13 }
-    },
     "isActive": true
   },
   {
@@ -26,10 +18,6 @@
     "name": "male",
     "assetPath": "/characters/male.png",
     "description": "A versatile warrior with balanced stats",
-    "animations": {
-      "idle": { "start": 0, "end": 9 },
-      "walk": { "start": 0, "end": 9 }
-    },
     "isActive": true
   },
   {
@@ -37,10 +25,6 @@
     "name": "sam",
     "assetPath": "/characters/sam.png",
     "description": "A quick and agile fighter",
-    "animations": {
-      "idle": { "start": 0, "end": 11 },
-      "walk": { "start": 0, "end": 11 }
-    },
     "isActive": true,
     "nftCollection": "6v8wpUjNMkdSf5q1xK4Yjjhjy1cy6FPfCXi9qMduuSG1"
   },
@@ -49,10 +33,13 @@
     "name": "warrior",
     "assetPath": "/characters/warrior.png",
     "description": "A seasoned combatant with strong defense",
-    "animations": {
-      "idle": { "start": 0, "end": 5 },
-      "walk": { "start": 0, "end": 5 }
-    },
+    "isActive": true
+  },
+  {
+    "id": 6,
+    "name": "pepe",
+    "assetPath": "/characters/pepe.png",
+    "description": "A legendary meme warrior with unique abilities",
     "isActive": true
   }
 ]

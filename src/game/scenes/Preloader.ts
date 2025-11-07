@@ -57,6 +57,8 @@ export class Preloader extends Scene {
       const jsonPath = character.assetPath.replace(".png", ".json");
       logger.game.debug("[Preloader] Loading character atlas:", key, character.assetPath);
       this.load.atlas(key, character.assetPath, jsonPath);
+      // Also load JSON separately with a different key so we can access frameTags in create()
+      this.load.json(`${key}-json`, jsonPath);
     });
 
     // Load background configs (animated/static backgrounds)
@@ -100,7 +102,11 @@ export class Preloader extends Scene {
         console.log(`📦 PRELOADER: load.atlas() called for '${bgConfig.textureKey}'`);
       } else {
         // Load as image for static backgrounds
-        logger.game.debug(`[Preloader] 🖼️ Loading static image:`, bgConfig.textureKey, bgConfig.assetPath);
+        logger.game.debug(
+          `[Preloader] 🖼️ Loading static image:`,
+          bgConfig.textureKey,
+          bgConfig.assetPath
+        );
         this.load.image(bgConfig.textureKey, bgConfig.assetPath);
       }
 
@@ -178,59 +184,119 @@ export class Preloader extends Scene {
       return;
     }
 
-    // Create animations for all characters dynamically from database
+    // Create animations for all characters dynamically by parsing frameTags from JSON atlas
     logger.game.debug("[Preloader] Creating animations for", charactersData.length, "characters");
+    console.log("✅ [Preloader] Starting animation creation for", charactersData.length, "characters");
+
     charactersData.forEach((character) => {
       const key = character.name.toLowerCase().replace(/\s+/g, "-");
+      console.log(`✅ [Preloader] Processing character: ${character.name}, key: ${key}`);
 
-      // Determine prefix and suffix from the character name
-      const prefix = character.name + " ";
-      const suffix = ".aseprite";
+      // Get the JSON atlas data from cache (loaded with -json suffix)
+      const jsonData = this.cache.json.get(`${key}-json`);
+      console.log(`✅ [Preloader] JSON data for ${key}:`, jsonData ? "FOUND" : "NOT FOUND", jsonData);
 
-      // Create idle animation
-      if (character.animations.idle) {
+      if (!jsonData) {
+        logger.game.warn(`[Preloader] No JSON data found for ${key}, skipping animation creation`);
+        console.error(`❌ [Preloader] No JSON data found for ${key}`);
+        return;
+      }
+
+      // Parse frameTags from the JSON metadata
+      const frameTags = jsonData?.meta?.frameTags || [];
+      console.log(`✅ [Preloader] frameTags for ${key}:`, frameTags.length, frameTags);
+
+      if (frameTags.length === 0) {
+        logger.game.warn(`[Preloader] No frameTags found in ${key}.json, skipping`);
+        console.error(`❌ [Preloader] No frameTags found in ${key}.json`);
+        return;
+      }
+
+      logger.game.debug(`[Preloader] Found ${frameTags.length} frameTags for ${character.name}`);
+
+      // Determine frame naming convention from first frame
+      const frames = jsonData?.frames || [];
+      if (frames.length === 0) {
+        logger.game.warn(`[Preloader] No frames found for ${key}`);
+        return;
+      }
+
+      // Extract prefix and suffix from first frame filename
+      const firstFrameName = frames[0].filename;
+      let prefix = "";
+      let suffix = "";
+
+      // Check for common suffixes (.aseprite, .ase, .png)
+      if (firstFrameName.includes(".aseprite")) {
+        suffix = ".aseprite";
+        prefix = firstFrameName.substring(0, firstFrameName.lastIndexOf(" ")) + " ";
+      } else if (firstFrameName.includes(".ase")) {
+        suffix = ".ase";
+        prefix = firstFrameName.substring(0, firstFrameName.lastIndexOf(" ")) + " ";
+      } else if (firstFrameName.includes(".png")) {
+        suffix = ".png";
+        prefix = firstFrameName.substring(0, firstFrameName.lastIndexOf(" ")) + " ";
+      }
+
+      console.log(`✅ [Preloader] Frame naming for ${key}: prefix="${prefix}", suffix="${suffix}"`);
+
+      // Helper function to determine if animation should loop
+      const shouldLoop = (animName: string) => ["idle", "win", "run"].includes(animName);
+
+      // Helper function to create a single animation
+      const createAnimation = (animName: string, frameTag: any, isFallback = false) => {
+        const animKey = `${key}-${animName}`;
+
+        console.log(`✅ [Preloader] Creating ${isFallback ? "fallback " : ""}animation: ${animKey}, frames ${frameTag.from}-${frameTag.to}`);
+
         this.anims.create({
-          key: `${key}-idle`,
+          key: animKey,
           frames: this.anims.generateFrameNames(key, {
             prefix: prefix,
             suffix: suffix,
-            start: character.animations.idle.start,
-            end: character.animations.idle.end,
+            start: frameTag.from,
+            end: frameTag.to,
           }),
           frameRate: 10,
-          repeat: -1,
+          repeat: shouldLoop(animName) ? -1 : 0,
         });
-      }
 
-      // Create walk animation
-      if (character.animations.walk) {
-        this.anims.create({
-          key: `${key}-walk`,
-          frames: this.anims.generateFrameNames(key, {
-            prefix: prefix,
-            suffix: suffix,
-            start: character.animations.walk.start,
-            end: character.animations.walk.end,
-          }),
-          frameRate: 10,
-          repeat: -1,
-        });
-      }
+        console.log(`✅ [Preloader] Animation created: ${animKey}`);
+        logger.game.debug(
+          `[Preloader] Created ${isFallback ? "fallback " : ""}animation: ${animKey} (frames ${frameTag.from}-${frameTag.to})`
+        );
+      };
 
-      // Create attack animation if it exists
-      if (character.animations.attack) {
-        this.anims.create({
-          key: `${key}-attack`,
-          frames: this.anims.generateFrameNames(key, {
-            prefix: prefix,
-            suffix: suffix,
-            start: character.animations.attack.start,
-            end: character.animations.attack.end,
-          }),
-          frameRate: 10,
-          repeat: 0,
-        });
-      }
+      // Store idle animation for fallback and create animations from frameTags
+      let idleFrameTag: any = null;
+
+      frameTags.forEach((tag: any) => {
+        const animName = tag.name.toLowerCase();
+
+        // Store idle for fallback
+        if (animName === "idle") {
+          idleFrameTag = tag;
+        }
+
+        createAnimation(animName, tag);
+      });
+
+      // Create fallback animations using idle if they don't exist
+      const essentialAnims = ["idle", "walk", "run", "win", "falling", "landing"];
+
+      essentialAnims.forEach((animType) => {
+        const animKey = `${key}-${animType}`;
+
+        // Skip if animation already exists
+        if (this.anims.exists(animKey)) {
+          return;
+        }
+
+        // Use idle animation as fallback
+        if (idleFrameTag) {
+          createAnimation(animType, idleFrameTag, true);
+        }
+      });
     });
 
     // Create explosion animation
