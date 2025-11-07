@@ -69,23 +69,14 @@ export function Header() {
               {/* Center - Game Status */}
               <div className="flex-1 flex justify-center">
                 {currentRoundState && (
-                  <div className="flex items-center gap-3">
-                    <Map className="w-5 h-5 text-amber-400" />
-                    <div className="flex flex-col">
-                      <div className="font-bold text-amber-300 text-base uppercase tracking-wide leading-tight">
-                        Round #
-                        {currentRoundState.roundId?.toString() ||
-                          currentRoundState.gameRound?.toString() ||
-                          "?"}
-                      </div>
-                      <div className="text-amber-400/80 text-xs flex items-center gap-1 leading-tight">
-                        <span className="text-yellow-300">⚡</span>
-                        {currentRoundState.status === 0 && "Waiting for players"}
-                        {currentRoundState.status === 1 && "Place bet for new round"}
-                        {![0, 1].includes(currentRoundState.status) &&
-                          `Status: ${currentRoundState.status}`}
-                      </div>
+                  <div className="flex items-center gap-3 xl:ml-60">
+                    
+                    <div className="text-amber-400 text-3xl font-bold flex items-center gap-2 leading-tight animate-pulse">
+                      {currentRoundState.status === 0 && "Waiting for Players to Join"}
+                      {currentRoundState.status === 1 && "Place Your Bet Now!"}
+                    
                     </div>
+                    
                   </div>
                 )}
               </div>
@@ -99,17 +90,6 @@ export function Header() {
 
                 {connected && (
                   <>
-                    {/* Profile Button */}
-                    <button
-                      onClick={() => setShowProfileDialog(true)}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-white/10 transition-colors"
-                      title={playerData?.displayName || "Profile"}
-                    >
-                      <User className="h-5 w-5 text-indigo-300" />
-                      <span className="hidden sm:inline text-indigo-200 font-medium text-sm">
-                        {playerData?.displayName || "Profile"}
-                      </span>
-                    </button>
 
                     {/* Divider */}
                     <div className="h-8 w-px bg-indigo-500/30"></div>

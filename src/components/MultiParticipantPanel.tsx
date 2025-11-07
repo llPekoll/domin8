@@ -54,6 +54,12 @@ export function MultiParticipantPanel() {
         <div className="p-4 border-b border-amber-500/30">
           <div className="flex items-center justify-between">
             <div className="flex-1 text-center">
+               <div className="font-bold text-amber-300 text-base uppercase tracking-wide leading-tight">
+                      Round #
+                      {activeGame.roundId?.toString() ||
+                        activeGame.gameRound?.toString() ||
+                        "?"}
+                    </div>
               <div className="text-amber-400 text-sm uppercase tracking-wider mb-1">Total Pot</div>
               <div className="text-3xl font-bold text-amber-300">
                 {(totalPot / LAMPORTS_PER_SOL).toFixed(2)} SOL

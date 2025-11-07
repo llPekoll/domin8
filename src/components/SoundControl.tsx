@@ -60,9 +60,7 @@ export function SoundControl() {
       ) : (
         <Volume2 className="h-5 w-5" />
       )}
-      <span className="ml-2 hidden sm:inline text-lg">
-        {isMuted ? "Sound Off" : "Sound On"}
-      </span>
+      
     </Button>
   );
 }
