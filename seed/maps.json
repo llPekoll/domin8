@@ -2,7 +2,6 @@
   {
     "id": 1,
     "name": "Classic Arena",
-    "background": "arena_classic",
     "description": "The original battleground where legends are made",
     "spawnConfiguration": {
       "maxPlayers": 20,
@@ -15,36 +14,11 @@
   {
     "id": 2,
     "name": "Mystic Forest",
-    "background": "arena_forest",
     "description": "An enchanted woodland filled with ancient magic",
     "spawnConfiguration": {
       "maxPlayers": 24,
       "spawnRadius": 280,
       "minSpacing": 0.262
-    },
-    "isActive": true
-  },
-  {
-    "id": 3,
-    "name": "Volcanic Crater",
-    "background": "arena_volcano",
-    "description": "A dangerous arena surrounded by molten lava",
-    "spawnConfiguration": {
-      "maxPlayers": 14,
-      "spawnRadius": 200,
-      "minSpacing": 0.449
-    },
-    "isActive": true
-  },
-  {
-    "id": 4,
-    "name": "Underwater Temple",
-    "background": "arena_underwater",
-    "description": "An ancient temple submerged beneath the waves",
-    "spawnConfiguration": {
-      "maxPlayers": 22,
-      "spawnRadius": 260,
-      "minSpacing": 0.285
     },
     "isActive": true
   }

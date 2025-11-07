@@ -42,19 +42,8 @@ export const upsertGameState = internalMutation({
     // Convert status: 0 = "waiting" (open), 1 = "finished" (closed)
     const status = gameRound.status === 0 ? "waiting" : "finished";
 
-    // Look up the map by its integer ID
-    let mapId = undefined;
-    if (gameRound.map !== undefined) {
-      const mapDoc = await db
-        .query("maps")
-        .filter((q) => q.eq(q.field("id"), gameRound.map))
-        .first();
-      if (mapDoc) {
-        mapId = mapDoc._id;
-      } else {
-        console.warn(`[Sync Mutations] Map with id ${gameRound.map} not found in database`);
-      }
-    }
+    // Store map ID directly from blockchain (no lookup needed)
+    const mapId = gameRound.map;
 
     // BACKFILL LOGIC: If this is a "finished" game, ensure we have a "waiting" state
     if (status === "finished") {

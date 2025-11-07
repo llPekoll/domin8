@@ -6,6 +6,7 @@ import { BlockchainDebugDialog } from "./components/BlockchainDebugDialog";
 import { MultiParticipantPanel } from "./components/MultiParticipantPanel";
 import { useActiveGame } from "./hooks/useActiveGame";
 import { EventBus } from "./game/EventBus";
+import { setActiveGameData } from "./game/main";
 
 export default function App() {
   const phaserRef = useRef<IRefPhaserGame | null>(null);
@@ -19,8 +20,13 @@ export default function App() {
     console.log("📡 [App] Emitting blockchain state to Phaser:", {
       hasGameState: !!currentRoundState,
       status: currentRoundState?.status,
+      map: currentRoundState?.map,
     });
 
+    // Store in global state for Phaser scenes to access during initialization
+    setActiveGameData(currentRoundState);
+
+    // Also emit via EventBus for runtime updates
     EventBus.emit("blockchain-state-update", currentRoundState);
   }, [currentRoundState]);
 

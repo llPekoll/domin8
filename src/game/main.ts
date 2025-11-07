@@ -16,6 +16,8 @@ export let charactersData: any[] = [];
 export let allMapsData: any[] = [];
 // Global storage for demo mode map (selected from allMapsData)
 export let demoMapData: any = null;
+// Global storage for active game state from blockchain (useActiveGame)
+export let activeGameData: any = null;
 
 export const setCurrentMapData = (map: any) => {
   currentMapData = map;
@@ -31,6 +33,10 @@ export const setAllMapsData = (maps: any[]) => {
 
 export const setDemoMapData = (map: any) => {
   demoMapData = map;
+};
+
+export const setActiveGameData = (gameData: any) => {
+  activeGameData = gameData;
 };
 
 const config: Phaser.Types.Core.GameConfig = {

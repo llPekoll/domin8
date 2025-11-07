@@ -22,7 +22,7 @@ export default defineSchema({
     capturedAt: v.number(), // When this state was captured (Unix timestamp)
 
     // Game configuration (selected when round is created)
-    mapId: v.optional(v.id("maps")), // Which map/arena this round uses (all players see same map)
+    mapId: v.optional(v.number()), // Map ID from blockchain (0-255) - matches smart contract
 
     // Game state (snapshot from blockchain)
     betCount: v.optional(v.number()), // Number of bets placed
@@ -96,8 +96,8 @@ export default defineSchema({
   maps: defineTable({
     name: v.string(),
     id: v.number(),
-    background: v.string(), // Background identifier (e.g., "arena_classic")
-    assetPath: v.string(), // Path to map asset (e.g., "/maps/arena_classic.png")
+    background: v.optional(v.string()), // Background identifier (e.g., "arena_classic")
+    assetPath: v.optional(v.string()), // Path to map asset (e.g., "/maps/arena_classic.png")
     description: v.optional(v.string()), // Map description
     spawnConfiguration: v.object({
       maxPlayers: v.number(), // Maximum players for this map

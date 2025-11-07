@@ -59,15 +59,8 @@ export class Preloader extends Scene {
       this.load.atlas(key, character.assetPath, jsonPath);
     });
 
-    // Load ALL active maps (so any map can be used for real games)
-    logger.game.debug("[Preloader] Loading all maps:", allMapsData.length);
-    allMapsData.forEach((map) => {
-      logger.game.debug("[Preloader] Loading map:", map.background, map.assetPath);
-      this.load.image(map.background, map.assetPath);
-    });
-
     // Load background configs (animated/static backgrounds)
-    // Dynamically load backgrounds based on map IDs from database
+    // Get map IDs from database to know which backgrounds to load
     const backgroundIds = allMapsData.map((map) => map.id);
 
     console.log("🎨🎨🎨 PRELOADER: About to load backgrounds, IDs:", backgroundIds);

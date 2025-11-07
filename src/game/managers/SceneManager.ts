@@ -193,7 +193,7 @@ export class SceneManager {
   }
 
   private transitionToDemo() {
-    const gameScene = this.game.scene.getScene("Game");
+    const gameScene = this.game.scene.getScene("Game") as any;
 
     if (!gameScene) {
       logger.game.error("[SceneManager] ❌ Game scene not found!");
@@ -206,7 +206,35 @@ export class SceneManager {
     }
 
     this.isTransitioning = true;
-    logger.game.debug("[SceneManager] Starting Game → Demo transition with wipe effect");
+    logger.game.debug("[CLEANUP] SceneManager.transitionToDemo() - Preparing transition");
+
+    // CRITICAL: Force clear all participants BEFORE transition starts
+    // This ensures Game scene containers are destroyed before Demo scene shows
+    if (gameScene.playerManager) {
+      logger.game.debug("[CLEANUP] Force clearing Game scene participants before transition");
+      const participantCount = gameScene.playerManager.getParticipants().size;
+      logger.game.debug(`[CLEANUP] Game scene has ${participantCount} participants to clear`);
+      gameScene.playerManager.clearParticipants();
+      logger.game.debug(`[CLEANUP] Game scene participants cleared, remaining: ${gameScene.playerManager.getParticipants().size}`);
+    }
+
+    // Also clear all tweens and game objects to be safe
+    gameScene.tweens.killAll();
+
+    // FORCE CLEAR: Destroy ALL children in the Game scene (nuclear option)
+    // This catches any lingering containers that weren't in the participants Map
+    const childrenCount = gameScene.children.list.length;
+    logger.game.debug(`[CLEANUP] Game scene has ${childrenCount} total children before force clear`);
+
+    // Get all containers in the scene and destroy them
+    const containers = gameScene.children.list.filter((child: any) => child.type === 'Container');
+    logger.game.debug(`[CLEANUP] Found ${containers.length} containers to force destroy`);
+    containers.forEach((container: any, index: number) => {
+      logger.game.debug(`[CLEANUP]   Force destroying container ${index}: depth=${container.depth}, alpha=${container.alpha}`);
+      container.destroy();
+    });
+
+    logger.game.debug(`[CLEANUP] Game scene children after force clear: ${gameScene.children.list.length}`);
 
     // Create wipe transition effect
     const camera = gameScene.cameras.main;
@@ -214,7 +242,7 @@ export class SceneManager {
 
     // Listen for transition complete
     gameScene.events.once("transitionout", () => {
-      logger.game.debug("[SceneManager] ✅ Game → Demo transition complete");
+      logger.game.debug("[CLEANUP] Game → Demo transition complete");
       this.isTransitioning = false;
 
       // Notify App.tsx that transition is complete
@@ -222,6 +250,7 @@ export class SceneManager {
       EventBus.emit("scene-transition-complete", "Demo");
     });
 
+    logger.game.debug("[CLEANUP] Starting scene transition (1000ms wipe)");
     gameScene.scene.transition({
       target: "Demo",
       duration: 1000,

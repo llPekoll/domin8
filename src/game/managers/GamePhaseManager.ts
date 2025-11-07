@@ -237,33 +237,92 @@ export class GamePhaseManager {
   }
 
   private handleGameCleanup() {
-    logger.game.debug("[GamePhaseManager] Cleaning up finished game");
+    logger.game.debug("[CLEANUP] ========================================");
+    logger.game.debug("[CLEANUP] STARTED - GamePhaseManager.handleGameCleanup()");
+    logger.game.debug("[CLEANUP] ========================================");
 
-    // Clear all effects and reset state
+    // Step 1: Stop all ongoing animations and timers FIRST
+    const tweenCount = this.scene.tweens.getTweens().length;
+    logger.game.debug(`[CLEANUP] Step 1: Killing tweens (${tweenCount} active) and timers`);
     this.scene.tweens.killAll();
     this.scene.time.removeAllEvents();
+    logger.game.debug("[CLEANUP] Step 1: Complete");
 
-    // Fade out all participants
-    this.playerManager.getParticipants().forEach((participant) => {
+    // Step 2: Get all participants before cleanup
+    const participants = Array.from(this.playerManager.getParticipants().values());
+    logger.game.debug(`[CLEANUP] Step 2: Found ${participants.length} participants to fade out`);
+    participants.forEach((p, index) => {
+      logger.game.debug(`[CLEANUP]   [${index}] ID: ${p.id}, Name: ${p.displayName}, Container: ${!!p.container}`);
+    });
+
+    // Step 3: Fade out all participants with proper tracking
+    let fadeCompleteCount = 0;
+    const totalFades = participants.length;
+
+    if (totalFades === 0) {
+      logger.game.debug("[CLEANUP] No participants to fade, skipping to finalize");
+      this.finalizeCleanup();
+      return;
+    }
+
+    logger.game.debug(`[CLEANUP] Step 3: Creating ${totalFades} fade tweens (1000ms each)`);
+    participants.forEach((participant, index) => {
       this.scene.tweens.add({
         targets: participant.container,
         alpha: 0,
         duration: 1000,
+        onStart: () => {
+          logger.game.debug(`[CLEANUP] Fade ${index + 1}/${totalFades} started: ${participant.id}`);
+        },
         onComplete: () => {
-          participant.container.destroy();
+          fadeCompleteCount++;
+          logger.game.debug(`[CLEANUP] Fade ${fadeCompleteCount}/${totalFades} complete: ${participant.id}`);
+
+          // When all fades complete, do final cleanup
+          if (fadeCompleteCount === totalFades) {
+            logger.game.debug("[CLEANUP] All fades complete, calling finalizeCleanup()");
+            this.finalizeCleanup();
+          }
         },
       });
     });
 
-    // Clear participants and return to IDLE after fade
-    this.scene.time.delayedCall(2000, () => {
-      this.playerManager.clearParticipants();
-      this.setPhase(GamePhase.IDLE);
-      logger.game.debug("[GamePhaseManager] ✅ Cleanup complete, returning to IDLE");
+    logger.game.debug(`[CLEANUP] All ${totalFades} fade tweens created`);
+  }
 
-      // Emit event to notify other systems (e.g., DemoScene) that we're back to IDLE
-      EventBus.emit("game-ended");
-    });
+  private finalizeCleanup() {
+    logger.game.debug("[CLEANUP] ========================================");
+    logger.game.debug("[CLEANUP] FINALIZE - GamePhaseManager.finalizeCleanup()");
+    logger.game.debug("[CLEANUP] ========================================");
+
+    // Log participant count before clearing
+    const participantCount = this.playerManager.getParticipants().size;
+    logger.game.debug(`[CLEANUP] Participants before clear: ${participantCount}`);
+
+    // Clear all participants (destroys containers if not already destroyed)
+    this.playerManager.clearParticipants();
+
+    // Verify participants were cleared
+    const remainingCount = this.playerManager.getParticipants().size;
+    logger.game.debug(`[CLEANUP] Participants after clear: ${remainingCount}`);
+
+    if (remainingCount > 0) {
+      logger.game.error(`[CLEANUP] ERROR: ${remainingCount} participants still remain!`);
+    } else {
+      logger.game.debug("[CLEANUP] All participants successfully cleared");
+    }
+
+    // Return to IDLE phase
+    logger.game.debug("[CLEANUP] Setting phase to IDLE");
+    this.setPhase(GamePhase.IDLE);
+
+    // Emit event to notify other systems (e.g., DemoScene) that we're back to IDLE
+    logger.game.debug("[CLEANUP] Emitting 'game-ended' event");
+    EventBus.emit("game-ended");
+
+    logger.game.debug("[CLEANUP] ========================================");
+    logger.game.debug("[CLEANUP] COMPLETE");
+    logger.game.debug("[CLEANUP] ========================================");
   }
 
   /**

@@ -7,6 +7,7 @@ import { UIManager } from "../managers/UIManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
 import { logger } from "../../lib/logger";
+import { activeGameData } from "../main";
 
 export class Game extends Scene {
   camera!: Phaser.Cameras.Scene2D.Camera;
@@ -42,19 +43,18 @@ export class Game extends Scene {
         this.playerNames.set(walletAddress, displayName);
       }
     });
-    logger.game.debug("[Game] Player names updated:", this.playerNames.size);
-    
+
     // Pass updated player names to AnimationManager
     if (this.animationManager) {
       this.animationManager.setPlayerNames(this.playerNames);
     }
-    
+
     // Update existing participants with new display names
     if (this.playerManager) {
       this.updateParticipantDisplayNames();
     }
   }
-  
+
   // Update display names for all existing participants
   private updateParticipantDisplayNames() {
     const participants = this.playerManager.getParticipants();
@@ -62,11 +62,6 @@ export class Game extends Scene {
       if (participant.playerId) {
         const displayName = this.playerNames.get(participant.playerId);
         if (displayName && displayName !== participant.displayName) {
-          logger.game.debug("[Game] Updating participant display name:", {
-            participantId: participant.id,
-            oldName: participant.displayName,
-            newName: displayName,
-          });
           participant.displayName = displayName;
           participant.nameText.setText(displayName);
         }
@@ -75,10 +70,8 @@ export class Game extends Scene {
   }
 
   create() {
-    logger.game.debug("[Game] 🎮 Game scene (RoyalRumble) created and ready");
     this.camera = this.cameras.main;
 
-    // Calculate proper center coordinates based on actual camera dimensions
     this.centerX = this.camera.centerX;
     this.centerY = this.camera.centerY;
 
@@ -89,9 +82,17 @@ export class Game extends Scene {
     this.uiManager = new UIManager(this, this.centerX);
     this.backgroundManager = new BackgroundManager(this, this.centerX, this.centerY);
 
-    // Set default background (will be updated when gameState is received)
-    // Use bg1 (Arena Classic) as default
-    this.backgroundManager.setBackgroundById(1);
+    // Set background from active game data (from useActiveGame hook)
+    if (activeGameData?.map !== undefined && activeGameData.map !== null) {
+      logger.game.debug(
+        "[Game] Setting initial background from activeGameData:",
+        activeGameData.map.id
+      );
+      this.backgroundManager.setBackgroundById(activeGameData.map.id);
+      console.log("Background set oooo");
+    } else {
+      logger.game.warn("[Game] No map data in activeGameData, will wait for updateGameState()");
+    }
 
     // Create UI elements
     this.uiManager.create();
@@ -256,7 +257,7 @@ export class Game extends Scene {
     if (character) {
       return character.name;
     }
-    
+
     // Fallback to default mapping if character not found
     const skinMap: { [key: number]: string } = {
       1: "Orc",
@@ -272,18 +273,18 @@ export class Game extends Scene {
   private getParticipantName(walletAddress: string): string {
     // Try to get display name from playerNames mapping
     const displayName = this.playerNames.get(walletAddress);
-    
+
     logger.game.debug("[Game] getParticipantName lookup:", {
       walletAddress: walletAddress.slice(0, 8) + "...",
       foundDisplayName: displayName,
       playerNamesSize: this.playerNames.size,
-      allKeys: Array.from(this.playerNames.keys()).map(k => k.slice(0, 8) + "..."),
+      allKeys: Array.from(this.playerNames.keys()).map((k) => k.slice(0, 8) + "..."),
     });
-    
+
     if (displayName) {
       return displayName;
     }
-    
+
     // Fallback to truncated wallet address
     return `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`;
   }
@@ -299,13 +300,56 @@ export class Game extends Scene {
   }
 
   shutdown() {
-    // Clean up event listeners to prevent memory leaks
+    logger.game.debug("[CLEANUP] ========================================");
+    logger.game.debug("[CLEANUP] SHUTDOWN - Game.shutdown()");
+    logger.game.debug("[CLEANUP] ========================================");
+
+    const participantCount = this.playerManager?.getParticipants().size || 0;
+    const tweenCount = this.tweens.getTweens().length;
+    logger.game.debug(
+      `[CLEANUP] Initial state: participants=${participantCount}, tweens=${tweenCount}`
+    );
+
+    // Clean up event listeners
+    logger.game.debug("[CLEANUP] Removing event listeners");
     EventBus.off("play-insert-coin-sound");
 
-    // Clean up UIManager event listeners
+    // Clean up UIManager
     if (this.uiManager) {
+      logger.game.debug("[CLEANUP] Destroying UIManager");
       this.uiManager.destroy();
     }
+
+    // Clear all participants from the scene
+    if (this.playerManager) {
+      logger.game.debug(
+        `[CLEANUP] Clearing participants (count: ${this.playerManager.getParticipants().size})`
+      );
+      this.playerManager.clearParticipants();
+      logger.game.debug(
+        `[CLEANUP] Participants after clear: ${this.playerManager.getParticipants().size}`
+      );
+    }
+
+    // Clear all tweens and timers
+    logger.game.debug(`[CLEANUP] Killing tweens (${this.tweens.getTweens().length} active)`);
+    this.tweens.killAll();
+    this.time.removeAllEvents();
+
+    // Reset game phase manager
+    if (this.gamePhaseManager) {
+      logger.game.debug("[CLEANUP] Resetting game phase manager");
+      this.gamePhaseManager.reset();
+    }
+
+    // Reset game state
+    logger.game.debug("[CLEANUP] Resetting game state");
+    this.gameState = null;
+    this.introPlayed = false;
+
+    logger.game.debug("[CLEANUP] ========================================");
+    logger.game.debug("[CLEANUP] SHUTDOWN COMPLETE");
+    logger.game.debug("[CLEANUP] ========================================");
   }
 
   changeScene() {

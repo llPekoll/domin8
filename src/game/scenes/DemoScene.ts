@@ -109,7 +109,7 @@ export class DemoScene extends Scene {
 
     // Listen for game-ended event from GamePhaseManager to restart demo
     EventBus.on("game-ended", () => {
-      logger.game.debug("[DemoScene] 🔄 Game ended, restarting demo mode");
+      logger.game.debug("[CLEANUP] DemoScene received 'game-ended' event");
       this.clearDemoParticipants();
       this.startDemoMode();
     });
@@ -159,15 +159,18 @@ export class DemoScene extends Scene {
   }
 
   private startDemoMode() {
+    logger.game.debug("[DemoScene] 🎬 Starting demo mode");
+
+    // First, ensure everything is cleared (defensive cleanup)
+    this.clearAllDemoState();
+
+    // Reset state
     this.isActive = true;
     this.countdown = DEMO_TIMINGS.SPAWNING_PHASE_DURATION / 1000;
     this.demoPhase = "spawning";
     this.participants = [];
     this.spawnCount = 0;
     this.isSpawning = false;
-
-    // Clear any existing spawns
-    this.clearAllDemoState();
 
     // Generate random positions
     this.shuffledPositions = generateRandomEllipsePositions(
@@ -523,9 +526,11 @@ export class DemoScene extends Scene {
   }
 
   public clearDemoParticipants() {
+    logger.game.debug(`[CLEANUP] DemoScene.clearDemoParticipants() - ${this.participants.length} demo participants`);
     this.playerManager.clearParticipants();
     this.animationManager.clearCelebration();
     this.participants = [];
+    logger.game.debug("[CLEANUP] Demo participants cleared");
   }
 
   shutdown() {

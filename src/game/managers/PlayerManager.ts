@@ -554,9 +554,32 @@ export class PlayerManager {
   }
 
   clearParticipants() {
-    this.participants.forEach((participant) => {
-      participant.container.destroy();
+    logger.game.debug(`[CLEANUP] PlayerManager.clearParticipants() - ${this.participants.size} participants`);
+
+    let destroyedCount = 0;
+    let alreadyDestroyedCount = 0;
+    let errorCount = 0;
+
+    this.participants.forEach((participant, id) => {
+      try {
+        // Check if container still exists and is active before destroying
+        if (participant.container && participant.container.scene) {
+          logger.game.debug(`[CLEANUP]   Destroying: ${id} (${participant.displayName}) - alpha:${participant.container.alpha}`);
+          participant.container.destroy();
+          destroyedCount++;
+        } else {
+          alreadyDestroyedCount++;
+          logger.game.warn(`[CLEANUP]   Already destroyed: ${id} (container:${!!participant.container}, scene:${!!participant.container?.scene})`);
+        }
+      } catch (e) {
+        errorCount++;
+        logger.game.error(`[CLEANUP]   Error destroying ${id}:`, e);
+      }
     });
+
+    logger.game.debug(`[CLEANUP] Destruction summary: total=${this.participants.size}, destroyed=${destroyedCount}, already=${alreadyDestroyedCount}, errors=${errorCount}`);
+
     this.participants.clear();
+    logger.game.debug(`[CLEANUP] Participants Map cleared (size now: ${this.participants.size})`);
   }
 }

@@ -44,8 +44,6 @@ export class BackgroundManager {
    * This is the main method to use for the new config system
    */
   setBackgroundById(id: number): void {
-    logger.game.debug(`[BackgroundManager] 🎨 Loading background ID: ${id}`);
-
     // Load config
     const config = loadBackgroundConfig(id);
     if (!config) {
@@ -88,15 +86,6 @@ export class BackgroundManager {
       logger.game.error(`[BackgroundManager] ❌ Texture '${textureKey}' not found`);
       return;
     }
-
-    // Create a temporary static config for legacy support
-    const legacyConfig: BackgroundConfig = {
-      id: 0,
-      name: "Legacy",
-      textureKey,
-      assetPath: "",
-      type: "static",
-    };
 
     this.createBackgroundFromConfig(legacyConfig);
   }
