@@ -232,27 +232,12 @@ export class PlayerManager {
       });
     }
 
-    // Randomly choose between two easing styles for variety
-    const useElastic = Math.random() < 0.5;
-
+    // Consistent falling animation for all characters
     this.scene.tweens.add({
       targets: container,
       y: targetY,
-      duration: 400, // Much faster fall (was 1000ms)
-      ease: useElastic
-        ? "Elastic.easeIn"
-        : function (t: number) {
-            // Custom ease: Fast fall with single subtle bounce
-            // t goes from 0 to 1 during the tween
-            if (t < 0.7) {
-              // Accelerate down for 70% of the animation
-              return t * t * 1.2; // Quadratic acceleration
-            } else {
-              // Single small bounce for last 30%
-              const bounceT = (t - 0.7) / 0.3; // Normalize to 0-1
-              return 1 - Math.abs(Math.sin(bounceT * Math.PI)) * 0.05; // Tiny bounce amplitude
-            }
-          },
+      duration: 250, // Fast fall duration
+      ease: "Cubic.easeIn", // Smooth acceleration downward
       onComplete: () => {
         // Play random impact sound when hitting ground
         try {
@@ -268,7 +253,7 @@ export class PlayerManager {
           sprite.play(landingAnimKey);
 
           // After landing animation completes, switch to idle
-          sprite.once('animationcomplete', () => {
+          sprite.once("animationcomplete", () => {
             const idleAnimKey = `${textureKey}-idle`;
             if (this.scene.anims.exists(idleAnimKey)) {
               sprite.play(idleAnimKey);
@@ -564,7 +549,9 @@ export class PlayerManager {
   }
 
   clearParticipants() {
-    logger.game.debug(`[CLEANUP] PlayerManager.clearParticipants() - ${this.participants.size} participants`);
+    logger.game.debug(
+      `[CLEANUP] PlayerManager.clearParticipants() - ${this.participants.size} participants`
+    );
 
     let destroyedCount = 0;
     let alreadyDestroyedCount = 0;
@@ -574,12 +561,16 @@ export class PlayerManager {
       try {
         // Check if container still exists and is active before destroying
         if (participant.container && participant.container.scene) {
-          logger.game.debug(`[CLEANUP]   Destroying: ${id} (${participant.displayName}) - alpha:${participant.container.alpha}`);
+          logger.game.debug(
+            `[CLEANUP]   Destroying: ${id} (${participant.displayName}) - alpha:${participant.container.alpha}`
+          );
           participant.container.destroy();
           destroyedCount++;
         } else {
           alreadyDestroyedCount++;
-          logger.game.warn(`[CLEANUP]   Already destroyed: ${id} (container:${!!participant.container}, scene:${!!participant.container?.scene})`);
+          logger.game.warn(
+            `[CLEANUP]   Already destroyed: ${id} (container:${!!participant.container}, scene:${!!participant.container?.scene})`
+          );
         }
       } catch (e) {
         errorCount++;
@@ -587,7 +578,9 @@ export class PlayerManager {
       }
     });
 
-    logger.game.debug(`[CLEANUP] Destruction summary: total=${this.participants.size}, destroyed=${destroyedCount}, already=${alreadyDestroyedCount}, errors=${errorCount}`);
+    logger.game.debug(
+      `[CLEANUP] Destruction summary: total=${this.participants.size}, destroyed=${destroyedCount}, already=${alreadyDestroyedCount}, errors=${errorCount}`
+    );
 
     this.participants.clear();
     logger.game.debug(`[CLEANUP] Participants Map cleared (size now: ${this.participants.size})`);
