@@ -6,13 +6,13 @@ import { ProfileDialog } from "./ProfileDialog";
 import { PrivyWalletButton } from "./PrivyWalletButton";
 import { SoundControl } from "./SoundControl";
 import { toast } from "sonner";
-import { User, Map } from "lucide-react";
 import { generateRandomName } from "../lib/nameGenerator";
 import { useActiveGame } from "../hooks/useActiveGame";
 import { logger } from "../lib/logger";
 
 export function Header() {
-  const { connected, publicKey, externalWalletAddress, solBalance, isLoadingBalance } = usePrivyWallet();
+  const { connected, publicKey, externalWalletAddress, solBalance, isLoadingBalance } =
+    usePrivyWallet();
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [hasAttemptedCreation, setHasAttemptedCreation] = useState(false);
 
@@ -70,13 +70,10 @@ export function Header() {
               <div className="flex-1 flex justify-center">
                 {currentRoundState && (
                   <div className="flex items-center gap-3 xl:ml-60">
-                    
                     <div className="text-amber-400 text-3xl font-bold flex items-center gap-2 leading-tight animate-pulse">
                       {currentRoundState.status === 0 && "Waiting for Players to Join"}
                       {currentRoundState.status === 1 && "Place Your Bet Now!"}
-                    
                     </div>
-                    
                   </div>
                 )}
               </div>
@@ -90,7 +87,6 @@ export function Header() {
 
                 {connected && (
                   <>
-
                     {/* Divider */}
                     <div className="h-8 w-px bg-indigo-500/30"></div>
 
