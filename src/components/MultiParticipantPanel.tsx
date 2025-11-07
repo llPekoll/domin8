@@ -52,17 +52,17 @@ export function MultiParticipantPanel() {
       <div className="bg-black/90 backdrop-blur-sm rounded-lg border border-amber-500/30 shadow-2xl">
         {/* Total Pot Header */}
         <div className="p-4 border-b border-amber-500/30">
-          <div className="flex items-center justify-between">
+          <div className="flex justify-between">
+            <div className="font-bold text-amber-300 text-base uppercase tracking-wide leading-tight">
+              Round #
+              {activeGame.roundId?.toString() ||
+              activeGame.gameRound?.toString() ||
+              "?"}
+            </div>
             <div className="flex-1 text-center">
-               <div className="font-bold text-amber-300 text-base uppercase tracking-wide leading-tight">
-                      Round #
-                      {activeGame.roundId?.toString() ||
-                        activeGame.gameRound?.toString() ||
-                        "?"}
-                    </div>
               <div className="text-amber-400 text-sm uppercase tracking-wider mb-1">Total Pot</div>
               <div className="text-3xl font-bold text-amber-300">
-                {(totalPot / LAMPORTS_PER_SOL).toFixed(2)} SOL
+          {(totalPot / LAMPORTS_PER_SOL).toFixed(2)} SOL
               </div>
             </div>
             <button
@@ -71,9 +71,9 @@ export function MultiParticipantPanel() {
               aria-label={isExpanded ? "Collapse panel" : "Expand panel"}
             >
               {isExpanded ? (
-                <ChevronDown className="w-5 h-5" />
+          <ChevronDown className="w-5 h-5" />
               ) : (
-                <ChevronUp className="w-5 h-5" />
+          <ChevronUp className="w-5 h-5" />
               )}
             </button>
           </div>
