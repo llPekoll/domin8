@@ -250,36 +250,15 @@ export class Game extends Scene {
     this.gamePhaseManager.handleGamePhase(gameState);
   }
 
-  // Helper to map skin ID to character name
   private getSkinName(skinId: number): string {
-    // Load this mapping from Convex characters table via AssetsContext
     const character = this.characters.find((char) => char.id === skinId);
-    if (character) {
-      return character.name;
-    }
-
-    // Fallback to default mapping if character not found
-    const skinMap: { [key: number]: string } = {
-      1: "Orc",
-      2: "Soldier",
-      3: "Male",
-      4: "Sam",
-      5: "Warrior",
-    };
-    return skinMap[skinId] || "Warrior";
+    return character.name;
   }
 
   // Helper to get participant display name from wallet address
   private getParticipantName(walletAddress: string): string {
     // Try to get display name from playerNames mapping
     const displayName = this.playerNames.get(walletAddress);
-
-    logger.game.debug("[Game] getParticipantName lookup:", {
-      walletAddress: walletAddress.slice(0, 8) + "...",
-      foundDisplayName: displayName,
-      playerNamesSize: this.playerNames.size,
-      allKeys: Array.from(this.playerNames.keys()).map((k) => k.slice(0, 8) + "..."),
-    });
 
     if (displayName) {
       return displayName;
@@ -300,56 +279,28 @@ export class Game extends Scene {
   }
 
   shutdown() {
-    logger.game.debug("[CLEANUP] ========================================");
-    logger.game.debug("[CLEANUP] SHUTDOWN - Game.shutdown()");
-    logger.game.debug("[CLEANUP] ========================================");
-
-    const participantCount = this.playerManager?.getParticipants().size || 0;
-    const tweenCount = this.tweens.getTweens().length;
-    logger.game.debug(
-      `[CLEANUP] Initial state: participants=${participantCount}, tweens=${tweenCount}`
-    );
-
-    // Clean up event listeners
-    logger.game.debug("[CLEANUP] Removing event listeners");
     EventBus.off("play-insert-coin-sound");
 
     // Clean up UIManager
     if (this.uiManager) {
-      logger.game.debug("[CLEANUP] Destroying UIManager");
       this.uiManager.destroy();
     }
 
     // Clear all participants from the scene
     if (this.playerManager) {
-      logger.game.debug(
-        `[CLEANUP] Clearing participants (count: ${this.playerManager.getParticipants().size})`
-      );
       this.playerManager.clearParticipants();
-      logger.game.debug(
-        `[CLEANUP] Participants after clear: ${this.playerManager.getParticipants().size}`
-      );
     }
 
-    // Clear all tweens and timers
-    logger.game.debug(`[CLEANUP] Killing tweens (${this.tweens.getTweens().length} active)`);
     this.tweens.killAll();
     this.time.removeAllEvents();
 
-    // Reset game phase manager
     if (this.gamePhaseManager) {
-      logger.game.debug("[CLEANUP] Resetting game phase manager");
       this.gamePhaseManager.reset();
     }
 
     // Reset game state
-    logger.game.debug("[CLEANUP] Resetting game state");
     this.gameState = null;
     this.introPlayed = false;
-
-    logger.game.debug("[CLEANUP] ========================================");
-    logger.game.debug("[CLEANUP] SHUTDOWN COMPLETE");
-    logger.game.debug("[CLEANUP] ========================================");
   }
 
   changeScene() {
