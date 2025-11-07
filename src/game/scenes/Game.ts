@@ -166,34 +166,8 @@ export class Game extends Scene {
 
     // Update map background based on game data
     if (gameState.map !== undefined && gameState.map !== null) {
-      logger.game.debug("[Game] 🗺️ Processing map data", {
-        mapType: typeof gameState.map,
-        mapValue: gameState.map,
-      });
-
-      // If map is a number (ID), load background config
-      if (typeof gameState.map === "number") {
-        logger.game.debug("[Game] Setting background by ID:", gameState.map);
-        this.backgroundManager.setBackgroundById(gameState.map);
-      }
-      // If map is an object with background property (legacy)
-      else if (typeof gameState.map === "object" && gameState.map.background) {
-        logger.game.debug("[Game] Setting background texture (legacy):", gameState.map.background);
-        this.backgroundManager.setTexture(gameState.map.background);
-
-        // Update center position if map specifies it
-        if (gameState.map.centerX && gameState.map.centerY) {
-          logger.game.debug("[Game] Updating center position", {
-            centerX: gameState.map.centerX,
-            centerY: gameState.map.centerY,
-          });
-          this.centerX = gameState.map.centerX;
-          this.centerY = gameState.map.centerY;
-          this.backgroundManager.updateCenter(this.centerX, this.centerY);
-        }
-      } else {
-        logger.game.error("[Game] ❌ Invalid map data format!", gameState.map);
-      }
+      logger.game.debug("[Game] 🗺️ Setting background by ID:", gameState.map);
+      this.backgroundManager.setBackgroundById(gameState.map);
     } else {
       logger.game.error("[Game] ❌ No map data in game state!");
     }

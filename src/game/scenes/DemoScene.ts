@@ -495,14 +495,6 @@ export class DemoScene extends Scene {
     }
   }
 
-  public setDemoMap(mapData: any) {
-    logger.game.debug("[DemoScene] setDemoMap called:", mapData?.name);
-
-    if (mapData?.background) {
-      this.backgroundManager.setTexture(mapData.background);
-    }
-  }
-
   public spawnDemoParticipant(participant: any) {
     const participantId = participant._id || participant.id;
 

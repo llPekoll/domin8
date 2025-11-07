@@ -77,20 +77,6 @@ export class BackgroundManager {
   }
 
   /**
-   * Set background from texture key (legacy method for old map system)
-   */
-  setTexture(textureKey: string): void {
-    logger.game.debug(`[BackgroundManager] 🎨 setTexture (legacy): ${textureKey}`);
-
-    if (!this.scene.textures.exists(textureKey)) {
-      logger.game.error(`[BackgroundManager] ❌ Texture '${textureKey}' not found`);
-      return;
-    }
-
-    this.createBackgroundFromConfig(legacyConfig);
-  }
-
-  /**
    * Create background game object from config
    */
   private createBackgroundFromConfig(config: BackgroundConfig): void {
