@@ -43,7 +43,7 @@ export function MultiParticipantPanel() {
   }, [activeGame, totalPot, playerNames, walletAddress]);
 
   // Don't show panel if no game or loading
-  if (isLoading || !activeGame ) {
+  if (isLoading || !activeGame || participants.length === 0) {
     return null;
   }
 
