@@ -392,6 +392,7 @@ export const useGameContract = () => {
       // Initialize variables outside try/catch so they're accessible in both
       let activeRoundId = 0;
       let betIndex = 0;
+      let shouldCreateNewGame = false;
 
       try {
         logger.solana.debug("[placeBet] Placing bet of", amount, "SOL");
@@ -410,7 +411,6 @@ export const useGameContract = () => {
         });
 
         let tx: string;
-        let shouldCreateNewGame = false;
 
         // STEP 1: Check active_game first to see if there's an open game
         logger.solana.debug("[placeBet] Checking active_game for open game...");
@@ -725,6 +725,34 @@ export const useGameContract = () => {
           if (walletAdapter?.lastSignature) {
             extractedSignature = walletAdapter.lastSignature;
             logger.solana.debug("[placeBet] Using signature from Privy:", extractedSignature);
+          }
+
+          // Send webhook notification if this was a game creation (first bet)
+          // This code runs in catch block because Privy signature error happens before webhook
+          if (shouldCreateNewGame) {
+            try {
+              // Fetch the newly created game data
+              const gameAccount = await program.account.domin8Game.fetch(activeGamePda);
+              
+              logger.solana.debug("[placeBet] Calling webhook notification for game creation (from catch block)");
+              
+              // Call Convex action to send webhook (keeps webhook URL secure in backend)
+              await notifyGameCreated({
+                roundId: activeRoundId,
+                transactionSignature: extractedSignature,
+                startTimestamp: gameAccount.startDate.toNumber(),
+                endTimestamp: gameAccount.endDate.toNumber(),
+                totalPot: gameAccount.totalDeposit.toNumber(),
+                creatorAddress: publicKey.toString(),
+                creatorDisplayName: displayName,
+                map: gameAccount.map,
+              });
+              
+              logger.solana.debug("[placeBet] Webhook notification sent successfully");
+            } catch (webhookError) {
+              // Don't fail the bet if webhook fails
+              logger.solana.error("[placeBet] Failed to send webhook notification:", webhookError);
+            }
           }
 
           // Return success - transaction went through on-chain
