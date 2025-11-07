@@ -48,7 +48,7 @@ export function MultiParticipantPanel() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 w-80 z-50">
+    <div className="fixed bottom-4 right-4 w-60 z-50">
       <div className="bg-black/40 backdrop-blur-sm rounded-lg shadow-sm">
         {/* Total Pot Header */}
         <div className="p-2 border-b border-amber-500/30">
