@@ -352,7 +352,13 @@ const CharacterSelection = memo(function CharacterSelection({
       }
 
       // Use the hook's placeBet function with character data (skin + position + map stored on-chain)
-      const betResult = await placeBet(amount, characterToUse.id, playerData.displayName, position, mapId);
+      const betResult = await placeBet(
+        amount,
+        characterToUse.id,
+        playerData.displayName,
+        position,
+        mapId
+      );
       const { signature: signatureHex, roundId, betIndex } = betResult;
 
       logger.ui.debug("[CharacterSelection] Transaction successful:", {
@@ -631,7 +637,7 @@ const CharacterSelection = memo(function CharacterSelection({
         selectedCharacters={selectedNFTCharacters}
         onSelectCharacters={setSelectedNFTCharacters}
         onNFTCharacterSelected={handleNFTCharacterSelected}
-        unlockedCharacters={unlockedCharacters as Character[]}
+        unlockedCharacters={unlockedCharacters}
         isLoading={isLoadingNFTs}
         error={nftError}
         allExclusiveCharacters={(allExclusiveChars || []) as Character[]}
