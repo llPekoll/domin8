@@ -387,10 +387,10 @@ export class PlayerManager {
         ease: "Cubic.easeIn",
       });
 
-      // Change to walking animation
-      const walkAnimKey = `${participant.characterKey}-walk`;
-      if (this.scene.anims.exists(walkAnimKey)) {
-        participant.sprite.play(walkAnimKey);
+      // Change to running animation
+      const runAnimKey = `${participant.characterKey}-run`;
+      if (this.scene.anims.exists(runAnimKey)) {
+        participant.sprite.play(runAnimKey);
       }
     });
   }
