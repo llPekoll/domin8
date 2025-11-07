@@ -135,9 +135,10 @@ export class PlayerManager {
       sprite.setFlipX(true);
     }
 
-    const animKey = `${textureKey}-idle`;
-    if (this.scene.anims.exists(animKey)) {
-      sprite.play(animKey);
+    // Start with falling animation
+    const fallingAnimKey = `${textureKey}-falling`;
+    if (this.scene.anims.exists(fallingAnimKey)) {
+      sprite.play(fallingAnimKey);
     }
 
     // Apply base 3x multiplier + bet scaling FIRST
@@ -259,6 +260,26 @@ export class PlayerManager {
           SoundManager.playRandomImpact(this.scene, 0.4);
         } catch (e) {
           logger.game.error("[PlayerManager] Failed to play impact sound:", e);
+        }
+
+        // Play landing animation, then transition to idle
+        const landingAnimKey = `${textureKey}-landing`;
+        if (this.scene.anims.exists(landingAnimKey)) {
+          sprite.play(landingAnimKey);
+
+          // After landing animation completes, switch to idle
+          sprite.once('animationcomplete', () => {
+            const idleAnimKey = `${textureKey}-idle`;
+            if (this.scene.anims.exists(idleAnimKey)) {
+              sprite.play(idleAnimKey);
+            }
+          });
+        } else {
+          // If no landing animation, go straight to idle
+          const idleAnimKey = `${textureKey}-idle`;
+          if (this.scene.anims.exists(idleAnimKey)) {
+            sprite.play(idleAnimKey);
+          }
         }
       },
     });
@@ -498,17 +519,6 @@ export class PlayerManager {
         y: containerY,
         duration: 1000,
         ease: "Power2.easeInOut",
-        onComplete: () => {
-          // After reaching center, start bouncing animation
-          this.scene.tweens.add({
-            targets: winnerParticipant.container,
-            y: containerY - 20, // Bounce up by 20 pixels
-            duration: 500,
-            ease: "Sine.easeInOut",
-            yoyo: true,
-            repeat: -1,
-          });
-        },
       });
 
       // Scale up the winner sprite
