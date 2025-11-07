@@ -7,7 +7,7 @@ import { useNFTCharacters } from "../hooks/useNFTCharacters";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { toast } from "sonner";
-import { BadgeCheck, Shuffle, Star } from "lucide-react";
+import { BadgeCheck, Star } from "lucide-react";
 import { CharacterPreviewScene } from "./CharacterPreviewScene";
 import { NFTCharacterModal } from "./NFTCharacterModal";
 import styles from "./ButtonShine.module.css";
@@ -186,23 +186,7 @@ const CharacterSelection = memo(function CharacterSelection({
     }
   }, [allCharacters, currentCharacter]);
 
-  const handleReroll = () => {
-    if (!allCharacters || allCharacters.length === 0) {
-      toast.error("No characters available");
-      return;
-    }
 
-    const availableCharacters = allCharacters.filter(
-      (c: { _id: Id<"characters"> | undefined }) => c._id !== currentCharacter?._id
-    );
-    if (availableCharacters.length === 0) {
-      toast.error("No other characters available");
-      return;
-    }
-
-    const randomChar = availableCharacters[Math.floor(Math.random() * availableCharacters.length)];
-    setCurrentCharacter(randomChar);
-  };
 
   const handleQuickBet = (amount: number) => {
     setBetAmount(amount.toString());
@@ -492,84 +476,69 @@ const CharacterSelection = memo(function CharacterSelection({
   }
 
   return (
-    <div className="fixed bottom-4 left-4 w-72 z-50">
+    <div className="fixed bottom-4 left-4 w-48 z-50">
       <div className="bg-gradient-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-lg shadow-2xl shadow-amber-900/50">
         {/* Character Section */}
-        <div className="p-3 border-b border-amber-700/50">
+        <div className="p-2 border-b border-amber-700/50">
           {/* Player participant count indicator */}
           {playerParticipantCount > 0 && (
-            <div className="mb-2 text-center">
-              <span className="text-sm text-amber-400 uppercase tracking-wide">
+            <div className="mb-1 text-center">
+              <span className="text-xs text-amber-400 uppercase tracking-wide">
                 You have {playerParticipantCount} participant{playerParticipantCount > 1 ? "s" : ""}{" "}
                 in this game
               </span>
             </div>
           )}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
               {/* Phaser character preview */}
-              <div className="w-16 h-16 flex-shrink-0">
+              <div className="w-12 h-12 flex-shrink-0">
                 <CharacterPreviewScene
                   characterId={currentCharacter._id}
                   characterName={currentCharacter.name}
                   isSpecial={!!currentCharacter.nftCollection}
-                  width={64}
-                  height={64}
+                  width={48}
+                  height={48}
                 />
               </div>
               <div>
-                <p className="text-amber-100 font-bold text-xl uppercase tracking-wide">
+                <p className="text-amber-100 font-bold text-base uppercase tracking-wide">
                   {currentCharacter.name}
                 </p>
               </div>
             </div>
 
-            {/* Reroll Button */}
-            <button
-              onClick={handleReroll}
-              className="p-2 mr-1 bg-amber-800/50 hover:bg-amber-700/50 rounded-lg border border-amber-600/50 transition-colors"
-              disabled={!allCharacters || allCharacters.length <= 1}
-            >
-              <Shuffle className="w-4 h-4 text-amber-300" />
-            </button>
-
-            <div className="flex items-center gap-2">
-              {/* NFT Character Button */}
-
-              {externalWalletAddress && (
-                <button
-                  onClick={() => setShowNFTModal(true)}
-                  disabled={isLoadingNFTs}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${selectedNFTCharacters.length > 0 ? "border-purple-400/50" : "border-amber-600/50"} transition-all shadow-lg ${isLoadingNFTs ? "opacity-70 cursor-wait bg-gray-700/40" : selectedNFTCharacters.length > 0 ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/20" : "bg-amber-800/30 hover:bg-amber-700/40 shadow-amber-900/20"}`}
-                  title="Select exclusive NFT characters"
-                >
-                  {selectedNFTCharacters.length === 0 && (
-                    <Star className="w-4 h-4 fill-yellow-400" />
-                  )}
-                  {selectedNFTCharacters.length > 0 && (
-                    <BadgeCheck className="w-4 h-4 fill-purple-600 text-yellow-400" />
-                  )}
-                  <span className="text-sm text-white font-bold">NFT</span>
-                  {isLoadingNFTs && (
-                    <span className="text-xs text-amber-200 ml-2">Checking...</span>
-                  )}
-                  {selectedNFTCharacters.length > 0 && (
-                    <span className="bg-purple-900/50 px-2 py-0.5 rounded-full text-xs font-bold text-white">
-                      {selectedNFTCharacters.length}
-                    </span>
-                  )}
-                </button>
-              )}
-            </div>
+            {/* NFT Character Button */}
+            {externalWalletAddress && (
+              <button
+                onClick={() => setShowNFTModal(true)}
+                disabled={isLoadingNFTs}
+                className={`flex items-center gap-1 px-2 py-1.5 rounded-lg border ${selectedNFTCharacters.length > 0 ? "border-purple-400/50" : "border-amber-600/50"} transition-all shadow-lg ${isLoadingNFTs ? "opacity-70 cursor-wait bg-gray-700/40" : selectedNFTCharacters.length > 0 ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/20" : "bg-amber-800/30 hover:bg-amber-700/40 shadow-amber-900/20"}`}
+                title="Select exclusive NFT characters"
+              >
+                {selectedNFTCharacters.length === 0 && (
+                  <Star className="w-3 h-3 fill-yellow-400" />
+                )}
+                {selectedNFTCharacters.length > 0 && (
+                  <BadgeCheck className="w-3 h-3 fill-purple-600 text-yellow-400" />
+                )}
+                <span className="text-xs text-white font-bold">NFT</span>
+                {selectedNFTCharacters.length > 0 && (
+                  <span className="bg-purple-900/50 px-1.5 py-0.5 rounded-full text-xs font-bold text-white">
+                    {selectedNFTCharacters.length}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
         {/* Betting Section */}
-        <div className="p-3 space-y-3">
-          <div className="flex items-center justify-between text-lg uppercase tracking-wide">
-            <span className="text-amber-400">Your Balance</span>
+        <div className="p-2 space-y-2">
+          <div className="flex items-center justify-between text-sm uppercase tracking-wide">
+            <span className="text-amber-400">Balance</span>
             <span className="text-amber-300">
-              {isLoadingBalance ? "Loading..." : `${solBalance.toFixed(4)} SOL`}
+              {isLoadingBalance ? "..." : `${solBalance.toFixed(3)} SOL`}
             </span>
           </div>
 
@@ -581,9 +550,9 @@ const CharacterSelection = memo(function CharacterSelection({
               placeholder="Amount"
               min={0.1}
               max={10}
-              className="w-full px-3 py-2 bg-black/30 border border-amber-700/50 rounded-lg text-amber-900 placeholder-amber-600 text-center text-lg font-bold focus:outline-none focus:border-amber-900"
+              className="w-full px-2 py-1.5 bg-black/30 border border-amber-700/50 rounded-lg text-amber-900 placeholder-amber-600 text-center text-base font-bold focus:outline-none focus:border-amber-900"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-amber-500 text-sm font-bold">
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-500 text-xs font-bold">
               Sol
             </span>
           </div>
@@ -592,21 +561,21 @@ const CharacterSelection = memo(function CharacterSelection({
           <div className="grid grid-cols-3 gap-1">
             <button
               onClick={() => handleQuickBet(0.1)}
-              className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-lg font-bold transition-colors"
+              className="cursor-pointer py-1 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-sm font-bold transition-colors"
             >
-              0.1 Sol
+              0.1
             </button>
             <button
               onClick={() => handleQuickBet(0.5)}
-              className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-lg font-bold transition-colors"
+              className="cursor-pointer py-1 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-sm font-bold transition-colors"
             >
-              0.5 Sol
+              0.5
             </button>
             <button
               onClick={() => handleQuickBet(1)}
-              className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-lg font-bold transition-colors"
+              className="cursor-pointer py-1 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-sm font-bold transition-colors"
             >
-              1 Sol
+              1
             </button>
           </div>
 
@@ -614,17 +583,17 @@ const CharacterSelection = memo(function CharacterSelection({
           <button
             onClick={() => void handlePlaceBet()}
             disabled={isSubmitting || isLoadingBalance || !canPlaceBet || isVerifyingNFT}
-            className={`cursor-pointer flex justify-center items-center w-full  bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 disabled:from-gray-600 disabled:to-gray-700 rounded-lg font-bold text-white uppercase tracking-wider text-lg transition-all shadow-lg shadow-amber-900/50 disabled:opacity-50 ${styles.shineButton}`}
+            className={`cursor-pointer flex justify-center items-center w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 disabled:from-gray-600 disabled:to-gray-700 rounded-lg font-bold text-white uppercase tracking-wider text-base transition-all shadow-lg shadow-amber-900/50 disabled:opacity-50 ${styles.shineButton}`}
           >
-            <img src="/assets/insert-coin.png" alt="Coin" className="h-8 cursor-pointer" />
+            <img src="/assets/insert-coin.png" alt="Coin" className="h-6 cursor-pointer" />
             {isVerifyingNFT
-              ? "Verifying NFT..."
+              ? "Verifying..."
               : isSubmitting
                 ? "Inserting..."
                 : isLoadingBalance
                   ? "Loading..."
                   : !canPlaceBet
-                    ? "Betting closed"
+                    ? "Closed"
                     : "Insert coin"}
           </button>
         </div>
