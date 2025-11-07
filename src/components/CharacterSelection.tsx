@@ -493,7 +493,7 @@ const CharacterSelection = memo(function CharacterSelection({
 
   return (
     <div className="fixed bottom-4 left-4 w-72 z-50">
-      <div className="bg-gradient-to-b from-amber-900/95 to-amber-950/95 backdrop-blur-sm rounded-lg border-2 border-amber-600/60 shadow-2xl shadow-amber-900/50">
+      <div className="bg-gradient-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-lg shadow-2xl shadow-amber-900/50">
         {/* Character Section */}
         <div className="p-3 border-b border-amber-700/50">
           {/* Player participant count indicator */}

@@ -43,13 +43,13 @@ export function MultiParticipantPanel() {
   }, [activeGame, totalPot, playerNames, walletAddress]);
 
   // Don't show panel if no game or loading
-  if (isLoading || !activeGame || participants.length === 0) {
-    return null;
-  }
+  // if (isLoading || !activeGame || participants.length === 0) {
+  //   return null;
+  // }
 
   return (
     <div className="fixed bottom-4 right-4 w-96 z-50">
-      <div className="bg-black/90 backdrop-blur-sm rounded-lg border border-amber-500/30 shadow-2xl">
+      <div className="bg-black/40 backdrop-blur-sm rounded-lg shadow-sm">
         {/* Total Pot Header */}
         <div className="p-4 border-b border-amber-500/30">
           <div className="flex justify-between">
