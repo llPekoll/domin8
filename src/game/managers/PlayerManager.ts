@@ -153,6 +153,27 @@ export class PlayerManager {
     sprite.setScale(scale);
     sprite.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
 
+    // Make sprite interactive for poke animation
+    sprite.setInteractive({ cursor: "pointer" });
+    sprite.on("pointerdown", () => {
+      // Only play poke animation if currently playing idle
+      const currentAnim = sprite.anims.currentAnim;
+      if (currentAnim && currentAnim.key === `${textureKey}-idle`) {
+        const pokeAnimKey = `${textureKey}-poke`;
+        if (this.scene.anims.exists(pokeAnimKey)) {
+          sprite.play(pokeAnimKey);
+
+          // After poke animation completes, return to idle
+          sprite.once("animationcomplete", () => {
+            const idleAnimKey = `${textureKey}-idle`;
+            if (this.scene.anims.exists(idleAnimKey)) {
+              sprite.play(idleAnimKey);
+            }
+          });
+        }
+      }
+    });
+
     // Create dust front sprite (plays in front of character)
     const dustFrontSprite = this.scene.add.sprite(0, 0, "dust");
     dustFrontSprite.setOrigin(0.5, 1.0); // Bottom-center anchor (same as character)
@@ -176,7 +197,8 @@ export class PlayerManager {
     const spriteOffsetsInPixels: { [key: string]: number } = {
       male: 48, // Transparent space at bottom in original sprite
       orc: 42, // Transparent space at bottom in original sprite
-      soldier: 42, // Transparent space at bottom in original sprite
+      soldier: 42,
+      pepe: 13, // Transparent space at bottom in original sprite
       // Add other characters here if needed
     };
     const offsetPixels = spriteOffsetsInPixels[textureKey] || 0;
