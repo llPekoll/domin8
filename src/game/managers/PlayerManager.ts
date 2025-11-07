@@ -527,7 +527,7 @@ export class PlayerManager {
       // winnerParticipant.nameText.setStroke("#000000", 4);
 
       // Victory animation
-      const victoryAnimKey = `${winnerParticipant.characterKey}-idle`;
+      const victoryAnimKey = `${winnerParticipant.characterKey}-win`;
       if (this.scene.anims.exists(victoryAnimKey)) {
         winnerParticipant.sprite.play(victoryAnimKey);
       }
