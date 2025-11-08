@@ -71,7 +71,7 @@ export default defineSchema({
   characters: defineTable({
     name: v.string(),
     id: v.number(),
-    assetPath: v.string(), // Path to character spritesheet (e.g., "/characters/orc.png")
+    assetPath: v.optional(v.string()), // Path to character spritesheet (e.g., "/characters/orc.png")
     description: v.optional(v.string()), // Character description
     nftCollection: v.optional(v.string()), // NFT collection program address for special/exclusive characters
     nftCollectionName: v.optional(v.string()), // Human-readable name of the NFT collection

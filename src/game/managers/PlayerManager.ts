@@ -153,8 +153,11 @@ export class PlayerManager {
     sprite.setScale(scale);
     sprite.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
 
-    // Make sprite interactive for poke animation
-    sprite.setInteractive({ cursor: "pointer" });
+    // Make sprite interactive for poke animation, but allow clicks to pass through
+    sprite.setInteractive({
+      cursor: "pointer",
+      pixelPerfect: true, // Only trigger on non-transparent pixels
+    });
     sprite.on("pointerdown", () => {
       // Only play poke animation if currently playing idle
       const currentAnim = sprite.anims.currentAnim;
