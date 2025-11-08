@@ -1,16 +1,9 @@
 [
   {
     "id": 1,
-    "name": "Orc",
+    "name": "orc",
     "assetPath": "/characters/orc.png",
     "description": "A mighty fighter with high power and defense",
-    "isActive": true
-  },
-  {
-    "id": 2,
-    "name": "Soldier",
-    "assetPath": "/characters/Soldier.png",
-    "description": "A holy knight with exceptional power and defense",
     "isActive": true
   },
   {
@@ -40,6 +33,27 @@
     "name": "pepe",
     "assetPath": "/characters/pepe.png",
     "description": "A legendary meme warrior with unique abilities",
+    "isActive": true
+  },
+  {
+    "id": 7,
+    "name": "darthvader",
+    "assetPath": "/characters/darthvader.png",
+    "description": "Dark lord of the Sith with powerful force abilities",
+    "isActive": true
+  },
+  {
+    "id": 8,
+    "name": "huggywuggy",
+    "assetPath": "/characters/huggywuggy.png",
+    "description": "Creepy but cuddly creature from the shadows",
+    "isActive": true
+  },
+  {
+    "id": 9,
+    "name": "yasuo",
+    "assetPath": "/characters/yasuo.png",
+    "description": "Swift wandering swordsman seeking redemption",
     "isActive": true
   }
 ]

@@ -282,7 +282,7 @@ export class Preloader extends Scene {
       });
 
       // Create fallback animations using idle if they don't exist
-      const essentialAnims = ["idle", "walk", "run", "win", "falling", "landing"];
+      const essentialAnims = ["idle", "walk", "run", "win", "falling", "landing", "poke", "poke1"];
 
       essentialAnims.forEach((animType) => {
         const animKey = `${key}-${animType}`;

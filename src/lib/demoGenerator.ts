@@ -60,8 +60,13 @@ export function generateDemoParticipant(
   // Random character type from database
   const character = dbCharacters[Math.floor(Math.random() * dbCharacters.length)];
 
-  // Random bet amount (0.01 - 1 SOL equivalent, represented as 10-1000 coins)
-  const betAmount = Math.floor(Math.random() * 990) + 10;
+  // Random bet amount (0.001 - 10 SOL to match real game betting limits)
+  // Using exponential distribution to favor smaller bets (more realistic)
+  const minBet = 0.001;
+  const maxBet = 10;
+  const randomValue = Math.random();
+  // Exponential curve: square the random value to skew toward smaller bets
+  const betAmount = minBet + (randomValue * randomValue) * (maxBet - minBet);
 
   const id = `demo_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -72,7 +77,9 @@ export function generateDemoParticipant(
     character,
     colorHue: Math.floor(Math.random() * 360),
     betAmount,
-    size: Math.max(0.8, Math.min(2.0, betAmount / 500)),
+    // Remove custom size calculation - let PlayerManager.calculateParticipantScale() handle it
+    // This ensures demo uses same scale range as real games
+    size: 0, // Placeholder, will be calculated by PlayerManager from betAmount
     power: betAmount,
     position,
     spawnIndex: index,

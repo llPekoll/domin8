@@ -29,7 +29,7 @@ export class PlayerManager {
   private centerX: number;
   private centerY: number;
   private currentMap: any = null;
-  private readonly BASE_SCALE_MULTIPLIER = 3.0; // 5x bigger base size
+  private readonly BASE_SCALE_MULTIPLIER = 1.0; // Scale multiplier (0.01 SOL = 3x, 10 SOL = 13x)
 
   constructor(scene: Scene, centerX: number, centerY: number) {
     this.scene = scene;
@@ -162,18 +162,32 @@ export class PlayerManager {
       // Only play poke animation if currently playing idle
       const currentAnim = sprite.anims.currentAnim;
       if (currentAnim && currentAnim.key === `${textureKey}-idle`) {
-        const pokeAnimKey = `${textureKey}-poke`;
-        if (this.scene.anims.exists(pokeAnimKey)) {
-          sprite.play(pokeAnimKey);
+        // Randomly choose between poke and poke1 animations
+        const pokeVariant = Math.random() < 0.5 ? "poke" : "poke1";
+        const pokeAnimKey = `${textureKey}-${pokeVariant}`;
 
-          // After poke animation completes, return to idle
-          sprite.once("animationcomplete", () => {
-            const idleAnimKey = `${textureKey}-idle`;
-            if (this.scene.anims.exists(idleAnimKey)) {
-              sprite.play(idleAnimKey);
-            }
-          });
+        // Check if the chosen poke animation exists, otherwise try the other one
+        let selectedPokeKey = pokeAnimKey;
+        if (!this.scene.anims.exists(pokeAnimKey)) {
+          const fallbackVariant = pokeVariant === "poke" ? "poke1" : "poke";
+          const fallbackKey = `${textureKey}-${fallbackVariant}`;
+          if (this.scene.anims.exists(fallbackKey)) {
+            selectedPokeKey = fallbackKey;
+          } else {
+            // Neither poke animation exists, don't play anything
+            return;
+          }
         }
+
+        sprite.play(selectedPokeKey);
+
+        // After poke animation completes, return to idle
+        sprite.once("animationcomplete", () => {
+          const idleAnimKey = `${textureKey}-idle`;
+          if (this.scene.anims.exists(idleAnimKey)) {
+            sprite.play(idleAnimKey);
+          }
+        });
       }
     });
 
@@ -321,11 +335,11 @@ export class PlayerManager {
   }
 
   private calculateParticipantScale(betAmountInSOL: number): number {
-    // Bet range: 0.01 - 10 SOL (from CLAUDE.md)
-    const minBet = 0.01;
+    // Bet range: 0.001 - 10 SOL
+    const minBet = 0.001;
     const maxBet = 10;
-    const minScale = 1.0;
-    const maxScale = 10.0; // Much bigger range: 1x to 5x (then × 3.0 base = 3x to 15x final)
+    const minScale = 3.0;
+    const maxScale = 13.0; // Range: 3x to 13x final scale
     const clampedBet = Math.max(minBet, Math.min(maxBet, betAmountInSOL));
     const scale = minScale + ((clampedBet - minBet) / (maxBet - minBet)) * (maxScale - minScale);
     return scale;
