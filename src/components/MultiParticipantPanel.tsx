@@ -48,32 +48,32 @@ export function MultiParticipantPanel() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 w-96 z-50">
-      <div className="bg-black/90 backdrop-blur-sm rounded-lg border border-amber-500/30 shadow-2xl">
+    <div className="fixed bottom-4 right-4 w-60 z-50">
+      <div className="bg-black/40 backdrop-blur-sm rounded-lg shadow-sm">
         {/* Total Pot Header */}
-        <div className="p-4 border-b border-amber-500/30">
-          <div className="flex items-center justify-between">
+        <div className="p-2 border-b border-amber-500/30">
+          <div className="flex justify-between items-center">
+            <div className="font-bold text-amber-300 text-sm uppercase tracking-wide leading-tight">
+              Round #
+              {activeGame.roundId?.toString() ||
+              activeGame.gameRound?.toString() ||
+              "?"}
+            </div>
             <div className="flex-1 text-center">
-               <div className="font-bold text-amber-300 text-base uppercase tracking-wide leading-tight">
-                      Round #
-                      {activeGame.roundId?.toString() ||
-                        activeGame.gameRound?.toString() ||
-                        "?"}
-                    </div>
-              <div className="text-amber-400 text-sm uppercase tracking-wider mb-1">Total Pot</div>
-              <div className="text-3xl font-bold text-amber-300">
-                {(totalPot / LAMPORTS_PER_SOL).toFixed(2)} SOL
+              <div className="text-amber-400 text-xs uppercase tracking-wider">Pot</div>
+              <div className="text-xl font-bold text-amber-300">
+          {(totalPot / LAMPORTS_PER_SOL).toFixed(2)} SOL
               </div>
             </div>
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="text-amber-400 hover:text-amber-300 transition-colors ml-4"
+              className="text-amber-400 hover:text-amber-300 transition-colors ml-2"
               aria-label={isExpanded ? "Collapse panel" : "Expand panel"}
             >
               {isExpanded ? (
-                <ChevronDown className="w-5 h-5" />
+          <ChevronDown className="w-4 h-4" />
               ) : (
-                <ChevronUp className="w-5 h-5" />
+          <ChevronUp className="w-4 h-4" />
               )}
             </button>
           </div>
@@ -81,12 +81,12 @@ export function MultiParticipantPanel() {
 
         {/* Participants List */}
         {isExpanded && (
-          <div className="p-4 space-y-3 max-h-96 overflow-y-auto custom-scrollbar">
+          <div className="p-2 space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
             {participants.map((participant) => (
             <div
               key={participant.id}
               className={`
-                flex items-center justify-between p-3 rounded-lg
+                flex items-center justify-between p-2 rounded-lg
                 ${participant.isOwn 
                   ? "bg-green-900/30 border border-green-500/40" 
                   : "bg-amber-900/20 border border-amber-500/20"
@@ -94,25 +94,25 @@ export function MultiParticipantPanel() {
               `}
             >
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-amber-100 truncate">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-amber-100 text-sm truncate">
                     {participant.displayName}
                   </span>
                   {participant.isOwn && (
                     <span className="text-green-400 text-xs">(You)</span>
                   )}
                 </div>
-                <div className="text-amber-400 text-sm">
+                <div className="text-amber-400 text-xs">
                   {(participant.amount / LAMPORTS_PER_SOL).toFixed(2)} SOL
                 </div>
               </div>
 
-              <div className="text-right ml-4">
-                <div className="text-2xl font-bold text-amber-300">
+              <div className="text-right ml-3">
+                <div className="text-xl font-bold text-amber-300">
                   {participant.winChance.toFixed(1)}%
                 </div>
                 <div className="text-amber-500 text-xs uppercase tracking-wide">
-                  Win Chance
+                  Win
                 </div>
               </div>
             </div>

@@ -57,9 +57,9 @@ export function Header() {
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50">
-        <div className="container mx-auto px-4 py-3">
+        <div className="container mx-auto px-4 py-1">
           {/* Single unified header bar */}
-          <div className="bg-gradient-to-r from-indigo-900/30 to-indigo-800/30 rounded-lg px-6 py-3 border border-indigo-600/50 backdrop-blur-sm shadow-lg shadow-indigo-500/20">
+          <div className="bg-transparent rounded-lg px-3 py-1 backdrop-blur-xs shadow-sm shadow-indigo-500/20">
             <div className="flex items-center justify-between gap-6">
               {/* Logo */}
               <div className="flex items-center flex-shrink-0">
