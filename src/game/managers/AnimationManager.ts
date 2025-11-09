@@ -45,6 +45,39 @@ export class AnimationManager {
   // Store celebration objects for cleanup
   private celebrationObjects: Phaser.GameObjects.GameObject[] = [];
 
+  /**
+   * Fade out celebration visuals (throne, overlay, confetti) before destroying
+   */
+  fadeOutCelebration(duration: number = 1000) {
+    logger.game.debug(
+      "[AnimationManager] Fading out celebration objects:",
+      this.celebrationObjects.length
+    );
+
+    this.celebrationObjects.forEach((obj) => {
+      if (obj && obj.active) {
+        // Fade out with tween
+        this.scene.tweens.add({
+          targets: obj,
+          alpha: 0,
+          duration: duration,
+          ease: "Power2",
+          onComplete: () => {
+            if (obj && obj.active) {
+              obj.destroy();
+            }
+          },
+        });
+      }
+    });
+
+    // Clear array after initiating fades
+    this.celebrationObjects = [];
+  }
+
+  /**
+   * Clear celebration immediately (legacy method, use fadeOutCelebration for smooth transitions)
+   */
   clearCelebration() {
     logger.game.debug(
       "[AnimationManager] Clearing celebration objects:",

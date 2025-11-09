@@ -32,6 +32,7 @@ export const DEMO_BOT_NAMES = [
 export const DEMO_PARTICIPANT_COUNT = 20; // Always 20 for long game format
 
 export interface DemoParticipant {
+  _id: string; // Unique ID for participant
   displayName: string;
   character: any; // Full character object from database
   characterId?: any; // Optional for compatibility with Phaser
@@ -66,7 +67,8 @@ export function generateDemoParticipant(
   const betAmount = minBet + randomValue * randomValue * (maxBet - minBet);
 
   return {
-    displayName: name, // Add BOT label to make it clear
+    _id: `demo_bot_${index}_${Date.now()}_${Math.random()}`, // Unique ID for each bot
+    displayName: name,
     character,
     betAmount,
     size: 0, // Placeholder, will be calculated by PlayerManager from betAmount

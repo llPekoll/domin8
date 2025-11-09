@@ -2,7 +2,6 @@ import { EventBus } from "../EventBus";
 import { Scene } from "phaser";
 import { PlayerManager } from "../managers/PlayerManager";
 import { AnimationManager } from "../managers/AnimationManager";
-import { GamePhaseManager } from "../managers/GamePhaseManager";
 import { UIManager } from "../managers/UIManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
@@ -18,7 +17,6 @@ export class Game extends Scene {
   // Managers
   private playerManager!: PlayerManager;
   private animationManager!: AnimationManager;
-  private gamePhaseManager!: GamePhaseManager;
   private uiManager!: UIManager;
   private backgroundManager!: BackgroundManager;
 
@@ -78,9 +76,11 @@ export class Game extends Scene {
     // Initialize managers
     this.playerManager = new PlayerManager(this, this.centerX, this.centerY);
     this.animationManager = new AnimationManager(this, this.centerX, this.centerY);
-    this.gamePhaseManager = new GamePhaseManager(this, this.playerManager, this.animationManager);
     this.uiManager = new UIManager(this, this.centerX);
     this.backgroundManager = new BackgroundManager(this, this.centerX, this.centerY);
+
+    // Set up event listeners from GlobalGameStateManager
+    this.setupEventListeners();
 
     // Set background from active game data (from useActiveGame hook)
     if (activeGameData?.map !== undefined && activeGameData.map !== null) {
@@ -97,10 +97,20 @@ export class Game extends Scene {
     // Create UI elements
     this.uiManager.create();
 
-    // Handle resize events to keep background centered
-    this.scale.on("resize", () => this.handleResize(), this);
-
     EventBus.emit("current-scene-ready", this);
+
+    // ✅ Initialize game state from activeGameData on initial load
+    if (activeGameData) {
+      logger.game.debug("[Game] 🎮 Initial load - updating game state from activeGameData", {
+        hasBets: !!activeGameData.bets,
+        betCount: activeGameData.bets?.length || 0,
+        hasWallets: !!activeGameData.wallets,
+        walletCount: activeGameData.wallets?.length || 0,
+      });
+      this.updateGameState(activeGameData);
+    } else {
+      logger.game.warn("[Game] ⚠️ No activeGameData on initial load");
+    }
 
     // Listen for insert coin event from React UI
     EventBus.on("play-insert-coin-sound", () => {
@@ -112,6 +122,120 @@ export class Game extends Scene {
 
     // Play intro sound when real game starts
     this.playIntroSound();
+  }
+
+  /**
+   * Set up event listeners from GlobalGameStateManager
+   */
+  private setupEventListeners() {
+    // Listen for battle phase start
+    EventBus.on("start-battle-phase", () => {
+      logger.game.debug("[Game] ⚔️ Battle phase triggered");
+      const participantsMap = this.playerManager.getParticipants();
+      if (participantsMap.size > 0) {
+        this.animationManager.startBattlePhaseSequence(this.playerManager);
+      }
+    });
+
+    // Listen for celebration start
+    EventBus.on(
+      "start-celebration",
+      ({ winner, remainingTime }: { winner: string; remainingTime: number }) => {
+        logger.game.debug("[Game] 🎉 Celebration triggered", { winner, remainingTime });
+
+        // Find winner participant
+        const participants = Array.from(this.playerManager.getParticipants().values());
+        const winnerParticipant = participants.find(
+          (p) => p.id === winner || p.playerId === winner
+        );
+
+        if (winnerParticipant) {
+          this.animationManager.startResultsPhaseSequence(this.playerManager, winnerParticipant);
+        } else {
+          logger.game.warn("[Game] ⚠️ Winner not found in participants:", winner);
+        }
+      }
+    );
+
+    // Listen for cleanup
+    EventBus.on("cleanup-game", () => {
+      logger.game.debug("[Game] 🧹 Cleanup triggered");
+      this.handleGameCleanup();
+    });
+  }
+
+  /**
+   * Handle game cleanup (fade out participants and celebration visuals)
+   */
+  private handleGameCleanup() {
+    logger.game.debug("[CLEANUP] ========================================");
+    logger.game.debug("[CLEANUP] STARTED - Game.handleGameCleanup()");
+    logger.game.debug("[CLEANUP] ========================================");
+
+    // ✅ Fade out celebration visuals FIRST (throne, overlay, confetti)
+    // This gives a smooth transition before participants disappear
+    this.animationManager.fadeOutCelebration(1000);
+
+    // ✅ Fade out UI elements (WINNER CROWNED text, etc.)
+    if (this.uiManager) {
+      this.uiManager.fadeOutWinnerUI(1000);
+    }
+
+    // Stop all ongoing animations and timers (but allow our cleanup fades)
+    this.time.delayedCall(100, () => {
+      const tweenCount = this.tweens.getTweens().length;
+      logger.game.debug(`[CLEANUP] Active tweens before kill: ${tweenCount}`);
+    });
+
+    // Get all participants before cleanup
+    const participants = Array.from(this.playerManager.getParticipants().values());
+    logger.game.debug(`[CLEANUP] Found ${participants.length} participants to fade out`);
+
+    // Fade out all participants
+    let fadeCompleteCount = 0;
+    const totalFades = participants.length;
+
+    if (totalFades === 0) {
+      logger.game.debug("[CLEANUP] No participants to fade, waiting for visual fade then cleanup");
+      // Wait for celebration visuals to fade (1000ms)
+      this.time.delayedCall(1000, () => {
+        this.finalizeCleanup();
+      });
+      return;
+    }
+
+    participants.forEach((participant, index) => {
+      this.tweens.add({
+        targets: participant.container,
+        alpha: 0,
+        duration: 1000,
+        onComplete: () => {
+          fadeCompleteCount++;
+          logger.game.debug(`[CLEANUP] Fade ${fadeCompleteCount}/${totalFades} complete`);
+
+          if (fadeCompleteCount === totalFades) {
+            logger.game.debug("[CLEANUP] All fades complete, calling finalizeCleanup()");
+            this.finalizeCleanup();
+          }
+        },
+      });
+    });
+  }
+
+  /**
+   * Finalize cleanup (clear participants and UI)
+   */
+  private finalizeCleanup() {
+    logger.game.debug("[CLEANUP] Finalizing - clearing participants and UI");
+    this.playerManager.clearParticipants();
+    this.animationManager.clearCelebration();
+
+    // ✅ Clear winner UI (WINNER CROWNED text, etc.)
+    if (this.uiManager) {
+      this.uiManager.hideAllUI();
+    }
+
+    logger.game.debug("[CLEANUP] Complete");
   }
 
   private playIntroSound() {
@@ -134,27 +258,18 @@ export class Game extends Scene {
     }
   }
 
-  handleResize() {
-    // Update center coordinates when window is resized
-    this.centerX = this.camera.centerX;
-    this.centerY = this.camera.centerY;
-
-    // Update managers with new center coordinates
-    this.backgroundManager.updateCenter(this.centerX, this.centerY);
-    this.playerManager.updateCenter(this.centerX, this.centerY);
-    this.animationManager.updateCenter(this.centerX, this.centerY);
-    this.uiManager.updateCenter(this.centerX);
-  }
-
   // Update game state from blockchain
   updateGameState(gameState: any) {
     logger.game.debug("[Game] 🎮 updateGameState called", {
       hasGameState: !!gameState,
       hasMap: !!gameState?.map,
-      mapType: typeof gameState?.map,
-      mapValue: gameState?.map,
-      mapBackground: gameState?.map?.background,
-      fullGameState: gameState,
+      hasBets: !!gameState?.bets,
+      betCount: gameState?.bets?.length || 0,
+      hasWallets: !!gameState?.wallets,
+      walletCount: gameState?.wallets?.length || 0,
+      hasCharacters: !!this.characters,
+      characterCount: this.characters?.length || 0,
+      status: gameState?.status,
     });
 
     this.gameState = gameState;
@@ -167,7 +282,7 @@ export class Game extends Scene {
     // Update map background and spawn configuration based on game data
     if (gameState.map !== undefined && gameState.map !== null) {
       // Extract map ID - it could be a number or an object with an id property
-      const mapId = typeof gameState.map === 'object' ? gameState.map.id : gameState.map;
+      const mapId = typeof gameState.map === "object" ? gameState.map.id : gameState.map;
 
       logger.game.debug("[Game] 🗺️ Setting background and map config by ID:", mapId);
       this.backgroundManager.setBackgroundById(mapId);
@@ -179,7 +294,12 @@ export class Game extends Scene {
         // Just set the map config, don't manage participants (they're managed separately below)
         this.playerManager.setMapData(selectedMap);
       } else {
-        logger.game.error("[Game] Could not find map data for ID:", mapId, "Available maps:", allMapsData.map((m: any) => m.id));
+        logger.game.error(
+          "[Game] Could not find map data for ID:",
+          mapId,
+          "Available maps:",
+          allMapsData.map((m: any) => m.id)
+        );
       }
     } else {
       logger.game.error("[Game] ❌ No map data in game state!");
@@ -187,15 +307,23 @@ export class Game extends Scene {
 
     // Spawn characters from blockchain bet data
     if (gameState.bets && gameState.wallets) {
-      logger.game.debug("[Game] Spawning characters from blockchain bet data:", {
+      logger.game.debug("[Game] 🚀 Starting character spawn from blockchain bet data:", {
         betCount: gameState.bets.length,
         walletCount: gameState.wallets.length,
+        hasPlayerManager: !!this.playerManager,
+        currentParticipantCount: this.playerManager?.getParticipants().size || 0,
       });
 
       gameState.bets.forEach((bet: any, betIndex: number) => {
+        logger.game.debug(`[Game] 🔍 Processing bet ${betIndex}:`, {
+          walletIndex: bet.walletIndex,
+          skin: bet.skin,
+          amount: bet.amount?.toString(),
+        });
+
         const walletAddress = gameState.wallets[bet.walletIndex]?.toBase58();
         if (!walletAddress) {
-          logger.game.warn("[Game] No wallet found for bet index", betIndex);
+          logger.game.warn("[Game] ❌ No wallet found for bet index", betIndex);
           return;
         }
 
@@ -203,6 +331,7 @@ export class Game extends Scene {
 
         // Skip if participant already exists
         if (this.playerManager.getParticipant(participantId)) {
+          logger.game.debug(`[Game] ⏭️ Participant ${participantId} already exists, skipping`);
           return;
         }
 
@@ -226,15 +355,23 @@ export class Game extends Scene {
           colorHue: undefined,
         };
 
-        logger.game.debug("[Game] Spawning participant from blockchain:", participant);
+        logger.game.debug("[Game] ✅ Spawning participant from blockchain:", participant);
         this.playerManager.addParticipant(participant, false);
+      });
+
+      logger.game.debug("[Game] ✅ Character spawn complete. Final participant count:", this.playerManager.getParticipants().size);
+    } else {
+      logger.game.warn("[Game] ⚠️ No bets or wallets in game state!", {
+        hasBets: !!gameState.bets,
+        hasWallets: !!gameState.wallets,
       });
     }
 
     // Update UI
     this.uiManager.updateGameState(gameState);
 
-    this.gamePhaseManager.handleGamePhase(gameState);
+    // ✅ Phase handling is now done by GlobalGameStateManager
+    // No need to call handleGamePhase() here
   }
 
   private getSkinName(skinId: number): string {
@@ -255,18 +392,20 @@ export class Game extends Scene {
     return `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`;
   }
 
-  // Add update method to continuously update the timer and check game phase
+  // Update method to update the timer display
   update() {
     this.uiManager.updateTimer();
 
-    // Continuously check game phase to detect winner during VRF_PENDING
-    if (this.gameState) {
-      this.gamePhaseManager.handleGamePhase(this.gameState);
-    }
+    // ✅ Phase detection is now handled by GlobalGameStateManager
+    // No need to continuously check phases here
   }
 
   shutdown() {
+    // Clean up event listeners
     EventBus.off("play-insert-coin-sound");
+    EventBus.off("start-battle-phase");
+    EventBus.off("start-celebration");
+    EventBus.off("cleanup-game");
 
     // Clean up UIManager
     if (this.uiManager) {
@@ -278,15 +417,18 @@ export class Game extends Scene {
       this.playerManager.clearParticipants();
     }
 
+    // Clear animations
+    if (this.animationManager) {
+      this.animationManager.clearCelebration();
+    }
+
     this.tweens.killAll();
     this.time.removeAllEvents();
-
-    if (this.gamePhaseManager) {
-      this.gamePhaseManager.reset();
-    }
 
     // Reset game state
     this.gameState = null;
     this.introPlayed = false;
+
+    logger.game.debug("[Game] Scene shutdown complete");
   }
 }

@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useMemo } from "react";
 import { IRefPhaserGame, PhaserGame } from "./PhaserGame";
 import { Header } from "./components/Header";
 import { PlayerOnboarding } from "./components/PlayerOnboarding";
@@ -15,21 +15,59 @@ export default function App() {
   // Get current game state directly from blockchain (no Convex, <1s updates)
   const { activeGame: currentRoundState } = useActiveGame();
 
+  // ✅ Create a stable reference that only changes when meaningful data changes
+  // This prevents infinite re-renders from object recreation
+  const stableGameState = useMemo(() => {
+    if (!currentRoundState) return null;
+
+    // Serialize bet data to detect actual changes
+    const betSignature = currentRoundState.bets
+      ?.map(b => `${b.walletIndex}-${b.amount?.toString()}-${b.skin}`)
+      .join('|') || '';
+
+    return {
+      gameRound: currentRoundState.gameRound?.toString(),
+      status: currentRoundState.status,
+      betCount: currentRoundState.bets?.length || 0,
+      betSignature, // Detects new bets even if count stays same
+      map: currentRoundState.map,
+      winner: currentRoundState.winner?.toBase58(),
+      endDate: currentRoundState.endDate?.toString(),
+      // Include the full data for Phaser to use
+      _fullData: currentRoundState,
+    };
+  }, [
+    currentRoundState?.gameRound?.toString(),
+    currentRoundState?.status,
+    currentRoundState?.bets?.length,
+    currentRoundState?.bets?.map(b => `${b.walletIndex}-${b.amount?.toString()}-${b.skin}`).join('|'),
+    currentRoundState?.map,
+    currentRoundState?.winner?.toBase58(),
+    currentRoundState?.endDate?.toString(),
+  ]);
+
   // Simple: Just pipe blockchain data to Phaser via EventBus
-  // SceneManager handles all the logic (phase detection, scene updates, transitions)
+  // Only updates when key fields actually change
   useEffect(() => {
-    console.log("📡 [App] Emitting blockchain state to Phaser:", {
-      hasGameState: !!currentRoundState,
-      status: currentRoundState?.status,
-      map: currentRoundState?.map,
+    const timestamp = Date.now();
+    const fullData = stableGameState?._fullData || null;
+
+    console.log(`📡 [App] [${timestamp}] Blockchain state changed:`, {
+      hasGameState: !!fullData,
+      status: fullData?.status,
+      map: fullData?.map,
+      hasBets: !!fullData?.bets,
+      betCount: fullData?.bets?.length || 0,
     });
 
     // Store in global state for Phaser scenes to access during initialization
-    setActiveGameData(currentRoundState);
+    setActiveGameData(fullData);
 
     // Also emit via EventBus for runtime updates
-    EventBus.emit("blockchain-state-update", currentRoundState);
-  }, [currentRoundState]);
+    console.log(`📡 [App] [${timestamp}] 🚀 Emitting blockchain-state-update event`);
+    EventBus.emit("blockchain-state-update", fullData);
+    console.log(`📡 [App] [${timestamp}] ✅ blockchain-state-update event emitted`);
+  }, [stableGameState]);
 
   return (
     <div className="relative min-h-screen overflow-hidden">

@@ -4,7 +4,7 @@ import { PlayerManager } from "../managers/PlayerManager";
 import { AnimationManager } from "../managers/AnimationManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
-import { charactersData } from "../main";
+import { charactersData, allMapsData } from "../main";
 import { logger } from "../../lib/logger";
 import {
   generateDemoParticipant,
@@ -41,13 +41,14 @@ export class DemoScene extends Scene {
 
   // Demo state
   private participants: any[] = [];
-  private isActive: boolean = true; // Start with demo active
+  private isActive: boolean = false; // ✅ Start INACTIVE, wait for confirmation
   private demoPhase: DemoPhase = "spawning";
   private countdown: number = 30;
   private shuffledPositions: Array<{ x: number; y: number }> = [];
   private spawnTimeouts: NodeJS.Timeout[] = [];
   private spawnCount: number = 0;
   private isSpawning: boolean = false;
+  private initialStateReceived: boolean = false; // ✅ Track if we got initial state
 
   // Timers
   private countdownTimer?: Phaser.Time.TimerEvent;
@@ -85,29 +86,31 @@ export class DemoScene extends Scene {
     this.backgroundManager.setBackgroundById(randomBgId);
 
     // Load corresponding map config for spawn positions
-    // Import the global allMapsData from main.ts
-    import("../main").then(({ allMapsData }) => {
-      const selectedMap = allMapsData.find((map: any) => map.id === randomBgId);
-      if (selectedMap) {
-        logger.game.debug("[DemoScene] Loaded map config:", selectedMap.spawnConfiguration);
-        // Pass map data to PlayerManager for spawn calculations
-        this.playerManager.updateParticipantsInWaiting([], selectedMap);
+    const selectedMap = allMapsData.find((map: any) => map.id === randomBgId);
+    if (selectedMap) {
+      logger.game.debug("[DemoScene] Loaded map config:", selectedMap.spawnConfiguration);
+      // Pass map data to PlayerManager for spawn calculations
+      this.playerManager.updateParticipantsInWaiting([], selectedMap);
 
-        // Generate spawn positions now that we have map config
-        this.shuffledPositions = generateRandomEllipsePositions(
-          DEMO_PARTICIPANT_COUNT,
-          selectedMap.spawnConfiguration
-        );
+      // Generate spawn positions from map config
+      this.shuffledPositions = generateRandomEllipsePositions(
+        DEMO_PARTICIPANT_COUNT,
+        selectedMap.spawnConfiguration
+      );
 
-        // DEBUG: Draw spawn ellipse to verify configuration
-        // this.playerManager.debugDrawSpawnEllipse();
-      }
-    });
-    this.scale.on("resize", () => this.handleResize(), this);
+      // DEBUG: Draw spawn ellipse to verify configuration
+      // this.playerManager.debugDrawSpawnEllipse();
+
+      logger.game.debug("[DemoScene] Positions ready, starting demo mode");
+    } else {
+      logger.game.error("[DemoScene] Could not find map config for ID:", randomBgId);
+    }
     EventBus.emit("current-scene-ready", this);
 
     // Listen for when scene becomes active again after Game scene (restart fresh demo)
     this.events.on("transitioncomplete", () => {
+      logger.game.debug("[DemoScene] Transition complete, restarting demo");
+      this.initialStateReceived = true; // We know we're in IDLE phase after transition
       this.startDemoMode();
     });
 
@@ -122,17 +125,39 @@ export class DemoScene extends Scene {
       SoundManager.playInsertCoin(this);
     });
 
-    // Listen for game-started event from GamePhaseManager to stop demo
+    // Listen for game-started event from GlobalGameStateManager to stop demo
     EventBus.on("game-started", () => {
       logger.game.debug("[DemoScene] 🛑 Real game starting, stopping demo mode");
       this.stopDemoMode();
     });
 
-    // Listen for game-ended event from GamePhaseManager to restart demo
-    EventBus.on("game-ended", () => {
-      logger.game.debug("[CLEANUP] DemoScene received 'game-ended' event");
-      this.clearDemoParticipants();
-      this.startDemoMode();
+    // Listen for demo-mode-active event from GlobalGameStateManager to restart demo
+    EventBus.on("demo-mode-active", (isActive: boolean) => {
+      logger.game.debug("[DemoScene] Received demo-mode-active event:", isActive);
+
+      // Mark that we received initial state
+      if (!this.initialStateReceived) {
+        this.initialStateReceived = true;
+        logger.game.debug("[DemoScene] ✅ Initial state confirmed: DEMO MODE");
+      }
+
+      if (isActive && !this.isActive) {
+        logger.game.debug("[DemoScene] 🎮 Demo mode activated");
+        this.clearDemoParticipants();
+        this.startDemoMode();
+      }
+    });
+
+    // ✅ NEW: Also listen to game-phase-changed for initial IDLE phase
+    EventBus.on("game-phase-changed", (newPhase: string) => {
+      logger.game.debug("[DemoScene] Received game-phase-changed:", newPhase);
+
+      // If initial state is IDLE, start demo
+      if (newPhase === "idle" && !this.initialStateReceived) {
+        this.initialStateReceived = true;
+        logger.game.debug("[DemoScene] ✅ Initial state confirmed: IDLE, starting demo");
+        this.startDemoMode();
+      }
     });
 
     // Listen for player bet placement to spawn character immediately
@@ -184,8 +209,20 @@ export class DemoScene extends Scene {
     // Create demo UI
     this.createDemoUI();
 
-    // Start demo mode
-    this.startDemoMode();
+    // ✅ DON'T auto-start demo - wait for initial state confirmation from GlobalGameStateManager
+    // Demo will start when we receive "demo-mode-active" event OR after timeout
+    logger.game.debug("[DemoScene] Waiting for initial state confirmation before starting demo...");
+
+    // Safety timeout: if no state arrives in 2 seconds, assume IDLE and start demo
+    this.time.delayedCall(2000, () => {
+      if (!this.initialStateReceived) {
+        logger.game.warn(
+          "[DemoScene] No initial state received after 2s, starting demo as fallback"
+        );
+        this.initialStateReceived = true;
+        this.startDemoMode();
+      }
+    });
   }
 
   private startDemoMode() {
@@ -501,20 +538,6 @@ export class DemoScene extends Scene {
     }
   }
 
-  handleResize() {
-    this.centerX = this.camera.centerX;
-    this.centerY = this.camera.centerY;
-    this.backgroundManager.updateCenter(this.centerX, this.centerY);
-    this.playerManager.updateCenter(this.centerX, this.centerY);
-    this.animationManager.updateCenter(this.centerX, this.centerY);
-
-    // Update demo UI container position - bottom 1/3 of screen
-    if (this.demoUIContainer) {
-      const bottomThirdY = this.camera.height * 0.75;
-      this.demoUIContainer.setPosition(this.centerX, bottomThirdY);
-    }
-  }
-
   public spawnDemoParticipant(participant: any) {
     const participantId = participant._id || participant.id;
 
@@ -560,7 +583,8 @@ export class DemoScene extends Scene {
     // Clean up event listeners to prevent memory leaks
     EventBus.off("play-insert-coin-sound");
     EventBus.off("game-started");
-    EventBus.off("game-ended");
+    EventBus.off("demo-mode-active");
+    EventBus.off("game-phase-changed");
     EventBus.off("player-bet-placed");
     this.events.off("transitioncomplete");
 

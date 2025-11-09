@@ -1,5 +1,5 @@
 import { Scene } from "phaser";
-import { GamePhase } from "./GamePhaseManager";
+import { GamePhase } from "./GlobalGameStateManager";
 import { EventBus } from "../EventBus";
 
 export class UIManager {
@@ -102,7 +102,7 @@ export class UIManager {
     );
   }
 
-  private hideAllUI() {
+  hideAllUI() {
     // Guard: Don't try to hide UI before it's created
     if (!this.isUIReady()) return;
 
@@ -127,10 +127,30 @@ export class UIManager {
 
     // Show winner UI
     this.winnerContainer.setVisible(true);
+    this.winnerContainer.setAlpha(1); // Reset alpha in case it was faded
     this.phaseText.setVisible(true);
     this.phaseText.setText("🏆 WINNER CROWNED!");
     this.subText.setVisible(true);
-    this.subText.setText("Restarting in 5s...");
+    this.subText.setText("Restarting in 4s...");
+  }
+
+  /**
+   * Fade out winner UI smoothly before hiding
+   */
+  fadeOutWinnerUI(duration: number = 1000) {
+    if (!this.isUIReady()) return;
+
+    // Fade out winner container
+    this.scene.tweens.add({
+      targets: this.winnerContainer,
+      alpha: 0,
+      duration: duration,
+      ease: "Power2",
+      onComplete: () => {
+        this.winnerContainer.setVisible(false);
+        this.winnerContainer.setAlpha(1); // Reset for next time
+      },
+    });
   }
 
   updateCenter(centerX: number) {

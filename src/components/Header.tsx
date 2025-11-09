@@ -71,8 +71,9 @@ export function Header() {
                 {currentRoundState && (
                   <div className="flex items-center gap-3 xl:ml-60">
                     <div className="text-amber-400 text-3xl font-bold flex items-center gap-2 leading-tight animate-pulse">
-                      {currentRoundState.status === 0 && "Waiting for Players to Join"}
-                      {currentRoundState.status === 1 && "Place Your Bet Now!"}
+                      {/* Hide text if there's a winner (celebration/cleanup phase) */}
+                      {!currentRoundState.winner && currentRoundState.status === 0 && "Waiting for Players to Join"}
+                      {!currentRoundState.winner && currentRoundState.status === 1 && "Place Your Bet Now!"}
                     </div>
                   </div>
                 )}

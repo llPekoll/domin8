@@ -1,7 +1,8 @@
 import { Scene } from "phaser";
-import { currentMapData, charactersData, allMapsData, demoMapData } from "../main";
+import { currentMapData, charactersData, allMapsData, demoMapData, activeGameData } from "../main";
 import { logger } from "../../lib/logger";
 import { loadBackgroundConfig } from "../config/backgrounds";
+import { EventBus } from "../EventBus";
 
 export class Preloader extends Scene {
   constructor() {
@@ -400,7 +401,19 @@ export class Preloader extends Scene {
       frameRate: 24,
     });
 
-    // Start with DemoScene by default
-    this.scene.start("Demo");
+    const hasActiveGame =
+      activeGameData &&
+      activeGameData.bets &&
+      activeGameData.bets.length > 0 &&
+      activeGameData.status !== undefined;
+
+    if (hasActiveGame) {
+      this.scene.start("Game");
+    } else {
+      this.scene.start("Demo");
+    }
+
+    // Emit event to signal that Preloader is complete and scene has been started
+    EventBus.emit("preloader-complete");
   }
 }

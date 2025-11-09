@@ -166,6 +166,12 @@ export class SoundManager {
   static setGlobalVolume(volume: number) {
     this.globalVolume = Math.max(0, Math.min(1, volume)); // Clamp to 0-1
     localStorage.setItem("sound-volume", this.globalVolume.toString());
+
+    // Update battle music volume immediately if it's playing
+    if (this.battleMusic && typeof (this.battleMusic as any).setVolume === 'function') {
+      (this.battleMusic as any).setVolume(this.globalVolume * 0.2); // 0.2 is the base volume for battle music
+      logger.ui.debug(`[SoundManager] Updated battle music volume to ${this.globalVolume.toFixed(2)}`);
+    }
   }
 
   /**

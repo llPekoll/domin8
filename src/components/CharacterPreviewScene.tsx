@@ -73,24 +73,46 @@ export const CharacterPreviewScene: React.FC<CharacterPreviewSceneProps> = ({
             const jsonPath = characterData.assetPath.replace('.png', '.json');
 
             sceneRef.current.load.atlas(characterKey, `assets/${characterData.assetPath}`, `assets/${jsonPath}`);
+            // Also load JSON separately for accessing frameTags
+            sceneRef.current.load.json(`${characterKey}-json`, `assets/${jsonPath}`);
 
             sceneRef.current.load.once('complete', () => {
-              // Create animations for this character
-              const prefix = characterData.name + ' ';
-              const suffix = '.aseprite';
+              // Get the JSON data to extract frameTags
+              const jsonData = sceneRef.current!.cache.json.get(`${characterKey}-json`);
 
-              if (characterData.animations.idle) {
-                sceneRef.current!.anims.create({
-                  key: `${characterKey}-idle`,
-                  frames: sceneRef.current!.anims.generateFrameNames(characterKey, {
-                    prefix: prefix,
-                    suffix: suffix,
-                    start: characterData.animations.idle.start,
-                    end: characterData.animations.idle.end
-                  }),
-                  frameRate: 10,
-                  repeat: -1
-                });
+              if (jsonData && jsonData.meta && jsonData.meta.frameTags) {
+                const frameTags = jsonData.meta.frameTags;
+
+                // Find the idle animation from frameTags
+                const idleTag = frameTags.find((tag: any) => tag.name.toLowerCase() === 'idle');
+
+                if (idleTag) {
+                  // Extract prefix and suffix from first frame
+                  const frames = jsonData.frames || [];
+                  const firstFrameName = frames[0]?.filename || '';
+                  let prefix = '';
+                  let suffix = '';
+
+                  if (firstFrameName.includes('.aseprite')) {
+                    suffix = '.aseprite';
+                    prefix = firstFrameName.substring(0, firstFrameName.lastIndexOf(' ')) + ' ';
+                  } else if (firstFrameName.includes('.ase')) {
+                    suffix = '.ase';
+                    prefix = firstFrameName.substring(0, firstFrameName.lastIndexOf(' ')) + ' ';
+                  }
+
+                  sceneRef.current!.anims.create({
+                    key: `${characterKey}-idle`,
+                    frames: sceneRef.current!.anims.generateFrameNames(characterKey, {
+                      prefix: prefix,
+                      suffix: suffix,
+                      start: idleTag.from,
+                      end: idleTag.to
+                    }),
+                    frameRate: 10,
+                    repeat: -1
+                  });
+                }
               }
 
               // Display the character
@@ -134,24 +156,46 @@ export const CharacterPreviewScene: React.FC<CharacterPreviewSceneProps> = ({
       const jsonPath = characterData.assetPath.replace('.png', '.json');
 
       scene.load.atlas(characterKey, `assets/${characterData.assetPath}`, `assets/${jsonPath}`);
+      // Also load JSON separately for accessing frameTags
+      scene.load.json(`${characterKey}-json`, `assets/${jsonPath}`);
 
       scene.load.once('complete', () => {
-        // Create animations for this character
-        const prefix = characterData.name + ' ';
-        const suffix = '.aseprite';
+        // Get the JSON data to extract frameTags
+        const jsonData = scene.cache.json.get(`${characterKey}-json`);
 
-        if (characterData.animations.idle) {
-          scene.anims.create({
-            key: `${characterKey}-idle`,
-            frames: scene.anims.generateFrameNames(characterKey, {
-              prefix: prefix,
-              suffix: suffix,
-              start: characterData.animations.idle.start,
-              end: characterData.animations.idle.end
-            }),
-            frameRate: 10,
-            repeat: -1
-          });
+        if (jsonData && jsonData.meta && jsonData.meta.frameTags) {
+          const frameTags = jsonData.meta.frameTags;
+
+          // Find the idle animation from frameTags
+          const idleTag = frameTags.find((tag: any) => tag.name.toLowerCase() === 'idle');
+
+          if (idleTag) {
+            // Extract prefix and suffix from first frame
+            const frames = jsonData.frames || [];
+            const firstFrameName = frames[0]?.filename || '';
+            let prefix = '';
+            let suffix = '';
+
+            if (firstFrameName.includes('.aseprite')) {
+              suffix = '.aseprite';
+              prefix = firstFrameName.substring(0, firstFrameName.lastIndexOf(' ')) + ' ';
+            } else if (firstFrameName.includes('.ase')) {
+              suffix = '.ase';
+              prefix = firstFrameName.substring(0, firstFrameName.lastIndexOf(' ')) + ' ';
+            }
+
+            scene.anims.create({
+              key: `${characterKey}-idle`,
+              frames: scene.anims.generateFrameNames(characterKey, {
+                prefix: prefix,
+                suffix: suffix,
+                start: idleTag.from,
+                end: idleTag.to
+              }),
+              frameRate: 10,
+              repeat: -1
+            });
+          }
         }
 
         // Display the character
