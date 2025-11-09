@@ -204,7 +204,7 @@ export class Game extends Scene {
       return;
     }
 
-    participants.forEach((participant, index) => {
+    participants.forEach((participant) => {
       this.tweens.add({
         targets: participant.container,
         alpha: 0,
@@ -359,7 +359,10 @@ export class Game extends Scene {
         this.playerManager.addParticipant(participant, false);
       });
 
-      logger.game.debug("[Game] ✅ Character spawn complete. Final participant count:", this.playerManager.getParticipants().size);
+      logger.game.debug(
+        "[Game] ✅ Character spawn complete. Final participant count:",
+        this.playerManager.getParticipants().size
+      );
     } else {
       logger.game.warn("[Game] ⚠️ No bets or wallets in game state!", {
         hasBets: !!gameState.bets,

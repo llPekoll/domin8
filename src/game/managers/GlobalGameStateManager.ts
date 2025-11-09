@@ -260,56 +260,6 @@ export class GlobalGameStateManager {
   }
 
   /**
-   * Handle initial state on page load
-   */
-  private handleInitialState(targetPhase: GamePhase, gameState: any) {
-    logger.game.debug("[GlobalGameStateManager] 🚀 INITIAL LOAD", {
-      targetPhase,
-      currentPhase: this.currentPhase,
-    });
-
-    const previousPhase = this.currentPhase;
-    this.currentPhase = targetPhase;
-
-    // Emit initial phase
-    EventBus.emit("game-phase-changed", targetPhase);
-
-    // ✅ Start the correct scene based on target phase
-    if (targetPhase === GamePhase.IDLE) {
-      // No active game → Start Demo scene
-      logger.game.debug("[GlobalGameStateManager] 🎬 Starting Demo scene (IDLE phase)");
-      this.game.scene.start("Demo");
-    } else {
-      // Active game → Start Game scene
-      logger.game.debug("[GlobalGameStateManager] 🎬 Starting Game scene (active game detected)", {
-        targetPhase,
-        hasBets: !!gameState?.bets,
-        betCount: gameState?.bets?.length || 0,
-      });
-      this.game.scene.start("Game");
-
-      // If joining during celebration, start celebration sequence with remaining time
-      if (targetPhase === GamePhase.CELEBRATING) {
-        logger.game.debug("[GlobalGameStateManager] Starting celebration sequence for late joiner");
-        this.startCelebrationSequence(gameState, this.getCelebrationElapsed(gameState));
-      }
-
-      // If joining during VRF_PENDING or FIGHTING, just wait for next phase
-    }
-
-    // ✅ Handle phase-specific actions for initial state (emit events)
-    this.handlePhaseActions(previousPhase, targetPhase, gameState);
-
-    // Store game state to update scene when it's ready
-    if (targetPhase !== GamePhase.IDLE) {
-      this.pendingInitialGameState = gameState;
-      logger.game.debug(
-        "[GlobalGameStateManager] Stored pending game state for Game scene initialization"
-      );
-    }
-  }
-
-  /**
    * Handle phase transitions during runtime
    */
   private handlePhaseTransition(targetPhase: GamePhase, gameState: any) {
@@ -318,7 +268,7 @@ export class GlobalGameStateManager {
     // No change, but check for countdown ending
     if (oldPhase === targetPhase) {
       this.checkCountdownTransition(gameState);
-      this.checkCelebrationProgress(gameState);
+      this.checkCelebrationProgress();
       return;
     }
 
@@ -387,7 +337,7 @@ export class GlobalGameStateManager {
   /**
    * Check celebration progress and cleanup when done
    */
-  private checkCelebrationProgress(gameState: any) {
+  private checkCelebrationProgress() {
     if (this.currentPhase !== GamePhase.CELEBRATING) return;
     if (this.celebrationStartTime === 0) return;
 
@@ -531,17 +481,6 @@ export class GlobalGameStateManager {
         this.transitionToDemo();
       }
     }, 1000);
-  }
-
-  /**
-   * Get celebration elapsed time from blockchain state
-   */
-  private getCelebrationElapsed(gameState: any): number {
-    const endTimestamp = gameState.endTimestamp || gameState.endDate;
-    if (!endTimestamp || endTimestamp === 0) return -1;
-
-    const endTimestampMs = endTimestamp > 10000000000 ? endTimestamp : endTimestamp * 1000;
-    return Math.max(0, Date.now() - endTimestampMs);
   }
 
   /**
