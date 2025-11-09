@@ -140,10 +140,17 @@ export class GlobalGameStateManager {
     // Determine what phase we should be in
     const targetPhase = this.determinePhaseFromState(gameState);
 
-    // Handle initial state (page load)
+    // ✅ On first update after Preloader, just update the scene data (Preloader already started the scene)
     if (this.isFirstUpdate) {
       this.isFirstUpdate = false;
-      this.handleInitialState(targetPhase, gameState);
+      logger.game.debug(`[GlobalGameStateManager] [${timestamp}] First runtime update, updating scene with game state`);
+      this.currentPhase = targetPhase;
+      EventBus.emit("game-phase-changed", targetPhase);
+
+      // Update the scene that Preloader started
+      if (!this.isTransitioning) {
+        this.updateActiveSceneWithGameState(gameState);
+      }
       return;
     }
 

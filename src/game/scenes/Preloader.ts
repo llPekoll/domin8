@@ -408,8 +408,18 @@ export class Preloader extends Scene {
       activeGameData.status !== undefined;
 
     if (hasActiveGame) {
+      logger.game.debug("[Preloader] Starting Game scene, ensuring Demo is stopped");
+      // Stop Demo if it's running (in case of page reload during active game)
+      if (this.scene.isActive("Demo")) {
+        this.scene.stop("Demo");
+      }
       this.scene.start("Game");
     } else {
+      logger.game.debug("[Preloader] Starting Demo scene, ensuring Game is stopped");
+      // Stop Game if it's running
+      if (this.scene.isActive("Game")) {
+        this.scene.stop("Game");
+      }
       this.scene.start("Demo");
     }
 
