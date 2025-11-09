@@ -99,25 +99,29 @@ export function useActiveGame() {
 
   const [isLoading, setIsLoading] = useState(false);
 
-  // Create Anchor program instance with Privy wallet
+  // Create Anchor program instance (read-only if no wallet, full access with wallet)
   const program = useMemo(() => {
-    if (!walletAddress || !wallet) {
-      return null;
-    }
-
     try {
-      // Create a simple wallet adapter for Anchor
+      // If no wallet, create read-only program for spectating
+      if (!walletAddress || !wallet) {
+        logger.solana.debug("[DOMIN8] Creating read-only program for spectating");
+        const provider = {
+          connection,
+        };
+        return new Program(idl as any, provider as any);
+      }
+
+      // With wallet, create full program for transactions
+      logger.solana.debug("[DOMIN8] Creating full program with wallet");
       const walletAdapter = {
         publicKey: new PublicKey(walletAddress),
         signTransaction: async (tx: any) => {
-          // Use Privy's signTransaction method
           if (!wallet?.signTransaction) {
             throw new Error("Wallet does not support signing transactions");
           }
           return await wallet.signTransaction(tx);
         },
         signAllTransactions: async (txs: any[]) => {
-          // Sign each transaction individually using Privy
           if (!wallet?.signTransaction) {
             throw new Error("Wallet does not support signing transactions");
           }
@@ -129,7 +133,6 @@ export function useActiveGame() {
         },
       };
 
-      // Create a minimal provider-like object for Anchor
       const provider = {
         connection,
         wallet: walletAdapter,

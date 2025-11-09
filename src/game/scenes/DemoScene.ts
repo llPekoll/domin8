@@ -4,7 +4,7 @@ import { PlayerManager } from "../managers/PlayerManager";
 import { AnimationManager } from "../managers/AnimationManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
-import { charactersData, allMapsData } from "../main";
+import { charactersData } from "../main";
 import { logger } from "../../lib/logger";
 import {
   generateDemoParticipant,
@@ -85,21 +85,24 @@ export class DemoScene extends Scene {
     this.backgroundManager.setBackgroundById(randomBgId);
 
     // Load corresponding map config for spawn positions
-    const selectedMap = allMapsData.find((map: any) => map.id === randomBgId);
-    if (selectedMap) {
-      logger.game.debug("[DemoScene] Loaded map config:", selectedMap.spawnConfiguration);
-      // Pass map data to PlayerManager for spawn calculations
-      this.playerManager.updateParticipantsInWaiting([], selectedMap);
+    // Import the global allMapsData from main.ts
+    import("../main").then(({ allMapsData }) => {
+      const selectedMap = allMapsData.find((map: any) => map.id === randomBgId);
+      if (selectedMap) {
+        logger.game.debug("[DemoScene] Loaded map config:", selectedMap.spawnConfiguration);
+        // Pass map data to PlayerManager for spawn calculations
+        this.playerManager.updateParticipantsInWaiting([], selectedMap);
 
-      // Generate spawn positions now that we have map config
-      this.shuffledPositions = generateRandomEllipsePositions(
-        DEMO_PARTICIPANT_COUNT,
-        selectedMap.spawnConfiguration
-      );
+        // Generate spawn positions now that we have map config
+        this.shuffledPositions = generateRandomEllipsePositions(
+          DEMO_PARTICIPANT_COUNT,
+          selectedMap.spawnConfiguration
+        );
 
-      // DEBUG: Draw spawn ellipse to verify configuration
-      // this.playerManager.debugDrawSpawnEllipse();
-    }
+        // DEBUG: Draw spawn ellipse to verify configuration
+        // this.playerManager.debugDrawSpawnEllipse();
+      }
+    });
     this.scale.on("resize", () => this.handleResize(), this);
     EventBus.emit("current-scene-ready", this);
 
