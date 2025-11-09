@@ -5,13 +5,13 @@
     "isActive": true,
     "name": "Classic Arena",
     "spawnConfiguration": {
-      "centerX": 396,
-      "centerY": 210,
-      "maxSpawnRadius": 110,
-      "minSpacing": 50,
-      "minSpawnRadius": 30,
-      "radiusX": 276,
-      "radiusY": 90
+      "centerX": 198,
+      "centerY": 105,
+      "maxSpawnRadius": 55,
+      "minSpacing": 25,
+      "minSpawnRadius": 15,
+      "radiusX": 138,
+      "radiusY": 45
     }
   },
   {
@@ -20,13 +20,13 @@
     "isActive": true,
     "name": "Mystic Forest",
     "spawnConfiguration": {
-      "centerX": 396,
-      "centerY": 220,
-      "maxSpawnRadius": 70,
-      "minSpacing": 50,
-      "minSpawnRadius": 40,
-      "radiusX": 156,
-      "radiusY": 46
+      "centerX": 198,
+      "centerY": 110,
+      "maxSpawnRadius": 35,
+      "minSpacing": 25,
+      "minSpawnRadius": 20,
+      "radiusX": 113,
+      "radiusY": 43
     }
   }
 ]

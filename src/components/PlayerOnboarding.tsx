@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { toast } from "sonner";
 import { generateRandomName } from "../lib/nameGenerator";
-import { Users, Gamepad2 } from "lucide-react";
+import { Users } from "lucide-react";
 import { logger } from "../lib/logger";
 
 export function PlayerOnboarding() {
@@ -59,10 +59,8 @@ export function PlayerOnboarding() {
   // Show connect wallet message if not connected
   if (!connected) {
     return (
-      <Card className="p-4 text-center mb-4">
-        <Gamepad2 className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-        <h2 className="text-lg font-bold mb-1">Royal Rumble</h2>
-        <p className="text-sm text-gray-400 mb-2">Connect wallet to join</p>
+      <Card className="p-4 text-center bg-amber-950 border-2 border-yellow-300">
+        <p className="text-xl text-yellow-400">Connect wallet to join</p>
       </Card>
     );
   }
@@ -70,9 +68,9 @@ export function PlayerOnboarding() {
   // If wallet is connected but playerData is undefined, query is still loading
   if (connected && playerData === undefined) {
     return (
-      <Card className="p-4">
+      <Card className="p-4 bg-amber-950 border-2 border-yellow-300">
         <div className="flex justify-center items-center min-h-[120px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+          <div className="animate-spin rounded-full h-8 w-8 "></div>
         </div>
       </Card>
     );
