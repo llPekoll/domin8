@@ -401,11 +401,13 @@ export class Preloader extends Scene {
       frameRate: 24,
     });
 
+    // TODO : this might be null
     const hasActiveGame =
       activeGameData &&
       activeGameData.bets &&
       activeGameData.bets.length > 0 &&
       activeGameData.status !== undefined;
+
     console.log("-->hasActiveGame:", hasActiveGame);
     if (hasActiveGame) {
       if (this.scene.isActive("Demo")) {
