@@ -91,7 +91,7 @@ ${gameUrl}
             </svg>
           </a>
           <a
-            href="https://t.me/your-telegram"
+            href="https://t.me/+tKHqLbBMvI02NDQ8"
             target="_blank"
             rel="noopener noreferrer"
             className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg transition-colors"
