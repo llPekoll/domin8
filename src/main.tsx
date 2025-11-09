@@ -21,7 +21,7 @@ createRoot(document.getElementById("root")!).render(
           config={{
             // SOLANA EMBEDDED WALLETS ONLY
             // Login with email/social - embedded wallet created automatically
-            loginMethods: ["wallet", "email", "google"],
+            loginMethods: ["wallet", "email", "google", "twitter", "discord"],
 
             // Appearance configuration
             appearance: {

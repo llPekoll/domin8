@@ -86,9 +86,13 @@ export default defineSchema({
     id: v.number(),
     description: v.optional(v.string()), // Map description
     spawnConfiguration: v.object({
-      maxPlayers: v.number(), // Maximum players for this map
-      spawnRadius: v.number(), // Radius for spawn area
-      minSpacing: v.number(), // Minimum spacing between spawns
+      centerX: v.number(), // Center X position in pixels
+      centerY: v.number(), // Center Y position in pixels (from top of image)
+      radiusX: v.number(), // Horizontal ellipse radius (from Aseprite measurement)
+      radiusY: v.number(), // Vertical ellipse radius (max of top/bottom)
+      minSpawnRadius: v.number(), // Inner dead zone (avoid center clustering)
+      maxSpawnRadius: v.number(), // Outer spawn boundary (radiusY - character margin)
+      minSpacing: v.number(), // Minimum distance between character spawns
     }),
     isActive: v.boolean(),
   }).index("by_active", ["isActive"]),

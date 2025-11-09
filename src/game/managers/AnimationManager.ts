@@ -126,7 +126,7 @@ export class AnimationManager {
 
     const throne = this.scene.add.image(this.centerX, this.centerY, "throne");
     throne.setDepth(90); // Behind winner (winner is at ~100+)
-    throne.setScale(2);
+    throne.setScale(1);
     throne.setAlpha(0);
     // Keep pixel art crisp when scaling
     throne.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -145,7 +145,7 @@ export class AnimationManager {
 
     // Get the displayName - first try from playerNamesMap using playerId, then fall back to participant.displayName
     let winnerDisplayName = "Champion";
-    
+
     if (winnerParticipant?.playerId) {
       // Try to get display name from playerNamesMap using the wallet address (playerId)
       const mappedName = this.playerNamesMap.get(winnerParticipant.playerId);
@@ -155,23 +155,27 @@ export class AnimationManager {
       } else {
         // Fall back to participant's displayName property
         winnerDisplayName = winnerParticipant.displayName || "Champion";
-        logger.game.debug("[AnimationManager] Using participant.displayName:", winnerParticipant.displayName);
+        logger.game.debug(
+          "[AnimationManager] Using participant.displayName:",
+          winnerParticipant.displayName
+        );
       }
     } else {
       winnerDisplayName = winnerParticipant?.displayName || "Champion";
     }
-    
+
     logger.game.debug("[AnimationManager] Final winner display name:", winnerDisplayName);
 
     // Winner name at bottom of screen
     const nameText = this.scene.add
-      .text(this.centerX, screenHeight - 80, winnerDisplayName, {
+      .text(this.centerX, screenHeight - 25, winnerDisplayName, {
         fontFamily: "Arial Black",
-        fontSize: 32,
+        fontSize: 12, // Scaled down from 32px
         color: "#ffffff",
         stroke: "#000000",
-        strokeThickness: 4,
+        strokeThickness: 1, // Scaled down from 4
         align: "center",
+        resolution: 4, // High resolution for crisp text when scaled
       })
       .setOrigin(0.5)
       .setDepth(200);
@@ -522,13 +526,14 @@ export class AnimationManager {
   showBettingPrompt() {
     // Show betting phase indicator
     const bettingText = this.scene.add
-      .text(this.centerX, 50, "BETTING PHASE", {
+      .text(this.centerX, 15, "BETTING PHASE", {
         fontFamily: "Arial Black",
-        fontSize: 32,
+        fontSize: 12, // Scaled down from 32px
         color: "#00ff00",
         stroke: "#000000",
-        strokeThickness: 4,
+        strokeThickness: 1, // Scaled down from 4
         align: "center",
+        resolution: 4, // High resolution for crisp text when scaled
       })
       .setOrigin(0.5)
       .setDepth(200);
@@ -637,7 +642,7 @@ export class AnimationManager {
 
         const bloodSprite = this.scene.add.sprite(impactX + offsetX, impactY + offsetY, "blood");
 
-        bloodSprite.setScale(2 + Math.random() * 2);
+        bloodSprite.setScale(1 + Math.random() * 2);
         bloodSprite.setDepth(350); // Above everything
         bloodSprite.setAlpha(0.9);
         bloodSprite.setRotation(Math.random() * Math.PI * 2);
@@ -715,7 +720,7 @@ export class AnimationManager {
             "blood"
           );
 
-          bloodSprite.setScale(2 + Math.random() * 2);
+          bloodSprite.setScale(1 + Math.random() * 2);
           bloodSprite.setDepth(1500); // In front of all characters
           bloodSprite.setAlpha(0.8);
           bloodSprite.setRotation(Math.random() * Math.PI * 2);
@@ -773,7 +778,7 @@ export class AnimationManager {
     // Create the biggest explosion for battle finale
     const explosion = this.scene.add.sprite(this.centerX, this.centerY, "explosion");
 
-    explosion.setScale(4);
+    explosion.setScale(1);
     explosion.setDepth(500); // On top of everything
     // Keep pixel art crisp when scaling
     explosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -809,7 +814,7 @@ export class AnimationManager {
         const explosion = this.scene.add.sprite(gameWidth / 2, gameHeight / 2 - 100, "explosion");
 
         // Random scale for variety (1.5x to 4x)
-        explosion.setScale(7 + Math.random() * 2.5);
+        explosion.setScale(1 + Math.random() * 2.5);
         explosion.setDepth(1600); // On top of everything else
         // Keep pixel art crisp when scaling
         explosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -846,21 +851,15 @@ export class AnimationManager {
     logger.game.debug("[AnimationManager] ⚔️ Starting battle phase sequence");
 
     // Play fullscreen explosion animation at the start
-    const gameWidth = this.scene.scale.width;
-    const gameHeight = this.scene.scale.height;
-
+    // Use native resolution center (game now renders at 396x180 and scales via Phaser.Scale.FIT)
     const fullscreenExplosion = this.scene.add.sprite(
-      gameWidth / 2,
-      gameHeight / 2,
+      STAGE_WIDTH / 2,
+      STAGE_HEIGHT / 2,
       "explosion-fullscreen"
     );
 
-    // TODO: this can be remove later on when the whole app it going to be at the correct size
-    const scaleX = gameWidth / STAGE_WIDTH;
-    const scaleY = gameHeight / STAGE_HEIGHT;
-    const scale = Math.max(scaleX, scaleY);
-
-    fullscreenExplosion.setScale(scale);
+    // No manual scaling needed - Phaser.Scale.FIT handles it automatically
+    fullscreenExplosion.setScale(1);
     fullscreenExplosion.setDepth(1550); // Between characters and continuous explosions
     // Keep pixel art crisp when scaling
     fullscreenExplosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);

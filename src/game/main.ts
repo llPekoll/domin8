@@ -5,8 +5,9 @@ import { AUTO, Game } from "phaser";
 import { Preloader } from "./scenes/Preloader";
 
 // Game stage dimensions (used for fullscreen effects and scaling)
-export const STAGE_WIDTH = 396;
-export const STAGE_HEIGHT = 180;
+// Doubled from 396x180 to give more space for characters
+export const STAGE_WIDTH = 792;
+export const STAGE_HEIGHT = 360;
 
 // Global storage for current game's map data
 export let currentMapData: any = null;
@@ -47,8 +48,10 @@ const config: Phaser.Types.Core.GameConfig = {
   parent: "game-container",
   pixelArt: true, // Enable pixel-perfect rendering globally
   scale: {
-    mode: Phaser.Scale.RESIZE,
+    mode: Phaser.Scale.FIT, // Scale to fit container while maintaining aspect ratio
     autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: STAGE_WIDTH, // Native resolution width
+    height: STAGE_HEIGHT, // Native resolution height
   },
   render: {
     antialiasGL: false, // Disable WebGL antialiasing for crisp pixels
