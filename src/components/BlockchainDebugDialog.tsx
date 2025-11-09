@@ -3,7 +3,7 @@
  * Shows last winner info and current game state for debugging during development
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useActiveGame } from "../hooks/useActiveGame";
 import { CircleHelp, X, Trophy, TrendingUp, Users, Clock, Coins, Share2 } from "lucide-react";
 import { useQuery } from "convex/react";
@@ -12,6 +12,7 @@ import { api } from "../../convex/_generated/api";
 export function BlockchainDebugDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [jsonCopied, setJsonCopied] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
   const { activeGame, activeGamePDA } = useActiveGame();
 
   // Get winner's display name if winner exists
@@ -33,6 +34,38 @@ export function BlockchainDebugDialog() {
     ? (Number(activeGame.winnerPrize) / 1e9).toFixed(4) 
     : "0";
 
+  // Show tooltip when there's a winner and game is in results/closed state
+  const shouldShowTooltip = hasWinner && activeGame?.status === 1;
+
+  // Auto-show tooltip when winner appears
+  useEffect(() => {
+    if (shouldShowTooltip && !isOpen) {
+      // Set a timeout to delay a bit, for better UX
+     setTimeout(() => setShowTooltip(true), 2000);
+
+      setShowTooltip(true);
+      // Auto-hide after 10 seconds
+      const timer = setTimeout(() => setShowTooltip(false), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldShowTooltip, isOpen]);
+
+  const shareWinnerOnX = () => {
+    if (!hasWinner) return;
+    
+    const gameUrl = window.location.origin;
+    const tweetText = `🏆 ${winnerDisplayName} just won ${winnerPrizeSOL} SOL in Royal Rumble! 
+
+Think you can be the next champion? Join the battle now! 👑
+
+${gameUrl}
+
+#RoyalRumble #Solana #Web3Gaming`;
+    
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+    window.open(twitterUrl, '_blank', 'width=550,height=420');
+  };
+
   if (!isOpen) {
     return (
       <div className="fixed top-4 right-4 z-50 flex flex-col items-end gap-3">
@@ -47,7 +80,7 @@ export function BlockchainDebugDialog() {
         {/* Social Links */}
         <div className="flex flex-col gap-2">
           <a
-            href="https://discord.gg/your-discord"
+            href="https://discord.gg/PuKXcSqK"
             target="_blank"
             rel="noopener noreferrer"
             className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg transition-colors"
@@ -68,17 +101,83 @@ export function BlockchainDebugDialog() {
               <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12a12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472c-.18 1.898-.962 6.502-1.36 8.627c-.168.9-.499 1.201-.82 1.23c-.696.065-1.225-.46-1.9-.902c-1.056-.693-1.653-1.124-2.678-1.8c-1.185-.78-.417-1.21.258-1.91c.177-.184 3.247-2.977 3.307-3.23c.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345c-.48.33-.913.49-1.302.48c-.428-.008-1.252-.241-1.865-.44c-.752-.245-1.349-.374-1.297-.789c.027-.216.325-.437.893-.663c3.498-1.524 5.83-2.529 6.998-3.014c3.332-1.386 4.025-1.627 4.476-1.635z"/>
             </svg>
           </a>
-          <a
-            href="https://x.com/your-twitter"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-2 bg-gray-800 hover:bg-gray-900 text-white rounded-full shadow-lg transition-colors"
-            aria-label="X (Twitter)"
-          >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M18.244 2.25h3.308l-7.227 8.26l8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-            </svg>
-          </a>
+          <div className="relative">
+            <a
+              href="https://x.com/domin8Arena"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-2 bg-gray-800 hover:bg-gray-900 text-white rounded-full shadow-lg transition-colors block"
+              aria-label="X (Twitter)"
+              onMouseEnter={() => shouldShowTooltip && setShowTooltip(true)}
+              onMouseLeave={() => setShowTooltip(false)}
+              onClick={(e) => {
+                if (shouldShowTooltip) {
+                  e.preventDefault();
+                  shareWinnerOnX();
+                }
+              }}
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M18.244 2.25h3.308l-7.227 8.26l8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </a>
+            
+            {/* Pixel Art Tooltip */}
+            {shouldShowTooltip && showTooltip && (
+              <div 
+                className="absolute right-full mr-3 top-1/2 -translate-y-1/2 z-[60] animate-bounce"
+                style={{
+                  imageRendering: 'pixelated',
+                  filter: 'contrast(1.1)',
+                }}
+              >
+                {/* Tooltip Arrow */}
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full">
+                  <div 
+                    className="w-0 h-0 border-y-[6px] border-y-transparent border-l-[8px] border-l-yellow-400"
+                    style={{ imageRendering: 'pixelated' }}
+                  />
+                  <div 
+                    className="absolute top-1/2 -translate-y-1/2 right-[2px] w-0 h-0 border-y-[4px] border-y-transparent border-l-[6px] border-l-gray-900"
+                    style={{ imageRendering: 'pixelated' }}
+                  />
+                </div>
+                
+                {/* Tooltip Content */}
+                <div 
+                  className="bg-gray-900 border-2 border-yellow-400 rounded px-3 py-2 shadow-2xl whitespace-nowrap"
+                  style={{
+                    boxShadow: '0 0 20px rgba(250, 204, 21, 0.5), inset 0 0 10px rgba(250, 204, 21, 0.1)',
+                    imageRendering: 'pixelated',
+                  }}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="text-yellow-400 text-lg">🏆</div>
+                    <div className="font-bold text-yellow-400 text-sm" style={{ fontFamily: 'monospace' }}>
+                      WINNER!
+                    </div>
+                  </div>
+                  <div className="text-white text-xs mb-2" style={{ fontFamily: 'monospace' }}>
+                    {winnerDisplayName}
+                  </div>
+                  <div className="flex items-center gap-2 text-green-400 text-xs font-bold mb-2" style={{ fontFamily: 'monospace' }}>
+                    <span>💰</span>
+                    <span>{winnerPrizeSOL} SOL</span>
+                  </div>
+                    <button
+                    onClick={shareWinnerOnX}
+                    className="text-center text-white text-xs font-bold py-1 px-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 rounded border border-purple-400 transition-all w-full"
+                    style={{ 
+                      fontFamily: 'monospace',
+                      textShadow: '1px 1px 0px rgba(0,0,0,0.5)',
+                    }}
+                    >
+                    👆 SHARE ON X!
+                    </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -110,22 +209,6 @@ export function BlockchainDebugDialog() {
     void navigator.clipboard.writeText(JSON.stringify(jsonData, null, 2));
     setJsonCopied(true);
     setTimeout(() => setJsonCopied(false), 2000);
-  };
-
-  const shareWinnerOnX = () => {
-    if (!hasWinner) return;
-    
-    const gameUrl = window.location.origin;
-    const tweetText = `🏆 ${winnerDisplayName} just won ${winnerPrizeSOL} SOL in Royal Rumble! 
-
-    Think you can be the next champion? Join the battle now! 👑
-
-    ${gameUrl}
-
-    #RoyalRumble #Solana #Web3Gaming`;
-    
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
-    window.open(twitterUrl, '_blank', 'width=550,height=420');
   };
 
   return (
