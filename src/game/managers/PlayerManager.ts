@@ -1,7 +1,8 @@
 import { Scene } from "phaser";
-import { calculateEllipsePosition } from "../../config/spawnConfig";
+import { type MapSpawnConfig } from "../../config/spawnConfig";
 import { SoundManager } from "./SoundManager";
 import { logger } from "../../lib/logger";
+import { RESOLUTION_SCALE } from "../main";
 
 export interface GameParticipant {
   id: string;
@@ -40,6 +41,10 @@ export class PlayerManager {
   updateCenter(centerX: number, centerY: number) {
     this.centerX = centerX;
     this.centerY = centerY;
+  }
+
+  setMapData(mapData: any) {
+    this.currentMap = mapData;
   }
 
   getParticipants(): Map<string, GameParticipant> {
@@ -94,6 +99,14 @@ export class PlayerManager {
     const { targetX, targetY } = this.calculateSpawnPosition(participant.spawnIndex);
     const spawnX = targetX;
     const spawnY = -50;
+
+    logger.game.info(`[PlayerManager] 🎯 Character spawn positions:`, {
+      participantId,
+      spawnIndex: participant.spawnIndex,
+      startPosition: { x: spawnX, y: spawnY },
+      finalPosition: { x: targetX, y: targetY },
+      distance: Math.abs(spawnY - targetY).toFixed(1) + "px",
+    });
 
     let characterKey = "warrior";
     if (participant.character) {
@@ -213,9 +226,12 @@ export class PlayerManager {
     // These values are in original sprite pixels and will be scaled automatically
     const spriteOffsetsInPixels: { [key: string]: number } = {
       male: 48, // Transparent space at bottom in original sprite
-      orc: 42, // Transparent space at bottom in original sprite
+      orc: 13, // Transparent space at bottom in original sprite
       soldier: 42,
       pepe: 13, // Transparent space at bottom in original sprite
+      yasuo: 13, // Transparent space at bottom in original sprite
+      darthvader: 13, // Transparent space at bottom in original sprite
+      huggywuggy: 13, // Transparent space at bottom in original sprite
       // Add other characters here if needed
     };
     const offsetPixels = spriteOffsetsInPixels[textureKey] || 0;
@@ -232,11 +248,12 @@ export class PlayerManager {
 
     const nameText = this.scene.add
       .text(0, nameYOffset, participant.displayName, {
-        fontFamily: "Arial",
-        fontSize: 12,
+        fontFamily: "jersey15",
+        fontSize: "13px",
         color: nameColor,
         stroke: strokeColor,
-        strokeThickness: 2,
+        strokeThickness: 2, // Scaled down from 6px
+        resolution: 40, // High resolution for crisp text when scaled
         align: "center",
       })
       .setOrigin(0.5);
@@ -271,13 +288,35 @@ export class PlayerManager {
       });
     }
 
+    logger.game.info(`[PlayerManager] 🎨 Initial opacity:`, {
+      participantId,
+      containerAlpha: container.alpha,
+      spriteAlpha: sprite.alpha,
+      visible: container.visible,
+    });
+
     // Consistent falling animation for all characters
     this.scene.tweens.add({
       targets: container,
       y: targetY,
       duration: 250, // Fast fall duration
       ease: "Cubic.easeIn", // Smooth acceleration downward
+      onStart: () => {
+        logger.game.info(`[PlayerManager] 🎬 Tween started:`, {
+          participantId,
+          currentY: container.y,
+          targetY,
+          alpha: container.alpha,
+        });
+      },
       onComplete: () => {
+        logger.game.info(`[PlayerManager] ✅ Tween completed:`, {
+          participantId,
+          finalY: container.y,
+          targetY,
+          alpha: container.alpha,
+        });
+
         // Play random impact sound when hitting ground
         try {
           logger.game.debug(`[PlayerManager] Playing random impact sound for ${participantId}`);
@@ -287,6 +326,12 @@ export class PlayerManager {
         }
 
         // Play landing animation, then transition to idle
+        // Safety check: ensure sprite still exists before playing animations
+        if (!sprite || !sprite.active) {
+          logger.game.warn(`[PlayerManager] Sprite no longer exists for ${participantId}, skipping animation`);
+          return;
+        }
+
         const landingAnimKey = `${textureKey}-landing`;
         if (this.scene.anims.exists(landingAnimKey)) {
           sprite.play(landingAnimKey);
@@ -294,7 +339,7 @@ export class PlayerManager {
           // After landing animation completes, switch to idle
           sprite.once("animationcomplete", () => {
             const idleAnimKey = `${textureKey}-idle`;
-            if (this.scene.anims.exists(idleAnimKey)) {
+            if (sprite && sprite.active && this.scene.anims.exists(idleAnimKey)) {
               sprite.play(idleAnimKey);
             }
           });
@@ -338,34 +383,72 @@ export class PlayerManager {
     // Bet range: 0.001 - 10 SOL
     const minBet = 0.001;
     const maxBet = 10;
-    const minScale = 3.0;
-    const maxScale = 13.0; // Range: 3x to 13x final scale
+
+    // Base scale values for native resolution (396x180)
+    const baseMinScale = 0.5;
+    const baseMaxScale = 2.0;
+
+    // Apply resolution scale to character sizes
+    const minScale = baseMinScale * RESOLUTION_SCALE;
+    const maxScale = baseMaxScale * RESOLUTION_SCALE;
+
     const clampedBet = Math.max(minBet, Math.min(maxBet, betAmountInSOL));
     const scale = minScale + ((clampedBet - minBet) / (maxBet - minBet)) * (maxScale - minScale);
     return scale;
   }
 
   private calculateSpawnPosition(spawnIndex: number) {
-    if (!this.currentMap || !this.currentMap.spawnConfiguration) {
-      const angle = (spawnIndex / 20) * Math.PI * 2;
-      const radius = 200;
-      // Use ellipse position with randomness
-      const position = calculateEllipsePosition(angle, radius, this.centerX, this.centerY, true);
-      return {
-        targetX: position.x,
-        targetY: position.y,
-      };
+    // Use map-specific config from database
+    const config: MapSpawnConfig = this.currentMap?.spawnConfiguration;
+
+    if (!config) {
+      logger.game.error("[PlayerManager] No spawn configuration available!");
+      throw new Error("No spawn configuration found - map data required");
     }
 
-    const { spawnRadius } = this.currentMap.spawnConfiguration;
-    const totalParticipants = Math.max(8, spawnIndex + 1);
-    const angle = (spawnIndex / totalParticipants) * Math.PI * 2;
+    // Apply resolution scale to all spawn config values
+    const scaledConfig = {
+      centerX: config.centerX * RESOLUTION_SCALE,
+      centerY: config.centerY * RESOLUTION_SCALE,
+      radiusX: config.radiusX * RESOLUTION_SCALE,
+      radiusY: config.radiusY * RESOLUTION_SCALE,
+      minSpawnRadius: config.minSpawnRadius * RESOLUTION_SCALE,
+      maxSpawnRadius: config.maxSpawnRadius * RESOLUTION_SCALE,
+      minSpacing: config.minSpacing * RESOLUTION_SCALE,
+    };
 
-    // calculateEllipsePosition handles all randomness via jitter
-    const position = calculateEllipsePosition(angle, spawnRadius, this.centerX, this.centerY, true);
+    // Distribute angles with randomness for more organic placement
+    // Base angle evenly distributed (every 8 participants completes a rotation)
+    const participantsPerRotation = 8;
+    const baseAngle = (spawnIndex / participantsPerRotation) * Math.PI * 2;
+
+    // Add random variation to angle (±22.5° = ±π/8 radians, half the spacing between positions)
+    const angleVariation = (Math.random() - 0.5) * (Math.PI / 4); // ±45° variation
+    const angle = baseAngle + angleVariation;
+
+    // Random factor (0 to 1) to vary distance from center
+    const randomFactor = Math.random() * 0.5 + 0.5; // 0.5 to 1.0 (spawn in outer half of ellipse)
+
+    // Calculate position on ellipse - no normalization needed, radiusX and radiusY define the ellipse
+    const x = scaledConfig.centerX + Math.cos(angle) * scaledConfig.radiusX * randomFactor;
+    const y = scaledConfig.centerY + Math.sin(angle) * scaledConfig.radiusY * randomFactor;
+
+    logger.game.debug(`[PlayerManager] Spawn position calculated for index ${spawnIndex}:`, {
+      angle: ((angle * 180) / Math.PI).toFixed(1) + "°",
+      randomFactor: randomFactor.toFixed(2),
+      targetX: x.toFixed(1),
+      targetY: y.toFixed(1),
+      config: {
+        centerX: config.centerX,
+        centerY: config.centerY,
+        radiusX: config.radiusX,
+        radiusY: config.radiusY,
+      },
+    });
+
     return {
-      targetX: position.x,
-      targetY: position.y,
+      targetX: x,
+      targetY: y,
     };
   }
 
@@ -418,16 +501,21 @@ export class PlayerManager {
   }
 
   moveParticipantsToCenter() {
+    // Use map-specific spawn center, not screen center
+    const config: MapSpawnConfig = this.currentMap?.spawnConfiguration;
+    const targetCenterX = config ? config.centerX * RESOLUTION_SCALE : this.centerX;
+    const targetCenterY = config ? config.centerY * RESOLUTION_SCALE : this.centerY;
+
     this.participants.forEach((participant) => {
       // Show names when moving to center
       participant.nameText.setVisible(true);
 
-      // Animate container moving towards center (sprite and text move together)
+      // Animate container moving towards map center (sprite and text move together)
       // Faster duration: 400-600ms instead of 800-1200ms
       this.scene.tweens.add({
         targets: participant.container,
-        x: this.centerX + (Math.random() - 0.5) * 100,
-        y: this.centerY + (Math.random() - 0.5) * 100,
+        x: targetCenterX + (Math.random() - 0.5) * 5,
+        y: targetCenterY + 30 + (Math.random() - 0.5) * 100,
         duration: 400 + Math.random() * 200,
         ease: "Cubic.easeIn",
       });
@@ -495,12 +583,6 @@ export class PlayerManager {
     // Find winner - get directly from PlayerManager using winnerId
     const winnerId = gameState.winnerId;
 
-    logger.game.debug("[PlayerManager] showResults called", {
-      winnerId,
-      participantIds: Array.from(this.participants.keys()),
-      hasWinner: this.participants.has(winnerId),
-    });
-
     const winnerParticipant = this.participants.get(winnerId);
 
     if (winnerParticipant) {
@@ -525,17 +607,8 @@ export class PlayerManager {
 
       // Position container so feet align with throne anchor
       // Need to ADD offset to move container down to account for sprite's internal offset
-      const targetThroneY = this.centerY + 180;
+      const targetThroneY = this.centerY + 100;
       const containerY = targetThroneY + spriteOffset;
-
-      logger.game.debug("[PlayerManager] 🎯 Winner positioning debug:", {
-        centerY: this.centerY,
-        targetThroneY: targetThroneY,
-        spriteOffset: spriteOffset,
-        containerY: containerY,
-        feetY: containerY + spriteOffset,
-        characterKey: winnerParticipant.characterKey,
-      });
 
       this.scene.tweens.add({
         targets: winnerParticipant.container,
@@ -565,12 +638,8 @@ export class PlayerManager {
       if (this.scene.anims.exists(victoryAnimKey)) {
         winnerParticipant.sprite.play(victoryAnimKey);
       }
-
-      logger.game.debug("[PlayerManager] Returning winner participant:", winnerParticipant.id);
       return winnerParticipant;
     }
-
-    logger.game.error("[PlayerManager] Winner participant not found for ID:", winnerId);
     return null;
   }
 
@@ -623,5 +692,109 @@ export class PlayerManager {
 
     this.participants.clear();
     logger.game.debug(`[CLEANUP] Participants Map cleared (size now: ${this.participants.size})`);
+  }
+
+  // Debug: Draw the spawn ellipse to visualize configuration
+  debugDrawSpawnEllipse(config?: MapSpawnConfig) {
+    const spawnConfig: MapSpawnConfig = config || this.currentMap?.spawnConfiguration;
+
+    if (!spawnConfig) {
+      logger.game.error("[PlayerManager] No spawn configuration available for debug drawing!");
+      console.error("[DEBUG] currentMap:", this.currentMap);
+      return;
+    }
+
+    // Apply resolution scale to all values for drawing
+    const scaledConfig = {
+      centerX: spawnConfig.centerX * RESOLUTION_SCALE,
+      centerY: spawnConfig.centerY * RESOLUTION_SCALE,
+      radiusX: spawnConfig.radiusX * RESOLUTION_SCALE,
+      radiusY: spawnConfig.radiusY * RESOLUTION_SCALE,
+      minSpawnRadius: spawnConfig.minSpawnRadius * RESOLUTION_SCALE,
+      maxSpawnRadius: spawnConfig.maxSpawnRadius * RESOLUTION_SCALE,
+      minSpacing: spawnConfig.minSpacing * RESOLUTION_SCALE,
+    };
+
+    console.log(`[DEBUG] ===== SPAWN ELLIPSE DEBUG =====`);
+    console.log(`[DEBUG] Base centerX: ${spawnConfig.centerX} → Scaled: ${scaledConfig.centerX}`);
+    console.log(`[DEBUG] Base centerY: ${spawnConfig.centerY} → Scaled: ${scaledConfig.centerY}`);
+    console.log(`[DEBUG] Base radiusX: ${spawnConfig.radiusX} → Scaled: ${scaledConfig.radiusX}`);
+    console.log(`[DEBUG] Base radiusY: ${spawnConfig.radiusY} → Scaled: ${scaledConfig.radiusY}`);
+    console.log(`[DEBUG] Resolution scale: ${RESOLUTION_SCALE}`);
+    console.log(
+      `[DEBUG] Green ellipse size: ${scaledConfig.radiusX * 2} x ${scaledConfig.radiusY * 2}`
+    );
+    console.log(`[DEBUG] ==================================`);
+
+    // Draw center point
+    const centerDot = this.scene.add.circle(
+      scaledConfig.centerX,
+      scaledConfig.centerY,
+      3,
+      0xff0000,
+      1
+    );
+    centerDot.setDepth(10000);
+
+    // Draw outer ellipse (full radiusX and radiusY)
+    const outerEllipse = this.scene.add.ellipse(
+      scaledConfig.centerX,
+      scaledConfig.centerY,
+      scaledConfig.radiusX * 2, // diameter = radius * 2
+      scaledConfig.radiusY * 2,
+      0x00ff00,
+      0
+    );
+    outerEllipse.setStrokeStyle(2, 0x00ff00, 1);
+    outerEllipse.setDepth(10000);
+
+    // Draw min spawn radius ellipse (inner boundary)
+    const minRadius = scaledConfig.minSpawnRadius;
+    const minRadiusX = (minRadius / scaledConfig.radiusY) * scaledConfig.radiusX;
+    const minEllipse = this.scene.add.ellipse(
+      scaledConfig.centerX,
+      scaledConfig.centerY,
+      minRadiusX * 2,
+      minRadius * 2,
+      0xff0000,
+      0
+    );
+    minEllipse.setStrokeStyle(2, 0xff0000, 1);
+    minEllipse.setDepth(10000);
+
+    // Draw max spawn radius ellipse (outer boundary)
+    const maxRadius = scaledConfig.maxSpawnRadius;
+    const maxRadiusX = (maxRadius / scaledConfig.radiusY) * scaledConfig.radiusX;
+    const maxEllipse = this.scene.add.ellipse(
+      scaledConfig.centerX,
+      scaledConfig.centerY,
+      maxRadiusX * 2,
+      maxRadius * 2,
+      0x0000ff,
+      0
+    );
+    maxEllipse.setStrokeStyle(2, 0x0000ff, 1);
+    maxEllipse.setDepth(10000);
+
+    // Add labels
+    const labelY = scaledConfig.centerY - scaledConfig.radiusY - 10;
+    const label = this.scene.add.text(
+      scaledConfig.centerX,
+      labelY,
+      `Spawn Ellipse\nCenter: (${scaledConfig.centerX}, ${scaledConfig.centerY})\nRadius: (${scaledConfig.radiusX}, ${scaledConfig.radiusY})`,
+      {
+        fontFamily: "jersey",
+        fontSize: "20px",
+        color: "#ffffff",
+        stroke: "#000000",
+        strokeThickness: 1,
+        align: "center",
+        resolution: 40,
+      }
+    );
+    label.setOrigin(0.5, 1);
+    label.setDepth(10000);
+
+    logger.game.info(`[DEBUG] Ellipse drawn - Green=Full, Red=Min, Blue=Max`);
   }
 }

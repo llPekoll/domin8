@@ -1,7 +1,7 @@
 import { Scene } from "phaser";
 import { SoundManager } from "./SoundManager";
 import { logger } from "../../lib/logger";
-import { STAGE_WIDTH, STAGE_HEIGHT } from "../main";
+import { STAGE_WIDTH, STAGE_HEIGHT, RESOLUTION_SCALE } from "../main";
 
 export class AnimationManager {
   private scene: Scene;
@@ -10,17 +10,18 @@ export class AnimationManager {
   private playerNamesMap: Map<string, string> = new Map();
 
   // Physics configuration for explosion - TWEAK THESE VALUES
+  // Base values are for RESOLUTION_SCALE = 1, automatically scaled
   private readonly EXPLOSION_CONFIG = {
-    forceMin: 150, // Minimum outward force (increased for more sideways)
-    forceMax: 250, // Maximum outward force (increased for more sideways)
-    upwardKickMin: 200, // Minimum upward boost (increased for more height)
-    upwardKickMax: 400, // Maximum upward boost (increased for more height)
-    upwardKickChance: 0.8, // Chance to apply upward kick (increased to 80%)
-    gravity: 150, // Gravity force (higher = falls faster)
-    rotationSpeed: 10, // Max rotation speed
-    fadeStartTime: 1.5, // When to start fading (seconds)
-    fadeRate: 0.3, // How fast to fade (0-1 per second)
-    maxLifetime: 5, // Maximum lifetime (seconds)
+    forceMin: 300 * RESOLUTION_SCALE, // Minimum outward force (doubled from 150)
+    forceMax: 500 * RESOLUTION_SCALE, // Maximum outward force (doubled from 250)
+    upwardKickMin: 300 * RESOLUTION_SCALE, // Minimum upward boost (increased from 200)
+    upwardKickMax: 600 * RESOLUTION_SCALE, // Maximum upward boost (increased from 400)
+    upwardKickChance: 0.8, // Chance to apply upward kick (no scaling needed)
+    gravity: 200 * RESOLUTION_SCALE, // Gravity force (increased from 150 to match higher forces)
+    rotationSpeed: 10, // Max rotation speed (no scaling needed)
+    fadeStartTime: 1.5, // When to start fading (no scaling needed)
+    fadeRate: 0.3, // How fast to fade (no scaling needed)
+    maxLifetime: 5, // Maximum lifetime (no scaling needed)
     showDebugTrails: true, // Set to true to see red trail lines
   };
 
@@ -124,9 +125,9 @@ export class AnimationManager {
       ease: "Power2",
     });
 
-    const throne = this.scene.add.image(this.centerX, this.centerY, "throne");
+    const throne = this.scene.add.image(this.centerX, this.centerY + 50, "throne");
     throne.setDepth(90); // Behind winner (winner is at ~100+)
-    throne.setScale(2);
+    throne.setScale(RESOLUTION_SCALE);
     throne.setAlpha(0);
     // Keep pixel art crisp when scaling
     throne.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -145,7 +146,7 @@ export class AnimationManager {
 
     // Get the displayName - first try from playerNamesMap using playerId, then fall back to participant.displayName
     let winnerDisplayName = "Champion";
-    
+
     if (winnerParticipant?.playerId) {
       // Try to get display name from playerNamesMap using the wallet address (playerId)
       const mappedName = this.playerNamesMap.get(winnerParticipant.playerId);
@@ -155,23 +156,27 @@ export class AnimationManager {
       } else {
         // Fall back to participant's displayName property
         winnerDisplayName = winnerParticipant.displayName || "Champion";
-        logger.game.debug("[AnimationManager] Using participant.displayName:", winnerParticipant.displayName);
+        logger.game.debug(
+          "[AnimationManager] Using participant.displayName:",
+          winnerParticipant.displayName
+        );
       }
     } else {
       winnerDisplayName = winnerParticipant?.displayName || "Champion";
     }
-    
+
     logger.game.debug("[AnimationManager] Final winner display name:", winnerDisplayName);
 
     // Winner name at bottom of screen
     const nameText = this.scene.add
-      .text(this.centerX, screenHeight - 80, winnerDisplayName, {
-        fontFamily: "Arial Black",
-        fontSize: 32,
+      .text(this.centerX, screenHeight - 25, winnerDisplayName, {
+        fontFamily: "jersey",
+        fontSize: 12, // Scaled down from 32px
         color: "#ffffff",
         stroke: "#000000",
-        strokeThickness: 4,
+        strokeThickness: 1, // Scaled down from 4
         align: "center",
+        resolution: 4, // High resolution for crisp text when scaled
       })
       .setOrigin(0.5)
       .setDepth(200);
@@ -330,8 +335,12 @@ export class AnimationManager {
     });
   }
 
-  explodeParticipantsOutward(participants: Map<string, any>) {
+  explodeParticipantsOutward(participants: Map<string, any>, explosionCenterX?: number, explosionCenterY?: number) {
     const config = this.EXPLOSION_CONFIG;
+
+    // Use provided explosion center or fall back to screen center
+    const centerX = explosionCenterX ?? this.centerX;
+    const centerY = explosionCenterY ?? this.centerY;
 
     // Create explosion at center first
     this.createCenterExplosion();
@@ -339,7 +348,7 @@ export class AnimationManager {
     // Add full-screen blood effect when characters are eliminated
     const eliminatedCount = Array.from(participants.values()).filter((p) => p.eliminated).length;
     if (eliminatedCount > 0) {
-      this.createBloodSplatter(this.centerX, this.centerY, true);
+      this.createBloodSplatter(centerX, centerY, true);
 
       // Play death screams for each eliminated character (with slight delays for variety)
       let screamDelay = 0;
@@ -371,9 +380,9 @@ export class AnimationManager {
       const spriteHeight = 32 * participant.sprite.scaleY;
       participant.sprite.setY(currentY - spriteHeight / 2);
 
-      // Calculate angle from center to participant
-      const dx = participant.container.x - this.centerX;
-      const dy = participant.container.y - this.centerY;
+      // Calculate angle from explosion center to participant
+      const dx = participant.container.x - centerX;
+      const dy = participant.container.y - centerY;
       const angle = Math.atan2(dy, dx);
 
       // Random force using config values
@@ -522,13 +531,14 @@ export class AnimationManager {
   showBettingPrompt() {
     // Show betting phase indicator
     const bettingText = this.scene.add
-      .text(this.centerX, 50, "BETTING PHASE", {
-        fontFamily: "Arial Black",
-        fontSize: 32,
+      .text(this.centerX, 15, "BETTING PHASE", {
+        fontFamily: "jersey",
+        fontSize: 12, // Scaled down from 32px
         color: "#00ff00",
         stroke: "#000000",
-        strokeThickness: 4,
+        strokeThickness: 1, // Scaled down from 4
         align: "center",
+        resolution: 4, // High resolution for crisp text when scaled
       })
       .setOrigin(0.5)
       .setDepth(200);
@@ -637,7 +647,7 @@ export class AnimationManager {
 
         const bloodSprite = this.scene.add.sprite(impactX + offsetX, impactY + offsetY, "blood");
 
-        bloodSprite.setScale(2 + Math.random() * 2);
+        bloodSprite.setScale(1 + Math.random() * 2);
         bloodSprite.setDepth(350); // Above everything
         bloodSprite.setAlpha(0.9);
         bloodSprite.setRotation(Math.random() * Math.PI * 2);
@@ -715,7 +725,7 @@ export class AnimationManager {
             "blood"
           );
 
-          bloodSprite.setScale(2 + Math.random() * 2);
+          bloodSprite.setScale(1 + Math.random() * 2);
           bloodSprite.setDepth(1500); // In front of all characters
           bloodSprite.setAlpha(0.8);
           bloodSprite.setRotation(Math.random() * Math.PI * 2);
@@ -773,7 +783,7 @@ export class AnimationManager {
     // Create the biggest explosion for battle finale
     const explosion = this.scene.add.sprite(this.centerX, this.centerY, "explosion");
 
-    explosion.setScale(4);
+    explosion.setScale(1);
     explosion.setDepth(500); // On top of everything
     // Keep pixel art crisp when scaling
     explosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -809,7 +819,7 @@ export class AnimationManager {
         const explosion = this.scene.add.sprite(gameWidth / 2, gameHeight / 2 - 100, "explosion");
 
         // Random scale for variety (1.5x to 4x)
-        explosion.setScale(7 + Math.random() * 2.5);
+        explosion.setScale(1 + Math.random() * 2.5);
         explosion.setDepth(1600); // On top of everything else
         // Keep pixel art crisp when scaling
         explosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -846,21 +856,15 @@ export class AnimationManager {
     logger.game.debug("[AnimationManager] ⚔️ Starting battle phase sequence");
 
     // Play fullscreen explosion animation at the start
-    const gameWidth = this.scene.scale.width;
-    const gameHeight = this.scene.scale.height;
-
+    // Use native resolution center (game now renders at 396x180 and scales via Phaser.Scale.FIT)
     const fullscreenExplosion = this.scene.add.sprite(
-      gameWidth / 2,
-      gameHeight / 2,
+      STAGE_WIDTH / 2,
+      STAGE_HEIGHT / 2,
       "explosion-fullscreen"
     );
 
-    // TODO: this can be remove later on when the whole app it going to be at the correct size
-    const scaleX = gameWidth / STAGE_WIDTH;
-    const scaleY = gameHeight / STAGE_HEIGHT;
-    const scale = Math.max(scaleX, scaleY);
-
-    fullscreenExplosion.setScale(scale);
+    // No manual scaling needed - Phaser.Scale.FIT handles it automatically
+    fullscreenExplosion.setScale(RESOLUTION_SCALE);
     fullscreenExplosion.setDepth(1550); // Between characters and continuous explosions
     // Keep pixel art crisp when scaling
     fullscreenExplosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -912,8 +916,13 @@ export class AnimationManager {
       }
     });
 
+    // Get the spawn center from PlayerManager's current map config
+    const mapConfig = playerManager.currentMap?.spawnConfiguration;
+    const explosionCenterX = mapConfig ? mapConfig.centerX * RESOLUTION_SCALE : this.centerX;
+    const explosionCenterY = mapConfig ? mapConfig.centerY * RESOLUTION_SCALE : this.centerY;
+
     // Explode losers outward with physics (includes explosions, blood, shake)
-    this.explodeParticipantsOutward(participants);
+    this.explodeParticipantsOutward(participants, explosionCenterX, explosionCenterY);
 
     // After 3 seconds: Show winner celebration
     this.scene.time.delayedCall(3000, () => {

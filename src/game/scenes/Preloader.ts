@@ -33,6 +33,20 @@ export class Preloader extends Scene {
         url: "fonts/metal-slug-colour.colr.ttf",
       } as any)
     );
+    this.load.addFile(
+      new Phaser.Loader.FileTypes.FontFile(this.load, {
+        type: "font",
+        key: "jersey",
+        url: "fonts/Jersey10-Regular.ttf",
+      } as any)
+    );
+    this.load.addFile(
+      new Phaser.Loader.FileTypes.FontFile(this.load, {
+        type: "font",
+        key: "jersey15",
+        url: "fonts/Jersey15-Regular.ttf",
+      } as any)
+    );
 
     // Check if data is available (should always be true due to PhaserGame.tsx guard)
     if (!charactersData || charactersData.length === 0) {
@@ -186,7 +200,11 @@ export class Preloader extends Scene {
 
     // Create animations for all characters dynamically by parsing frameTags from JSON atlas
     logger.game.debug("[Preloader] Creating animations for", charactersData.length, "characters");
-    console.log("✅ [Preloader] Starting animation creation for", charactersData.length, "characters");
+    console.log(
+      "✅ [Preloader] Starting animation creation for",
+      charactersData.length,
+      "characters"
+    );
 
     charactersData.forEach((character) => {
       const key = character.name.toLowerCase().replace(/\s+/g, "-");
@@ -194,7 +212,11 @@ export class Preloader extends Scene {
 
       // Get the JSON atlas data from cache (loaded with -json suffix)
       const jsonData = this.cache.json.get(`${key}-json`);
-      console.log(`✅ [Preloader] JSON data for ${key}:`, jsonData ? "FOUND" : "NOT FOUND", jsonData);
+      console.log(
+        `✅ [Preloader] JSON data for ${key}:`,
+        jsonData ? "FOUND" : "NOT FOUND",
+        jsonData
+      );
 
       if (!jsonData) {
         logger.game.warn(`[Preloader] No JSON data found for ${key}, skipping animation creation`);
@@ -247,7 +269,9 @@ export class Preloader extends Scene {
       const createAnimation = (animName: string, frameTag: any, isFallback = false) => {
         const animKey = `${key}-${animName}`;
 
-        console.log(`✅ [Preloader] Creating ${isFallback ? "fallback " : ""}animation: ${animKey}, frames ${frameTag.from}-${frameTag.to}`);
+        console.log(
+          `✅ [Preloader] Creating ${isFallback ? "fallback " : ""}animation: ${animKey}, frames ${frameTag.from}-${frameTag.to}`
+        );
 
         this.anims.create({
           key: animKey,

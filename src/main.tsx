@@ -21,7 +21,7 @@ createRoot(document.getElementById("root")!).render(
           config={{
             // SOLANA EMBEDDED WALLETS ONLY
             // Login with email/social - embedded wallet created automatically
-            loginMethods: ["wallet", "email", "google"],
+            loginMethods: ["wallet", "email", "google", "twitter", "discord"],
 
             // Appearance configuration
             appearance: {
@@ -85,7 +85,7 @@ createRoot(document.getElementById("root")!).render(
         position="top-right"
         toastOptions={{
           style: {
-            fontFamily: '"metal-slug", "Press Start 2P", monospace, Arial, sans-serif',
+            fontFamily: '"metal-slug", "Press Start 2P"',
             fontSize: "14px",
             backgroundColor: "#2c1810",
             color: "#FFD700",

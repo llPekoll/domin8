@@ -1,25 +1,32 @@
 [
   {
-    "id": 1,
-    "name": "Classic Arena",
     "description": "The original battleground where legends are made",
+    "id": 1,
+    "isActive": true,
+    "name": "Classic Arena",
     "spawnConfiguration": {
-      "maxPlayers": 20,
-      "spawnRadius": 250,
-      "minSpacing": 0.314
-    },
-    "isActive": true
+      "centerX": 198,
+      "centerY": 105,
+      "maxSpawnRadius": 55,
+      "minSpacing": 25,
+      "minSpawnRadius": 15,
+      "radiusX": 138,
+      "radiusY": 45
+    }
   },
-
   {
-    "id": 2,
-    "name": "Mystic Forest",
     "description": "An enchanted woodland filled with ancient magic",
+    "id": 2,
+    "isActive": true,
+    "name": "Mystic Forest",
     "spawnConfiguration": {
-      "maxPlayers": 24,
-      "spawnRadius": 280,
-      "minSpacing": 0.262
-    },
-    "isActive": true
+      "centerX": 198,
+      "centerY": 110,
+      "maxSpawnRadius": 35,
+      "minSpacing": 25,
+      "minSpawnRadius": 20,
+      "radiusX": 113,
+      "radiusY": 43
+    }
   }
 ]

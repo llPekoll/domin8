@@ -79,9 +79,30 @@ export class DemoScene extends Scene {
     // Initialize background with random selection between available backgrounds
     // Available backgrounds: bg1 (Arena Classic), bg2 (Secte Arena)
     const availableBackgrounds = [1, 2];
-    const randomBgId = availableBackgrounds[Math.floor(Math.random() * availableBackgrounds.length)];
+    const randomBgId =
+      availableBackgrounds[Math.floor(Math.random() * availableBackgrounds.length)];
     logger.game.debug("[DemoScene] Randomly selected background ID:", randomBgId);
     this.backgroundManager.setBackgroundById(randomBgId);
+
+    // Load corresponding map config for spawn positions
+    // Import the global allMapsData from main.ts
+    import("../main").then(({ allMapsData }) => {
+      const selectedMap = allMapsData.find((map: any) => map.id === randomBgId);
+      if (selectedMap) {
+        logger.game.debug("[DemoScene] Loaded map config:", selectedMap.spawnConfiguration);
+        // Pass map data to PlayerManager for spawn calculations
+        this.playerManager.updateParticipantsInWaiting([], selectedMap);
+
+        // Generate spawn positions now that we have map config
+        this.shuffledPositions = generateRandomEllipsePositions(
+          DEMO_PARTICIPANT_COUNT,
+          selectedMap.spawnConfiguration
+        );
+
+        // DEBUG: Draw spawn ellipse to verify configuration
+        // this.playerManager.debugDrawSpawnEllipse();
+      }
+    });
     this.scale.on("resize", () => this.handleResize(), this);
     EventBus.emit("current-scene-ready", this);
 
@@ -181,12 +202,7 @@ export class DemoScene extends Scene {
     this.spawnCount = 0;
     this.isSpawning = false;
 
-    // Generate random positions
-    this.shuffledPositions = generateRandomEllipsePositions(
-      DEMO_PARTICIPANT_COUNT,
-      this.centerX,
-      this.centerY
-    );
+    // Note: shuffledPositions are generated in create() after map config loads
 
     // Update UI
     this.updateDemoUI(this.demoPhase, this.countdown, 0);
@@ -327,44 +343,48 @@ export class DemoScene extends Scene {
     this.demoUIContainer.setDepth(1000);
     this.demoUIContainer.setScrollFactor(0);
 
-    // "INSERT COIN!" text - much bigger and centered
+    // "INSERT COIN!" text - scaled for native 396x180 resolution
     this.insertCoinText = this.add.text(0, 0, "INSERT COIN!", {
-      fontFamily: "metal-slug, Arial, sans-serif",
-      fontSize: "64px",
+      fontFamily: "metal-slug",
+      fontSize: "20px", // Scaled down from 64px (approximately 1/3)
       color: "#FFD700",
       stroke: "#000000",
-      strokeThickness: 6,
+      strokeThickness: 2, // Scaled down from 6px
+      resolution: 4, // High resolution for crisp text when scaled
     });
     // this.insertCoinText.setAlpha(0);
     this.insertCoinText.setOrigin(0.5);
 
-    // Countdown text - bigger and centered below INSERT COIN
-    this.countdownText = this.add.text(0, 110, "30", {
-      fontFamily: "metal-slug, Arial, sans-serif",
-      fontSize: "96px",
+    // Countdown text - scaled for native resolution
+    this.countdownText = this.add.text(0, 35, "30", {
+      fontFamily: "metal-slug",
+      fontSize: "30px", // Scaled down from 96px
       color: "#FF4444",
       stroke: "#000000",
-      strokeThickness: 8,
+      strokeThickness: 3, // Scaled down from 8px
+      resolution: 4, // High resolution for crisp text when scaled
     });
     this.countdownText.setOrigin(0.5);
 
-    // Phase text (Battle Royale / Winner Crowned) - bigger and centered
+    // Phase text (Battle Royale / Winner Crowned) - scaled for native resolution
     this.phaseText = this.add.text(0, 0, "", {
-      fontFamily: "metal-slug, Arial, sans-serif",
-      fontSize: "48px",
+      fontFamily: "metal-slug",
+      fontSize: "16px", // Scaled down from 48px
       color: "#FFD700",
       stroke: "#000000",
-      strokeThickness: 5,
+      strokeThickness: 2, // Scaled down from 5px
+      resolution: 4, // High resolution for crisp text when scaled
     });
     this.phaseText.setOrigin(0.5);
 
-    // Sub text (participant count / restarting info) - bigger and centered
-    this.subText = this.add.text(0, 70, "", {
-      fontFamily: "metal-slug, Arial, sans-serif",
-      fontSize: "28px",
+    // Sub text (participant count / restarting info) - scaled for native resolution
+    this.subText = this.add.text(0, 22, "", {
+      fontFamily: "metal-slug",
+      fontSize: "10px", // Scaled down from 28px
       color: "#FFFFFF",
       stroke: "#000000",
-      strokeThickness: 3,
+      strokeThickness: 1, // Scaled down from 3px
+      resolution: 4, // High resolution for crisp text when scaled
     });
     this.subText.setOrigin(0.5);
 
@@ -527,7 +547,9 @@ export class DemoScene extends Scene {
   }
 
   public clearDemoParticipants() {
-    logger.game.debug(`[CLEANUP] DemoScene.clearDemoParticipants() - ${this.participants.length} demo participants`);
+    logger.game.debug(
+      `[CLEANUP] DemoScene.clearDemoParticipants() - ${this.participants.length} demo participants`
+    );
     this.playerManager.clearParticipants();
     this.animationManager.clearCelebration();
     this.participants = [];

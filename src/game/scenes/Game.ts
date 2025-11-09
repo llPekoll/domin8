@@ -7,7 +7,7 @@ import { UIManager } from "../managers/UIManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
 import { logger } from "../../lib/logger";
-import { activeGameData } from "../main";
+import { activeGameData, allMapsData } from "../main";
 
 export class Game extends Scene {
   camera!: Phaser.Cameras.Scene2D.Camera;
@@ -164,10 +164,23 @@ export class Game extends Scene {
       return;
     }
 
-    // Update map background based on game data
+    // Update map background and spawn configuration based on game data
     if (gameState.map !== undefined && gameState.map !== null) {
-      logger.game.debug("[Game] 🗺️ Setting background by ID:", gameState.map);
-      this.backgroundManager.setBackgroundById(gameState.map);
+      // Extract map ID - it could be a number or an object with an id property
+      const mapId = typeof gameState.map === 'object' ? gameState.map.id : gameState.map;
+
+      logger.game.debug("[Game] 🗺️ Setting background and map config by ID:", mapId);
+      this.backgroundManager.setBackgroundById(mapId);
+
+      // Load map config for spawn positions from global allMapsData
+      const selectedMap = allMapsData.find((map: any) => map.id === mapId);
+      if (selectedMap) {
+        logger.game.debug("[Game] Loaded map config for spawning:", selectedMap.spawnConfiguration);
+        // Just set the map config, don't manage participants (they're managed separately below)
+        this.playerManager.setMapData(selectedMap);
+      } else {
+        logger.game.error("[Game] Could not find map data for ID:", mapId, "Available maps:", allMapsData.map((m: any) => m.id));
+      }
     } else {
       logger.game.error("[Game] ❌ No map data in game state!");
     }

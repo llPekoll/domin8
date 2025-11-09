@@ -32,12 +32,9 @@ export const DEMO_BOT_NAMES = [
 export const DEMO_PARTICIPANT_COUNT = 20; // Always 20 for long game format
 
 export interface DemoParticipant {
-  _id: string; // Use _id to match database structure
-  id: string; // Keep for backward compatibility
   displayName: string;
   character: any; // Full character object from database
   characterId?: any; // Optional for compatibility with Phaser
-  colorHue: number;
   betAmount: number;
   size: number;
   power: number;
@@ -66,19 +63,12 @@ export function generateDemoParticipant(
   const maxBet = 10;
   const randomValue = Math.random();
   // Exponential curve: square the random value to skew toward smaller bets
-  const betAmount = minBet + (randomValue * randomValue) * (maxBet - minBet);
-
-  const id = `demo_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`;
+  const betAmount = minBet + randomValue * randomValue * (maxBet - minBet);
 
   return {
-    _id: id, // Primary id for database compatibility
-    id, // Keep for backward compatibility
-    displayName: `${name} (BOT)`, // Add BOT label to make it clear
+    displayName: name, // Add BOT label to make it clear
     character,
-    colorHue: Math.floor(Math.random() * 360),
     betAmount,
-    // Remove custom size calculation - let PlayerManager.calculateParticipantScale() handle it
-    // This ensures demo uses same scale range as real games
     size: 0, // Placeholder, will be calculated by PlayerManager from betAmount
     power: betAmount,
     position,

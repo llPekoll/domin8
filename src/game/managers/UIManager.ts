@@ -193,13 +193,14 @@ export class UIManager {
     this.timerBackground.setVisible(false);
 
     // Create demo-style countdown (large, centered at bottom like demo mode)
-    const demoCountdownY = this.scene.cameras.main.height * 0.75 + 110; // 75% down screen + 110 offset
+    const demoCountdownY = this.scene.cameras.main.height * 0.75 + 35; // 75% down screen + 35 offset (scaled from 110)
     this.demoCountdownText = this.scene.add.text(this.centerX, demoCountdownY, "60", {
-      fontFamily: "metal-slug, Arial, sans-serif",
-      fontSize: "96px",
+      fontFamily: "metal-slug ",
+      fontSize: "30px", // Scaled down from 96px
       color: "#FF4444",
       stroke: "#000000",
-      strokeThickness: 8,
+      strokeThickness: 3, // Scaled down from 8
+      resolution: 4, // High resolution for crisp text when scaled
     });
     this.demoCountdownText.setOrigin(0.5);
     this.demoCountdownText.setDepth(1000);
@@ -230,22 +231,24 @@ export class UIManager {
     this.vrfContainer.setVisible(false);
 
     // Main text: "DETERMINING WINNER..."
-    this.vrfText = this.scene.add.text(0, -30, "DETERMINING WINNER...", {
-      fontFamily: "metal-slug, Arial, sans-serif",
-      fontSize: "48px",
+    this.vrfText = this.scene.add.text(0, -10, "DETERMINING WINNER...", {
+      fontFamily: "metal-slug",
+      fontSize: "16px", // Scaled down from 48px
       color: "#FFA500", // Domin8 orange
       stroke: "#000000",
-      strokeThickness: 6,
+      strokeThickness: 2, // Scaled down from 6
+      resolution: 4, // High resolution for crisp text when scaled
     });
     this.vrfText.setOrigin(0.5);
 
     // Sub text: "Requesting blockchain randomness"
-    this.vrfSubText = this.scene.add.text(0, 40, "Requesting blockchain randomness", {
-      fontFamily: "metal-slug, Arial, sans-serif",
-      fontSize: "24px",
+    this.vrfSubText = this.scene.add.text(0, 13, "Requesting blockchain randomness", {
+      fontFamily: "metal-slug",
+      fontSize: "8px", // Scaled down from 24px
       color: "#FFFFFF",
       stroke: "#000000",
-      strokeThickness: 4,
+      strokeThickness: 1, // Scaled down from 4
+      resolution: 4, // High resolution for crisp text when scaled
     });
     this.vrfSubText.setOrigin(0.5);
 
@@ -268,23 +271,25 @@ export class UIManager {
     this.winnerContainer.setScrollFactor(0);
     this.winnerContainer.setVisible(false);
 
-    // Phase text (Winner Crowned) - bigger and centered
+    // Phase text (Winner Crowned) - scaled for native resolution
     this.phaseText = this.scene.add.text(0, 0, "", {
-      fontFamily: "metal-slug, Arial, sans-serif",
-      fontSize: "48px",
+      fontFamily: "metal-slug",
+      fontSize: "16px", // Scaled down from 48px
       color: "#FFD700",
       stroke: "#000000",
-      strokeThickness: 5,
+      strokeThickness: 2, // Scaled down from 5
+      resolution: 4, // High resolution for crisp text when scaled
     });
     this.phaseText.setOrigin(0.5);
 
-    // Sub text (restarting info) - bigger and centered
-    this.subText = this.scene.add.text(0, 70, "", {
-      fontFamily: "metal-slug, Arial, sans-serif",
-      fontSize: "28px",
+    // Sub text (restarting info) - scaled for native resolution
+    this.subText = this.scene.add.text(0, 22, "", {
+      fontFamily: "metal-slug",
+      fontSize: "10px", // Scaled down from 28px
       color: "#FFFFFF",
       stroke: "#000000",
-      strokeThickness: 3,
+      strokeThickness: 1, // Scaled down from 3
+      resolution: 4, // High resolution for crisp text when scaled
     });
     this.subText.setOrigin(0.5);
 
