@@ -100,7 +100,7 @@ export class DemoScene extends Scene {
         );
 
         // DEBUG: Draw spawn ellipse to verify configuration
-        this.playerManager.debugDrawSpawnEllipse();
+        // this.playerManager.debugDrawSpawnEllipse();
       }
     });
     this.scale.on("resize", () => this.handleResize(), this);
