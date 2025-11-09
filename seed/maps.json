@@ -3,8 +3,6 @@
     "id": 1,
     "name": "Classic Arena",
     "description": "The original battleground where legends are made",
-    "assetPath": "assets/maps/classic_arena.png",
-    "background": "assets/maps/classic_arena_bg.png",
     "spawnConfiguration": {
       "maxPlayers": 20,
       "spawnRadius": 250,
@@ -17,8 +15,6 @@
     "id": 2,
     "name": "Mystic Forest",
     "description": "An enchanted woodland filled with ancient magic",
-    "assetPath": "assets/maps/mystic_forest.png",
-    "background": "assets/maps/mystic_forest_bg.png",
     "spawnConfiguration": {
       "maxPlayers": 24,
       "spawnRadius": 280,
