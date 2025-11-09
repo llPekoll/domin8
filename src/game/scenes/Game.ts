@@ -177,7 +177,7 @@ export class Game extends Scene {
       if (selectedMap) {
         logger.game.debug("[Game] Loaded map config for spawning:", selectedMap.spawnConfiguration);
         // Just set the map config, don't manage participants (they're managed separately below)
-        this.playerManager.currentMap = selectedMap;
+        this.playerManager.setMapData(selectedMap);
       } else {
         logger.game.error("[Game] Could not find map data for ID:", mapId, "Available maps:", allMapsData.map((m: any) => m.id));
       }

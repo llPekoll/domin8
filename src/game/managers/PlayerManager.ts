@@ -43,6 +43,10 @@ export class PlayerManager {
     this.centerY = centerY;
   }
 
+  setMapData(mapData: any) {
+    this.currentMap = mapData;
+  }
+
   getParticipants(): Map<string, GameParticipant> {
     return this.participants;
   }
@@ -322,6 +326,12 @@ export class PlayerManager {
         }
 
         // Play landing animation, then transition to idle
+        // Safety check: ensure sprite still exists before playing animations
+        if (!sprite || !sprite.active) {
+          logger.game.warn(`[PlayerManager] Sprite no longer exists for ${participantId}, skipping animation`);
+          return;
+        }
+
         const landingAnimKey = `${textureKey}-landing`;
         if (this.scene.anims.exists(landingAnimKey)) {
           sprite.play(landingAnimKey);
@@ -329,7 +339,7 @@ export class PlayerManager {
           // After landing animation completes, switch to idle
           sprite.once("animationcomplete", () => {
             const idleAnimKey = `${textureKey}-idle`;
-            if (this.scene.anims.exists(idleAnimKey)) {
+            if (sprite && sprite.active && this.scene.anims.exists(idleAnimKey)) {
               sprite.play(idleAnimKey);
             }
           });
