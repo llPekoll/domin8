@@ -85,7 +85,7 @@ createRoot(document.getElementById("root")!).render(
         position="top-right"
         toastOptions={{
           style: {
-            fontFamily: '"metal-slug", "Press Start 2P", monospace, Arial, sans-serif',
+            fontFamily: '"metal-slug", "Press Start 2P"',
             fontSize: "14px",
             backgroundColor: "#2c1810",
             color: "#FFD700",

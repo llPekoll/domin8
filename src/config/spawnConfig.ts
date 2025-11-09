@@ -89,10 +89,13 @@ export function generateRandomEllipsePositions(
       // Calculate position on ellipse
       const candidatePosition = calculateEllipsePosition(randomAngle, randomRadius, config);
 
+      // Add randomness to spacing (±20% variation)
+      const spacingVariation = config.minSpacing * (0.8 + Math.random() * 0.4); // 80% to 120% of minSpacing
+
       // Check if this position is far enough from existing positions
       let isTooClose = false;
       for (const existingPos of positions) {
-        if (distance(candidatePosition, existingPos) < config.minSpacing) {
+        if (distance(candidatePosition, existingPos) < spacingVariation) {
           isTooClose = true;
           break;
         }

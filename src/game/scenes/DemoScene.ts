@@ -100,7 +100,7 @@ export class DemoScene extends Scene {
         );
 
         // DEBUG: Draw spawn ellipse to verify configuration
-        // this.playerManager.debugDrawSpawnEllipse();
+        this.playerManager.debugDrawSpawnEllipse();
       }
     });
     this.scale.on("resize", () => this.handleResize(), this);
@@ -345,7 +345,7 @@ export class DemoScene extends Scene {
 
     // "INSERT COIN!" text - scaled for native 396x180 resolution
     this.insertCoinText = this.add.text(0, 0, "INSERT COIN!", {
-      fontFamily: "metal-slug, Arial, sans-serif",
+      fontFamily: "metal-slug",
       fontSize: "20px", // Scaled down from 64px (approximately 1/3)
       color: "#FFD700",
       stroke: "#000000",
@@ -357,7 +357,7 @@ export class DemoScene extends Scene {
 
     // Countdown text - scaled for native resolution
     this.countdownText = this.add.text(0, 35, "30", {
-      fontFamily: "metal-slug, Arial, sans-serif",
+      fontFamily: "metal-slug",
       fontSize: "30px", // Scaled down from 96px
       color: "#FF4444",
       stroke: "#000000",
@@ -368,7 +368,7 @@ export class DemoScene extends Scene {
 
     // Phase text (Battle Royale / Winner Crowned) - scaled for native resolution
     this.phaseText = this.add.text(0, 0, "", {
-      fontFamily: "metal-slug, Arial, sans-serif",
+      fontFamily: "metal-slug",
       fontSize: "16px", // Scaled down from 48px
       color: "#FFD700",
       stroke: "#000000",
@@ -379,7 +379,7 @@ export class DemoScene extends Scene {
 
     // Sub text (participant count / restarting info) - scaled for native resolution
     this.subText = this.add.text(0, 22, "", {
-      fontFamily: "metal-slug, Arial, sans-serif",
+      fontFamily: "metal-slug",
       fontSize: "10px", // Scaled down from 28px
       color: "#FFFFFF",
       stroke: "#000000",

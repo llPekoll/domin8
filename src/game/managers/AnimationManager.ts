@@ -1,7 +1,7 @@
 import { Scene } from "phaser";
 import { SoundManager } from "./SoundManager";
 import { logger } from "../../lib/logger";
-import { STAGE_WIDTH, STAGE_HEIGHT } from "../main";
+import { STAGE_WIDTH, STAGE_HEIGHT, RESOLUTION_SCALE } from "../main";
 
 export class AnimationManager {
   private scene: Scene;
@@ -10,17 +10,18 @@ export class AnimationManager {
   private playerNamesMap: Map<string, string> = new Map();
 
   // Physics configuration for explosion - TWEAK THESE VALUES
+  // Base values are for RESOLUTION_SCALE = 1, automatically scaled
   private readonly EXPLOSION_CONFIG = {
-    forceMin: 150, // Minimum outward force (increased for more sideways)
-    forceMax: 250, // Maximum outward force (increased for more sideways)
-    upwardKickMin: 200, // Minimum upward boost (increased for more height)
-    upwardKickMax: 400, // Maximum upward boost (increased for more height)
-    upwardKickChance: 0.8, // Chance to apply upward kick (increased to 80%)
-    gravity: 150, // Gravity force (higher = falls faster)
-    rotationSpeed: 10, // Max rotation speed
-    fadeStartTime: 1.5, // When to start fading (seconds)
-    fadeRate: 0.3, // How fast to fade (0-1 per second)
-    maxLifetime: 5, // Maximum lifetime (seconds)
+    forceMin: 300 * RESOLUTION_SCALE, // Minimum outward force (doubled from 150)
+    forceMax: 500 * RESOLUTION_SCALE, // Maximum outward force (doubled from 250)
+    upwardKickMin: 300 * RESOLUTION_SCALE, // Minimum upward boost (increased from 200)
+    upwardKickMax: 600 * RESOLUTION_SCALE, // Maximum upward boost (increased from 400)
+    upwardKickChance: 0.8, // Chance to apply upward kick (no scaling needed)
+    gravity: 200 * RESOLUTION_SCALE, // Gravity force (increased from 150 to match higher forces)
+    rotationSpeed: 10, // Max rotation speed (no scaling needed)
+    fadeStartTime: 1.5, // When to start fading (no scaling needed)
+    fadeRate: 0.3, // How fast to fade (no scaling needed)
+    maxLifetime: 5, // Maximum lifetime (no scaling needed)
     showDebugTrails: true, // Set to true to see red trail lines
   };
 
@@ -124,9 +125,9 @@ export class AnimationManager {
       ease: "Power2",
     });
 
-    const throne = this.scene.add.image(this.centerX, this.centerY, "throne");
+    const throne = this.scene.add.image(this.centerX, this.centerY + 50, "throne");
     throne.setDepth(90); // Behind winner (winner is at ~100+)
-    throne.setScale(1);
+    throne.setScale(RESOLUTION_SCALE);
     throne.setAlpha(0);
     // Keep pixel art crisp when scaling
     throne.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -169,7 +170,7 @@ export class AnimationManager {
     // Winner name at bottom of screen
     const nameText = this.scene.add
       .text(this.centerX, screenHeight - 25, winnerDisplayName, {
-        fontFamily: "Arial Black",
+        fontFamily: "jersey",
         fontSize: 12, // Scaled down from 32px
         color: "#ffffff",
         stroke: "#000000",
@@ -334,8 +335,12 @@ export class AnimationManager {
     });
   }
 
-  explodeParticipantsOutward(participants: Map<string, any>) {
+  explodeParticipantsOutward(participants: Map<string, any>, explosionCenterX?: number, explosionCenterY?: number) {
     const config = this.EXPLOSION_CONFIG;
+
+    // Use provided explosion center or fall back to screen center
+    const centerX = explosionCenterX ?? this.centerX;
+    const centerY = explosionCenterY ?? this.centerY;
 
     // Create explosion at center first
     this.createCenterExplosion();
@@ -343,7 +348,7 @@ export class AnimationManager {
     // Add full-screen blood effect when characters are eliminated
     const eliminatedCount = Array.from(participants.values()).filter((p) => p.eliminated).length;
     if (eliminatedCount > 0) {
-      this.createBloodSplatter(this.centerX, this.centerY, true);
+      this.createBloodSplatter(centerX, centerY, true);
 
       // Play death screams for each eliminated character (with slight delays for variety)
       let screamDelay = 0;
@@ -375,9 +380,9 @@ export class AnimationManager {
       const spriteHeight = 32 * participant.sprite.scaleY;
       participant.sprite.setY(currentY - spriteHeight / 2);
 
-      // Calculate angle from center to participant
-      const dx = participant.container.x - this.centerX;
-      const dy = participant.container.y - this.centerY;
+      // Calculate angle from explosion center to participant
+      const dx = participant.container.x - centerX;
+      const dy = participant.container.y - centerY;
       const angle = Math.atan2(dy, dx);
 
       // Random force using config values
@@ -527,7 +532,7 @@ export class AnimationManager {
     // Show betting phase indicator
     const bettingText = this.scene.add
       .text(this.centerX, 15, "BETTING PHASE", {
-        fontFamily: "Arial Black",
+        fontFamily: "jersey",
         fontSize: 12, // Scaled down from 32px
         color: "#00ff00",
         stroke: "#000000",
@@ -859,7 +864,7 @@ export class AnimationManager {
     );
 
     // No manual scaling needed - Phaser.Scale.FIT handles it automatically
-    fullscreenExplosion.setScale(1);
+    fullscreenExplosion.setScale(RESOLUTION_SCALE);
     fullscreenExplosion.setDepth(1550); // Between characters and continuous explosions
     // Keep pixel art crisp when scaling
     fullscreenExplosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -911,8 +916,13 @@ export class AnimationManager {
       }
     });
 
+    // Get the spawn center from PlayerManager's current map config
+    const mapConfig = playerManager.currentMap?.spawnConfiguration;
+    const explosionCenterX = mapConfig ? mapConfig.centerX * RESOLUTION_SCALE : this.centerX;
+    const explosionCenterY = mapConfig ? mapConfig.centerY * RESOLUTION_SCALE : this.centerY;
+
     // Explode losers outward with physics (includes explosions, blood, shake)
-    this.explodeParticipantsOutward(participants);
+    this.explodeParticipantsOutward(participants, explosionCenterX, explosionCenterY);
 
     // After 3 seconds: Show winner celebration
     this.scene.time.delayedCall(3000, () => {

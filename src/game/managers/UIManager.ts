@@ -195,7 +195,7 @@ export class UIManager {
     // Create demo-style countdown (large, centered at bottom like demo mode)
     const demoCountdownY = this.scene.cameras.main.height * 0.75 + 35; // 75% down screen + 35 offset (scaled from 110)
     this.demoCountdownText = this.scene.add.text(this.centerX, demoCountdownY, "60", {
-      fontFamily: "metal-slug, Arial, sans-serif",
+      fontFamily: "metal-slug ",
       fontSize: "30px", // Scaled down from 96px
       color: "#FF4444",
       stroke: "#000000",
@@ -232,7 +232,7 @@ export class UIManager {
 
     // Main text: "DETERMINING WINNER..."
     this.vrfText = this.scene.add.text(0, -10, "DETERMINING WINNER...", {
-      fontFamily: "metal-slug, Arial, sans-serif",
+      fontFamily: "metal-slug",
       fontSize: "16px", // Scaled down from 48px
       color: "#FFA500", // Domin8 orange
       stroke: "#000000",
@@ -243,7 +243,7 @@ export class UIManager {
 
     // Sub text: "Requesting blockchain randomness"
     this.vrfSubText = this.scene.add.text(0, 13, "Requesting blockchain randomness", {
-      fontFamily: "metal-slug, Arial, sans-serif",
+      fontFamily: "metal-slug",
       fontSize: "8px", // Scaled down from 24px
       color: "#FFFFFF",
       stroke: "#000000",
@@ -273,7 +273,7 @@ export class UIManager {
 
     // Phase text (Winner Crowned) - scaled for native resolution
     this.phaseText = this.scene.add.text(0, 0, "", {
-      fontFamily: "metal-slug, Arial, sans-serif",
+      fontFamily: "metal-slug",
       fontSize: "16px", // Scaled down from 48px
       color: "#FFD700",
       stroke: "#000000",
@@ -284,7 +284,7 @@ export class UIManager {
 
     // Sub text (restarting info) - scaled for native resolution
     this.subText = this.scene.add.text(0, 22, "", {
-      fontFamily: "metal-slug, Arial, sans-serif",
+      fontFamily: "metal-slug",
       fontSize: "10px", // Scaled down from 28px
       color: "#FFFFFF",
       stroke: "#000000",

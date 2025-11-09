@@ -5,9 +5,11 @@ import { AUTO, Game } from "phaser";
 import { Preloader } from "./scenes/Preloader";
 
 // Game stage dimensions (used for fullscreen effects and scaling)
-// Doubled from 396x180 to give more space for characters
-export const STAGE_WIDTH = 792;
-export const STAGE_HEIGHT = 360;
+// Base resolution: 396x180
+// Scale factor: Multiply base resolution to adjust overall game size
+export const RESOLUTION_SCALE = 3; // Change this to scale the entire game (1 = 396x180, 2 = 792x360, 3 = 1188x540, etc.)
+export const STAGE_WIDTH = 396 * RESOLUTION_SCALE;
+export const STAGE_HEIGHT = 180 * RESOLUTION_SCALE;
 
 // Global storage for current game's map data
 export let currentMapData: any = null;
