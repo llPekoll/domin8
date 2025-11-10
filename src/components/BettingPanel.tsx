@@ -235,19 +235,19 @@ const BettingPanel = memo(function BettingPanel({
       });
 
       // Show toast
-      const hasRealSignature = signatureHex && !signatureHex.startsWith("transaction_");
-      toast.success(`Tx placed!`, {
-        description: hasRealSignature
-          ? `${signatureHex.slice(0, 3)}...${signatureHex.slice(-3)}`
-          : `Round ${roundId}, Bet ${betIndex}`,
-        duration: 5000,
-        action: hasRealSignature
-          ? {
-              label: "View",
-              onClick: () => window.open(`https://solscan.io/tx/${signatureHex}`, "_blank"),
-            }
-          : undefined,
-      });
+      // const hasRealSignature = signatureHex && !signatureHex.startsWith("transaction_");
+      // toast.success(`Tx placed!`, {
+      //   description: hasRealSignature
+      //     ? `${signatureHex.slice(0, 3)}...${signatureHex.slice(-3)}`
+      //     : `Round ${roundId}, Bet ${betIndex}`,
+      //   duration: 5000,
+      //   action: hasRealSignature
+      //     ? {
+      //         label: "View",
+      //         onClick: () => window.open(`https://solscan.io/tx/${signatureHex}`, "_blank"),
+      //       }
+      //     : undefined,
+      // });
 
       // Emit event for game scene
       const eventData = {
