@@ -16,6 +16,7 @@ import {
 import { Button } from "./ui/button";
 import { isPhantomInstalled, openPhantomDownload } from "../lib/solana-wallet-utils";
 import { toast } from "sonner";
+import { WithdrawDialog } from "./WithdrawDialog";
 
 interface PrivyWalletButtonProps {
   className?: string;
@@ -37,6 +38,7 @@ export function PrivyWalletButton({
   const [isMounted, setIsMounted] = useState(false);
   const [hasPhantom, setHasPhantom] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
 
   // Get Privy embedded wallet from user.linkedAccounts (more reliable)
   const embeddedWalletAccount = user?.linkedAccounts?.find(
@@ -136,7 +138,7 @@ export function PrivyWalletButton({
 
   const handleWithdraw = () => {
     setDropdownOpen(false);
-    toast.info("Withdraw functionality coming soon");
+    setShowWithdrawDialog(true);
   };
 
   const handleProfile = () => {
@@ -201,7 +203,9 @@ export function PrivyWalletButton({
 
   if (compact) {
     return (
-      <div className={`relative ${className}`} ref={dropdownRef}>
+      <>
+        <WithdrawDialog isOpen={showWithdrawDialog} onClose={() => setShowWithdrawDialog(false)} />
+        <div className={`relative ${className}`} ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-700 bg-gray-800/50 backdrop-blur-sm hover:bg-gray-800 transition-colors"
@@ -268,11 +272,14 @@ export function PrivyWalletButton({
           </div>
         )}
       </div>
+      </>
     );
   }
 
   return (
-    <div className={`relative ${className}`} ref={dropdownRef}>
+    <>
+      <WithdrawDialog isOpen={showWithdrawDialog} onClose={() => setShowWithdrawDialog(false)} />
+      <div className={`relative ${className}`} ref={dropdownRef}>
       <button
         onClick={() => setDropdownOpen(!dropdownOpen)}
         className="flex items-center gap-3 px-4 py-2 rounded-lg border border-gray-700 bg-gray-800/50 backdrop-blur-sm hover:bg-gray-800 transition-colors"
@@ -340,5 +347,6 @@ export function PrivyWalletButton({
         </div>
       )}
     </div>
+    </>
   );
 }
