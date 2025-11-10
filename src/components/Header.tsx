@@ -66,17 +66,8 @@ export function Header() {
                 <img src="/assets/logo.webp" alt="Enrageded" className="h-12 w-auto" />
               </div>
 
-              {/* Center - Game Status */}
+              {/* Center - Empty (status moved to PotDisplayPanel) */}
               <div className="flex-1 flex justify-center">
-                {currentRoundState && (
-                  <div className="flex items-center gap-3 xl:ml-60">
-                    <div className="text-amber-400 text-3xl font-bold flex items-center gap-2 leading-tight animate-pulse">
-                      {/* Hide text if there's a winner (celebration/cleanup phase) */}
-                      {!currentRoundState.winner && currentRoundState.status === 0 && "Waiting for Players to Join"}
-                      {!currentRoundState.winner && currentRoundState.status === 1 && "Place Your Bet Now!"}
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Right Side - User Controls */}

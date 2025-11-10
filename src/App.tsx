@@ -6,6 +6,7 @@ import { CharacterSelection2 } from "./components/CharacterSelection2";
 import { BettingPanel } from "./components/BettingPanel";
 import { BlockchainDebugDialog } from "./components/BlockchainDebugDialog";
 import { MultiParticipantPanel } from "./components/MultiParticipantPanel";
+import { PotDisplayPanel } from "./components/PotDisplayPanel";
 import { useActiveGame } from "./hooks/useActiveGame";
 import { EventBus } from "./game/EventBus";
 import { setActiveGameData } from "./game/main";
@@ -97,6 +98,9 @@ export default function App() {
 
       {/* Betting Panel - Bottom Center */}
       <BettingPanel selectedCharacter={selectedCharacter} />
+
+      {/* Pot Display - Top Center */}
+      <PotDisplayPanel />
 
       <MultiParticipantPanel />
       <BlockchainDebugDialog />
