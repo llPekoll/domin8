@@ -84,6 +84,14 @@ const BettingPanel = memo(function BettingPanel({
     setBetAmount(amount.toString());
   };
 
+  const handleIncrementBet = (increment: number) => {
+    const currentAmount = parseFloat(betAmount) || 0;
+    const newAmount = currentAmount + increment;
+    // Cap at max bet of 10 SOL
+    const cappedAmount = Math.min(newAmount, 10);
+    setBetAmount(cappedAmount.toFixed(2));
+  };
+
   const handlePlaceBet = useCallback(async () => {
     if (!connected || !publicKey || !playerData || !selectedCharacter) {
       toast.error("Please wait for data to load or select a character");
@@ -321,6 +329,7 @@ const BettingPanel = memo(function BettingPanel({
             placeholder="Amount"
             min={0.1}
             max={10}
+            step={0.1}
             className="text-2xl w-full px-3 py-2 bg-black/30 border border-amber-700/50 rounded-lg text-amber-100 placeholder-amber-600 text-center  font-bold focus:outline-none focus:border-amber-500"
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-amber-500 text-xs font-bold">
@@ -331,22 +340,22 @@ const BettingPanel = memo(function BettingPanel({
         {/* Quick bet buttons */}
         <div className="grid grid-cols-3 gap-2 w-1/3">
           <button
-            onClick={() => handleQuickBet(0.1)}
-            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-sm font-bold transition-colors"
+            onClick={() => handleIncrementBet(0.1)}
+            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-2xl font-bold transition-colors"
           >
-            0.1
+            +0.1
           </button>
           <button
-            onClick={() => handleQuickBet(0.5)}
-            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-sm font-bold transition-colors"
+            onClick={() => handleIncrementBet(0.5)}
+            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-2xl font-bold transition-colors"
           >
-            0.5
+            +0.5
           </button>
           <button
-            onClick={() => handleQuickBet(1)}
-            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-sm font-bold transition-colors"
+            onClick={() => handleIncrementBet(1)}
+            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-2xl font-bold transition-colors"
           >
-            1
+            +1
           </button>
         </div>
 
