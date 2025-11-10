@@ -80,10 +80,6 @@ const BettingPanel = memo(function BettingPanel({
     return false;
   }, [activeGame]);
 
-  const handleQuickBet = (amount: number) => {
-    setBetAmount(amount.toString());
-  };
-
   const handleIncrementBet = (increment: number) => {
     const currentAmount = parseFloat(betAmount) || 0;
     const newAmount = currentAmount + increment;

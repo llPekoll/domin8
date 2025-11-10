@@ -14,7 +14,6 @@ interface CharacterPreviewSceneProps {
 export const CharacterPreviewScene: React.FC<CharacterPreviewSceneProps> = ({
   characterId,
   characterName,
-  isSpecial,
   width = 140,
   height = 140,
 }) => {

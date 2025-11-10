@@ -39,6 +39,7 @@ export class GlobalGameStateManager {
   // Timing state
   private celebrationStartTime: number = 0;
   private lastCountdownSeconds: number = -1;
+  private currentGameEndTimestamp: number = 0; // Track current game's end time
 
   // Animation tracking
   private battleSequenceStarted: boolean = false;
@@ -46,6 +47,12 @@ export class GlobalGameStateManager {
 
   // Initial state handling
   private pendingInitialGameState: any = null;
+
+  // Store current game state for phase transitions
+  private currentGameState: any = null;
+
+  // Local countdown timer
+  private countdownInterval: NodeJS.Timeout | null = null;
 
   // Constants
   private readonly CELEBRATION_DURATION = 4000; // 4 seconds (reduced from 15s)
@@ -55,6 +62,48 @@ export class GlobalGameStateManager {
     this.game = game;
     logger.game.debug("[GlobalGameStateManager] 🎬 Initialized");
     this.setupEventListeners();
+    this.startCountdownTimer(); // ✅ Start local timer immediately
+  }
+
+  /**
+   * Start local countdown timer (checks every second)
+   * This allows us to detect countdown=0 immediately without waiting for blockchain updates
+   */
+  private startCountdownTimer() {
+    if (this.countdownInterval) return;
+
+    this.countdownInterval = setInterval(() => {
+      this.checkLocalCountdown();
+    }, 1000); // Check every second
+
+    logger.game.debug("[GlobalGameStateManager] ⏱️ Local countdown timer started");
+  }
+
+  /**
+   * Check countdown locally (independent of blockchain updates)
+   */
+  private checkLocalCountdown() {
+    // Only check during WAITING phase with valid endTimestamp
+    if (this.currentPhase !== GamePhase.WAITING) return;
+    if (!this.currentGameEndTimestamp || this.currentGameEndTimestamp === 0) return;
+
+    const currentTime = Date.now();
+    const timeRemaining = Math.max(0, this.currentGameEndTimestamp - currentTime);
+    const countdownSeconds = Math.ceil(timeRemaining / 1000);
+
+    // Detect countdown ending (transition from >0 to 0)
+    if (countdownSeconds === 0 && this.lastCountdownSeconds > 0) {
+      logger.game.debug("=".repeat(60));
+      logger.game.debug("[GlobalGameStateManager] ⏰ LOCAL COUNTDOWN REACHED 0!");
+      logger.game.debug("[GlobalGameStateManager] 🎲 Transitioning to VRF_PENDING");
+      logger.game.debug("=".repeat(60));
+
+      // Transition to VRF_PENDING (wait for winner from blockchain)
+      this.currentPhase = GamePhase.VRF_PENDING;
+      EventBus.emit("game-phase-changed", GamePhase.VRF_PENDING);
+    }
+
+    this.lastCountdownSeconds = countdownSeconds;
   }
 
   private setupEventListeners() {
@@ -149,6 +198,12 @@ export class GlobalGameStateManager {
         `[GlobalGameStateManager] [${timestamp}] ⏸️ Ignoring update - Preloader is active (will read activeGameData directly)`
       );
       return; // Just ignore, Preloader handles initial state
+    }
+
+    // ✅ Store endTimestamp for local countdown timer
+    const endTimestamp = gameState?.endTimestamp || gameState?.endDate;
+    if (endTimestamp && endTimestamp !== 0) {
+      this.currentGameEndTimestamp = endTimestamp > 10000000000 ? endTimestamp : endTimestamp * 1000;
     }
 
     // Determine what phase we should be in
@@ -265,9 +320,23 @@ export class GlobalGameStateManager {
   private handlePhaseTransition(targetPhase: GamePhase, gameState: any) {
     const oldPhase = this.currentPhase;
 
-    // No change, but check for countdown ending
+    // ✅ Special case: VRF_PENDING + winner arrives → Go to FIGHTING
+    if (oldPhase === GamePhase.VRF_PENDING && this.checkHasWinner(gameState)) {
+      logger.game.debug("=".repeat(60));
+      logger.game.debug("[GlobalGameStateManager] 🏆 WINNER ARRIVED!");
+      logger.game.debug("[GlobalGameStateManager] ⚔️ Transitioning VRF_PENDING → FIGHTING");
+      logger.game.debug("=".repeat(60));
+
+      this.currentGameState = gameState; // Store for later phases
+      this.currentPhase = GamePhase.FIGHTING;
+      EventBus.emit("game-phase-changed", GamePhase.FIGHTING);
+      this.updateActiveSceneWithGameState(gameState); // Update scene with winner data
+      this.startBattleSequence();
+      return;
+    }
+
+    // No change, check for celebration progress
     if (oldPhase === targetPhase) {
-      this.checkCountdownTransition(gameState);
       this.checkCelebrationProgress();
       return;
     }
@@ -303,36 +372,6 @@ export class GlobalGameStateManager {
     this.handlePhaseActions(previousPhase, targetPhase, gameState);
   }
 
-  /**
-   * Check if countdown just reached 0 → trigger VRF_PENDING
-   */
-  private checkCountdownTransition(gameState: any) {
-    if (!gameState) return;
-
-    const endTimestamp = gameState.endTimestamp || gameState.endDate;
-    if (!endTimestamp || endTimestamp === 0) return;
-
-    const endTimestampMs = endTimestamp > 10000000000 ? endTimestamp : endTimestamp * 1000;
-    const currentTime = Date.now();
-    const timeRemaining = Math.max(0, endTimestampMs - currentTime);
-    const countdownSeconds = Math.ceil(timeRemaining / 1000);
-
-    // Detect countdown ending (transition from >0 to 0)
-    if (
-      countdownSeconds === 0 &&
-      this.lastCountdownSeconds > 0 &&
-      this.currentPhase === GamePhase.WAITING
-    ) {
-      logger.game.debug("=".repeat(60));
-      logger.game.debug("[GlobalGameStateManager] ⏰ COUNTDOWN REACHED 0!");
-      logger.game.debug("=".repeat(60));
-
-      this.currentPhase = GamePhase.VRF_PENDING;
-      EventBus.emit("game-phase-changed", GamePhase.VRF_PENDING);
-    }
-
-    this.lastCountdownSeconds = countdownSeconds;
-  }
 
   /**
    * Check celebration progress and cleanup when done
@@ -412,14 +451,25 @@ export class GlobalGameStateManager {
 
     this.battleSequenceStarted = true;
 
+    logger.game.debug("[GlobalGameStateManager] ⚔️ Starting battle sequence (3s)");
+
     // Tell Game scene to start battle animations
     EventBus.emit("start-battle-phase");
 
     // Transition to CELEBRATING after battle duration
     setTimeout(() => {
       if (this.currentPhase === GamePhase.FIGHTING) {
+        logger.game.debug("[GlobalGameStateManager] ⚔️ Battle complete, transitioning to CELEBRATING");
+
         this.currentPhase = GamePhase.CELEBRATING;
         EventBus.emit("game-phase-changed", GamePhase.CELEBRATING);
+
+        // Start celebration with elapsedTime=0 (we just finished FIGHTING)
+        if (this.currentGameState) {
+          this.startCelebrationSequence(this.currentGameState, 0);
+        } else {
+          logger.game.error("[GlobalGameStateManager] ❌ No game state available for celebration!");
+        }
       }
     }, this.BATTLE_DURATION);
   }
@@ -474,7 +524,16 @@ export class GlobalGameStateManager {
     setTimeout(() => {
       if (this.currentPhase === GamePhase.CLEANUP) {
         logger.game.debug("[GlobalGameStateManager] Cleanup complete, transitioning to Demo");
+
+        // ✅ Reset all game state
         this.currentPhase = GamePhase.IDLE;
+        this.currentGameState = null;
+        this.currentGameEndTimestamp = 0;
+        this.lastCountdownSeconds = -1;
+        this.battleSequenceStarted = false;
+        this.celebrationSequenceStarted = false;
+        this.celebrationStartTime = 0;
+
         EventBus.emit("game-phase-changed", GamePhase.IDLE);
 
         // ✅ Directly transition to Demo scene
@@ -607,6 +666,13 @@ export class GlobalGameStateManager {
    * Clean up event listeners
    */
   destroy() {
+    // Stop countdown timer
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
+      logger.game.debug("[GlobalGameStateManager] ⏱️ Countdown timer stopped");
+    }
+
     EventBus.off("blockchain-state-update");
     EventBus.off("player-names-update");
     EventBus.off("current-scene-ready");
