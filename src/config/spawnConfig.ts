@@ -1,58 +1,42 @@
 /**
  * Spawn Configuration
  * Controls the shape and positioning of participant spawn locations
- * NEW: Fully randomized spawns - no predictable patterns
+ * NEW: Per-map ellipse configuration based on Aseprite measurements
  */
 import { logger } from "../lib/logger";
 
-export const SPAWN_CONFIG = {
-  // Ellipse ratios - multiply radius by these values for each axis
-  ELLIPSE_RATIO_X: 2.5, // 2.5x wider on horizontal axis
-  ELLIPSE_RATIO_Y: 0.5, // 0.5x flatter on vertical axis
-
-  // Spawn radius ranges
-  MIN_SPAWN_RADIUS: 200, // Minimum distance from center
-  MAX_SPAWN_RADIUS: 400, // Maximum distance from center
-
-  // Position jitter (additional random offset after ellipse calculation)
-  POSITION_JITTER_X: 80, // ±40 pixels horizontal
-  POSITION_JITTER_Y: 60, // ±30 pixels vertical
-
-  // Minimum distance between spawn points to avoid overlap
-  MIN_DISTANCE_BETWEEN_SPAWNS: 50, // pixels
-} as const;
+/**
+ * Map-specific spawn configuration
+ * Measurements taken from Aseprite ellipse tool
+ */
+export interface MapSpawnConfig {
+  centerX: number; // Center X position in pixels
+  centerY: number; // Center Y position in pixels (from top of image)
+  radiusX: number; // Horizontal ellipse radius (from Aseprite measurement)
+  radiusY: number; // Vertical ellipse radius (max of top/bottom)
+  minSpawnRadius: number; // Inner dead zone (avoid center clustering)
+  maxSpawnRadius: number; // Outer spawn boundary (radiusY - character margin)
+  minSpacing: number; // Minimum distance between character spawns
+}
 
 /**
- * Calculate elliptical spawn position with randomness
+ * Calculate elliptical spawn position
  * @param angle - Angle in radians (0 to 2π)
- * @param radius - Base radius before ellipse transformation
- * @param centerX - Center X coordinate
- * @param centerY - Center Y coordinate
- * @param withRandomness - Whether to apply jitter (default true)
+ * @param radius - Distance from center
+ * @param config - Map-specific spawn configuration
  * @returns Position {x, y}
  */
 export function calculateEllipsePosition(
   angle: number,
   radius: number,
-  centerX: number,
-  centerY: number,
-  withRandomness: boolean = true
+  config: MapSpawnConfig
 ): { x: number; y: number } {
-  const baseX = centerX + Math.cos(angle) * radius * SPAWN_CONFIG.ELLIPSE_RATIO_X;
-  const baseY = centerY + Math.sin(angle) * radius * SPAWN_CONFIG.ELLIPSE_RATIO_Y;
+  // Calculate position on ellipse using radiusX and radiusY from config
+  const normalizedRadius = radius / config.radiusY; // Normalize to vertical radius
+  const x = config.centerX + Math.cos(angle) * config.radiusX * normalizedRadius;
+  const y = config.centerY + Math.sin(angle) * config.radiusY * normalizedRadius;
 
-  if (!withRandomness) {
-    return { x: baseX, y: baseY };
-  }
-
-  // Add random jitter to make it unpredictable
-  const jitterX = (Math.random() - 0.5) * SPAWN_CONFIG.POSITION_JITTER_X;
-  const jitterY = (Math.random() - 0.5) * SPAWN_CONFIG.POSITION_JITTER_Y;
-
-  return {
-    x: baseX + jitterX,
-    y: baseY + jitterY,
-  };
+  return { x, y };
 }
 
 /**
@@ -66,23 +50,27 @@ function distance(p1: { x: number; y: number }, p2: { x: number; y: number }): n
  * Generate truly random ellipse positions with collision avoidance
  * Each spawn point is:
  * - Random angle around the ellipse
- * - Random radius within range
- * - Random jitter applied
+ * - Random radius within map-specific range
  * - Guaranteed minimum distance from other spawns
  *
  * @param count - Number of positions to generate
- * @param centerX - Center X coordinate
- * @param centerY - Center Y coordinate
+ * @param config - Map-specific spawn configuration (from database)
  * @returns Array of random positions with no predictable pattern
  */
 export function generateRandomEllipsePositions(
   count: number,
-  centerX: number,
-  centerY: number
+  config: MapSpawnConfig
 ): Array<{ x: number; y: number }> {
   const positions: Array<{ x: number; y: number }> = [];
 
-  logger.game.debug(`[SpawnConfig] 🎲 Generating ${count} FULLY RANDOM positions`);
+  logger.game.debug(`[SpawnConfig] 🎲 Generating ${count} random positions with config:`, {
+    centerX: config.centerX,
+    centerY: config.centerY,
+    radiusX: config.radiusX,
+    radiusY: config.radiusY,
+    minSpawnRadius: config.minSpawnRadius,
+    maxSpawnRadius: config.maxSpawnRadius,
+  });
 
   for (let i = 0; i < count; i++) {
     let attempts = 0;
@@ -94,24 +82,20 @@ export function generateRandomEllipsePositions(
       // Completely random angle (0 to 2π)
       const randomAngle = Math.random() * Math.PI * 2;
 
-      // Completely random radius within range
+      // Completely random radius within map-specific range
       const randomRadius =
-        SPAWN_CONFIG.MIN_SPAWN_RADIUS +
-        Math.random() * (SPAWN_CONFIG.MAX_SPAWN_RADIUS - SPAWN_CONFIG.MIN_SPAWN_RADIUS);
+        config.minSpawnRadius + Math.random() * (config.maxSpawnRadius - config.minSpawnRadius);
 
-      // Calculate position with jitter
-      const candidatePosition = calculateEllipsePosition(
-        randomAngle,
-        randomRadius,
-        centerX,
-        centerY,
-        true // Apply jitter
-      );
+      // Calculate position on ellipse
+      const candidatePosition = calculateEllipsePosition(randomAngle, randomRadius, config);
+
+      // Add randomness to spacing (±20% variation)
+      const spacingVariation = config.minSpacing * (0.8 + Math.random() * 0.4); // 80% to 120% of minSpacing
 
       // Check if this position is far enough from existing positions
       let isTooClose = false;
       for (const existingPos of positions) {
-        if (distance(candidatePosition, existingPos) < SPAWN_CONFIG.MIN_DISTANCE_BETWEEN_SPAWNS) {
+        if (distance(candidatePosition, existingPos) < spacingVariation) {
           isTooClose = true;
           break;
         }
@@ -129,9 +113,8 @@ export function generateRandomEllipsePositions(
     if (!position) {
       const fallbackAngle = Math.random() * Math.PI * 2;
       const fallbackRadius =
-        SPAWN_CONFIG.MIN_SPAWN_RADIUS +
-        Math.random() * (SPAWN_CONFIG.MAX_SPAWN_RADIUS - SPAWN_CONFIG.MIN_SPAWN_RADIUS);
-      position = calculateEllipsePosition(fallbackAngle, fallbackRadius, centerX, centerY, true);
+        config.minSpawnRadius + Math.random() * (config.maxSpawnRadius - config.minSpawnRadius);
+      position = calculateEllipsePosition(fallbackAngle, fallbackRadius, config);
       logger.game.warn(
         `[SpawnConfig] ⚠️ Could not find non-overlapping position for spawn ${i}, using fallback`
       );

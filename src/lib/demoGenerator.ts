@@ -32,12 +32,10 @@ export const DEMO_BOT_NAMES = [
 export const DEMO_PARTICIPANT_COUNT = 20; // Always 20 for long game format
 
 export interface DemoParticipant {
-  _id: string; // Use _id to match database structure
-  id: string; // Keep for backward compatibility
+  _id: string; // Unique ID for participant
   displayName: string;
   character: any; // Full character object from database
   characterId?: any; // Optional for compatibility with Phaser
-  colorHue: number;
   betAmount: number;
   size: number;
   power: number;
@@ -60,19 +58,20 @@ export function generateDemoParticipant(
   // Random character type from database
   const character = dbCharacters[Math.floor(Math.random() * dbCharacters.length)];
 
-  // Random bet amount (0.01 - 1 SOL equivalent, represented as 10-1000 coins)
-  const betAmount = Math.floor(Math.random() * 990) + 10;
-
-  const id = `demo_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`;
+  // Random bet amount (0.001 - 10 SOL to match real game betting limits)
+  // Using exponential distribution to favor smaller bets (more realistic)
+  const minBet = 0.001;
+  const maxBet = 10;
+  const randomValue = Math.random();
+  // Exponential curve: square the random value to skew toward smaller bets
+  const betAmount = minBet + randomValue * randomValue * (maxBet - minBet);
 
   return {
-    _id: id, // Primary id for database compatibility
-    id, // Keep for backward compatibility
-    displayName: `${name} (BOT)`, // Add BOT label to make it clear
+    _id: `demo_bot_${index}_${Date.now()}_${Math.random()}`, // Unique ID for each bot
+    displayName: name,
     character,
-    colorHue: Math.floor(Math.random() * 360),
     betAmount,
-    size: Math.max(0.8, Math.min(2.0, betAmount / 500)),
+    size: 0, // Placeholder, will be calculated by PlayerManager from betAmount
     power: betAmount,
     position,
     spawnIndex: index,

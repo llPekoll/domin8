@@ -4,8 +4,16 @@ import { PlayerManager } from "../managers/PlayerManager";
 import { AnimationManager } from "../managers/AnimationManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
-import { demoMapData } from "../main";
+import { charactersData, allMapsData } from "../main";
 import { logger } from "../../lib/logger";
+import {
+  generateDemoParticipant,
+  generateDemoWinner,
+  generateRandomSpawnIntervals,
+  DEMO_PARTICIPANT_COUNT,
+} from "../../lib/demoGenerator";
+import { DEMO_TIMINGS } from "../../config/demoTimings";
+import { generateRandomEllipsePositions } from "../../config/spawnConfig";
 
 /**
  * DemoScene - Pure client-side demo mode
@@ -16,7 +24,11 @@ import { logger } from "../../lib/logger";
  * - 3 phases: spawning (30s) → arena (3s) → results (5s)
  * - Auto-restart loop
  * - No database calls, no blockchain
+ * - Listens to GamePhaseManager: active when phase === IDLE
  */
+
+type DemoPhase = "spawning" | "arena" | "results";
+
 export class DemoScene extends Scene {
   camera!: Phaser.Cameras.Scene2D.Camera;
   centerX: number = 0;
@@ -29,6 +41,17 @@ export class DemoScene extends Scene {
 
   // Demo state
   private participants: any[] = [];
+  private isActive: boolean = false; // ✅ Start INACTIVE, wait for confirmation
+  private demoPhase: DemoPhase = "spawning";
+  private countdown: number = 30;
+  private shuffledPositions: Array<{ x: number; y: number }> = [];
+  private spawnTimeouts: NodeJS.Timeout[] = [];
+  private spawnCount: number = 0;
+  private isSpawning: boolean = false;
+  private initialStateReceived: boolean = false; // ✅ Track if we got initial state
+
+  // Timers
+  private countdownTimer?: Phaser.Time.TimerEvent;
 
   private battleMusic: Phaser.Sound.BaseSound | null = null;
   private audioUnlocked: boolean = false;
@@ -42,29 +65,54 @@ export class DemoScene extends Scene {
   private subText!: Phaser.GameObjects.Text;
 
   constructor() {
-    super("DemoScene");
+    super("Demo");
   }
 
   create() {
-    logger.game.debug("[DemoScene] 🎮 DemoScene created and ready");
     this.camera = this.cameras.main;
     this.centerX = this.camera.centerX;
     this.centerY = this.camera.centerY;
 
     this.playerManager = new PlayerManager(this, this.centerX, this.centerY);
     this.animationManager = new AnimationManager(this, this.centerX, this.centerY);
-    this.backgroundManager = new BackgroundManager(this, this.centerX, this.centerY + 200);
+    this.backgroundManager = new BackgroundManager(this, this.centerX, this.centerY);
 
-    // Initialize background immediately with preloaded demo map
-    if (demoMapData?.background) {
-      logger.game.debug("[DemoScene] Initializing background with:", demoMapData.background);
-      this.backgroundManager.setTexture(demoMapData.background);
+    // Initialize background with random selection between available backgrounds
+    // Available backgrounds: bg1 (Arena Classic), bg2 (Secte Arena)
+    const availableBackgrounds = [1, 2];
+    const randomBgId =
+      availableBackgrounds[Math.floor(Math.random() * availableBackgrounds.length)];
+    logger.game.debug("[DemoScene] Randomly selected background ID:", randomBgId);
+    this.backgroundManager.setBackgroundById(randomBgId);
+
+    // Load corresponding map config for spawn positions
+    const selectedMap = allMapsData.find((map: any) => map.id === randomBgId);
+    if (selectedMap) {
+      logger.game.debug("[DemoScene] Loaded map config:", selectedMap.spawnConfiguration);
+      // Pass map data to PlayerManager for spawn calculations
+      this.playerManager.updateParticipantsInWaiting([], selectedMap);
+
+      // Generate spawn positions from map config
+      this.shuffledPositions = generateRandomEllipsePositions(
+        DEMO_PARTICIPANT_COUNT,
+        selectedMap.spawnConfiguration
+      );
+
+      // DEBUG: Draw spawn ellipse to verify configuration
+      // this.playerManager.debugDrawSpawnEllipse();
+
+      logger.game.debug("[DemoScene] Positions ready, starting demo mode");
     } else {
-      logger.game.warn("[DemoScene] No demo map data available!");
+      logger.game.error("[DemoScene] Could not find map config for ID:", randomBgId);
     }
-
-    this.scale.on("resize", () => this.handleResize(), this);
     EventBus.emit("current-scene-ready", this);
+
+    // Listen for when scene becomes active again after Game scene (restart fresh demo)
+    this.events.on("transitioncomplete", () => {
+      logger.game.debug("[DemoScene] Transition complete, restarting demo");
+      this.initialStateReceived = true; // We know we're in IDLE phase after transition
+      this.startDemoMode();
+    });
 
     // Initialize SoundManager
     SoundManager.initialize();
@@ -77,45 +125,252 @@ export class DemoScene extends Scene {
       SoundManager.playInsertCoin(this);
     });
 
-    // Listen for player bet placement to spawn character immediately
-    EventBus.on("player-bet-placed", (data: {
-      characterId: number;
-      characterName: string;
-      position: [number, number];
-      betAmount: number;
-      roundId: number;
-      betIndex: number;
-      walletAddress: string;
-    }) => {
-      logger.game.debug("[DemoScene] 🎯 RECEIVED player-bet-placed EVENT");
-      logger.game.debug("[DemoScene] Event data:", data);
-
-      // Derive character key from character name (e.g., "Warrior" -> "warrior")
-      const characterKey = data.characterName?.toLowerCase().replace(/\s+/g, "-") || "warrior";
-
-      // Transform the data into the format expected by PlayerManager
-      const participant = {
-        _id: `${data.walletAddress}_${data.betIndex}`, // Unique ID combining wallet + bet index
-        playerId: data.walletAddress,
-        displayName: data.characterName || "Player",
-        betAmount: data.betAmount,
-        character: {
-          key: characterKey, // Derived sprite key
-          name: data.characterName,
-          id: data.characterId, // Store blockchain numeric ID for reference
-        },
-        spawnIndex: data.betIndex, // Use bet index as spawn index
-        isBot: false, // This is a real player
-        eliminated: false,
-        colorHue: undefined, // Will be assigned by backend if needed
-      };
-
-      // Spawn the character in the demo scene
-      this.spawnDemoParticipant(participant);
+    // Listen for game-started event from GlobalGameStateManager to stop demo
+    EventBus.on("game-started", () => {
+      logger.game.debug("[DemoScene] 🛑 Real game starting, stopping demo mode");
+      this.stopDemoMode();
     });
+
+    // Listen for demo-mode-active event from GlobalGameStateManager to restart demo
+    EventBus.on("demo-mode-active", (isActive: boolean) => {
+      logger.game.debug("[DemoScene] Received demo-mode-active event:", isActive);
+
+      // Mark that we received initial state
+      if (!this.initialStateReceived) {
+        this.initialStateReceived = true;
+        logger.game.debug("[DemoScene] ✅ Initial state confirmed: DEMO MODE");
+      }
+
+      if (isActive && !this.isActive) {
+        logger.game.debug("[DemoScene] 🎮 Demo mode activated");
+        this.clearDemoParticipants();
+        this.startDemoMode();
+      }
+    });
+
+    // ✅ NEW: Also listen to game-phase-changed for initial IDLE phase
+    EventBus.on("game-phase-changed", (newPhase: string) => {
+      logger.game.debug("[DemoScene] Received game-phase-changed:", newPhase);
+
+      // If initial state is IDLE, start demo
+      if (newPhase === "idle" && !this.initialStateReceived) {
+        this.initialStateReceived = true;
+        logger.game.debug("[DemoScene] ✅ Initial state confirmed: IDLE, starting demo");
+        this.startDemoMode();
+      }
+    });
+
+    // Listen for player bet placement to spawn character immediately
+    // CRITICAL: Only spawn if demo is active, not during real game
+    EventBus.on(
+      "player-bet-placed",
+      (data: {
+        characterId: number;
+        characterName: string;
+        position: [number, number];
+        betAmount: number;
+        roundId: number;
+        betIndex: number;
+        walletAddress: string;
+      }) => {
+        // GUARD: Only spawn characters in demo scene if demo is actually active
+        if (!this.isActive) {
+          logger.game.debug("[DemoScene] Ignoring player-bet-placed event (demo not active)");
+          return;
+        }
+
+        logger.game.debug("[DemoScene] Spawning player character in demo mode", data);
+
+        // Derive character key from character name (e.g., "Warrior" -> "warrior")
+        const characterKey = data.characterName?.toLowerCase().replace(/\s+/g, "-") || "warrior";
+
+        // Transform the data into the format expected by PlayerManager
+        const participant = {
+          _id: `${data.walletAddress}_${data.betIndex}`, // Unique ID combining wallet + bet index
+          playerId: data.walletAddress,
+          displayName: data.characterName || "Player",
+          betAmount: data.betAmount,
+          character: {
+            key: characterKey, // Derived sprite key
+            name: data.characterName,
+            id: data.characterId, // Store blockchain numeric ID for reference
+          },
+          spawnIndex: data.betIndex, // Use bet index as spawn index
+          isBot: false, // This is a real player
+          eliminated: false,
+          colorHue: undefined, // Will be assigned by backend if needed
+        };
+
+        // Spawn the character in the demo scene
+        this.spawnDemoParticipant(participant);
+      }
+    );
 
     // Create demo UI
     this.createDemoUI();
+
+    // ✅ DON'T auto-start demo - wait for initial state confirmation from GlobalGameStateManager
+    // Demo will start when we receive "demo-mode-active" event OR after timeout
+    logger.game.debug("[DemoScene] Waiting for initial state confirmation before starting demo...");
+
+    // Safety timeout: if no state arrives in 2 seconds, assume IDLE and start demo
+    this.time.delayedCall(2000, () => {
+      if (!this.initialStateReceived) {
+        logger.game.warn(
+          "[DemoScene] No initial state received after 2s, starting demo as fallback"
+        );
+        this.initialStateReceived = true;
+        this.startDemoMode();
+      }
+    });
+  }
+
+  private startDemoMode() {
+    logger.game.debug("[DemoScene] 🎬 Starting demo mode");
+
+    // First, ensure everything is cleared (defensive cleanup)
+    this.clearAllDemoState();
+
+    // Reset state
+    this.isActive = true;
+    this.countdown = DEMO_TIMINGS.SPAWNING_PHASE_DURATION / 1000;
+    this.demoPhase = "spawning";
+    this.participants = [];
+    this.spawnCount = 0;
+    this.isSpawning = false;
+
+    // Note: shuffledPositions are generated in create() after map config loads
+
+    // Update UI
+    this.updateDemoUI(this.demoPhase, this.countdown, 0);
+
+    // Start countdown timer
+    this.startCountdownTimer();
+
+    // Start spawning bots
+    this.startBotSpawning();
+  }
+
+  private stopDemoMode() {
+    this.isActive = false;
+    this.clearAllDemoState();
+
+    // Hide demo UI
+    if (this.demoUIContainer) {
+      this.demoUIContainer.setVisible(false);
+    }
+  }
+
+  private clearAllDemoState() {
+    // Clear timers
+    if (this.countdownTimer) {
+      this.countdownTimer.destroy();
+      this.countdownTimer = undefined;
+    }
+
+    // Clear spawn timeouts
+    this.spawnTimeouts.forEach((timeout) => clearTimeout(timeout));
+    this.spawnTimeouts = [];
+
+    // Clear participants
+    this.clearDemoParticipants();
+
+    this.isSpawning = false;
+    this.spawnCount = 0;
+  }
+
+  private startCountdownTimer() {
+    if (this.countdownTimer) {
+      this.countdownTimer.destroy();
+    }
+
+    this.countdownTimer = this.time.addEvent({
+      delay: 1000,
+      callback: () => {
+        if (!this.isActive || this.demoPhase !== "spawning") return;
+
+        this.countdown--;
+        this.updateDemoUI(this.demoPhase, this.countdown, this.participants.length);
+
+        if (this.countdown <= 0) {
+          // Transition to arena phase
+          this.transitionToArenaPhase();
+        }
+      },
+      loop: true,
+    });
+  }
+
+  private startBotSpawning() {
+    if (this.isSpawning || !charactersData || charactersData.length === 0) {
+      logger.game.warn("[DemoScene] Cannot start spawning:", {
+        isSpawning: this.isSpawning,
+        hasCharacters: !!charactersData,
+      });
+      return;
+    }
+
+    logger.game.debug("[DemoScene] Starting bot spawn sequence");
+    this.isSpawning = true;
+
+    // Generate random spawn intervals
+    const spawnIntervals = generateRandomSpawnIntervals(DEMO_PARTICIPANT_COUNT);
+
+    let cumulativeTime = 0;
+    spawnIntervals.forEach((interval) => {
+      cumulativeTime += interval;
+
+      const timeout = setTimeout(() => {
+        if (!this.isActive || this.spawnCount >= DEMO_PARTICIPANT_COUNT) return;
+
+        const position = this.shuffledPositions[this.spawnCount];
+        if (!position) {
+          logger.game.error(`[DemoScene] No position at index ${this.spawnCount}`);
+          return;
+        }
+
+        const participant = generateDemoParticipant(this.spawnCount, charactersData, position);
+
+        this.spawnDemoParticipant(participant);
+        this.spawnCount++;
+        this.updateDemoUI(this.demoPhase, this.countdown, this.participants.length);
+      }, cumulativeTime);
+
+      this.spawnTimeouts.push(timeout);
+    });
+  }
+
+  private transitionToArenaPhase() {
+    logger.game.debug("[DemoScene] ⚔️ Transitioning to arena phase");
+    this.demoPhase = "arena";
+    this.updateDemoUI(this.demoPhase, 0, this.participants.length);
+
+    // Use shared battle phase animation sequence
+    this.animationManager.startBattlePhaseSequence(this.playerManager);
+
+    // After 3 seconds, show results (using max duration)
+    this.time.delayedCall(DEMO_TIMINGS.ARENA_PHASE_MAX_DURATION, () => {
+      this.transitionToResultsPhase();
+    });
+  }
+
+  private transitionToResultsPhase() {
+    logger.game.debug("[DemoScene] 🏆 Transitioning to results phase");
+    this.demoPhase = "results";
+    this.updateDemoUI(this.demoPhase, 0, this.participants.length);
+
+    // Pick random winner and use shared results phase animation sequence
+    const winner = generateDemoWinner(this.participants);
+    if (winner) {
+      this.animationManager.startResultsPhaseSequence(this.playerManager, winner);
+    }
+
+    // After 5 seconds, restart demo
+    this.time.delayedCall(DEMO_TIMINGS.RESULTS_PHASE_DURATION, () => {
+      if (this.isActive) {
+        this.startDemoMode(); // Restart the loop
+      }
+    });
   }
 
   private createDemoUI() {
@@ -125,44 +380,48 @@ export class DemoScene extends Scene {
     this.demoUIContainer.setDepth(1000);
     this.demoUIContainer.setScrollFactor(0);
 
-    // "INSERT COIN!" text - much bigger and centered
+    // "INSERT COIN!" text - scaled for native 396x180 resolution
     this.insertCoinText = this.add.text(0, 0, "INSERT COIN!", {
-      fontFamily: "metal-slug, Arial, sans-serif",
-      fontSize: "64px",
+      fontFamily: "metal-slug",
+      fontSize: "20px", // Scaled down from 64px (approximately 1/3)
       color: "#FFD700",
       stroke: "#000000",
-      strokeThickness: 6,
+      strokeThickness: 2, // Scaled down from 6px
+      resolution: 4, // High resolution for crisp text when scaled
     });
     // this.insertCoinText.setAlpha(0);
     this.insertCoinText.setOrigin(0.5);
 
-    // Countdown text - bigger and centered below INSERT COIN
-    this.countdownText = this.add.text(0, 110, "30", {
-      fontFamily: "metal-slug, Arial, sans-serif",
-      fontSize: "96px",
+    // Countdown text - scaled for native resolution
+    this.countdownText = this.add.text(0, 35, "30", {
+      fontFamily: "metal-slug",
+      fontSize: "30px", // Scaled down from 96px
       color: "#FF4444",
       stroke: "#000000",
-      strokeThickness: 8,
+      strokeThickness: 3, // Scaled down from 8px
+      resolution: 4, // High resolution for crisp text when scaled
     });
     this.countdownText.setOrigin(0.5);
 
-    // Phase text (Battle Royale / Winner Crowned) - bigger and centered
+    // Phase text (Battle Royale / Winner Crowned) - scaled for native resolution
     this.phaseText = this.add.text(0, 0, "", {
-      fontFamily: "metal-slug, Arial, sans-serif",
-      fontSize: "48px",
+      fontFamily: "metal-slug",
+      fontSize: "16px", // Scaled down from 48px
       color: "#FFD700",
       stroke: "#000000",
-      strokeThickness: 5,
+      strokeThickness: 2, // Scaled down from 5px
+      resolution: 4, // High resolution for crisp text when scaled
     });
     this.phaseText.setOrigin(0.5);
 
-    // Sub text (participant count / restarting info) - bigger and centered
-    this.subText = this.add.text(0, 70, "", {
-      fontFamily: "metal-slug, Arial, sans-serif",
-      fontSize: "28px",
+    // Sub text (participant count / restarting info) - scaled for native resolution
+    this.subText = this.add.text(0, 22, "", {
+      fontFamily: "metal-slug",
+      fontSize: "10px", // Scaled down from 28px
       color: "#FFFFFF",
       stroke: "#000000",
-      strokeThickness: 3,
+      strokeThickness: 1, // Scaled down from 3px
+      resolution: 4, // High resolution for crisp text when scaled
     });
     this.subText.setOrigin(0.5);
 
@@ -217,13 +476,11 @@ export class DemoScene extends Scene {
       this.subText.setVisible(true);
       this.subText.setText(`${participantCount} bots fighting for victory`);
     } else if (phase === "results") {
-      // Show Winner Crowned
+      // Hide all UI in results phase - no need to show anything in demo mode
       this.insertCoinText.setVisible(false);
       this.countdownText.setVisible(false);
-      this.phaseText.setVisible(true);
-      this.phaseText.setText("🏆 WINNER CROWNED!");
-      this.subText.setVisible(true);
-      this.subText.setText("Restarting in 5s...");
+      this.phaseText.setVisible(false);
+      this.subText.setVisible(false);
     }
   }
 
@@ -281,28 +538,6 @@ export class DemoScene extends Scene {
     }
   }
 
-  handleResize() {
-    this.centerX = this.camera.centerX;
-    this.centerY = this.camera.centerY;
-    this.backgroundManager.updateCenter(this.centerX, this.centerY);
-    this.playerManager.updateCenter(this.centerX, this.centerY);
-    this.animationManager.updateCenter(this.centerX, this.centerY);
-
-    // Update demo UI container position - bottom 1/3 of screen
-    if (this.demoUIContainer) {
-      const bottomThirdY = this.camera.height * 0.75;
-      this.demoUIContainer.setPosition(this.centerX, bottomThirdY);
-    }
-  }
-
-  public setDemoMap(mapData: any) {
-    logger.game.debug("[DemoScene] setDemoMap called:", mapData?.name);
-
-    if (mapData?.background) {
-      this.backgroundManager.setTexture(mapData.background);
-    }
-  }
-
   public spawnDemoParticipant(participant: any) {
     const participantId = participant._id || participant.id;
 
@@ -334,83 +569,30 @@ export class DemoScene extends Scene {
     logger.game.debug(`[DemoScene] Participant ${participantId} added successfully`);
   }
 
-  public moveParticipantsToCenter() {
-    this.playerManager.moveParticipantsToCenter();
-
-    // After 2 seconds of running, start continuous explosions
-    this.time.delayedCall(500, () => {
-      logger.game.debug("[DemoScene] 💥 Starting continuous explosions after 2 seconds of running");
-      this.animationManager.createContinuousExplosions();
-    });
-  }
-
-  public showDemoWinner(winner: any) {
-    // Mark all non-winners as eliminated
-    const participants = this.playerManager.getParticipants();
-    participants.forEach((participant) => {
-      if (participant.id !== winner._id && participant.id !== winner.id) {
-        participant.eliminated = true;
-      } else {
-        participant.eliminated = false; // Winner stays
-      }
-    });
-
-    // Explode losers outward with physics (includes explosions, blood, shake)
-    this.animationManager.explodeParticipantsOutward(participants);
-
-    // After 3 seconds: Show winner celebration
-    this.time.delayedCall(3000, () => {
-      logger.game.debug("[DemoScene] 🎉 Starting winner celebration for:", winner);
-
-      const demoGameState = {
-        status: "results",
-        winnerId: winner._id || winner.id,
-        participants: Array.from(participants.values()),
-        isDemo: true,
-      };
-
-      // Show winner with PlayerManager (scales up, golden tint, etc.)
-      const winnerParticipant = this.playerManager.showResults(demoGameState);
-
-      logger.game.debug("[DemoScene] Winner participant from showResults:", winnerParticipant);
-
-      // Add celebration animations (confetti, text, bounce)
-      if (winnerParticipant) {
-        logger.game.debug("[DemoScene] 🏆 Calling addWinnerCelebration");
-        this.animationManager.addWinnerCelebration(winnerParticipant, winner);
-      } else {
-        logger.game.error("[DemoScene] ❌ No winner participant returned!");
-      }
-    });
-  }
-
   public clearDemoParticipants() {
-    logger.game.debug("[DemoScene] Clearing demo participants", {
-      count: this.participants.length,
-    });
+    logger.game.debug(
+      `[CLEANUP] DemoScene.clearDemoParticipants() - ${this.participants.length} demo participants`
+    );
     this.playerManager.clearParticipants();
     this.animationManager.clearCelebration();
     this.participants = [];
-  }
-
-  public transitionToRealGame() {
-    this.clearDemoParticipants();
-    // Hide demo UI
-    if (this.demoUIContainer) {
-      this.demoUIContainer.setVisible(false);
-    }
-    // Stop battle music when transitioning to real game
-    if (this.battleMusic) {
-      this.battleMusic.stop();
-      this.battleMusic = null;
-    }
-    this.scene.start("RoyalRumble");
+    logger.game.debug("[CLEANUP] Demo participants cleared");
   }
 
   shutdown() {
     // Clean up event listeners to prevent memory leaks
     EventBus.off("play-insert-coin-sound");
+    EventBus.off("game-started");
+    EventBus.off("demo-mode-active");
+    EventBus.off("game-phase-changed");
     EventBus.off("player-bet-placed");
+    this.events.off("transitioncomplete");
+
+    // Stop demo mode when scene is shut down
+    this.stopDemoMode();
+
+    // Clean up demo state
+    this.clearAllDemoState();
 
     // Clean up music when scene is shut down
     if (this.battleMusic) {

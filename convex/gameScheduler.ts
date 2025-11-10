@@ -40,17 +40,23 @@ export const executeEndGame = internalAction({
     try {
       const solanaClient = new SolanaClient(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
 
+      
+
       // 1. Get current game state from blockchain (active_game PDA)
-      const activeGame = await solanaClient.getActiveGame();
+      let activeGame = await solanaClient.getActiveGame();
+
+      // If this is not the active game, use getGameRound to fetch specific round data
+      if (activeGame?.gameRound !== roundId) {
+        console.log(`Round ${roundId}: Not the active game (active: ${activeGame?.gameRound}), fetching specific round data`);
+        activeGame = await solanaClient.getGameRound(roundId);
+        if (!activeGame) {
+          console.log(`Round ${roundId}: No game found on blockchain, skipping`);
+          return;
+        }
+      }
 
       if (!activeGame) {
         console.log(`Round ${roundId}: No active game found, skipping`);
-        return;
-      }
-
-      // Verify this is the correct round
-      if (activeGame.gameRound !== roundId) {
-        console.log(`Round ${roundId}: Not the active game (active: ${activeGame.gameRound}), skipping`);
         return;
       }
 
@@ -95,13 +101,24 @@ export const executeEndGame = internalAction({
 
       // 2. Verify time window has closed (with buffer for blockchain clock)
       const currentTime = Math.floor(Date.now() / 1000);
-      const BLOCKCHAIN_CLOCK_BUFFER = 2; // seconds to account for blockchain clock drift
+      const BLOCKCHAIN_CLOCK_BUFFER = 1; // seconds to account for blockchain clock drift
 
       if (currentTime < activeGame.endDate + BLOCKCHAIN_CLOCK_BUFFER) {
         const remaining = activeGame.endDate + BLOCKCHAIN_CLOCK_BUFFER - currentTime;
         console.log(
           `Round ${roundId}: Waiting for time window (${remaining}s remaining), skipping`
         );
+        
+        // Update the scheduled job to execute at the correct time
+        const newScheduledTime = currentTime + remaining;
+        await ctx.runMutation(internal.gameSchedulerMutations.updateScheduledJobTime, {
+          roundId,
+          action: "end_game",
+          scheduledTime: newScheduledTime,
+        });
+        
+        console.log(`Round ${roundId}: Updated job to execute at ${new Date(newScheduledTime * 1000).toISOString()}`);
+        
         return;
       }
 
@@ -154,6 +171,20 @@ export const executeEndGame = internalAction({
         if (updatedGame?.winner) {
           console.log(`Round ${roundId}: Winner selected: ${updatedGame.winner}`);
           console.log(`Round ${roundId}: Prize amount: ${updatedGame.winnerPrize} lamports`);
+
+          // Send webhook notification for winner
+          const winningBetIndex = updatedGame.winningBetIndex ?? -1;
+          const winnerBet = winningBetIndex >= 0 && updatedGame.bets?.[winningBetIndex] 
+            ? updatedGame.bets[winningBetIndex] 
+            : null;
+
+          await ctx.runAction(internal.webhooks.notifyGameWinner, {
+            roundId,
+            winnerWalletAddress: updatedGame.winner.toString(),
+            betAmount: winnerBet?.amount || 0,
+            totalPot: updatedGame.totalDeposit || 0,
+            participantCount: updatedGame.bets?.length || 0,
+          });
 
           // Schedule sendPrizeWinner
           const jobId = await ctx.scheduler.runAfter(
@@ -258,6 +289,26 @@ export const executeSendPrize = internalAction({
           action: "send_prize",
         });
 
+        // mark game as complete in database
+        await ctx.runMutation(internal.syncServiceMutations.upsertGameState, {
+            gameRound: {
+              roundId: gameRound.gameRound,
+              status: gameRound.status,
+              startTimestamp: gameRound.startDate,
+              endTimestamp: gameRound.endDate,
+              map: gameRound.map,
+              betCount: gameRound.bets.length,
+              betAmounts: gameRound.bets.map((b) => b.amount),
+              betSkin: gameRound.bets.map((b) => b.skin),
+              betPosition: gameRound.bets.map((b) => b.position),
+              totalPot: gameRound.totalDeposit,
+              winner: gameRound.winner,
+              winningBetIndex: gameRound.winningBetIndex ?? undefined,
+              prizeSent: true,
+            },
+          });
+
+
         console.log(`Round ${roundId}: 🎉 GAME COMPLETE - System ready for next game`);
         return;
       }
@@ -281,11 +332,28 @@ export const executeSendPrize = internalAction({
           action: "send_prize",
         });
 
-        // 4. Verify prize was sent
+        // 4. Verify prize was sent and update database
         await new Promise((resolve) => setTimeout(resolve, 1000));
         const updatedGame = await solanaClient.getGameRound(roundId);
 
         if (updatedGame?.winnerPrize === 0) {
+          await ctx.runMutation(internal.syncServiceMutations.upsertGameState, {
+            gameRound: {
+              roundId: updatedGame.gameRound,
+              status: updatedGame.status,
+              startTimestamp: updatedGame.startDate,
+              endTimestamp: updatedGame.endDate,
+              map: updatedGame.map,
+              betCount: updatedGame.bets.length,
+              betAmounts: updatedGame.bets.map((b) => b.amount),
+              betSkin: updatedGame.bets.map((b) => b.skin),
+              betPosition: updatedGame.bets.map((b) => b.position),
+              totalPot: updatedGame.totalDeposit,
+              winner: updatedGame.winner,
+              winningBetIndex: updatedGame.winningBetIndex ?? undefined,
+              prizeSent: true,
+            },
+          });
           console.log(`Round ${roundId}: ✅ Verified: Prize successfully distributed`);
           console.log(`Round ${roundId}: 🎉 GAME COMPLETE - Ready for next round`);
         } else {

@@ -1,12 +1,12 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { useWallets } from "@privy-io/react-auth/solana";
-import { PublicKey, Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useState, useEffect } from "react";
-import { getSolanaRpcUrl } from "../lib/utils";
+import { getSharedConnection } from "../lib/sharedConnection";
 import { logger } from "../lib/logger";
 
 export function usePrivyWallet() {
-  const { ready, authenticated } = usePrivy();
+  const { ready, authenticated, user } = usePrivy();
   const { wallets } = useWallets();
   const [solBalance, setSolBalance] = useState<number>(0);
   const [isLoadingBalance, setIsLoadingBalance] = useState<boolean>(false);
@@ -14,6 +14,25 @@ export function usePrivyWallet() {
   const solanaWallet = wallets[0];
   const walletAddress = solanaWallet?.address;
   const connected = ready && authenticated && !!walletAddress;
+
+  // Get external wallet address (non-Privy wallet, e.g., Phantom)
+  const externalWalletAccount = user?.linkedAccounts?.find(
+    (account) =>
+      account.type === "wallet" &&
+      "chainType" in account &&
+      account.chainType === "solana" &&
+      "walletClientType" in account &&
+      account.walletClientType !== "privy" &&
+      account.walletClientType
+  );
+
+  const externalWalletAccountType = externalWalletAccount && "walletClientType" in externalWalletAccount
+    ? externalWalletAccount.walletClientType
+    : null;
+
+  const externalWalletAddress = externalWalletAccount && "address" in externalWalletAccount
+    ? externalWalletAccount.address
+    : null;
 
   // Fetch SOL balance from the Privy embedded wallet
   useEffect(() => {
@@ -25,8 +44,8 @@ export function usePrivyWallet() {
     const fetchBalance = async () => {
       setIsLoadingBalance(true);
       try {
-        // Get RPC endpoint based on network environment
-        const connection = new Connection(getSolanaRpcUrl(), "confirmed");
+        // Use shared connection instance
+        const connection = getSharedConnection();
 
         // Fetch balance in lamports
         const publicKey = new PublicKey(walletAddress);
@@ -56,7 +75,7 @@ export function usePrivyWallet() {
 
     setIsLoadingBalance(true);
     try {
-      const connection = new Connection(getSolanaRpcUrl(), "confirmed");
+      const connection = getSharedConnection();
       const publicKey = new PublicKey(walletAddress);
       const balanceLamports = await connection.getBalance(publicKey);
       const balanceSOL = balanceLamports / LAMPORTS_PER_SOL;
@@ -66,16 +85,18 @@ export function usePrivyWallet() {
     } finally {
       setIsLoadingBalance(false);
     }
+   
   };
-
-  return {
-    connected,
-    publicKey: walletAddress ? new PublicKey(walletAddress) : null,
-    walletAddress,
-    wallet: solanaWallet,
-    ready,
-    solBalance,
-    isLoadingBalance,
-    refreshBalance,
-  };
+   return {
+      connected,
+      publicKey: walletAddress ? new PublicKey(walletAddress) : null,
+      walletAddress,
+      externalWalletAddress,
+      externalWalletAccountType,
+      wallet: solanaWallet,
+      ready,
+      solBalance,
+      isLoadingBalance,
+      refreshBalance,
+    };
 }

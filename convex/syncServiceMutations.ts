@@ -1,7 +1,7 @@
 /**
  * Sync Service Mutations - Database operations for blockchain sync
  */
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -11,59 +11,39 @@ import { v } from "convex/values";
 export const upsertGameState = internalMutation({
   args: {
     gameRound: v.object({
-      gameRound: v.number(),
-      startDate: v.number(),
-      endDate: v.number(),
-      totalDeposit: v.number(),
-      rand: v.string(), // Changed to string to avoid BN overflow
-      map: v.number(), // Map/background ID (0-255)
-      userCount: v.number(),
-      force: v.array(v.number()),
-      status: v.number(),
-      winner: v.union(v.string(), v.null()),
-      winnerPrize: v.number(),
-      winningBetIndex: v.union(v.number(), v.null()),
-      wallets: v.array(v.string()),
-      bets: v.array(
-        v.object({
-          walletIndex: v.number(),
-          amount: v.number(),
-          skin: v.number(),
-          position: v.array(v.number()),
-        })
-      ),
-      // Computed properties for backward compatibility
-      roundId: v.optional(v.number()),
-      startTimestamp: v.optional(v.number()),
-      endTimestamp: v.optional(v.number()),
-      totalPot: v.optional(v.number()),
+      // Round identification
+      roundId: v.number(),
+      status: v.number(), // Blockchain status (0 = waiting, 1 = finished)
+
+      // Timestamps
+      startTimestamp: v.number(),
+      endTimestamp: v.number(),
+
+      // Game configuration
+      map: v.optional(v.number()), // Map ID from blockchain
+
+      // Game state
       betCount: v.optional(v.number()),
       betAmounts: v.optional(v.array(v.number())),
       betSkin: v.optional(v.array(v.number())),
       betPosition: v.optional(v.array(v.array(v.number()))),
+      totalPot: v.optional(v.number()),
+      winner: v.optional(v.union(v.string(), v.null())),
+      winningBetIndex: v.optional(v.number()),
+
+      prizeSent: v.optional(v.boolean()),
     }),
   },
   handler: async (ctx, { gameRound }) => {
     const { db } = ctx;
 
-    const roundId = gameRound.roundId || gameRound.gameRound;
+    const roundId = gameRound.roundId;
 
     // Convert status: 0 = "waiting" (open), 1 = "finished" (closed)
     const status = gameRound.status === 0 ? "waiting" : "finished";
 
-    // Look up the map by its integer ID
-    let mapId = undefined;
-    if (gameRound.map !== undefined) {
-      const mapDoc = await db
-        .query("maps")
-        .filter((q) => q.eq(q.field("id"), gameRound.map))
-        .first();
-      if (mapDoc) {
-        mapId = mapDoc._id;
-      } else {
-        console.warn(`[Sync Mutations] Map with id ${gameRound.map} not found in database`);
-      }
-    }
+    // Store map ID directly from blockchain (no lookup needed)
+    const mapId = gameRound.map;
 
     // BACKFILL LOGIC: If this is a "finished" game, ensure we have a "waiting" state
     if (status === "finished") {
@@ -79,20 +59,18 @@ export const upsertGameState = internalMutation({
         await db.insert("gameRoundStates", {
           roundId,
           status: "waiting",
-          startTimestamp: gameRound.startTimestamp || gameRound.startDate,
-          endTimestamp: gameRound.endTimestamp || gameRound.endDate,
-          totalPot: gameRound.totalPot || gameRound.totalDeposit,
-          betCount: gameRound.betCount || gameRound.bets.length,
+          startTimestamp: gameRound.startTimestamp,
+          endTimestamp: gameRound.endTimestamp,
+          capturedAt: gameRound.startTimestamp,
           mapId,
+          betCount: gameRound.betCount,
+          betAmounts: gameRound.betAmounts,
+          betSkin: gameRound.betSkin,
+          betPosition: gameRound.betPosition,
+          totalPot: gameRound.totalPot,
           winner: null, // No winner during waiting phase
           winningBetIndex: 0,
-          betAmounts: gameRound.betAmounts || gameRound.bets.map((b) => b.amount),
-          betSkin: gameRound.betSkin || gameRound.bets.map((b) => b.skin),
-          betPosition: gameRound.betPosition || gameRound.bets.map((b) => b.position),
-          vrfRequestPubkey: null,
-          vrfSeed: [],
-          randomnessFulfilled: false, // Not fulfilled during waiting
-          capturedAt: gameRound.startTimestamp || gameRound.startDate, // Use start time
+          prizeSent: false, // No prize sent during waiting phase
         });
 
         console.log(`[Sync Mutations] ✅ Created backfilled "waiting" state for round ${roundId}`);
@@ -108,32 +86,129 @@ export const upsertGameState = internalMutation({
     const gameData = {
       roundId,
       status,
-      startTimestamp: gameRound.startTimestamp || gameRound.startDate,
-      endTimestamp: gameRound.endTimestamp || gameRound.endDate,
-      totalPot: gameRound.totalPot || gameRound.totalDeposit,
-      betCount: gameRound.betCount || gameRound.bets.length,
-      mapId, // Map reference from blockchain map field
-      winner: gameRound.winner,
-      winningBetIndex: gameRound.winningBetIndex || 0,
-      // Store bets data
-      betAmounts: gameRound.betAmounts || gameRound.bets.map((b) => b.amount),
-      betSkin: gameRound.betSkin || gameRound.bets.map((b) => b.skin),
-      betPosition: gameRound.betPosition || gameRound.bets.map((b) => b.position),
-      // VRF data (simplified for risk architecture)
-      vrfRequestPubkey: null,
-      vrfSeed: [],
-      randomnessFulfilled: gameRound.status === 1, // True if game is closed
+      startTimestamp: gameRound.startTimestamp,
+      endTimestamp: gameRound.endTimestamp,
       capturedAt: Math.floor(Date.now() / 1000),
+      mapId, // Map reference from blockchain map field
+      betCount: gameRound.betCount,
+      betAmounts: gameRound.betAmounts,
+      betSkin: gameRound.betSkin,
+      betPosition: gameRound.betPosition,
+      totalPot: gameRound.totalPot,
+      winner: gameRound.winner,
+      winningBetIndex: gameRound.winningBetIndex ?? 0,
+      prizeSent: gameRound.prizeSent ?? false, // Use provided value or default to false
     };
 
-    if (existingState) {
+    // Do not update if the existing state is finished as the data is final
+    if (existingState && existingState.status === "waiting") {
       // Update existing state
       await db.patch(existingState._id, gameData);
       console.log(`[Sync Mutations] Updated game ${roundId} (status: ${status}, map: ${gameRound.map})`);
-    } else {
+    } else if (existingState && existingState.status === "finished" && existingState.prizeSent === false && gameData.prizeSent === true) {
+      // Update existing finished state only if prizeSent is changing from false to true
+      await db.patch(existingState._id, {
+        prizeSent: true,
+      });
+      console.log(`[Sync Mutations] Updated game ${roundId} prizeSent to true (status: ${status}, map: ${gameRound.map})`);
+    } else if (!existingState) {
       // Create new state
       await db.insert("gameRoundStates", gameData);
       console.log(`[Sync Mutations] Created game ${roundId} (status: ${status}, map: ${gameRound.map})`);
     }
+  },
+});
+
+/**
+ * Query to find ended games still in "waiting" status
+ * Returns games where endTimestamp < currentTime and status = "waiting"
+ */
+export const getEndedWaitingGames = internalQuery({
+  args: {
+    currentTime: v.number(),
+  },
+  handler: async (ctx, { currentTime }) => {
+    const { db } = ctx;
+
+    // Find all games in "waiting" status that have passed their end time
+    const endedGames = await db
+      .query("gameRoundStates")
+      .withIndex("by_status", (q) => q.eq("status", "waiting"))
+      .filter((q) => q.lt(q.field("endTimestamp"), currentTime))
+      .collect();
+
+    // Return simplified game data
+    return endedGames.map((game) => ({
+      _id: game._id,
+      roundId: game.roundId,
+      endTimestamp: game.endTimestamp,
+      startTimestamp: game.startTimestamp,
+      betCount: game.betCount,
+      totalPot: game.totalPot,
+    }));
+  },
+});
+
+/**
+ * Query to find finished games (for prize distribution check)
+ * Returns games in "finished" status, ordered by most recent first
+ */
+export const getFinishedGames = internalQuery({
+  args: {
+    limit: v.number(),
+  },
+  handler: async (ctx, { limit }) => {
+    const { db } = ctx;
+
+    // Find all games in "finished" status, ordered by roundId descending (most recent first)
+    const finishedGames = await db
+      .query("gameRoundStates")
+      .withIndex("by_status", (q) => q.eq("status", "finished"))
+      .order("desc")
+      .take(limit);
+
+    // Return simplified game data
+    return finishedGames.map((game) => ({
+      _id: game._id,
+      roundId: game.roundId,
+      endTimestamp: game.endTimestamp,
+      startTimestamp: game.startTimestamp,
+      betCount: game.betCount,
+      totalPot: game.totalPot,
+      winner: game.winner,
+    }));
+  },
+});
+
+/**
+ * Query to find finished games that need prize distribution
+ * Returns games in "finished" status with prizeSent = false
+ */
+export const getFinishedGamesNeedingPrize = internalQuery({
+  args: {
+    limit: v.number(),
+  },
+  handler: async (ctx, { limit }) => {
+    const { db } = ctx;
+
+    // Find all games in "finished" status with prizeSent = false
+    const finishedGames = await db
+      .query("gameRoundStates")
+      .withIndex("by_status", (q) => q.eq("status", "finished"))
+      .filter((q) => q.eq(q.field("prizeSent"), false))
+      .order("desc")
+      .take(limit);
+
+    // Return simplified game data
+    return finishedGames.map((game) => ({
+      _id: game._id,
+      roundId: game.roundId,
+      endTimestamp: game.endTimestamp,
+      startTimestamp: game.startTimestamp,
+      betCount: game.betCount,
+      totalPot: game.totalPot,
+      winner: game.winner,
+      prizeSent: game.prizeSent,
+    }));
   },
 });

@@ -29,6 +29,8 @@
 import { useCallback, useMemo } from "react";
 import { usePrivyWallet } from "./usePrivyWallet";
 import { useWallets } from "@privy-io/react-auth/solana";
+import { useAction } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import {
   Connection,
   PublicKey,
@@ -36,7 +38,6 @@ import {
   TransactionSignature,
   Transaction,
   VersionedTransaction,
-  Keypair,
 } from "@solana/web3.js";
 import { SystemProgram } from "@solana/web3.js";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
@@ -179,6 +180,9 @@ export const useGameContract = () => {
   const { connected, publicKey, walletAddress } = usePrivyWallet();
   const { wallets } = useWallets();
 
+  // Convex action for webhook notifications
+  const notifyGameCreated = useAction(api.webhooks.notifyGameCreated);
+
   // Get selected wallet (first Solana wallet from Privy)
   const selectedWallet = useMemo(() => {
     return wallets.length > 0 ? wallets[0] : null;
@@ -187,7 +191,8 @@ export const useGameContract = () => {
   // RPC connection (use env variable)
   const connection = useMemo(() => {
     const rpcUrl = import.meta.env.VITE_SOLANA_RPC_URL || "http://127.0.0.1:8899";
-    return new Connection(rpcUrl, "confirmed");
+    // return new Connection(rpcUrl, "confirmed");
+    return new Connection(rpcUrl, "processed");
   }, []);
 
   // Network configuration
@@ -208,7 +213,8 @@ export const useGameContract = () => {
     try {
       const wallet = new PrivyWalletAdapter(publicKey, selectedWallet, network);
       const provider = new AnchorProvider(connection, wallet, {
-        commitment: "confirmed",
+        // commitment: "confirmed",
+        commitment: "processed",
       });
 
       const program = new Program<Domin8Prgm>(Domin8PrgmIDL as any, provider);
@@ -365,6 +371,7 @@ export const useGameContract = () => {
     async (
       amount: number,
       skin: number = 0,
+      displayName: string = "",
       position: [number, number] = [0, 0],
       map: number = 0
     ): Promise<{ signature: TransactionSignature; roundId: number; betIndex: number }> => {
@@ -387,6 +394,7 @@ export const useGameContract = () => {
       // Initialize variables outside try/catch so they're accessible in both
       let activeRoundId = 0;
       let betIndex = 0;
+      let shouldCreateNewGame = false;
 
       try {
         logger.solana.debug("[placeBet] Placing bet of", amount, "SOL");
@@ -405,73 +413,42 @@ export const useGameContract = () => {
         });
 
         let tx: string;
-        let shouldCreateNewGame = false;
 
-        // STEP 1: Check active_game first to see if there's an open game
-        logger.solana.debug("[placeBet] Checking active_game for open game...");
-        const activeGameInfo = await connection.getAccountInfo(activeGamePda);
+        // OPTIMIZATION: Fetch both active game AND config in parallel (saves ~200-300ms)
+        logger.solana.debug("[placeBet] Fetching game state in parallel...");
+        const [activeGameAccount, configAccount] = await Promise.all([
+          program.account.domin8Game.fetch(activeGamePda).catch(() => null),
+          program.account.domin8Config.fetch(gameConfigPda)
+        ]);
 
-        if (activeGameInfo) {
-          try {
-            const activeGameAccount = await program.account.domin8Game.fetch(activeGamePda);
-            // Status is a number: 0 = GAME_STATUS_OPEN, 1 = GAME_STATUS_CLOSED
-            const gameStatus = activeGameAccount.status;
-            logger.solana.debug("[placeBet] Active game found", {
-              status: gameStatus,
-              statusText: gameStatus === 0 ? "open" : "closed",
-              round: activeGameAccount.gameRound.toNumber(),
-            });
+        // STEP 1: Determine game state and bet strategy
+        if (activeGameAccount && activeGameAccount.status === 0) {
+          // Game is open - check if betting window is still open
+          const endTimestamp = activeGameAccount.endDate.toNumber();
+          const currentTime = Math.floor(Date.now() / 1000);
+          const betCount = activeGameAccount.bets?.length || 0;
 
-            if (gameStatus === 0) {
-              // Game is open - check if betting window is still open
-              const endTimestamp = activeGameAccount.endDate.toNumber();
-              const currentTime = Math.floor(Date.now() / 1000);
-              const betCount = activeGameAccount.bets?.length || 0;
-
-              if (currentTime < endTimestamp) {
-                // Active game is open and accepting bets!
-                logger.solana.debug("[placeBet] Found open game, placing bet");
-                shouldCreateNewGame = false;
-                activeRoundId = activeGameAccount.gameRound.toNumber();
-              } else {
-                // Game expired
-                if (betCount === 0) {
-                  logger.solana.debug("[placeBet] Empty expired game, creating new one");
-                  shouldCreateNewGame = true;
-                } else {
-                  throw new Error(
-                    "Betting window closed. Please wait for the current game to finish."
-                  );
-                }
-              }
-            } else {
-              // Game is closed (status=1) - need new game
-              logger.solana.debug("[placeBet] Active game is closed, need new game");
-              shouldCreateNewGame = true;
-            }
-          } catch (fetchError: any) {
-            if (fetchError.message?.includes("Betting window")) {
-              throw fetchError;
-            }
-            logger.solana.debug(
-              "[placeBet] Error fetching active game, will try to create new one"
-            );
+          if (currentTime < endTimestamp) {
+            // Active game is open and accepting bets!
+            logger.solana.debug("[placeBet] Found open game, placing bet");
+            shouldCreateNewGame = false;
+            activeRoundId = activeGameAccount.gameRound.toNumber();
+            betIndex = betCount; // Set betIndex here for existing game
+          } else if (betCount === 0) {
+            // Empty expired game
+            logger.solana.debug("[placeBet] Empty expired game, creating new one");
             shouldCreateNewGame = true;
+            activeRoundId = configAccount.gameRound.toNumber();
+          } else {
+            throw new Error(
+              "Betting window closed. Please wait for the current game to finish."
+            );
           }
         } else {
-          // No active game exists
-          logger.solana.debug("[placeBet] No active game found, creating new game");
+          // No active game or game is closed - create new game
+          logger.solana.debug("[placeBet] No active game found or game closed, creating new game");
           shouldCreateNewGame = true;
-        }
-
-        // STEP 2: If we need to create a new game, get the next round ID from config
-        if (shouldCreateNewGame) {
-          const nextRoundId = await fetchCurrentRoundId();
-          logger.solana.debug("[placeBet] Next round ID from config:", nextRoundId);
-          activeRoundId = nextRoundId;
-
-          // Note: We don't check config.lock here - let the smart contract enforce it
-          // This prevents race conditions between frontend and backend (endGame unlocks)
+          activeRoundId = configAccount.gameRound.toNumber();
         }
 
         logger.solana.debug("[placeBet] Decision", { shouldCreateNewGame, activeRoundId });
@@ -479,35 +456,9 @@ export const useGameContract = () => {
         if (shouldCreateNewGame) {
           // Creating new game means this is the first bet (index 0)
           betIndex = 0;
-          // activeRoundId already set above from config.game_round
 
-          // Check what network you're actually using
-          logger.solana.debug("[placeBet] Network configuration", {
-            network: import.meta.env.VITE_SOLANA_NETWORK,
-            rpcUrl: import.meta.env.VITE_SOLANA_RPC_URL,
-            programId: import.meta.env.VITE_GAME_PROGRAM_ID,
-          });
-          // No game exists OR game is finished - CREATE a new game with this bet
-          logger.solana.debug("[placeBet] Creating new game for round", activeRoundId);
-          logger.solana.debug("[placeBet] Available methods:", Object.keys(program.methods));
-
-          // Get config to fetch VRF force field
-          logger.solana.debug("[placeBet] Game config details", {
-            gameConfigPda: gameConfigPda.toString(),
-            rpcEndpoint: connection.rpcEndpoint,
-            envRpcUrl: import.meta.env.VITE_SOLANA_RPC_URL,
-          });
-          const configInfo = await connection.getAccountInfo(gameConfigPda);
-          if (!configInfo) {
-            throw new Error("Game config not found. Please contact support.");
-          }
-          // Parse force field from config using Anchor deserialization
-          // const configAccountParsed = await program.account.domin8Config.fetch(gameConfigPda);
-          // const force = Buffer.from(configAccountParsed.force);
-
-          // Use Anchor to fetch the Domin8Config (has `force: [u8;32]`)
-          const configAccount = await program.account.domin8Config.fetch(gameConfigPda);
-          const forceArr = configAccount.force; // usually Uint8Array or number[]
+          // OPTIMIZATION: Use configAccount already fetched above (no extra RPC call)
+          const forceArr = configAccount.force;
           const forceBuf = Buffer.from(forceArr);
 
           // Derive all required PDAs for createGame
@@ -538,151 +489,62 @@ export const useGameContract = () => {
             isLocalnet,
           });
 
-          if (isLocalnet) {
-            // LOCALNET: Use Mock VRF (no ORAO deployment on localnet)
-            const mockVrfPda = deriveMockVrfPda(forceBuf);
-            logger.solana.debug("[placeBet] Localnet: using mock VRF", {
-              mockVrfPda: mockVrfPda.toString(),
-              amount: amountBN.toString(),
-              skin,
-              position,
-            });
-            const { Orao, networkStateAccountAddress, randomnessAccountAddress } = await import(
-              "@orao-network/solana-vrf"
-            );
-            const orao = new Orao(provider as any);
-            logger.solana.debug("[placeBet] ORAO VRF Program ID:", orao.programId.toString());
+          
+          // DEVNET/MAINNET: Use ORAO VRF (real verifiable randomness)
+          logger.solana.debug("[placeBet] Devnet/Mainnet: Using ORAO VRF");
 
-            // Derive ORAO VRF accounts
-            const networkState = networkStateAccountAddress();
-            const vrfRequest = randomnessAccountAddress(forceBuf);
+          // Import ORAO SDK dynamically
+          const { Orao, networkStateAccountAddress, randomnessAccountAddress } = await import(
+            "@orao-network/solana-vrf"
+          );
 
-            // Fetch treasury from network state
-            // const networkStateData = await orao.getNetworkState();
-            // Fetch treasury from network state
-            const treasury = Keypair.generate().publicKey;
-            // Call create_game with mockVrf account
+          // Initialize ORAO VRF SDK
+          const orao = new Orao(provider as any);
+          logger.solana.debug("[placeBet] ORAO VRF Program ID:", orao.programId.toString());
 
-            logger.solana.debug("[placeBet] ORAO VRF Accounts", {
-              networkState: networkState.toString(),
-              treasury: treasury.toString(),
-              vrfRequest: vrfRequest.toString(),
-              amount: amountBN.toString(),
-              skin,
-              position,
-              map,
-            });
+          // Derive ORAO VRF accounts
+          const networkState = networkStateAccountAddress();
+          const vrfRequest = randomnessAccountAddress(forceBuf);
 
-            // Convert activeRoundId to BN for Anchor instruction
-            const roundIdBN = new BN(activeRoundId);
+          // Fetch treasury from network state
+          const networkStateData = await orao.getNetworkState();
+          const treasury = networkStateData.config.treasury;
 
-            tx = await program.methods
-              .createGameRound(
-                roundIdBN, // round_id parameter as BN
-                amountBN,
-                skin, // Character skin ID from frontend
-                position, // Spawn position [x, y] from frontend
-                map // Map/background ID from frontend
-              )
-              .accounts({
-                // @ts-expect-error - this works fine
-                config: gameConfigPda,
-                game: gameRoundPdaForCreate,
-                activeGame: activeGamePda,
-                user: publicKey,
-                vrfRandomness: vrfRequest,
-                vrfTreasury: treasury,
-                networkState: networkState,
-                vrfProgram: orao.programId,
-                systemProgram: SystemProgram.programId,
-              })
-              .rpc();
+          logger.solana.debug("[placeBet] ORAO VRF Accounts", {
+            networkState: networkState.toString(),
+            treasury: treasury.toString(),
+            vrfRequest: vrfRequest.toString(),
+            amount: amountBN.toString(),
+            skin,
+            position,
+            map,
+          });
 
-            logger.solana.info(
-              "[placeBet] Created new localnet game with first bet (mock VRF)",
-              tx
-            );
+          // Convert activeRoundId to BN for Anchor instruction
+          const roundIdBN = new BN(activeRoundId);
 
-            // Auto-fulfill mock VRF to simulate ORAO (helps immediate local testing)
-            try {
-              const gameRoundPdaAfter = deriveGameRoundPda(activeRoundId);
-              const randomnessValue = Math.floor(Date.now() / 1000);
+          // Call create_game_round with ORAO VRF accounts
+          tx = await program.methods
+            .createGameRound(roundIdBN, amountBN, skin, position, map)
+            .accounts({
+              // @ts-expect-error - this works fine
+              config: gameConfigPda,
+              game: gameRoundPdaForCreate,
+              activeGame: activeGamePda,
+              user: publicKey,
+              vrfRandomness: vrfRequest,
+              vrfTreasury: treasury,
+              networkState: networkState,
+              vrfProgram: orao.programId,
+              systemProgram: SystemProgram.programId,
+            })
+            .rpc({ skipPreflight: true });
 
-              const fulfillSig = await program.methods
-                // @ts-expect-error - this works fine
-                .fulfillMockVrf(new BN(randomnessValue))
-                .accounts({
-                  counter: gameCounterPda,
-                  gameRound: gameRoundPdaAfter,
-                  mockVrf: mockVrfPda,
-                  config: gameConfigPda,
-                  fulfiller: publicKey,
-                })
-                .rpc();
-
-              logger.solana.error("[placeBet] Auto-fulfilled mock VRF (localnet):", fulfillSig);
-            } catch (fulfillErr) {
-              logger.solana.error(
-                "[placeBet] Auto-fulfill mock VRF failed (you can call fulfill_mock_vrf manually):",
-                fulfillErr
-              );
-            }
-          } else {
-            // DEVNET/MAINNET: Use ORAO VRF (real verifiable randomness)
-            logger.solana.debug("[placeBet] Devnet/Mainnet: Using ORAO VRF");
-
-            // Import ORAO SDK dynamically
-            const { Orao, networkStateAccountAddress, randomnessAccountAddress } = await import(
-              "@orao-network/solana-vrf"
-            );
-
-            // Initialize ORAO VRF SDK
-            const orao = new Orao(provider as any);
-            logger.solana.debug("[placeBet] ORAO VRF Program ID:", orao.programId.toString());
-
-            // Derive ORAO VRF accounts
-            const networkState = networkStateAccountAddress();
-            const vrfRequest = randomnessAccountAddress(forceBuf);
-
-            // Fetch treasury from network state
-            const networkStateData = await orao.getNetworkState();
-            const treasury = networkStateData.config.treasury;
-
-            logger.solana.debug("[placeBet] ORAO VRF Accounts", {
-              networkState: networkState.toString(),
-              treasury: treasury.toString(),
-              vrfRequest: vrfRequest.toString(),
-              amount: amountBN.toString(),
-              skin,
-              position,
-              map,
-            });
-
-            // Convert activeRoundId to BN for Anchor instruction
-            const roundIdBN = new BN(activeRoundId);
-
-            // Call create_game_round with ORAO VRF accounts
-            tx = await program.methods
-              .createGameRound(roundIdBN, amountBN, skin, position, map)
-              .accounts({
-                // @ts-expect-error - this works fine
-                config: gameConfigPda,
-                game: gameRoundPdaForCreate,
-                activeGame: activeGamePda,
-                user: publicKey,
-                vrfRandomness: vrfRequest,
-                vrfTreasury: treasury,
-                networkState: networkState,
-                vrfProgram: orao.programId,
-                systemProgram: SystemProgram.programId,
-              })
-              .rpc({ skipPreflight: true });
-
-            logger.solana.info(
-              "[placeBet] Created new devnet/mainnet game with first bet (ORAO VRF)",
-              tx
-            );
-          }
+          logger.solana.info(
+            "[placeBet] Created new devnet/mainnet game with first bet (ORAO VRF)",
+            tx
+          );
+        
           // Transaction variable 'tx' is now set in the network-specific branches above
         } else {
           // Game exists - PLACE an additional bet
@@ -690,14 +552,8 @@ export const useGameContract = () => {
             `[placeBet] Game exists (round ${activeRoundId}), placing additional bet`
           );
 
-          // Fetch fresh game state using Anchor (more reliable than manual parsing)
-          const activeGameAccount = await program.account.domin8Game.fetch(activeGamePda);
-          logger.solana.debug("[placeBet] Active game account:", activeGameAccount);
-          const betCount = activeGameAccount.bets?.length || 0;
-          logger.solana.debug("[placeBet] Current bet count:", betCount);
-
-          // The bet index for this new bet will be the current bet count
-          betIndex = betCount;
+          // OPTIMIZATION: Use activeGameAccount already fetched above (no extra RPC call)
+          // betIndex was already set in the initial decision logic
 
           // Derive all required PDAs for placeBet
           const gameRoundPda = deriveGameRoundPda(activeRoundId);
@@ -744,6 +600,34 @@ export const useGameContract = () => {
           betIndex,
           roundId: activeRoundId,
         });
+
+        // Send webhook notification if this was a game creation (first bet)
+        if (shouldCreateNewGame) {
+          try {
+            // Fetch the newly created game data
+            const gameAccount = await program.account.domin8Game.fetch(activeGamePda);
+
+            logger.solana.debug("[placeBet] Calling webhook notification for game creation");
+
+            // Call Convex action to send webhook (keeps webhook URL secure in backend)
+            await notifyGameCreated({
+              roundId: activeRoundId,
+              transactionSignature: actualSignature,
+              startTimestamp: gameAccount.startDate.toNumber(),
+              endTimestamp: gameAccount.endDate.toNumber(),
+              totalPot: gameAccount.totalDeposit.toNumber(),
+              creatorAddress: publicKey.toString(),
+              creatorDisplayName: displayName,
+              map: gameAccount.map,
+            });
+
+            logger.solana.debug("[placeBet] Webhook notification sent successfully");
+          } catch (webhookError) {
+            // Don't fail the bet if webhook fails
+            logger.solana.error("[placeBet] Failed to send webhook notification:", webhookError);
+          }
+        }
+
         logger.solana.groupEnd();
 
         return {
@@ -781,6 +665,34 @@ export const useGameContract = () => {
           if (walletAdapter?.lastSignature) {
             extractedSignature = walletAdapter.lastSignature;
             logger.solana.debug("[placeBet] Using signature from Privy:", extractedSignature);
+          }
+
+          // Send webhook notification if this was a game creation (first bet)
+          // This code runs in catch block because Privy signature error happens before webhook
+          if (shouldCreateNewGame) {
+            try {
+              // Fetch the newly created game data
+              const gameAccount = await program.account.domin8Game.fetch(activeGamePda);
+              
+              logger.solana.debug("[placeBet] Calling webhook notification for game creation (from catch block)");
+              
+              // Call Convex action to send webhook (keeps webhook URL secure in backend)
+              await notifyGameCreated({
+                roundId: activeRoundId,
+                transactionSignature: extractedSignature,
+                startTimestamp: gameAccount.startDate.toNumber(),
+                endTimestamp: gameAccount.endDate.toNumber(),
+                totalPot: gameAccount.totalDeposit.toNumber(),
+                creatorAddress: publicKey.toString(),
+                creatorDisplayName: displayName,
+                map: gameAccount.map,
+              });
+              
+              logger.solana.debug("[placeBet] Webhook notification sent successfully");
+            } catch (webhookError) {
+              // Don't fail the bet if webhook fails
+              logger.solana.error("[placeBet] Failed to send webhook notification:", webhookError);
+            }
           }
 
           // Return success - transaction went through on-chain

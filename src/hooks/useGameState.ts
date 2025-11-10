@@ -23,9 +23,7 @@ export interface GameState {
   bets: BetEntry[];
   initialPot: number;
   winner: string | null;
-  vrfRequestPubkey: string;
-  vrfSeed: number[];
-  randomnessFulfilled: boolean;
+  prizeSent: boolean; // Computed: true if winner exists and winner_prize === 0
   gameRoundPda: string;
   vaultPda: string;
 }
@@ -72,10 +70,9 @@ export function useGameState() {
       })) || [],
       initialPot: activeGame.totalDeposit.toNumber() / 1_000_000_000, // Convert lamports to SOL
       winner: activeGame.winner?.toString() || '',
-      vrfRequestPubkey: '', // VRF request not stored directly in game account
-      vrfSeed: activeGame.rand ? [activeGame.rand.toNumber()] : [], // Using rand field as seed
-      randomnessFulfilled: activeGame.status === 1, // Game is finished when status = 1
       gameRoundPda: activeGamePDA?.toString() || "Unknown",
+      // Prize is sent if winner exists and winner_prize is 0 (send_prize_winner sets it to 0)
+      prizeSent: activeGame.winner !== null && activeGame.winnerPrize.toNumber() === 0,
       vaultPda: "Derived from seeds",
     };
   }, [activeGame, activeGamePDA]);

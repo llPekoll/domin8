@@ -1,4 +1,6 @@
 import { Scene } from "phaser";
+import { GamePhase } from "./GlobalGameStateManager";
+import { EventBus } from "../EventBus";
 
 export class UIManager {
   private scene: Scene;
@@ -6,18 +8,149 @@ export class UIManager {
 
   // UI Elements
   public titleLogo!: Phaser.GameObjects.Image;
-  public phaseText!: Phaser.GameObjects.Text;
   public timerText!: Phaser.GameObjects.Text;
   public timerBackground!: Phaser.GameObjects.Rectangle;
 
   private gameState: any = null;
-  private lastTimerValue: string = "";
   private timerContainer!: Phaser.GameObjects.Container;
-  private digitContainers: Map<number, Phaser.GameObjects.Container> = new Map();
+
+  // Demo-style countdown (large, bottom center)
+  private demoCountdownText!: Phaser.GameObjects.Text;
+
+  // VRF waiting overlay
+  private vrfOverlay!: Phaser.GameObjects.Rectangle;
+  private vrfText!: Phaser.GameObjects.Text;
+  private vrfSubText!: Phaser.GameObjects.Text;
+  private vrfContainer!: Phaser.GameObjects.Container;
+
+  // Winner phase UI (large, centered)
+  private phaseText!: Phaser.GameObjects.Text;
+  private subText!: Phaser.GameObjects.Text;
+  private winnerContainer!: Phaser.GameObjects.Container;
 
   constructor(scene: Scene, centerX: number) {
     this.scene = scene;
     this.centerX = centerX;
+
+    // Listen for phase changes from GamePhaseManager
+    EventBus.on("game-phase-changed", this.onPhaseChanged.bind(this));
+  }
+
+  /**
+   * Handle phase changes from GamePhaseManager
+   * Updates UI visibility based on current phase
+   */
+  private onPhaseChanged(newPhase: GamePhase) {
+    // Guard: Don't try to update UI before it's created
+    if (!this.isUIReady()) {
+      console.log(`[UIManager] Phase changed to ${newPhase} but UI not created yet`);
+      return;
+    }
+
+    console.log(`[UIManager] 🎭 Phase changed to: ${newPhase}`);
+
+    switch (newPhase) {
+      case GamePhase.IDLE:
+        // Demo mode - hide all UI
+        this.hideAllUI();
+        break;
+
+      case GamePhase.WAITING:
+        // Waiting for bets - show countdown
+        this.vrfOverlay.setVisible(false);
+        this.vrfContainer.setVisible(false);
+        // Countdown visibility handled by updateTimer
+        break;
+
+      case GamePhase.VRF_PENDING:
+        // Waiting for winner determination - show VRF overlay
+        console.log("[UIManager] 🎲 Showing VRF overlay");
+        this.vrfOverlay.setVisible(true);
+        this.vrfContainer.setVisible(true);
+        this.timerContainer.setVisible(false);
+        this.timerBackground.setVisible(false);
+        break;
+
+      case GamePhase.FIGHTING:
+        // Battle animations - hide VRF overlay, show countdown at 0
+        console.log("[UIManager] ⚔️ Hiding VRF overlay for battle");
+        this.vrfOverlay.setVisible(false);
+        this.vrfContainer.setVisible(false);
+        break;
+
+      case GamePhase.CELEBRATING:
+        // Winner celebration - show winner UI
+        console.log("[UIManager] 🎉 Showing winner UI for celebration");
+        this.showWinnerUI();
+        break;
+
+      case GamePhase.CLEANUP:
+        // Cleanup phase - hide all UI
+        this.hideAllUI();
+        break;
+    }
+  }
+
+  private isUIReady(): boolean {
+    return !!(
+      this.vrfOverlay &&
+      this.vrfContainer &&
+      this.timerContainer &&
+      this.timerBackground &&
+      this.demoCountdownText &&
+      this.winnerContainer
+    );
+  }
+
+  hideAllUI() {
+    // Guard: Don't try to hide UI before it's created
+    if (!this.isUIReady()) return;
+
+    this.timerContainer.setVisible(false);
+    this.timerBackground.setVisible(false);
+    this.demoCountdownText.setVisible(false);
+    this.vrfOverlay.setVisible(false);
+    this.vrfContainer.setVisible(false);
+    this.winnerContainer.setVisible(false);
+  }
+
+  private showWinnerUI() {
+    // Guard: Don't try to show UI before it's created
+    if (!this.isUIReady()) return;
+
+    // Hide other UI elements
+    this.timerContainer.setVisible(false);
+    this.timerBackground.setVisible(false);
+    this.demoCountdownText.setVisible(false);
+    this.vrfOverlay.setVisible(false);
+    this.vrfContainer.setVisible(false);
+
+    // Show winner UI
+    this.winnerContainer.setVisible(true);
+    this.winnerContainer.setAlpha(1); // Reset alpha in case it was faded
+    this.phaseText.setVisible(true);
+    this.phaseText.setText("🏆 WINNER CROWNED!");
+    this.subText.setVisible(true);
+    this.subText.setText("Restarting in 4s...");
+  }
+
+  /**
+   * Fade out winner UI smoothly before hiding
+   */
+  fadeOutWinnerUI(duration: number = 1000) {
+    if (!this.isUIReady()) return;
+
+    // Fade out winner container
+    this.scene.tweens.add({
+      targets: this.winnerContainer,
+      alpha: 0,
+      duration: duration,
+      ease: "Power2",
+      onComplete: () => {
+        this.winnerContainer.setVisible(false);
+        this.winnerContainer.setAlpha(1); // Reset for next time
+      },
+    });
   }
 
   updateCenter(centerX: number) {
@@ -26,14 +159,23 @@ export class UIManager {
     if (this.titleLogo) {
       this.titleLogo.setX(centerX);
     }
-    if (this.phaseText) {
-      this.phaseText.setX(centerX);
-    }
     if (this.timerContainer) {
       this.timerContainer.setX(centerX);
     }
     if (this.timerBackground) {
       this.timerBackground.setX(centerX);
+    }
+    if (this.demoCountdownText) {
+      this.demoCountdownText.setX(centerX);
+    }
+    if (this.vrfContainer) {
+      this.vrfContainer.setX(centerX);
+    }
+    if (this.vrfOverlay) {
+      this.vrfOverlay.setX(centerX);
+    }
+    if (this.winnerContainer) {
+      this.winnerContainer.setX(centerX);
     }
   }
 
@@ -59,293 +201,175 @@ export class UIManager {
       },
     });
 
-    // Phase indicator (always visible after title)
-    this.phaseText = this.scene.add
-      .text(this.centerX, 120, "", {
-        fontFamily: "Arial Black",
-        fontSize: 28,
-        color: "#FFA500",
-        stroke: "#4B2F20",
-        strokeThickness: 4,
-        align: "center",
-        shadow: { offsetX: 1, offsetY: 1, color: "#000000", blur: 3, fill: true },
-      })
-      .setOrigin(0.5)
-      .setDepth(150);
+    // Create timer container and background (placeholder for future use)
+    this.timerContainer = this.scene.add.container(this.centerX, 50);
+    this.timerContainer.setDepth(1000);
+    this.timerContainer.setScrollFactor(0);
+    this.timerContainer.setVisible(false);
 
-    // Timer background with gradient-like effect
-    this.timerBackground = this.scene.add.rectangle(this.centerX, 180, 160, 60, 0x2c1810, 0.8);
-    this.timerBackground.setStrokeStyle(4, 0xffb347);
-    this.timerBackground.setDepth(149);
+    this.timerBackground = this.scene.add.rectangle(this.centerX, 50, 200, 50, 0x000000, 0.5);
+    this.timerBackground.setDepth(999);
+    this.timerBackground.setScrollFactor(0);
+    this.timerBackground.setVisible(false);
 
-    // Create timer container for animated digits
-    this.timerContainer = this.scene.add.container(this.centerX, 180);
-    this.timerContainer.setDepth(151);
+    // Create demo-style countdown (large, centered at bottom like demo mode)
+    const demoCountdownY = this.scene.cameras.main.height * 0.75 + 35; // 75% down screen + 35 offset (scaled from 110)
+    this.demoCountdownText = this.scene.add.text(this.centerX, demoCountdownY, "60", {
+      fontFamily: "metal-slug ",
+      fontSize: "30px", // Scaled down from 96px
+      color: "#FF4444",
+      stroke: "#000000",
+      strokeThickness: 3, // Scaled down from 8
+      resolution: 4, // High resolution for crisp text when scaled
+    });
+    this.demoCountdownText.setOrigin(0.5);
+    this.demoCountdownText.setDepth(1000);
+    this.demoCountdownText.setScrollFactor(0);
+    this.demoCountdownText.setVisible(false); // Hidden by default
 
-    // Initialize with default timer display
-    this.lastTimerValue = "";
-    this.initializeTimer("0:00");
-  }
+    // Create VRF waiting overlay (pop-up style)
+    const centerY = this.scene.cameras.main.height / 2;
+    const topThirdY = this.scene.cameras.main.height * 0.25; // 25% down from top
 
-  private initializeTimer(timeText: string) {
-    // Clear existing containers
-    this.digitContainers.forEach((container) => container.destroy());
-    this.digitContainers.clear();
+    // Dark overlay background (semi-transparent so explosions show through)
+    this.vrfOverlay = this.scene.add.rectangle(
+      this.centerX,
+      centerY,
+      this.scene.cameras.main.width,
+      this.scene.cameras.main.height,
+      0x000000,
+      0.4 // Reduced from 0.85 to 0.4 so animations are visible
+    );
+    this.vrfOverlay.setDepth(2000);
+    this.vrfOverlay.setScrollFactor(0);
+    this.vrfOverlay.setVisible(false);
 
-    // Calculate centering offset based on string length
-    const charWidth = 22;
-    const totalWidth = timeText.length * charWidth;
-    const startOffset = -totalWidth / 2 + charWidth / 2;
+    // VRF Container for text elements (positioned higher up)
+    this.vrfContainer = this.scene.add.container(this.centerX, topThirdY);
+    this.vrfContainer.setDepth(2001);
+    this.vrfContainer.setScrollFactor(0);
+    this.vrfContainer.setVisible(false);
 
-    // Create initial digits
-    for (let i = 0; i < timeText.length; i++) {
-      const char = timeText[i];
-      const xOffset = startOffset + i * charWidth;
+    // Main text: "DETERMINING WINNER..."
+    this.vrfText = this.scene.add.text(0, -10, "DETERMINING WINNER...", {
+      fontFamily: "metal-slug",
+      fontSize: "16px", // Scaled down from 48px
+      color: "#FFA500", // Domin8 orange
+      stroke: "#000000",
+      strokeThickness: 2, // Scaled down from 6
+      resolution: 4, // High resolution for crisp text when scaled
+    });
+    this.vrfText.setOrigin(0.5);
 
-      const container = this.scene.add.container(xOffset, 0);
-      this.timerContainer.add(container);
-      this.digitContainers.set(i, container);
+    // Sub text: "Requesting blockchain randomness"
+    this.vrfSubText = this.scene.add.text(0, 13, "Requesting blockchain randomness", {
+      fontFamily: "metal-slug",
+      fontSize: "8px", // Scaled down from 24px
+      color: "#FFFFFF",
+      stroke: "#000000",
+      strokeThickness: 1, // Scaled down from 4
+      resolution: 4, // High resolution for crisp text when scaled
+    });
+    this.vrfSubText.setOrigin(0.5);
 
-      // Create mask for this digit position
-      const maskGraphics = this.scene.add.graphics();
-      maskGraphics.fillRect(this.centerX + xOffset - 15, 180 - 25, 30, 50);
-      const mask = maskGraphics.createGeometryMask();
-      container.setMask(mask);
+    this.vrfContainer.add([this.vrfText, this.vrfSubText]);
 
-      // Add initial digit
-      const digit = this.createDigitText(char, "#FFDB58");
-      container.add(digit);
-    }
+    // Pulsing animation for VRF text
+    this.scene.tweens.add({
+      targets: this.vrfText,
+      scale: { from: 1, to: 1.1 },
+      duration: 800,
+      ease: "Sine.easeInOut",
+      yoyo: true,
+      repeat: -1,
+    });
+
+    // Create winner UI container (bottom 1/3 of screen, like demo mode)
+    const bottomThirdY = this.scene.cameras.main.height * 0.75; // 75% down the screen
+    this.winnerContainer = this.scene.add.container(this.centerX, bottomThirdY);
+    this.winnerContainer.setDepth(1000);
+    this.winnerContainer.setScrollFactor(0);
+    this.winnerContainer.setVisible(false);
+
+    // Phase text (Winner Crowned) - scaled for native resolution
+    this.phaseText = this.scene.add.text(0, 0, "", {
+      fontFamily: "metal-slug",
+      fontSize: "16px", // Scaled down from 48px
+      color: "#FFD700",
+      stroke: "#000000",
+      strokeThickness: 2, // Scaled down from 5
+      resolution: 4, // High resolution for crisp text when scaled
+    });
+    this.phaseText.setOrigin(0.5);
+
+    // Sub text (restarting info) - scaled for native resolution
+    this.subText = this.scene.add.text(0, 22, "", {
+      fontFamily: "metal-slug",
+      fontSize: "10px", // Scaled down from 28px
+      color: "#FFFFFF",
+      stroke: "#000000",
+      strokeThickness: 1, // Scaled down from 3
+      resolution: 4, // High resolution for crisp text when scaled
+    });
+    this.subText.setOrigin(0.5);
+
+    // Add to container
+    this.winnerContainer.add([this.phaseText, this.subText]);
   }
 
   updateGameState(gameState: any) {
     this.gameState = gameState;
-    if (!gameState) return;
-
-    this.updatePhaseDisplay(gameState);
-  }
-
-  private updatePhaseDisplay(gameState: any) {
-    const phaseNames: { [key: string]: string } = {
-      waiting: "PLACE YOUR BETS",
-      awaitingWinnerRandomness: "DRAWING WINNER",
-      finished: "WINNER DECLARED",
-    };
-
-    const phaseName = phaseNames[gameState.status] || "Game Phase";
-    const maxPhases = 3; // MVP: 3 phases only
-
-    // MVP: 3 phases
-    // Phase 1: Waiting (waiting for players)
-    // Phase 2: Drawing Winner (awaitingWinnerRandomness)
-    // Phase 3: Winner Declared (finished)
-    const phaseMapping: { [key: string]: number } = {
-      waiting: 1,
-      awaitingWinnerRandomness: 2,
-      finished: 3,
-    };
-
-    const displayPhase = phaseMapping[gameState.status] || 1;
-
-    // Display phase counter
-    let displayText = `${phaseName} (${displayPhase}/${maxPhases})`;
-
-    // Add player count for waiting phase
-    if (gameState.status === "waiting" && gameState.playersCount !== undefined) {
-      displayText = `${phaseName} (${gameState.playersCount}/5)`;
-    }
-
-    this.phaseText.setText(displayText);
-  }
-
-  private createDigitText(char: string, color: string): Phaser.GameObjects.Text {
-    return this.scene.add
-      .text(0, 0, char, {
-        fontFamily: "Arial Black",
-        fontSize: 36,
-        color: color,
-        stroke: "#6B4423",
-        strokeThickness: 5,
-        align: "center",
-        shadow: { offsetX: 2, offsetY: 2, color: "#000000", blur: 4, fill: true },
-      })
-      .setOrigin(0.5);
-  }
-
-  private animateDigitChange(
-    position: number,
-    newChar: string,
-    color: string,
-    totalLength: number
-  ) {
-    // Calculate centering offset based on total string length
-    const charWidth = 22;
-    const totalWidth = totalLength * charWidth;
-    const startOffset = -totalWidth / 2 + charWidth / 2;
-    const xOffset = startOffset + position * charWidth;
-
-    // Get or create container for this position
-    let container = this.digitContainers.get(position);
-    if (!container) {
-      container = this.scene.add.container(xOffset, 0);
-      this.timerContainer.add(container);
-      this.digitContainers.set(position, container);
-
-      // Create mask for this digit position
-      const maskGraphics = this.scene.add.graphics();
-      maskGraphics.fillRect(this.centerX + xOffset - 15, 180 - 25, 30, 50);
-      const mask = maskGraphics.createGeometryMask();
-      container.setMask(mask);
-    } else {
-      // Update position if length changed
-      container.setX(xOffset);
-    }
-
-    // Clear old digits that are off-screen
-    const toRemove: Phaser.GameObjects.Text[] = [];
-    container.each((child: any) => {
-      if (child.y > 40 || child.y < -40) {
-        toRemove.push(child);
-      }
-    });
-    toRemove.forEach((child) => container.remove(child, true));
-
-    // Create new digit coming from top
-    const newDigit = this.createDigitText(newChar, color);
-    newDigit.setY(-40); // Start above visible area
-    container.add(newDigit);
-
-    // Animate existing digits down and new digit into place
-    container.each((child: any) => {
-      if (child === newDigit) {
-        // New digit slides in from top
-        this.scene.tweens.add({
-          targets: child,
-          y: 0,
-          duration: 200,
-          ease: "Power2",
-        });
-      } else {
-        // Old digits slide down and fade out
-        this.scene.tweens.add({
-          targets: child,
-          y: child.y + 40,
-          alpha: 0,
-          duration: 200,
-          ease: "Power2",
-          onComplete: () => {
-            container.remove(child, true);
-          },
-        });
-      }
-    });
   }
 
   updateTimer() {
-    if (!this.gameState) return;
-
-    // endTimestamp comes from blockchain as Unix timestamp in SECONDS
-    // Need to convert to milliseconds to match Date.now()
-    const endTimestamp = this.gameState.endTimestamp;
-
-    if (!endTimestamp || endTimestamp === 0) {
-      // No countdown to show yet
-      this.timerContainer.setVisible(false);
-      this.timerBackground.setVisible(false);
+    if (!this.gameState) {
+      this.hideAllUI();
       return;
     }
 
-    // MVP: Show timer only during waiting phase
-    if (this.gameState.status !== "waiting") {
-      this.timerContainer.setVisible(false);
-      this.timerBackground.setVisible(false);
-      return;
-    }
+    const endTimestamp = this.gameState.endTimestamp || this.gameState.endDate;
 
-    // Make sure timer is visible
-    this.timerContainer.setVisible(true);
-    this.timerBackground.setVisible(true);
+    this.updateDemoCountdown(endTimestamp);
+  }
 
-    // Convert blockchain timestamp from seconds to milliseconds
-    const endTimestampMs = endTimestamp * 1000;
+  // Update demo-style countdown (large text at bottom)
+  // Pure display logic - no game state decisions
+  private updateDemoCountdown(endTimestamp: number) {
+    // Convert blockchain timestamp from seconds to milliseconds if needed
+    const endTimestampMs = endTimestamp > 10000000000 ? endTimestamp : endTimestamp * 1000;
 
-    // Calculate time remaining: endTimestamp - current time
+    // Calculate time remaining (allow negative values)
     const currentTime = Date.now();
-    const timeRemaining = Math.max(0, endTimestampMs - currentTime);
+    const timeRemaining = endTimestampMs - currentTime;
     const seconds = Math.ceil(timeRemaining / 1000);
 
-    // Format time as M:SS
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    const timeText = `${minutes}:${secs.toString().padStart(2, "0")}`;
+    // Show countdown (including 0)
+    this.demoCountdownText.setVisible(true);
+    this.demoCountdownText.setText(Math.max(0, seconds).toString()); // Display 0 instead of negative
 
-    // Determine color based on time remaining
-    let color = "#FFDB58"; // Golden for normal
+    // Hide countdown only after it goes negative (below 0)
+    if (seconds < 0) {
+      this.demoCountdownText.setVisible(false);
+      return;
+    }
+
+    // Color changes based on urgency
     if (seconds <= 5) {
-      color = "#FF6B6B"; // Red-orange for urgent
-      this.timerBackground.setStrokeStyle(4, 0xff6b6b);
-      // Pulse effect for last 5 seconds
-      const scale = 1 + Math.sin(currentTime * 0.01) * 0.1;
-      this.timerContainer.setScale(scale);
+      this.demoCountdownText.setColor("#FF4444"); // Red
+      // Pulse effect for last 5 seconds - scale text (not container) so it scales from center
+      const scale = 1 + Math.sin(currentTime * 0.01) * 0.15;
+      this.demoCountdownText.setScale(scale);
     } else if (seconds <= 10) {
-      color = "#FFA500"; // Orange for warning
-      this.timerBackground.setStrokeStyle(4, 0xffa500);
-      this.timerContainer.setScale(1);
+      this.demoCountdownText.setColor("#FFA500"); // Orange
+      this.demoCountdownText.setScale(1);
     } else {
-      this.timerBackground.setStrokeStyle(4, 0xffb347);
-      this.timerContainer.setScale(1);
+      this.demoCountdownText.setColor("#FF4444"); // Default red
+      this.demoCountdownText.setScale(1);
     }
+  }
 
-    // Animate digit changes
-    if (timeText !== this.lastTimerValue) {
-      // Update all digit positions if length changed
-      if (timeText.length !== this.lastTimerValue.length) {
-        // Recenter all containers
-        const charWidth = 22;
-        const totalWidth = timeText.length * charWidth;
-        const startOffset = -totalWidth / 2 + charWidth / 2;
-
-        for (let i = 0; i < timeText.length; i++) {
-          const xOffset = startOffset + i * charWidth;
-          const container = this.digitContainers.get(i);
-          if (container) {
-            container.setX(xOffset);
-          }
-        }
-      }
-
-      for (let i = 0; i < timeText.length; i++) {
-        const newChar = timeText[i];
-        const oldChar = this.lastTimerValue[i] || "";
-
-        if (newChar !== oldChar) {
-          this.animateDigitChange(i, newChar, color, timeText.length);
-        } else {
-          // Update color of existing digits
-          const container = this.digitContainers.get(i);
-          if (container) {
-            container.each((child: any) => {
-              if (child.y === 0) {
-                // Only update the visible digit
-                child.setColor(color);
-              }
-            });
-          }
-        }
-      }
-
-      // Remove extra digit containers if new text is shorter
-      if (timeText.length < this.lastTimerValue.length) {
-        for (let i = timeText.length; i < this.lastTimerValue.length; i++) {
-          const container = this.digitContainers.get(i);
-          if (container) {
-            container.destroy();
-            this.digitContainers.delete(i);
-          }
-        }
-      }
-
-      this.lastTimerValue = timeText;
-    }
+  // Cleanup event listeners
+  destroy() {
+    EventBus.off("game-phase-changed", this.onPhaseChanged.bind(this));
   }
 }

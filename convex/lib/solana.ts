@@ -99,8 +99,8 @@ export class SolanaClient {
       DOMIN8_PROGRAM_ID
     );
 
-    console.log("current program id:", this.program.programId.toBase58());
-    console.log("roundId:", roundId);
+    // console.log("current program id:", this.program.programId.toBase58());
+    // console.log("roundId:", roundId);
 
     // Derive per-game PDA if roundId is provided (for historical lookups)
     let gameRound: PublicKey | undefined;
@@ -168,7 +168,7 @@ export class SolanaClient {
   async getGameRound(roundId?: number): Promise<GameRound | null> {
     // First get the current round ID if not provided
     const currentRoundId = roundId ?? (await this.getCurrentRoundId());
-    console.log("---->Current round ID:", currentRoundId);
+    // console.log("---->Current round ID:", currentRoundId);
 
     // Derive the PDA for the current round
     const { gameRound } = this.getPDAs(currentRoundId);
@@ -194,14 +194,14 @@ export class SolanaClient {
         return null;
       }
 
-      console.log("=== Game Round Account ===");
-      console.log(`  Game Round: ${account.gameRound?.toNumber()}`);
-      console.log(`  Status: ${account.status} (0=open, 1=closed)`);
-      console.log(`  Bet Count: ${account.bets?.length ?? 0}`);
-      console.log(`  Total Deposit: ${account.totalDeposit?.toNumber()} lamports`);
-      console.log(`  Winner: ${account.winner?.toBase58() ?? "None"}`);
-      console.log(`  Winning Bet Index: ${account.winningBetIndex?.toNumber() ?? "N/A"}`);
-      console.log("==========================");
+      // console.log("=== Game Round Account ===");
+      // console.log(`  Game Round: ${account.gameRound?.toNumber()}`);
+      // console.log(`  Status: ${account.status} (0=open, 1=closed)`);
+      // console.log(`  Bet Count: ${account.bets?.length ?? 0}`);
+      // console.log(`  Total Deposit: ${account.totalDeposit?.toNumber()} lamports`);
+      // console.log(`  Winner: ${account.winner?.toBase58() ?? "None"}`);
+      // console.log(`  Winning Bet Index: ${account.winningBetIndex?.toNumber() ?? "N/A"}`);
+      // console.log("==========================");
 
       // Transform bets array
       const bets: BetInfoStruct[] = (account.bets || []).map((bet: any) => ({
@@ -255,7 +255,6 @@ export class SolanaClient {
     try {
       // Fetch account with null check
       const account = await this.program.account.domin8Game.fetchNullable(activeGame);
-      console.log({ account });
       if (!account) {
         console.log("No active game exists");
         return null;

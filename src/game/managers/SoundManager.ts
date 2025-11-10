@@ -1,4 +1,5 @@
 import { Scene } from "phaser";
+import { logger } from "~/lib/logger";
 
 /**
  * SoundManager - Centralized sound management
@@ -69,14 +70,14 @@ export class SoundManager {
       // Only play if not muted
       if (!this.isMuted) {
         sound.play();
-        console.log(`[SoundManager] Playing "${key}" at volume ${finalVolume.toFixed(2)}`);
+        logger.ui.debug(`[SoundManager] Playing "${key}" at volume ${finalVolume.toFixed(2)}`);
       } else {
-        console.log(`[SoundManager] Sound "${key}" created but not played (muted)`);
+        logger.ui.debug(`[SoundManager] Sound "${key}" created but not played (muted)`);
       }
 
       return sound;
     } catch (error) {
-      console.error(`[SoundManager] Failed to create sound "${key}":`, error);
+      logger.ui.error(`[SoundManager] Failed to create sound "${key}":`, error);
       return null;
     }
   }
@@ -97,9 +98,9 @@ export class SoundManager {
 
     try {
       scene.sound.play(key, { volume: finalVolume });
-      console.log(`[SoundManager] Playing sound "${key}" at volume ${finalVolume.toFixed(2)}`);
+      logger.ui.debug(`[SoundManager] Playing sound "${key}" at volume ${finalVolume.toFixed(2)}`);
     } catch (error) {
-      console.error(`[SoundManager] Failed to play sound "${key}":`, error);
+      logger.ui.error(`[SoundManager] Failed to play sound "${key}":`, error);
     }
   }
 
@@ -165,6 +166,12 @@ export class SoundManager {
   static setGlobalVolume(volume: number) {
     this.globalVolume = Math.max(0, Math.min(1, volume)); // Clamp to 0-1
     localStorage.setItem("sound-volume", this.globalVolume.toString());
+
+    // Update battle music volume immediately if it's playing
+    if (this.battleMusic && typeof (this.battleMusic as any).setVolume === 'function') {
+      (this.battleMusic as any).setVolume(this.globalVolume * 0.2); // 0.2 is the base volume for battle music
+      logger.ui.debug(`[SoundManager] Updated battle music volume to ${this.globalVolume.toFixed(2)}`);
+    }
   }
 
   /**
@@ -191,7 +198,7 @@ export class SoundManager {
       } else {
         this.battleMusic.resume();
       }
-      console.log(`[SoundManager] Sound ${muted ? "muted" : "unmuted"}`);
+      logger.ui.debug(`[SoundManager] Sound ${muted ? "muted" : "unmuted"}`);
     }
   }
 

@@ -1,7 +1,6 @@
-import { query } from "./_generated/server";
 import { v } from "convex/values";
+import { query } from "./_generated/server";
 
-// Get all active characters
 export const getActiveCharacters = query({
   args: {},
   handler: async (ctx) => {
@@ -38,6 +37,32 @@ export const getRandomCharacter = query({
 
     const randomIndex = Math.floor(Math.random() * characters.length);
     return characters[randomIndex];
+  },
+});
+
+// Get characters by NFT collection address
+export const getCharactersByCollection = query({
+  args: { nftCollection: v.string() },
+  handler: async (ctx, args) => {
+    const characters = await ctx.db
+      .query("characters")
+      .filter((q) => q.eq(q.field("nftCollection"), args.nftCollection))
+      .collect();
+
+    return characters;
+  },
+});
+
+// Get all characters with NFT collection requirement (exclusive characters)
+export const getExclusiveCharacters = query({
+  args: {},
+  handler: async (ctx) => {
+    const characters = await ctx.db
+      .query("characters")
+      .filter((q) => q.neq(q.field("nftCollection"), undefined))
+      .collect();
+
+    return characters;
   },
 });
 

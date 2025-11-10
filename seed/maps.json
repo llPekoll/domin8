@@ -1,55 +1,32 @@
 [
   {
-    "id": 1,
-    "name": "Classic Arena",
-    "background": "arena_classic",
-    "assetPath": "/maps/arena_classic.png",
     "description": "The original battleground where legends are made",
+    "id": 1,
+    "isActive": true,
+    "name": "Classic Arena",
     "spawnConfiguration": {
-      "maxPlayers": 20,
-      "spawnRadius": 250,
-      "minSpacing": 0.314
-    },
-    "isActive": true
+      "centerX": 198,
+      "centerY": 105,
+      "maxSpawnRadius": 55,
+      "minSpacing": 25,
+      "minSpawnRadius": 15,
+      "radiusX": 138,
+      "radiusY": 45
+    }
   },
-
   {
-    "id": 2,
-    "name": "Mystic Forest",
-    "background": "arena_forest",
-    "assetPath": "/maps/arena_forest.png",
     "description": "An enchanted woodland filled with ancient magic",
+    "id": 2,
+    "isActive": true,
+    "name": "Mystic Forest",
     "spawnConfiguration": {
-      "maxPlayers": 24,
-      "spawnRadius": 280,
-      "minSpacing": 0.262
-    },
-    "isActive": true
-  },
-  {
-    "id": 3,
-    "name": "Volcanic Crater",
-    "background": "arena_volcano",
-    "assetPath": "/maps/arena_volcano.png",
-    "description": "A dangerous arena surrounded by molten lava",
-    "spawnConfiguration": {
-      "maxPlayers": 14,
-      "spawnRadius": 200,
-      "minSpacing": 0.449
-    },
-    "isActive": true
-  },
-  {
-    "id": 4,
-    "name": "Underwater Temple",
-    "assetPath": "/maps/arena_underwater.png",
-    "background": "arena_underwater",
-    "description": "An ancient temple submerged beneath the waves",
-    "spawnConfiguration": {
-      "maxPlayers": 22,
-      "spawnRadius": 260,
-      "minSpacing": 0.285
-    },
-    "isActive": true
+      "centerX": 198,
+      "centerY": 110,
+      "maxSpawnRadius": 35,
+      "minSpacing": 25,
+      "minSpawnRadius": 20,
+      "radiusX": 113,
+      "radiusY": 43
+    }
   }
 ]

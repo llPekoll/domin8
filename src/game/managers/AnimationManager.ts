@@ -1,25 +1,27 @@
 import { Scene } from "phaser";
-import { GameParticipant } from "./PlayerManager";
 import { SoundManager } from "./SoundManager";
 import { logger } from "../../lib/logger";
+import { STAGE_WIDTH, STAGE_HEIGHT, RESOLUTION_SCALE } from "../main";
 
 export class AnimationManager {
   private scene: Scene;
   private centerX: number;
   private centerY: number;
+  private playerNamesMap: Map<string, string> = new Map();
 
   // Physics configuration for explosion - TWEAK THESE VALUES
+  // Base values are for RESOLUTION_SCALE = 1, automatically scaled
   private readonly EXPLOSION_CONFIG = {
-    forceMin: 150, // Minimum outward force (increased for more sideways)
-    forceMax: 250, // Maximum outward force (increased for more sideways)
-    upwardKickMin: 200, // Minimum upward boost (increased for more height)
-    upwardKickMax: 400, // Maximum upward boost (increased for more height)
-    upwardKickChance: 0.8, // Chance to apply upward kick (increased to 80%)
-    gravity: 150, // Gravity force (higher = falls faster)
-    rotationSpeed: 10, // Max rotation speed
-    fadeStartTime: 1.5, // When to start fading (seconds)
-    fadeRate: 0.3, // How fast to fade (0-1 per second)
-    maxLifetime: 5, // Maximum lifetime (seconds)
+    forceMin: 300 * RESOLUTION_SCALE, // Minimum outward force (doubled from 150)
+    forceMax: 500 * RESOLUTION_SCALE, // Maximum outward force (doubled from 250)
+    upwardKickMin: 300 * RESOLUTION_SCALE, // Minimum upward boost (increased from 200)
+    upwardKickMax: 600 * RESOLUTION_SCALE, // Maximum upward boost (increased from 400)
+    upwardKickChance: 0.8, // Chance to apply upward kick (no scaling needed)
+    gravity: 200 * RESOLUTION_SCALE, // Gravity force (increased from 150 to match higher forces)
+    rotationSpeed: 10, // Max rotation speed (no scaling needed)
+    fadeStartTime: 1.5, // When to start fading (no scaling needed)
+    fadeRate: 0.3, // How fast to fade (no scaling needed)
+    maxLifetime: 5, // Maximum lifetime (no scaling needed)
     showDebugTrails: true, // Set to true to see red trail lines
   };
 
@@ -34,11 +36,53 @@ export class AnimationManager {
     this.centerY = centerY;
   }
 
+  // Update player names mapping
+  setPlayerNames(playerNames: Map<string, string>) {
+    this.playerNamesMap = playerNames;
+    logger.game.debug("[AnimationManager] Player names map updated:", this.playerNamesMap.size);
+  }
+
   // Store celebration objects for cleanup
   private celebrationObjects: Phaser.GameObjects.GameObject[] = [];
 
+  /**
+   * Fade out celebration visuals (throne, overlay, confetti) before destroying
+   */
+  fadeOutCelebration(duration: number = 1000) {
+    logger.game.debug(
+      "[AnimationManager] Fading out celebration objects:",
+      this.celebrationObjects.length
+    );
+
+    this.celebrationObjects.forEach((obj) => {
+      if (obj && obj.active) {
+        // Fade out with tween
+        this.scene.tweens.add({
+          targets: obj,
+          alpha: 0,
+          duration: duration,
+          ease: "Power2",
+          onComplete: () => {
+            if (obj && obj.active) {
+              obj.destroy();
+            }
+          },
+        });
+      }
+    });
+
+    // Clear array after initiating fades
+    this.celebrationObjects = [];
+  }
+
+  /**
+   * Clear celebration immediately (legacy method, use fadeOutCelebration for smooth transitions)
+   */
   clearCelebration() {
-    logger.game.debug("[AnimationManager] Clearing celebration objects:", this.celebrationObjects.length);
+    logger.game.debug(
+      "[AnimationManager] Clearing celebration objects:",
+      this.celebrationObjects.length
+    );
     this.celebrationObjects.forEach((obj) => {
       if (obj && obj.active) {
         obj.destroy();
@@ -91,66 +135,16 @@ export class AnimationManager {
     createExplosion(1200);
   }
 
-  addWinnerCelebration(winnerPlayer: GameParticipant, winner: any) {
+  addWinnerCelebration(winnerParticipant: any) {
     // Play victory sound when winner celebration starts
     SoundManager.playVictory(this.scene, 0.6);
-
-    // DEBUG: Show sprite anchor point visualization
-    const debugAnchor = this.scene.add.graphics();
-    debugAnchor.setDepth(1000); // On top of everything
-
-    // Draw a crosshair at the anchor point
-    const anchorWorldX = winnerPlayer.container.x + winnerPlayer.sprite.x;
-    const anchorWorldY = winnerPlayer.container.y + winnerPlayer.sprite.y;
-
-    // Red circle at anchor point
-    // debugAnchor.fillStyle(0xff0000, 1);
-    // debugAnchor.fillCircle(anchorWorldX, anchorWorldY, 8);
-
-    // // Yellow crosshair
-    // debugAnchor.lineStyle(3, 0xffff00, 1);
-    // debugAnchor.beginPath();
-    // debugAnchor.moveTo(anchorWorldX - 20, anchorWorldY);
-    // debugAnchor.lineTo(anchorWorldX + 20, anchorWorldY);
-    // debugAnchor.moveTo(anchorWorldX, anchorWorldY - 20);
-    // debugAnchor.lineTo(anchorWorldX, anchorWorldY + 20);
-    // debugAnchor.strokePath();
-
-    // Add label showing anchor coordinates
-    // const anchorLabel = this.scene.add.text(
-    //   anchorWorldX + 25,
-    //   anchorWorldY - 10,
-    //   `Anchor: (${winnerPlayer.sprite.originX.toFixed(2)}, ${winnerPlayer.sprite.originY.toFixed(2)})`,
-    //   {
-    //     fontFamily: "Arial",
-    //     fontSize: "14px",
-    //     color: "#ffff00",
-    //     backgroundColor: "#000000",
-    //     padding: { x: 5, y: 5 },
-    //   }
-    // );
-    // anchorLabel.setDepth(1000);
-
-    // Track for cleanup
-    // this.celebrationObjects.push(debugAnchor, anchorLabel);
-
-    logger.game.debug("[AnimationManager] 🎯 DEBUG: Winner sprite anchor at", {
-      originX: winnerPlayer.sprite.originX,
-      originY: winnerPlayer.sprite.originY,
-      worldX: anchorWorldX,
-      worldY: anchorWorldY,
-      spriteX: winnerPlayer.sprite.x,
-      spriteY: winnerPlayer.sprite.y,
-      containerX: winnerPlayer.container.x,
-      containerY: winnerPlayer.container.y,
-    });
 
     // Create dark background overlay for focus
     const backgroundOverlay = this.scene.add.rectangle(
       this.centerX,
       this.centerY,
-      this.scene.game.config.width as number,
-      this.scene.game.config.height as number,
+      this.scene.scale.width,
+      this.scene.scale.height,
       0x000000
     );
     backgroundOverlay.setDepth(85); // Behind throne (throne is at 90)
@@ -164,9 +158,9 @@ export class AnimationManager {
       ease: "Power2",
     });
 
-    const throne = this.scene.add.image(this.centerX, this.centerY, "throne");
+    const throne = this.scene.add.image(this.centerX, this.centerY + 50, "throne");
     throne.setDepth(90); // Behind winner (winner is at ~100+)
-    throne.setScale(2);
+    throne.setScale(RESOLUTION_SCALE);
     throne.setAlpha(0);
     // Keep pixel art crisp when scaling
     throne.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -181,53 +175,56 @@ export class AnimationManager {
     // Apply pixelated rendering - render at lower resolution for crisp pixel art look
 
     // Get screen height for positioning at bottom
-    const screenHeight = this.scene.game.config.height as number;
+    const screenHeight = this.scene.scale.height;
+
+    // Get the displayName - first try from playerNamesMap using playerId, then fall back to participant.displayName
+    let winnerDisplayName = "Champion";
+
+    if (winnerParticipant?.playerId) {
+      // Try to get display name from playerNamesMap using the wallet address (playerId)
+      const mappedName = this.playerNamesMap.get(winnerParticipant.playerId);
+      if (mappedName) {
+        winnerDisplayName = mappedName;
+        logger.game.debug("[AnimationManager] Found winner display name in map:", mappedName);
+      } else {
+        // Fall back to participant's displayName property
+        winnerDisplayName = winnerParticipant.displayName || "Champion";
+        logger.game.debug(
+          "[AnimationManager] Using participant.displayName:",
+          winnerParticipant.displayName
+        );
+      }
+    } else {
+      winnerDisplayName = winnerParticipant?.displayName || "Champion";
+    }
+
+    logger.game.debug("[AnimationManager] Final winner display name:", winnerDisplayName);
 
     // Winner name at bottom of screen
     const nameText = this.scene.add
-      .text(this.centerX, screenHeight - 80, winner.displayName, {
-        fontFamily: "Arial Black",
-        fontSize: 32,
+      .text(this.centerX, screenHeight - 25, winnerDisplayName, {
+        fontFamily: "jersey",
+        fontSize: 12, // Scaled down from 32px
         color: "#ffffff",
         stroke: "#000000",
-        strokeThickness: 4,
+        strokeThickness: 1, // Scaled down from 4
         align: "center",
-      })
-      .setOrigin(0.5)
-      .setDepth(200);
-
-    // Bet amount text at bottom
-    const betText = this.scene.add
-      .text(this.centerX, screenHeight - 40, `Bet: ${winner.betAmount} coins`, {
-        fontFamily: "Arial",
-        fontSize: 20,
-        color: "#00ff00",
-        stroke: "#000000",
-        strokeThickness: 3,
-        align: "center",
+        resolution: 4, // High resolution for crisp text when scaled
       })
       .setOrigin(0.5)
       .setDepth(200);
 
     // Track all celebration objects for cleanup
-    this.celebrationObjects.push(backgroundOverlay, throne, nameText, betText);
+    this.celebrationObjects.push(backgroundOverlay, throne, nameText);
 
     // Animate name and bet text
     nameText.setAlpha(0);
-    betText.setAlpha(0);
 
     this.scene.tweens.add({
       targets: nameText,
       alpha: 1,
       duration: 500,
       delay: 300,
-    });
-
-    this.scene.tweens.add({
-      targets: betText,
-      alpha: 1,
-      duration: 500,
-      delay: 500,
     });
 
     // Bounce animation is now handled in PlayerManager.showResults()
@@ -240,8 +237,13 @@ export class AnimationManager {
     // Create confetti particle effect
     const colors = [0xffd700, 0xff0000, 0x00ff00, 0x0000ff, 0xff00ff, 0xffff00];
 
-    for (let i = 0; i < 50; i++) {
-      const x = Math.random() * (this.scene.game.config.width as number);
+    // Use scale manager for actual scene dimensions (respects RESIZE mode)
+    const sceneWidth = this.scene.scale.width;
+    const sceneHeight = this.scene.scale.height;
+
+    // Increase particle count for more dramatic full-screen effect
+    for (let i = 0; i < 100; i++) {
+      const x = Math.random() * sceneWidth;
       const startY = -50;
       const color = colors[Math.floor(Math.random() * colors.length)];
 
@@ -254,8 +256,8 @@ export class AnimationManager {
       // Animate confetti falling
       this.scene.tweens.add({
         targets: confetti,
-        y: (this.scene.game.config.height as number) + 50,
-        x: x + (Math.random() - 0.5) * 200,
+        y: sceneHeight + 50,
+        x: x + (Math.random() - 0.5) * 300, // More horizontal drift
         angle: Math.random() * 720,
         duration: 2000 + Math.random() * 2000,
         ease: "Linear",
@@ -366,8 +368,12 @@ export class AnimationManager {
     });
   }
 
-  explodeParticipantsOutward(participants: Map<string, any>) {
+  explodeParticipantsOutward(participants: Map<string, any>, explosionCenterX?: number, explosionCenterY?: number) {
     const config = this.EXPLOSION_CONFIG;
+
+    // Use provided explosion center or fall back to screen center
+    const centerX = explosionCenterX ?? this.centerX;
+    const centerY = explosionCenterY ?? this.centerY;
 
     // Create explosion at center first
     this.createCenterExplosion();
@@ -375,7 +381,7 @@ export class AnimationManager {
     // Add full-screen blood effect when characters are eliminated
     const eliminatedCount = Array.from(participants.values()).filter((p) => p.eliminated).length;
     if (eliminatedCount > 0) {
-      this.createBloodSplatter(this.centerX, this.centerY, true);
+      this.createBloodSplatter(centerX, centerY, true);
 
       // Play death screams for each eliminated character (with slight delays for variety)
       let screamDelay = 0;
@@ -407,9 +413,9 @@ export class AnimationManager {
       const spriteHeight = 32 * participant.sprite.scaleY;
       participant.sprite.setY(currentY - spriteHeight / 2);
 
-      // Calculate angle from center to participant
-      const dx = participant.container.x - this.centerX;
-      const dy = participant.container.y - this.centerY;
+      // Calculate angle from explosion center to participant
+      const dx = participant.container.x - centerX;
+      const dy = participant.container.y - centerY;
       const angle = Math.atan2(dy, dx);
 
       // Random force using config values
@@ -477,8 +483,8 @@ export class AnimationManager {
           // participant.container.alpha stays at 1
 
           // Remove when off screen or after max lifetime
-          const gameWidth = this.scene.game.config.width as number;
-          const gameHeight = this.scene.game.config.height as number;
+          const gameWidth = this.scene.scale.width;
+          const gameHeight = this.scene.scale.height;
 
           const isOffScreen =
             participant.container.x < -100 ||
@@ -558,13 +564,14 @@ export class AnimationManager {
   showBettingPrompt() {
     // Show betting phase indicator
     const bettingText = this.scene.add
-      .text(this.centerX, 50, "BETTING PHASE", {
-        fontFamily: "Arial Black",
-        fontSize: 32,
+      .text(this.centerX, 15, "BETTING PHASE", {
+        fontFamily: "jersey",
+        fontSize: 12, // Scaled down from 32px
         color: "#00ff00",
         stroke: "#000000",
-        strokeThickness: 4,
+        strokeThickness: 1, // Scaled down from 4
         align: "center",
+        resolution: 4, // High resolution for crisp text when scaled
       })
       .setOrigin(0.5)
       .setDepth(200);
@@ -594,7 +601,7 @@ export class AnimationManager {
 
         const explosion = this.scene.add.sprite(x, y, "explosion");
         explosion.setScale(1.5);
-        explosion.setDepth(500); // On top of everything
+        explosion.setDepth(1500); // In front of all characters (characters are ~100-900)
         // Keep pixel art crisp when scaling
         explosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
 
@@ -622,8 +629,8 @@ export class AnimationManager {
 
   checkScreenEdgeCollision(participant: any) {
     // Get screen dimensions
-    const screenWidth = this.scene.game.config.width as number;
-    const screenHeight = this.scene.game.config.height as number;
+    const screenWidth = this.scene.scale.width;
+    const screenHeight = this.scene.scale.height;
 
     // Monitor participant position over time
     const checkCollision = () => {
@@ -673,7 +680,7 @@ export class AnimationManager {
 
         const bloodSprite = this.scene.add.sprite(impactX + offsetX, impactY + offsetY, "blood");
 
-        bloodSprite.setScale(2 + Math.random() * 2);
+        bloodSprite.setScale(1 + Math.random() * 2);
         bloodSprite.setDepth(350); // Above everything
         bloodSprite.setAlpha(0.9);
         bloodSprite.setRotation(Math.random() * Math.PI * 2);
@@ -705,8 +712,8 @@ export class AnimationManager {
     const flash = this.scene.add.rectangle(
       this.centerX,
       this.centerY,
-      this.scene.game.config.width as number,
-      this.scene.game.config.height as number,
+      this.scene.scale.width,
+      this.scene.scale.height,
       0x8b0000 // Dark red
     );
     flash.setDepth(340);
@@ -751,8 +758,8 @@ export class AnimationManager {
             "blood"
           );
 
-          bloodSprite.setScale(2 + Math.random() * 2);
-          bloodSprite.setDepth(300);
+          bloodSprite.setScale(1 + Math.random() * 2);
+          bloodSprite.setDepth(1500); // In front of all characters
           bloodSprite.setAlpha(0.8);
           bloodSprite.setRotation(Math.random() * Math.PI * 2);
           // Keep pixel art crisp when scaling
@@ -783,7 +790,7 @@ export class AnimationManager {
       );
 
       bloodSprite.setScale(0.8 + Math.random() * 1.2);
-      bloodSprite.setDepth(115);
+      bloodSprite.setDepth(1500); // In front of all characters
       bloodSprite.setAlpha(0.9);
       bloodSprite.setRotation(Math.random() * Math.PI * 2);
       // Keep pixel art crisp when scaling
@@ -809,7 +816,7 @@ export class AnimationManager {
     // Create the biggest explosion for battle finale
     const explosion = this.scene.add.sprite(this.centerX, this.centerY, "explosion");
 
-    explosion.setScale(4);
+    explosion.setScale(1);
     explosion.setDepth(500); // On top of everything
     // Keep pixel art crisp when scaling
     explosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -839,13 +846,13 @@ export class AnimationManager {
         }
 
         // Random position across the entire screen
-        const gameWidth = this.scene.game.config.width as number;
-        const gameHeight = this.scene.game.config.height as number;
+        const gameWidth = this.scene.scale.width;
+        const gameHeight = this.scene.scale.height;
 
         const explosion = this.scene.add.sprite(gameWidth / 2, gameHeight / 2 - 100, "explosion");
 
         // Random scale for variety (1.5x to 4x)
-        explosion.setScale(7 + Math.random() * 2.5);
+        explosion.setScale(1 + Math.random() * 2.5);
         explosion.setDepth(1600); // On top of everything else
         // Keep pixel art crisp when scaling
         explosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -870,5 +877,117 @@ export class AnimationManager {
       explosionCount,
       "explosions"
     );
+  }
+
+  /**
+   * Shared battle phase animation sequence
+   * Moves participants to center, starts explosions after delay
+   * @param playerManager - PlayerManager instance to move participants
+   * @param onComplete - Callback when sequence completes
+   */
+  startBattlePhaseSequence(playerManager: any, onComplete?: () => void) {
+    logger.game.debug("[AnimationManager] ⚔️ Starting battle phase sequence");
+
+    // Play fullscreen explosion animation at the start
+    // Use native resolution center (game now renders at 396x180 and scales via Phaser.Scale.FIT)
+    const fullscreenExplosion = this.scene.add.sprite(
+      STAGE_WIDTH / 2,
+      STAGE_HEIGHT / 2,
+      "explosion-fullscreen"
+    );
+
+    // No manual scaling needed - Phaser.Scale.FIT handles it automatically
+    fullscreenExplosion.setScale(RESOLUTION_SCALE);
+    fullscreenExplosion.setDepth(1550); // Between characters and continuous explosions
+    // Keep pixel art crisp when scaling
+    fullscreenExplosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+
+    if (this.scene.anims.exists("explosion-fullscreen")) {
+      this.scene.time.delayedCall(200, () => {
+        fullscreenExplosion.play("explosion-fullscreen");
+      });
+    }
+
+    fullscreenExplosion.once("animationcomplete", () => {
+      fullscreenExplosion.destroy();
+    });
+
+    // Screen shake for dramatic impact
+    this.scene.cameras.main.shake(400, 0.015);
+
+    // Move participants to center
+    playerManager.moveParticipantsToCenter();
+
+    // After 500ms of running, start continuous explosions
+    this.scene.time.delayedCall(200, () => {
+      this.createContinuousExplosions();
+    });
+
+    // Call onComplete callback if provided
+    if (onComplete) {
+      onComplete();
+    }
+  }
+
+  /**
+   * Shared results phase animation sequence
+   * Marks eliminated participants, explodes losers, shows winner celebration
+   * @param playerManager - PlayerManager instance
+   * @param winner - Winner participant data
+   * @param onComplete - Callback when sequence completes (after celebration delay)
+   */
+  startResultsPhaseSequence(playerManager: any, winner: any, onComplete?: () => void) {
+    logger.game.debug("[AnimationManager] 🏆 Starting results phase sequence for winner:", winner);
+
+    // Mark all non-winners as eliminated
+    const participants = playerManager.getParticipants();
+    participants.forEach((participant: any) => {
+      if (participant.id !== winner._id && participant.id !== winner.id) {
+        participant.eliminated = true;
+      } else {
+        participant.eliminated = false; // Winner stays
+      }
+    });
+
+    // Get the spawn center from PlayerManager's current map config
+    const mapConfig = playerManager.currentMap?.spawnConfiguration;
+    const explosionCenterX = mapConfig ? mapConfig.centerX * RESOLUTION_SCALE : this.centerX;
+    const explosionCenterY = mapConfig ? mapConfig.centerY * RESOLUTION_SCALE : this.centerY;
+
+    // Explode losers outward with physics (includes explosions, blood, shake)
+    this.explodeParticipantsOutward(participants, explosionCenterX, explosionCenterY);
+
+    // After 3 seconds: Show winner celebration
+    this.scene.time.delayedCall(3000, () => {
+      logger.game.debug("[AnimationManager] 🎉 Starting winner celebration");
+
+      const gameState = {
+        status: "results",
+        winnerId: winner._id || winner.id,
+        participants: Array.from(participants.values()),
+        isDemo: true,
+      };
+
+      // Show winner with PlayerManager (scales up, golden tint, etc.)
+      const winnerParticipant = playerManager.showResults(gameState);
+
+      logger.game.debug(
+        "[AnimationManager] Winner participant from showResults:",
+        winnerParticipant
+      );
+
+      // Add celebration animations (confetti, text, bounce)
+      if (winnerParticipant) {
+        logger.game.debug("[AnimationManager] 🏆 Calling addWinnerCelebration");
+        this.addWinnerCelebration(winnerParticipant);
+      } else {
+        logger.game.error("[AnimationManager] ❌ No winner participant returned!");
+      }
+
+      // Call onComplete callback if provided
+      if (onComplete) {
+        onComplete();
+      }
+    });
   }
 }

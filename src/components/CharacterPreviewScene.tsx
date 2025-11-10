@@ -1,11 +1,12 @@
-import React, { useEffect, useRef } from 'react';
-import Phaser from 'phaser';
-import { CharacterPreview } from '../game/scenes/CharacterPreview';
-import { charactersData } from '../game/main';
+import React, { useEffect, useRef } from "react";
+import Phaser from "phaser";
+import { CharacterPreview } from "../game/scenes/CharacterPreview";
+import { charactersData } from "../game/main";
 
 interface CharacterPreviewSceneProps {
   characterId?: string;
   characterName?: string;
+  isSpecial?: boolean;
   width?: number;
   height?: number;
 }
@@ -13,8 +14,8 @@ interface CharacterPreviewSceneProps {
 export const CharacterPreviewScene: React.FC<CharacterPreviewSceneProps> = ({
   characterId,
   characterName,
-  width = 120,
-  height = 120
+  width = 140,
+  height = 140,
 }) => {
   const gameRef = useRef<Phaser.Game | null>(null);
   const sceneRef = useRef<CharacterPreview | null>(null);
@@ -29,38 +30,31 @@ export const CharacterPreviewScene: React.FC<CharacterPreviewSceneProps> = ({
       width,
       height,
       parent: containerRef.current,
-      backgroundColor: '#2d1810',
       scene: CharacterPreview,
       pixelArt: true,
+      transparent: true,
       render: {
         antialias: false,
         pixelArt: true,
-        roundPixels: true
+        roundPixels: true,
       },
       scale: {
         mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH
+        autoCenter: Phaser.Scale.CENTER_BOTH,
       },
-      physics: {
-        default: 'arcade',
-        arcade: {
-          gravity: { x: 0, y: 0 },
-          debug: false
-        }
-      }
     };
 
     gameRef.current = new Phaser.Game(config);
 
     // Get reference to the scene and load initial character if provided
-    gameRef.current.events.once('ready', () => {
-      sceneRef.current = gameRef.current?.scene.getScene('CharacterPreview') as CharacterPreview;
+    gameRef.current.events.once("ready", () => {
+      sceneRef.current = gameRef.current?.scene.getScene("CharacterPreview") as CharacterPreview;
 
       // Load initial character if provided
       if (sceneRef.current && characterId && characterName) {
-        const characterData = charactersData.find(char => char._id === characterId);
+        const characterData = charactersData.find((char) => char._id === characterId);
         if (characterData) {
-          const characterKey = characterData.name.toLowerCase().replace(/\s+/g, '-');
+          const characterKey = characterData.name.toLowerCase().replace(/\s+/g, "-");
 
           // Check if character assets are already loaded
           if (sceneRef.current.textures.exists(characterKey)) {
@@ -68,27 +62,53 @@ export const CharacterPreviewScene: React.FC<CharacterPreviewSceneProps> = ({
             sceneRef.current.displayCharacter(characterKey);
           } else {
             // Load character assets
-            const jsonPath = characterData.assetPath.replace('.png', '.json');
+            const jsonPath = characterData.assetPath.replace(".png", ".json");
 
-            sceneRef.current.load.atlas(characterKey, `assets/${characterData.assetPath}`, `assets/${jsonPath}`);
+            sceneRef.current.load.atlas(
+              characterKey,
+              `assets/${characterData.assetPath}`,
+              `assets/${jsonPath}`
+            );
+            // Also load JSON separately for accessing frameTags
+            sceneRef.current.load.json(`${characterKey}-json`, `assets/${jsonPath}`);
 
-            sceneRef.current.load.once('complete', () => {
-              // Create animations for this character
-              const prefix = characterData.name + ' ';
-              const suffix = '.aseprite';
+            sceneRef.current.load.once("complete", () => {
+              // Get the JSON data to extract frameTags
+              const jsonData = sceneRef.current!.cache.json.get(`${characterKey}-json`);
 
-              if (characterData.animations.idle) {
-                sceneRef.current!.anims.create({
-                  key: `${characterKey}-idle`,
-                  frames: sceneRef.current!.anims.generateFrameNames(characterKey, {
-                    prefix: prefix,
-                    suffix: suffix,
-                    start: characterData.animations.idle.start,
-                    end: characterData.animations.idle.end
-                  }),
-                  frameRate: 10,
-                  repeat: -1
-                });
+              if (jsonData && jsonData.meta && jsonData.meta.frameTags) {
+                const frameTags = jsonData.meta.frameTags;
+
+                // Find the idle animation from frameTags
+                const idleTag = frameTags.find((tag: any) => tag.name.toLowerCase() === "idle");
+
+                if (idleTag) {
+                  // Extract prefix and suffix from first frame
+                  const frames = jsonData.frames || [];
+                  const firstFrameName = frames[0]?.filename || "";
+                  let prefix = "";
+                  let suffix = "";
+
+                  if (firstFrameName.includes(".aseprite")) {
+                    suffix = ".aseprite";
+                    prefix = firstFrameName.substring(0, firstFrameName.lastIndexOf(" ")) + " ";
+                  } else if (firstFrameName.includes(".ase")) {
+                    suffix = ".ase";
+                    prefix = firstFrameName.substring(0, firstFrameName.lastIndexOf(" ")) + " ";
+                  }
+
+                  sceneRef.current!.anims.create({
+                    key: `${characterKey}-idle`,
+                    frames: sceneRef.current!.anims.generateFrameNames(characterKey, {
+                      prefix: prefix,
+                      suffix: suffix,
+                      start: idleTag.from,
+                      end: idleTag.to,
+                    }),
+                    frameRate: 10,
+                    repeat: -1,
+                  });
+                }
               }
 
               // Display the character
@@ -117,10 +137,10 @@ export const CharacterPreviewScene: React.FC<CharacterPreviewSceneProps> = ({
     }
 
     // Find character data
-    const characterData = charactersData.find(char => char._id === characterId);
+    const characterData = charactersData.find((char) => char._id === characterId);
     if (!characterData) return;
 
-    const characterKey = characterData.name.toLowerCase().replace(/\s+/g, '-');
+    const characterKey = characterData.name.toLowerCase().replace(/\s+/g, "-");
 
     // Check if character assets are already loaded
     const scene = sceneRef.current;
@@ -129,27 +149,49 @@ export const CharacterPreviewScene: React.FC<CharacterPreviewSceneProps> = ({
       scene.displayCharacter(characterKey);
     } else {
       // Load character assets
-      const jsonPath = characterData.assetPath.replace('.png', '.json');
+      const jsonPath = characterData.assetPath.replace(".png", ".json");
 
       scene.load.atlas(characterKey, `assets/${characterData.assetPath}`, `assets/${jsonPath}`);
+      // Also load JSON separately for accessing frameTags
+      scene.load.json(`${characterKey}-json`, `assets/${jsonPath}`);
 
-      scene.load.once('complete', () => {
-        // Create animations for this character
-        const prefix = characterData.name + ' ';
-        const suffix = '.aseprite';
+      scene.load.once("complete", () => {
+        // Get the JSON data to extract frameTags
+        const jsonData = scene.cache.json.get(`${characterKey}-json`);
 
-        if (characterData.animations.idle) {
-          scene.anims.create({
-            key: `${characterKey}-idle`,
-            frames: scene.anims.generateFrameNames(characterKey, {
-              prefix: prefix,
-              suffix: suffix,
-              start: characterData.animations.idle.start,
-              end: characterData.animations.idle.end
-            }),
-            frameRate: 10,
-            repeat: -1
-          });
+        if (jsonData && jsonData.meta && jsonData.meta.frameTags) {
+          const frameTags = jsonData.meta.frameTags;
+
+          // Find the idle animation from frameTags
+          const idleTag = frameTags.find((tag: any) => tag.name.toLowerCase() === "idle");
+
+          if (idleTag) {
+            // Extract prefix and suffix from first frame
+            const frames = jsonData.frames || [];
+            const firstFrameName = frames[0]?.filename || "";
+            let prefix = "";
+            let suffix = "";
+
+            if (firstFrameName.includes(".aseprite")) {
+              suffix = ".aseprite";
+              prefix = firstFrameName.substring(0, firstFrameName.lastIndexOf(" ")) + " ";
+            } else if (firstFrameName.includes(".ase")) {
+              suffix = ".ase";
+              prefix = firstFrameName.substring(0, firstFrameName.lastIndexOf(" ")) + " ";
+            }
+
+            scene.anims.create({
+              key: `${characterKey}-idle`,
+              frames: scene.anims.generateFrameNames(characterKey, {
+                prefix: prefix,
+                suffix: suffix,
+                start: idleTag.from,
+                end: idleTag.to,
+              }),
+              frameRate: 10,
+              repeat: -1,
+            });
+          }
         }
 
         // Display the character
@@ -163,8 +205,11 @@ export const CharacterPreviewScene: React.FC<CharacterPreviewSceneProps> = ({
   return (
     <div
       ref={containerRef}
-      className="character-preview-container rounded-lg overflow-hidden border-2 border-amber-600/60"
-      style={{ width, height }}
+      className="character-preview-container"
+      style={{
+        width,
+        height,
+      }}
     />
   );
 };

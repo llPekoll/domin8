@@ -2,46 +2,21 @@ import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useState, useEffect } from "react";
-import { Button } from "./ui/button";
 import { ProfileDialog } from "./ProfileDialog";
 import { PrivyWalletButton } from "./PrivyWalletButton";
 import { SoundControl } from "./SoundControl";
 import { toast } from "sonner";
-import { User, Map } from "lucide-react";
 import { generateRandomName } from "../lib/nameGenerator";
-import { usePrivy } from "@privy-io/react-auth";
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { getSolanaRpcUrl } from "../lib/utils";
 import { useActiveGame } from "../hooks/useActiveGame";
 import { logger } from "../lib/logger";
 
 export function Header() {
-  const { connected, publicKey } = usePrivyWallet();
-  const { user, authenticated } = usePrivy();
+  const { connected, publicKey, externalWalletAddress, solBalance, isLoadingBalance } =
+    usePrivyWallet();
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [hasAttemptedCreation, setHasAttemptedCreation] = useState(false);
-  const [balance, setBalance] = useState<number | null>(null);
-  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
   const createPlayer = useMutation(api.players.createPlayer);
-
-  // Get ONLY Privy embedded wallet ADDRESS (not external wallets)
-  const getPrivyEmbeddedWalletAddress = () => {
-    if (!user) return null;
-
-    // Look for Privy embedded Solana wallet in linkedAccounts
-    const embeddedWallet = user.linkedAccounts?.find(
-      (account) =>
-        account.type === "wallet" &&
-        "chainType" in account &&
-        account.chainType === "solana" &&
-        (!("walletClientType" in account) || account.walletClientType === "privy")
-    );
-
-    return embeddedWallet && "address" in embeddedWallet ? embeddedWallet.address : null;
-  };
-
-  const privyWalletAddress = getPrivyEmbeddedWalletAddress();
 
   const playerData = useQuery(
     api.players.getPlayer,
@@ -50,45 +25,6 @@ export function Header() {
 
   // Get current game state directly from blockchain (not Convex)
   const { activeGame: currentRoundState } = useActiveGame();
-
-  // Debug: log when game status changes
-  useEffect(() => {
-    if (currentRoundState) {
-      logger.ui.debug(
-        `[Header] Game status update - Round ${currentRoundState.roundId}: ${currentRoundState.status}`
-      );
-    }
-  }, [currentRoundState?.status, currentRoundState?.roundId]);
-
-  // Fetch ONLY Privy embedded wallet balance via direct RPC
-  useEffect(() => {
-    if (!authenticated || !privyWalletAddress) {
-      setBalance(null);
-      setIsLoadingBalance(false);
-      return;
-    }
-
-    const fetchBalance = async () => {
-      setIsLoadingBalance(true);
-      try {
-        const connection = new Connection(getSolanaRpcUrl(), "confirmed");
-        const publicKey = new PublicKey(privyWalletAddress);
-        const lamports = await connection.getBalance(publicKey);
-        setBalance(lamports / LAMPORTS_PER_SOL);
-      } catch (error) {
-        logger.ui.error("Failed to fetch Privy wallet balance:", error);
-        setBalance(null);
-      } finally {
-        setIsLoadingBalance(false);
-      }
-    };
-
-    void fetchBalance();
-
-    // Refresh balance every 10 seconds
-    const interval = setInterval(() => void fetchBalance(), 10000);
-    return () => clearInterval(interval);
-  }, [authenticated, privyWalletAddress]);
 
   // Create player with random name on first connect
   useEffect(() => {
@@ -101,6 +37,7 @@ export function Header() {
       createPlayer({
         walletAddress: walletAddr,
         displayName: randomName,
+        externalWalletAddress: externalWalletAddress || undefined,
       })
         .then(() => {
           toast.success(`Welcome! Your display name is: ${randomName}`);
@@ -115,76 +52,76 @@ export function Header() {
     if (!connected) {
       setHasAttemptedCreation(false);
     }
-  }, [connected, publicKey, playerData, hasAttemptedCreation, createPlayer]);
+  }, [connected, publicKey, playerData, hasAttemptedCreation, createPlayer, externalWalletAddress]);
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 ">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-20">
-            <div className="flex items-center space-x-6">
-              <img src="/assets/logo.webp" alt="Enrageded" className="h-22 w-auto" />
-            </div>
+      <header className="fixed top-0 left-0 right-0 z-50">
+        <div className="container mx-auto px-4 py-1">
+          {/* Single unified header bar */}
+          <div className="bg-transparent rounded-lg px-3 py-1 backdrop-blur-xs shadow-sm shadow-indigo-500/20">
+            <div className="flex items-center justify-between gap-6">
+              {/* Logo */}
+              <div className="flex items-center flex-shrink-0">
+                <img src="/assets/logo.webp" alt="Enrageded" className="h-12 w-auto" />
+              </div>
 
-            <div className="flex items-center space-x-4">
-              {/* Game Status Display */}
-              {currentRoundState && (
-                <div className="flex flex-col items-center text-amber-300">
-                  <div className="flex items-center gap-2">
-                    <Map className="w-4 h-4 text-amber-400" />
-                    <div className="font-bold text-amber-300 text-lg uppercase tracking-wide">
-                      Round #{currentRoundState.roundId?.toString() || currentRoundState.gameRound?.toString() || "?"}
+              {/* Center - Game Status */}
+              <div className="flex-1 flex justify-center">
+                {currentRoundState && (
+                  <div className="flex items-center gap-3 xl:ml-60">
+                    <div className="text-amber-400 text-3xl font-bold flex items-center gap-2 leading-tight animate-pulse">
+                      {/* Hide text if there's a winner (celebration/cleanup phase) */}
+                      {!currentRoundState.winner && currentRoundState.status === 0 && "Waiting for Players to Join"}
+                      {!currentRoundState.winner && currentRoundState.status === 1 && "Place Your Bet Now!"}
                     </div>
                   </div>
-                  <div className="text-amber-300 text-sm flex items-center gap-1 mt-1">
-                    <span className="text-yellow-300">⚡</span>
-                    {currentRoundState.status === 0 && "Waiting for players"}
-                    {currentRoundState.status === 1 && "Game Over - Place bet for new round"}
-                    {/* Debug: show status if unexpected */}
-                    {![0, 1].includes(currentRoundState.status as number) && `Status: ${currentRoundState.status}`}
-                  </div>
+                )}
+              </div>
+
+              {/* Right Side - User Controls */}
+              <div className="flex items-center gap-4 flex-shrink-0">
+                {/* Sound Control */}
+                <div className="flex items-center">
+                  <SoundControl />
                 </div>
-              )}
 
-              {/* Sound Control */}
-              <SoundControl />
+                {connected && (
+                  <>
+                    {/* Divider */}
+                    <div className="h-8 w-px bg-indigo-500/30"></div>
 
-              {connected && (
-                <>
-                  <Button
-                    onClick={() => setShowProfileDialog(true)}
-                    variant="ghost"
-                    className="text-gray-300 hover:text-white hover:bg-gray-800"
-                    title={playerData?.displayName || "Profile"}
-                  >
-                    <User className="h-5 w-5" />
-                    <span className="ml-2 hidden sm:inline text-lg">
-                      {playerData?.displayName || "Profile"}
-                    </span>
-                  </Button>
-
-                  <div className="bg-gradient-to-r from-indigo-900/30 to-indigo-800/30 rounded-lg px-4 py-2 border border-indigo-600/50 backdrop-blur-sm shadow-lg shadow-indigo-500/20">
-                    <div className="text-right">
-                      <div className="text-sm text-gray-400 mb-0.5">Wallet Balance</div>
-                      <div className="text-indigo-300 font-bold text-xl flex items-center justify-end">
+                    {/* Wallet Balance */}
+                    <div className="flex flex-col">
+                      <div className="text-xs text-indigo-400/80 leading-tight">Balance</div>
+                      <div className="text-indigo-200 font-bold text-base flex items-center leading-tight">
                         {isLoadingBalance ? (
-                          <span className="text-lg">Loading...</span>
-                        ) : balance !== null ? (
+                          <span className="text-sm">Loading...</span>
+                        ) : solBalance !== null ? (
                           <>
-                            {balance.toFixed(4)}{" "}
-                            <span className="text-indigo-400 ml-1 text-lg">SOL</span>
+                            {solBalance.toFixed(4)}{" "}
+                            <span className="text-indigo-300 ml-1 text-sm">SOL</span>
                           </>
                         ) : (
-                          <span className="text-lg">--</span>
+                          <span className="text-sm">--</span>
                         )}
                       </div>
                     </div>
-                  </div>
-                </>
-              )}
 
-              {/* Privy Wallet Button */}
-              <PrivyWalletButton compact={false} showDisconnect={true} />
+                    {/* Divider */}
+                    <div className="h-8 w-px bg-indigo-500/30"></div>
+                  </>
+                )}
+
+                {/* Wallet Connect Button */}
+                <div className="flex items-center">
+                  <PrivyWalletButton
+                    compact={false}
+                    showDisconnect={true}
+                    onShowProfile={() => setShowProfileDialog(true)}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>

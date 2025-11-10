@@ -1,6 +1,8 @@
 import { Scene } from "phaser";
-import { currentMapData, charactersData, demoMapData } from "../main";
+import { currentMapData, charactersData, allMapsData, demoMapData, activeGameData, blockchainDataReady } from "../main";
 import { logger } from "../../lib/logger";
+import { loadBackgroundConfig } from "../config/backgrounds";
+import { EventBus } from "../EventBus";
 
 export class Preloader extends Scene {
   constructor() {
@@ -32,19 +34,34 @@ export class Preloader extends Scene {
         url: "fonts/metal-slug-colour.colr.ttf",
       } as any)
     );
+    this.load.addFile(
+      new Phaser.Loader.FileTypes.FontFile(this.load, {
+        type: "font",
+        key: "jersey",
+        url: "fonts/Jersey10-Regular.ttf",
+      } as any)
+    );
+    this.load.addFile(
+      new Phaser.Loader.FileTypes.FontFile(this.load, {
+        type: "font",
+        key: "jersey15",
+        url: "fonts/Jersey15-Regular.ttf",
+      } as any)
+    );
 
     // Check if data is available (should always be true due to PhaserGame.tsx guard)
     if (!charactersData || charactersData.length === 0) {
       logger.game.error("[Preloader] No characters data available! This should not happen.");
       return;
     }
-    if (!demoMapData) {
-      logger.game.error("[Preloader] No demo map data available!");
+    if (!allMapsData || allMapsData.length === 0) {
+      logger.game.error("[Preloader] No maps data available!");
       return;
     }
 
     logger.game.debug("[Preloader] Data check passed:", {
       charactersCount: charactersData.length,
+      mapsCount: allMapsData.length,
       demoMap: demoMapData?.name,
       currentMap: currentMapData?.name || "none",
     });
@@ -55,20 +72,79 @@ export class Preloader extends Scene {
       const jsonPath = character.assetPath.replace(".png", ".json");
       logger.game.debug("[Preloader] Loading character atlas:", key, character.assetPath);
       this.load.atlas(key, character.assetPath, jsonPath);
+      // Also load JSON separately with a different key so we can access frameTags in create()
+      this.load.json(`${key}-json`, jsonPath);
     });
 
-    // Load demo map (single random map for demo mode)
-    logger.game.debug("[Preloader] Loading demo map:", demoMapData.background, demoMapData.assetPath);
-    this.load.image(demoMapData.background, demoMapData.assetPath);
+    // Load background configs (animated/static backgrounds)
+    // Get map IDs from database to know which backgrounds to load
+    const backgroundIds = allMapsData.map((map) => map.id);
 
-    // Load current game map if available (for real games)
-    if (currentMapData && currentMapData.background && currentMapData.assetPath) {
-      logger.game.debug("[Preloader] Loading current game map:", currentMapData.background);
-      this.load.image(currentMapData.background, currentMapData.assetPath);
-    }
+    console.log("🎨🎨🎨 PRELOADER: About to load backgrounds, IDs:", backgroundIds);
+    logger.game.debug("[Preloader] 🎨 Starting to load background configs from maps...");
+
+    backgroundIds.forEach((id) => {
+      console.log(`🔍 PRELOADER: Loading background ID ${id}...`);
+      const bgConfig = loadBackgroundConfig(id);
+
+      if (!bgConfig) {
+        console.error(`❌ PRELOADER: Failed to load config for ID ${id}`);
+        logger.game.error(`[Preloader] ❌ Failed to load config for background ID ${id}`);
+        return;
+      }
+
+      console.log(`✅ PRELOADER: Config loaded for bg${id}:`, bgConfig);
+      logger.game.debug(`[Preloader] ✅ Config loaded for bg${id}:`, {
+        name: bgConfig.name,
+        textureKey: bgConfig.textureKey,
+        assetPath: bgConfig.assetPath,
+        type: bgConfig.type,
+      });
+
+      if (bgConfig.type === "animated") {
+        // Load as atlas for animated backgrounds
+        const jsonPath = bgConfig.assetPath.replace(".png", ".json");
+
+        logger.game.debug(`[Preloader] 📦 Loading animated atlas:`, {
+          textureKey: bgConfig.textureKey,
+          pngPath: bgConfig.assetPath,
+          jsonPath: jsonPath,
+          fullPngPath: `assets/${bgConfig.assetPath}`,
+          fullJsonPath: `assets/${jsonPath}`,
+        });
+
+        this.load.atlas(bgConfig.textureKey, bgConfig.assetPath, jsonPath);
+        console.log(`📦 PRELOADER: load.atlas() called for '${bgConfig.textureKey}'`);
+      } else {
+        // Load as image for static backgrounds
+        logger.game.debug(
+          `[Preloader] 🖼️ Loading static image:`,
+          bgConfig.textureKey,
+          bgConfig.assetPath
+        );
+        this.load.image(bgConfig.textureKey, bgConfig.assetPath);
+      }
+
+      // Load overlays if configured
+      if (bgConfig.overlays && bgConfig.overlays.length > 0) {
+        bgConfig.overlays.forEach((overlay) => {
+          const overlayJsonPath = overlay.assetPath.replace(".png", ".json");
+          logger.game.debug(`[Preloader] 🎭 Loading overlay atlas:`, {
+            textureKey: overlay.textureKey,
+            pngPath: overlay.assetPath,
+            jsonPath: overlayJsonPath,
+          });
+          this.load.atlas(overlay.textureKey, overlay.assetPath, overlayJsonPath);
+          console.log(`🎭 PRELOADER: load.atlas() called for overlay '${overlay.textureKey}'`);
+        });
+      }
+    });
+
+    logger.game.debug("[Preloader] 🎨 Background configs queued for loading");
 
     // Load VFX assets
     this.load.atlas("explosion", "vfx/Explosion.png", "vfx/Explosion.json");
+    this.load.atlas("explosion-fullscreen", "vfx/fight-effect.png", "vfx/fight-effect.json");
     this.load.atlas("blood", "vfx/blood_spritesheet.png", "vfx/blood_spritesheet.json");
     this.load.atlas("dust", "dust_char.png", "dust_char.json");
     this.load.image("logo", "logo.webp");
@@ -110,6 +186,7 @@ export class Preloader extends Scene {
 
     // Log load errors for debugging
     this.load.on("loaderror", (file: any) => {
+      console.error("❌❌❌ PRELOADER LOAD ERROR:", file.key, file.src, file);
       logger.game.error("[Preloader] Failed to load file:", file.key, file.src);
     });
   }
@@ -118,63 +195,133 @@ export class Preloader extends Scene {
     // Safety check before creating animations
     if (!charactersData || charactersData.length === 0) {
       logger.game.error("[Preloader] No characters data for animations, starting DemoScene anyway");
-      this.scene.start("DemoScene");
+      this.scene.start("Demo");
       return;
     }
 
-    // Create animations for all characters dynamically from database
+    // Create animations for all characters dynamically by parsing frameTags from JSON atlas
     logger.game.debug("[Preloader] Creating animations for", charactersData.length, "characters");
+    console.log(
+      "✅ [Preloader] Starting animation creation for",
+      charactersData.length,
+      "characters"
+    );
+
     charactersData.forEach((character) => {
       const key = character.name.toLowerCase().replace(/\s+/g, "-");
+      console.log(`✅ [Preloader] Processing character: ${character.name}, key: ${key}`);
 
-      // Determine prefix and suffix from the character name
-      const prefix = character.name + " ";
-      const suffix = ".aseprite";
+      // Get the JSON atlas data from cache (loaded with -json suffix)
+      const jsonData = this.cache.json.get(`${key}-json`);
+      console.log(
+        `✅ [Preloader] JSON data for ${key}:`,
+        jsonData ? "FOUND" : "NOT FOUND",
+        jsonData
+      );
 
-      // Create idle animation
-      if (character.animations.idle) {
+      if (!jsonData) {
+        logger.game.warn(`[Preloader] No JSON data found for ${key}, skipping animation creation`);
+        console.error(`❌ [Preloader] No JSON data found for ${key}`);
+        return;
+      }
+
+      // Parse frameTags from the JSON metadata
+      const frameTags = jsonData?.meta?.frameTags || [];
+      console.log(`✅ [Preloader] frameTags for ${key}:`, frameTags.length, frameTags);
+
+      if (frameTags.length === 0) {
+        logger.game.warn(`[Preloader] No frameTags found in ${key}.json, skipping`);
+        console.error(`❌ [Preloader] No frameTags found in ${key}.json`);
+        return;
+      }
+
+      logger.game.debug(`[Preloader] Found ${frameTags.length} frameTags for ${character.name}`);
+
+      // Determine frame naming convention from first frame
+      const frames = jsonData?.frames || [];
+      if (frames.length === 0) {
+        logger.game.warn(`[Preloader] No frames found for ${key}`);
+        return;
+      }
+
+      // Extract prefix and suffix from first frame filename
+      const firstFrameName = frames[0].filename;
+      let prefix = "";
+      let suffix = "";
+
+      // Check for common suffixes (.aseprite, .ase, .png)
+      if (firstFrameName.includes(".aseprite")) {
+        suffix = ".aseprite";
+        prefix = firstFrameName.substring(0, firstFrameName.lastIndexOf(" ")) + " ";
+      } else if (firstFrameName.includes(".ase")) {
+        suffix = ".ase";
+        prefix = firstFrameName.substring(0, firstFrameName.lastIndexOf(" ")) + " ";
+      } else if (firstFrameName.includes(".png")) {
+        suffix = ".png";
+        prefix = firstFrameName.substring(0, firstFrameName.lastIndexOf(" ")) + " ";
+      }
+
+      console.log(`✅ [Preloader] Frame naming for ${key}: prefix="${prefix}", suffix="${suffix}"`);
+
+      // Helper function to determine if animation should loop
+      const shouldLoop = (animName: string) => ["idle", "win", "run"].includes(animName);
+
+      // Helper function to create a single animation
+      const createAnimation = (animName: string, frameTag: any, isFallback = false) => {
+        const animKey = `${key}-${animName}`;
+
+        console.log(
+          `✅ [Preloader] Creating ${isFallback ? "fallback " : ""}animation: ${animKey}, frames ${frameTag.from}-${frameTag.to}`
+        );
+
         this.anims.create({
-          key: `${key}-idle`,
+          key: animKey,
           frames: this.anims.generateFrameNames(key, {
             prefix: prefix,
             suffix: suffix,
-            start: character.animations.idle.start,
-            end: character.animations.idle.end,
+            start: frameTag.from,
+            end: frameTag.to,
           }),
           frameRate: 10,
-          repeat: -1,
+          repeat: shouldLoop(animName) ? -1 : 0,
         });
-      }
 
-      // Create walk animation
-      if (character.animations.walk) {
-        this.anims.create({
-          key: `${key}-walk`,
-          frames: this.anims.generateFrameNames(key, {
-            prefix: prefix,
-            suffix: suffix,
-            start: character.animations.walk.start,
-            end: character.animations.walk.end,
-          }),
-          frameRate: 10,
-          repeat: -1,
-        });
-      }
+        console.log(`✅ [Preloader] Animation created: ${animKey}`);
+        logger.game.debug(
+          `[Preloader] Created ${isFallback ? "fallback " : ""}animation: ${animKey} (frames ${frameTag.from}-${frameTag.to})`
+        );
+      };
 
-      // Create attack animation if it exists
-      if (character.animations.attack) {
-        this.anims.create({
-          key: `${key}-attack`,
-          frames: this.anims.generateFrameNames(key, {
-            prefix: prefix,
-            suffix: suffix,
-            start: character.animations.attack.start,
-            end: character.animations.attack.end,
-          }),
-          frameRate: 10,
-          repeat: 0,
-        });
-      }
+      // Store idle animation for fallback and create animations from frameTags
+      let idleFrameTag: any = null;
+
+      frameTags.forEach((tag: any) => {
+        const animName = tag.name.toLowerCase();
+
+        // Store idle for fallback
+        if (animName === "idle") {
+          idleFrameTag = tag;
+        }
+
+        createAnimation(animName, tag);
+      });
+
+      // Create fallback animations using idle if they don't exist
+      const essentialAnims = ["idle", "walk", "run", "win", "falling", "landing", "poke", "poke1"];
+
+      essentialAnims.forEach((animType) => {
+        const animKey = `${key}-${animType}`;
+
+        // Skip if animation already exists
+        if (this.anims.exists(animKey)) {
+          return;
+        }
+
+        // Use idle animation as fallback
+        if (idleFrameTag) {
+          createAnimation(animType, idleFrameTag, true);
+        }
+      });
     });
 
     // Create explosion animation
@@ -185,6 +332,19 @@ export class Preloader extends Scene {
         suffix: ".png",
         start: 0,
         end: 17,
+      }),
+      frameRate: 18,
+      repeat: 0,
+    });
+
+    // Create fullscreen explosion animation
+    this.anims.create({
+      key: "explosion-fullscreen",
+      frames: this.anims.generateFrameNames("explosion-fullscreen", {
+        prefix: "fight-effect ",
+        suffix: ".ase",
+        start: 0,
+        end: 40,
       }),
       frameRate: 18,
       repeat: 0,
@@ -241,7 +401,54 @@ export class Preloader extends Scene {
       frameRate: 24,
     });
 
-    // Start with DemoScene by default
-    this.scene.start("DemoScene");
+    // ✅ Wait for blockchain data before deciding which scene to start
+    this.waitForBlockchainThenStartScene();
+  }
+
+  /**
+   * Wait for blockchain data (with timeout), then start appropriate scene
+   */
+  private waitForBlockchainThenStartScene() {
+    const maxWaitTime = 2000; // Wait max 2 seconds for blockchain
+    const checkInterval = 100; // Check every 100ms
+    let elapsedTime = 0;
+
+    const checkAndStart = () => {
+      if (blockchainDataReady || elapsedTime >= maxWaitTime) {
+        // Blockchain loaded or timeout reached, make decision
+        const hasActiveGame =
+          activeGameData &&
+          activeGameData.bets &&
+          activeGameData.bets.length > 0 &&
+          activeGameData.status !== undefined;
+
+        logger.game.debug("[Preloader] Starting scene decision:", {
+          blockchainReady: blockchainDataReady,
+          timedOut: elapsedTime >= maxWaitTime,
+          hasActiveGame,
+          elapsedMs: elapsedTime,
+        });
+
+        if (hasActiveGame) {
+          if (this.scene.isActive("Demo")) {
+            this.scene.stop("Demo");
+          }
+          this.scene.start("Game");
+        } else {
+          if (this.scene.isActive("Game")) {
+            this.scene.stop("Game");
+          }
+          this.scene.start("Demo");
+        }
+        EventBus.emit("preloader-complete");
+      } else {
+        // Still waiting for blockchain, check again
+        elapsedTime += checkInterval;
+        this.time.delayedCall(checkInterval, checkAndStart, [], this);
+      }
+    };
+
+    // Start checking
+    checkAndStart();
   }
 }

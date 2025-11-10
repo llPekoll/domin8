@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A fast-paced battle royale betting game on Solana where players control multiple characters in dynamic arenas. Built with Convex, React, Phaser.js, and Solana blockchain integration.
+A fast-paced battle royale betting game on Solana where players bet on themselves in real-time battles. Built with Convex, React, Phaser.js, and Solana blockchain integration using Orao VRF for verifiable randomness.
 
 ## Tech Stack
 
@@ -11,6 +11,7 @@ A fast-paced battle royale betting game on Solana where players control multiple
 - **Frontend**: React + TypeScript + Vite
 - **Game Engine**: Phaser.js (WebGL/Canvas)
 - **Blockchain**: Solana (Anchor framework)
+- **VRF Provider**: Orao VRF (production-grade verifiable randomness)
 - **Wallet**: Privy (embedded wallets, seamless auth)
 - **Styling**: Tailwind CSS
 - **State**: Convex React hooks
@@ -28,7 +29,6 @@ bun run dev
 
 # Build for production
 bun run build
-
 ```
 
 ### Smart Contract (Anchor)
@@ -51,615 +51,576 @@ anchor deploy
 
 ```
 /
-├── convex/           # Backend functions and schema
-│   ├── games.ts      # Game loop logic
-│   ├── players.ts    # Player actions
-│   ├── solana.ts     # Blockchain integration
-│   ├── schema.ts     # Database schema
-│   └── crons.ts      # Scheduled functions
+├── convex/                    # Backend functions and schema
+│   ├── syncService.ts         # Blockchain sync (every 45s)
+│   ├── gameScheduler.ts       # Execute smart contract calls
+│   ├── gameSchedulerMutations.ts  # Job tracking
+│   ├── syncServiceMutations.ts    # DB writes for sync
+│   ├── players.ts             # Player CRUD operations
+│   ├── characters.ts          # Character management
+│   ├── maps.ts                # Map management
+│   ├── schema.ts              # Database schema
+│   └── crons.ts               # Scheduled functions
 ├── programs/
-│   ├── domin8-vrf/   # Solana VRF program
-│   │   └── programs/domin8_vrf/
-│   │       ├── src/
-│   │       │   ├── lib.rs           # Program entry
-│   │       │   ├── state.rs         # Account structures
-│   │       │   ├── errors.rs        # Error definitions
-│   │       │   └── instructions/    # Instruction handlers
-│   │       └── tests/               # TypeScript tests
-│   └── domin8-game/  # Game bet escrow program (Anchor workspace)
-│       ├── Anchor.toml              # Anchor configuration
-│       ├── programs/domin8_game/
-│       │   ├── src/
-│       │   │   ├── lib.rs           # Program entry (11 instructions)
-│       │   │   ├── state.rs         # Game & Authority PDAs
-│       │   │   ├── errors.rs        # 26 error codes
-│       │   │   └── instructions/    # 11 instruction modules
-│       │   └── Cargo.toml
-│       └── tests/
-│           └── domin8-game.ts       # Comprehensive test suite
+│   ├── domin8_prgm/           # Main game smart contract
+│   │   ├── src/
+│   │   │   ├── lib.rs         # Program entry (6 instructions)
+│   │   │   ├── state/
+│   │   │   │   ├── domin8_game.rs    # Game account structure
+│   │   │   │   └── domin8_config.rs  # Global config
+│   │   │   ├── instructions/  # 6 instruction handlers
+│   │   │   │   ├── initialize_config.rs
+│   │   │   │   ├── create_game_round.rs (first bet + VRF request)
+│   │   │   │   ├── bet.rs (additional bets)
+│   │   │   │   ├── end_game.rs (winner selection via Orao VRF)
+│   │   │   │   ├── send_prize_winner.rs (payout)
+│   │   │   │   └── delete_game.rs (admin cleanup)
+│   │   │   ├── constants.rs   # Bet limits, fees
+│   │   │   ├── error.rs       # 26+ error codes
+│   │   │   └── utils.rs       # Helper functions
+│   │   └── Cargo.toml
+│   └── domin8_prgm.backup/    # Old version (10 instructions, mock VRF)
 ├── src/
-│   ├── game/         # Phaser game engine
-│   │   ├── scenes/   # Game scenes
-│   │   └── config.ts # Game configuration
-│   └── components/   # React components
+│   ├── game/                  # Phaser game engine
+│   │   ├── scenes/
+│   │   │   ├── Boot.ts        # Initialization
+│   │   │   ├── Preloader.ts   # Asset loading
+│   │   │   ├── DemoScene.ts   # Client-side 20-bot demo
+│   │   │   ├── Game.ts        # Real game (blockchain-synced)
+│   │   │   └── CharacterPreview.ts
+│   │   ├── managers/
+│   │   │   ├── GamePhaseManager.ts      # Phase state machine
+│   │   │   └── AnimationManager.ts      # Explosion effects
+│   │   └── config.ts          # Phaser configuration
+│   ├── components/            # React UI components
+│   │   ├── CharacterSelection.tsx       # Betting UI
+│   │   ├── MultiParticipantPanel.tsx    # Participant list
+│   │   ├── BettingCountdown.tsx         # Timer
+│   │   └── BlockchainDebugDialog.tsx    # Debug panel
+│   └── hooks/
+│       ├── usePrivyWallet.ts            # Privy integration
+│       ├── useGameContract.ts           # Smart contract calls
+│       ├── useActiveGame.ts             # Real-time blockchain updates
+│       └── useNFTCharacters.ts          # NFT verification
 └── public/
-    └── assets/       # Game assets (sprites, sounds)
+    └── assets/                # Game assets
+        ├── characters/        # Character sprites
+        └── backgrounds/       # Map backgrounds
 ```
 
 ## Key Features
 
 ### Game Mechanics
 
-#### Global Game Flow
+#### Game Modes
 
-The platform runs **one global game instance** that all players join. There are two distinct modes:
+The platform has two distinct modes:
 
 ##### Demo Mode (Client-Side Only)
 
 - **Local Execution**: Runs entirely in user's browser (Phaser.js)
-- **20 Bots**: Always long game format (top 4 betting)
+- **20 Bots**: Fixed bot count for demo games
 - **Client-Generated**: Each user sees their own independent demo
 - **Randomness**: Uses Math.random() locally, no blockchain/backend calls
 - **Purpose**: Showcase gameplay, attract new players, zero cost
 - **Instant Start**: No waiting for server, loads immediately
+- **Phases**: Spawning (20s) → Arena (2-3s) → Results (15s) → Auto-restart
+- **No Database**: 100% client-side, no records stored
 
-##### Real Game Mode (Server-Side)
+##### Real Game Mode
 
 Triggered when **first player places a bet**:
 
-1. **Game Creation**: Convex creates game document, smart contract initializes GamePool
+1. **Game Creation**: First bet calls `create_game_round` instruction
 2. **Demo Stops**: Client-side demo stops in user's browser
-3. **Countdown Starts**: 30-second waiting phase begins (server-managed)
-4. **Other Players Join**: Additional players can bet during waiting phase
-5. **Game Determined**: Final participant count determines game type
-6. **Server Execution**: Convex manages all game logic, Phaser renders on all clients
-7. **Settlement**: Smart contract distributes winnings
-8. **Return to Demo**: All clients return to local client-side demo
+3. **VRF Request**: Smart contract requests Orao VRF randomness
+4. **Waiting Phase**: 30-second countdown for other players
+5. **Additional Bets**: Other players call `bet` instruction
+6. **Game End**: Backend calls `end_game` after countdown
+7. **Winner Selection**: Orao VRF determines winner (weighted by bet amounts)
+8. **Settlement**: Backend calls `send_prize_winner` for payout
+9. **Return to Demo**: All clients return to local client-side demo
 
-#### Game Types by Participant Count
+#### Game Flow (Single Round)
 
-- **1 human player only** (regardless of participant count): Play against "Bank" bot (after countdown)
-  - Bank balance check: Must have ≥ sum of all player's participants' bets
-  - If insufficient: Auto-refund player, return to demo mode
-  - If sufficient: Spawn Bank bot with matching total bet, 55% win chance (player 45%)
-  - Player can have multiple participants, Bank checks total combined bet
-- **2+ human players, 2-7 total participants**: Quick game (4 phases)
-  - Waiting (30s) → Arena (dynamic\*) → Results (5s)
-  - **\*Dynamic Arena Phase**: Extends until blockchain call completes (3-8 seconds)
-  - Single VRF transaction for winner determination
-- **2+ human players, ≥ 8 total participants**: Long game with top 4 betting (7 phases)
-  - Waiting (30s) → Arena (10s) → Elimination → Betting (15s) → Battle (15s) → Results (5s)
-  - Two VRF transactions (top 4, then final winner)
+All real games follow the same **3-phase structure**:
+
+1. **WAITING PHASE** (30 seconds)
+   - First bet creates game via `create_game_round`
+   - Additional players join via `bet` instruction
+   - Game status = 0 (open)
+   - Each bet includes: amount, skin (character), position (spawn coords)
+
+2. **ARENA PHASE** (Variable duration)
+   - Countdown reaches zero
+   - Backend calls `end_game` instruction
+   - Orao VRF provides randomness
+   - Winner selected on-chain (weighted by bet amounts)
+   - Game status = 1 (closed)
+   - Frontend shows battle animations
+
+3. **RESULTS PHASE** (15 seconds)
+   - Winner celebration animations
+   - Eliminated participants explode
+   - Backend calls `send_prize_winner`
+   - 95% pool to winner, 5% house fee
+   - Return to demo mode
 
 #### Core Features
 
 - **Client-Side Demo**: Each user runs their own demo locally, zero server cost
-- **Single Global Real Game**: One server-managed game for all real players
-- **Demo-to-Real Transition**: Client demo stops, server game starts on first bet
-- **Multiple Characters per Player**: One player can control multiple game participants
-- **Multiple Maps**: Various arenas with unique backgrounds and spawn configurations
-- **Character System**: Players start with a random character that can be re-rolled
-- **Bet-to-size**: Character size increases with bet amount
-- **Phase Lock**: All game parameters locked after waiting phase ends
-- **Server-side Execution**: No disconnection issues, game runs on server
-- **Tie Resolution**: Random winner selection weighted by bet amounts
-- **Demo Bot Count**: Always 20 bots in demo mode (client-generated)
-- **Bank Opponent**: Solo players face Bank bot (55% bank win, 45% player win)
+- **Single Global Real Game**: One blockchain-synced game for all real players
+- **Demo-to-Real Transition**: Client demo stops, real game starts on first bet
+- **Multiple Maps**: Random selection between bg1 and bg2 backgrounds
+- **Character System**: 8 characters available (some NFT-gated)
+- **Bet-to-size**: Character size scales with bet amount
+- **Real-time Updates**: Blockchain state synced to clients in <1 second
+- **Server-side Settlement**: Convex schedules smart contract calls
 - **No Demo Backend**: Demo runs purely in browser, no database records
+- **Orao VRF**: Production-grade verifiable randomness from Solana
 
-### Betting Rules
+### Betting System
 
-- **Self-Betting**: Players can ONLY bet on themselves during game entry (waiting phase)
-- **Spectator Betting**: During top 4 phase, players bet on OTHER participants only
-- **No Double Self-Betting**: Players cannot bet additional amounts on themselves in top 4
-- **Reason**: Maintains game balance and encourages social interaction
-
-### Economy System
-
+- **Self-Betting Only**: Players bet on themselves during waiting phase
+- **One Bet Per Game**: Each player can place one bet per game round
 - **Currency**: Native SOL (no conversion, direct betting)
-- **Betting Limits**: Min 0.01 SOL, Max 10 SOL per bet (dynamic based on house balance)
+- **Betting Limits**:
+  - Minimum: 0.001 SOL (hardcoded constant)
+  - Maximum: Configurable (set by admin in `initialize_config`)
+  - Recommended: 0.01 SOL min, 10 SOL max
 - **Embedded Wallets**: Privy manages user wallets seamlessly
 - **Smart Contract Escrow**: All bets locked in on-chain program (non-custodial)
-- **Pool Distribution**: 95% to winners, 5% house edge
-- **Self Bet Pool**: All initial entry bets, winners share 95% proportionally
-- **Spectator Pool**: All top 4 bets, winners share 95% proportionally
+- **Pool Distribution**: 95% to winner, 5% house fee
 - **Trustless**: Funds secured by smart contract, automatic payouts
 
 ### Technical Features
 
-- **Real-time**: Convex subscriptions for live updates
+- **Real-time**: Blockchain updates in <1 second via WebSocket subscriptions
 - **Type-safe**: End-to-end TypeScript
 - **Responsive**: Mobile and desktop support
-- **Scalable**: Serverless architecture
+- **Scalable**: Serverless architecture (Convex)
 - **Non-custodial**: Smart contract holds funds, not backend
 - **Seamless Auth**: Privy embedded wallets (email/social login)
 - **Signless UX**: Privy handles transaction signing smoothly
+- **Verifiable**: Orao VRF randomness on-chain
 
-## Database Schema
+## Smart Contract Architecture
+
+### Program: domin8_prgm
+
+**Program ID**: `D8zxCM4tehr4Aux9zvonwCCYjV71WEgFnssWxgpgEEb7` (Devnet)
+
+### Instructions (6 total)
+
+1. **initialize_config** - Admin-only setup
+   - Sets: treasury wallet, house fee, min/max bet amounts, round time
+   - Creates global config account (PDA)
+
+2. **create_game_round** - First bet creates game
+   - Transfers SOL from player to game vault
+   - Requests Orao VRF randomness
+   - Locks system (prevents concurrent games)
+   - Stores first bet with skin + position
+
+3. **bet** - Additional players join
+   - Transfers SOL to game vault
+   - Adds bet to game with skin + position
+   - Checks bet limits (amount, per-user count)
+
+4. **end_game** - Winner selection
+   - Reads Orao VRF randomness
+   - Weighted selection by bet amounts
+   - Closes game (status = 1)
+   - Stores winner + prize amount
+
+5. **send_prize_winner** - Payout distribution
+   - Transfers 95% pool to winner
+   - Transfers 5% fee to treasury
+   - Marks prize as sent
+
+6. **delete_game** - Admin cleanup
+   - Removes old game accounts
+   - Frees up storage
+
+### Game State Structure
+
+```rust
+pub struct Domin8Game {
+    pub game_round: u64,          // Increments each game
+    pub start_date: i64,          // Unix timestamp
+    pub end_date: i64,            // Unix timestamp
+    pub total_deposit: u64,       // Total pool in lamports
+    pub rand: u64,                // VRF randomness (unused, legacy)
+    pub map: u8,                  // Background ID (0-255)
+    pub user_count: u64,          // Unique players
+    pub force: [u8; 32],          // VRF force seed (entropy)
+    pub status: u8,               // 0 = open, 1 = closed
+    pub winner: Option<Pubkey>,   // Winner wallet
+    pub winner_prize: u64,        // Prize amount
+    pub winning_bet_index: Option<u64>, // Which bet won
+    pub wallets: Vec<Pubkey>,     // Unique wallets (deduplicated)
+    pub bets: Vec<BetInfo>,       // All bets with details
+}
+
+pub struct BetInfo {
+    pub wallet_index: u16,        // Index into wallets Vec
+    pub amount: u64,              // Bet in lamports
+    pub skin: u8,                 // Character ID (0-255)
+    pub position: [u16; 2],       // [x, y] spawn coordinates
+}
+```
+
+### Bet Limits & Constants
+
+```rust
+// Minimum bet (hardcoded)
+MIN_DEPOSIT_AMOUNT = 1_000_000 lamports (0.001 SOL)
+
+// Maximum bet (configurable, no hardcoded limit)
+// Set during initialize_config by admin
+
+// House fee cap
+MAX_HOUSE_FEE = 1000 basis points (10%)
+
+// Anti-spam limits
+MAX_BETS_PER_GAME = 1000 total bets
+MAX_BETS_PER_USER_SMALL = 20 (for bets < 0.01 SOL)
+MAX_BETS_PER_USER_LARGE = 30 (for bets >= 0.01 SOL)
+SMALL_BET_THRESHOLD = 10_000_000 lamports (0.01 SOL)
+
+// Timing
+MIN_ROUND_TIME = 10 seconds
+MAX_ROUND_TIME = 86400 seconds (24 hours)
+```
+
+## Database Schema (Convex)
 
 ### Core Tables
 
-- `games`: Game state, phases, map selection, and blockchain call tracking
-  - **ONLY real games**: Demo games not stored in database (client-side only)
-  - `gamePda` (Pubkey string): References on-chain GamePool account
-  - `blockchainCallStatus` ("none" | "pending" | "completed")
-  - `blockchainCallStartTime`: Tracking blockchain call duration
-  - **Global Game**: Only one active real game at a time
-- `players`: Player data and Privy wallet info
-  - `privyWalletAddress`: User's embedded wallet address
-  - `privyUserId`: Privy user identifier
-  - No balance stored (queried from Privy wallet directly)
-- `characters`: Generic character definitions (Warrior, Mage, Archer, etc.)
-- `gameParticipants`: Individual characters in a game (one player can have multiple)
-  - **ONLY real game participants**: No demo bots stored in database
-  - Includes "Bank" bot type for solo player games
-  - Links to on-chain bet transaction signature
-- `maps`: Arena configurations and backgrounds
-- `bets`: Off-chain betting record cache (source of truth is on-chain)
-  - `txSignature`: Transaction signature of place_bet instruction
-  - `amount`: SOL amount (native, no conversion)
-  - `onChainConfirmed`: Boolean for confirmation status
-- `transactionQueue`: Solana transaction processing
-- `bankBalance`: Tracks available funds for Bank bot matchmaking
+**gameRoundStates** - Real game state cache
+- `roundId`: number (from blockchain)
+- `status`: "waiting" | "finished"
+- `startTimestamp`: number
+- `endTimestamp`: number
+- `capturedAt`: number (sync timestamp)
+- `mapId`: number
+- `betCount`: number
+- `betAmounts`: number[]
+- `betSkin`: number[]
+- `betPosition`: [number, number][]
+- `totalPot`: number
+- `winner`: string | null (wallet address)
+- `winningBetIndex`: number
+- `prizeSent`: boolean
 
-## Animation Engine (Phaser.js)
+**scheduledJobs** - Backend task tracking
+- `jobId`: string
+- `roundId`: number
+- `action`: "end_game" | "send_prize"
+- `scheduledTime`: number
+- `status`: "pending" | "completed" | "failed"
+- `createdAt`: number
 
-### Key Animations
+**players** - Player profiles
+- `walletAddress`: string (primary key)
+- `externalWalletAddress`: string (optional)
+- `displayName`: string (optional)
+- `lastActive`: number
+- `totalGamesPlayed`: number
+- `totalWins`: number
+- `achievements`: string[]
 
-- **Client-Side Demo**: Full game loop runs locally in browser (20 bots, long game)
-- **Demo Transition**: Client demo stops, switches to server-synced real game scene
-- Character movement to center
-- Character idle
-- **Smart Explosion Effects**: Only explodes eliminated participants, winner stays in center
-- Battle clash animations
-- Victory celebrations
-- Coin rain and confetti
-- **Blockchain Randomness Dialog**: Shows during winner determination process
-- **Demo Mode Indicator**: Visual badge showing "DEMO" or "LIVE" status
+**characters** - Character definitions
+- `name`: string
+- `id`: number
+- `assetPath`: string (e.g., "/characters/orc.png")
+- `description`: string
+- `nftCollection`: string (optional, for exclusive characters)
+- `isActive`: boolean
+
+**maps** - Arena configurations
+- `name`: string
+- `id`: number
+- `description`: string
+- `spawnConfiguration`: { maxPlayers, spawnRadius, minSpacing }
+- `isActive`: boolean
+
+### Available Characters
+
+From `seed/characters.json`:
+- ID 1: orc
+- ID 3: male
+- ID 4: sam
+- ID 5: warrior
+- ID 6: pepe
+- ID 7: darthvader
+- ID 8: huggywuggy
+- ID 9: yasuo
+
+### Available Maps
+
+From `seed/maps.json`:
+- ID 1: bg1 (128 max players, 200px spawn radius)
+- ID 2: bg2 (128 max players, 200px spawn radius)
 
 ## Convex Backend
 
-### Scheduled Functions
+### Scheduled Functions (Crons)
 
-- **Real game loop**: Every 3 seconds (phase management for active real games only)
-- **Blockchain call processor**: Every 5 seconds (processes pending VRF winner determinations)
-- **Bank balance tracker**: Every 30 seconds (monitors available funds for solo player matchmaking)
-- **Transaction processing**: Every 30 seconds (Solana operations)
-- **Transaction cleanup**: Every 1 hour (removes 7-day old transactions)
-- **Game cleanup**: Every 6 hours (removes 3-day old completed games)
+```typescript
+// Every 45 seconds - sync blockchain state to Convex
+crons.interval("sync-blockchain-state", { seconds: 45 },
+  internal.syncService.syncBlockchainState
+);
 
-**Note**: No demo spawner cron needed - demos run client-side only
+// Every 6 hours - cleanup old scheduled jobs
+crons.interval("cleanup-old-scheduled-jobs", { hours: 6 },
+  internal.gameSchedulerMutations.cleanupOldJobs
+);
+```
+
+### Key Functions
+
+**syncService.ts**
+- `syncBlockchainState()` - Main cron: reads active_game PDA, syncs to DB
+- `syncActiveGame()` - Stores game state in gameRoundStates table
+- `processEndedGames()` - Detects when countdown expires
+- `scheduleEndGameAction()` - Creates scheduled job for end_game
+
+**gameScheduler.ts**
+- `executeEndGame()` - Calls smart contract end_game instruction
+- `executeSendPrize()` - Calls smart contract send_prize_winner instruction
+
+**gameSchedulerMutations.ts**
+- Job tracking (prevent duplicates)
+- Status updates (pending → completed/failed)
+- Cleanup old jobs (older than 24 hours)
 
 ### Real-time Features
 
-- Automatic UI updates
-- No WebSocket configuration needed
+- Blockchain updates synced every 45 seconds
+- Frontend subscribes to `active_game` PDA directly (<1s updates)
+- Automatic UI updates via Convex hooks
 - Optimistic updates with rollback
 
-## Winner Selection System
+## VRF Integration (Orao)
 
-### Blockchain VRF Integration (Verifiable Random Function)
+### Orao VRF Overview
 
-#### Architecture Overview
+**Provider**: Orao Network (production-grade Solana VRF)
+**Program ID**: `VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y`
 
-- **Hybrid Approach**: Bets and VRF seeds on-chain, game logic off-chain
-- **Bet Escrow**: Smart contract holds all player funds during game
-- **VRF Seeds**: Random seeds stored on blockchain for verification
-- **Game State**: Participant data and animations in Convex database
-- **User Signing**: Players sign bet transactions via Privy (seamless UX)
-- **Backend Settlement**: Server triggers payout after VRF winner determination
+### VRF Flow
 
-#### What Gets Stored On-chain
+1. **Request** (create_game_round)
+   - Smart contract calls Orao VRF `request_v2` via CPI
+   - Force seed (32 bytes) provided for entropy
+   - Orao generates verifiable randomness (~1-3 seconds)
 
-##### VRF Program State
+2. **Fulfillment** (automatic)
+   - Orao VRF stores randomness in on-chain account
+   - Randomness account PDA derived from force seed
+
+3. **Consumption** (end_game)
+   - Backend calls `end_game` instruction
+   - Smart contract reads Orao randomness account
+   - Extracts random bytes for winner selection
+   - Weighted selection: higher bets = higher win chance
+
+4. **Verification**
+   - Anyone can verify randomness on-chain
+   - Orao provides cryptographic proofs
+   - Reproducible: same seed + bets = same winner
+
+### Why Orao VRF?
+
+- **Production-Grade**: Battle-tested, used by major Solana dapps
+- **No Custom Audit**: Saves $10-50k in audit costs
+- **Fast**: 1-3 second randomness generation
+- **Verifiable**: Cryptographic proofs on-chain
+- **Reliable**: No custom implementation bugs
+
+### Winner Selection Algorithm
 
 ```rust
-// Global VRF State (singleton)
-pub struct VrfState {
-    pub authority: Pubkey,  // Backend wallet that can request VRF
-    pub nonce: u64,        // Counter for additional entropy
-}
-
-// Per-game seed storage
-pub struct GameSeed {
-    pub game_id: String,       // Reference to Convex database (max 32 chars)
-    pub round: u8,            // 1 for first round/quick games, 2 for final round
-    pub random_seed: [u8; 32], // VRF output for winner selection
-    pub timestamp: i64,        // When randomness was generated
-    pub used: bool,           // Track if seed was consumed
-}
+// Pseudo-code (implemented in smart contract)
+1. Read Orao VRF randomness (32 bytes)
+2. Convert to u64 random number
+3. Calculate total pool (sum of all bet amounts)
+4. Random point = random_number % total_pool
+5. Iterate through bets, accumulate weights
+6. Winner = first bet where cumulative >= random_point
 ```
 
-##### Game Bet Escrow Program State
+**Example**:
+- Bet 1: 1 SOL (weight: 1)
+- Bet 2: 3 SOL (weight: 3)
+- Bet 3: 1 SOL (weight: 1)
+- Total: 5 SOL
+- Random point: 3.7
+- Cumulative: 0→1 (Bet 1), 1→4 (Bet 2), 4→5 (Bet 3)
+- Winner: Bet 2 (because 3.7 falls in range 1-4)
 
-```rust
-// Single reusable Game PDA - holds all game state
-// Cost optimized: ~0.004 SOL one-time vs 0.00089 SOL per bet (97% savings)
-pub struct Game {
-    // Game metadata
-    pub game_id: u64,              // Increments each game
-    pub status: GameStatus,         // EntryPhase → SpectatorPhase → Settled
-    pub game_mode: GameMode,        // Unknown → Short/Long
+## Frontend Architecture
 
-    // Escrow pools
-    pub entry_pool: u64,            // Phase 1 total bets
-    pub spectator_pool: u64,        // Phase 2 total bets
-
-    // Entry phase bets (arrays, max 64 bets)
-    pub entry_bets: [u64; 64],           // Bet amounts
-    pub entry_players: [Pubkey; 64],     // Player wallets
-    pub entry_bet_count: u8,             // Number of bets placed
-
-    // Spectator phase bets (arrays, max 64 bets)
-    pub spectator_bets: [u64; 64],       // Bet amounts
-    pub spectator_players: [Pubkey; 64], // Player wallets
-    pub spectator_targets: [i8; 64],     // Which top_four they bet on (0-3)
-    pub spectator_bet_count: u8,         // Number of bets placed
-
-    // Winners
-    pub top_four: [i8; 4],          // Entry bet positions (long games only)
-    pub winner: i8,                 // Winning entry bet position
-
-    // Timing
-    pub entry_phase_start: i64,          // Unix timestamp
-    pub entry_phase_duration: i64,       // 45 seconds
-    pub spectator_phase_start: i64,      // Unix timestamp
-    pub spectator_phase_duration: i64,   // 45 seconds
-
-    // Settlement tracking
-    pub house_collected: bool,           // House fees claimed
-    pub entry_winnings_claimed: bool,    // Winner claimed entry pool
-    pub entry_refunded: [bool; 64],      // Per-bet refund tracking
-    pub spectator_refunded: [bool; 64],  // Per-bet refund tracking
-
-    // Safety features
-    pub last_game_end: i64,         // Time lock (5 seconds between games)
-    pub vrf_seed_top_four: Option<Pubkey>,  // VRF for top 4 selection
-    pub vrf_seed_winner: Option<Pubkey>,    // VRF for final winner
-    pub house_wallet: Pubkey,       // House fee destination
-    pub bump: u8,                   // PDA bump
-}
-
-pub enum GameStatus {
-    EntryPhase,        // Accepting entry bets
-    SelectingTopFour,  // Backend selecting top 4 (long games)
-    SpectatorPhase,    // Accepting spectator bets (long games)
-    SelectingWinner,   // Backend selecting winner
-    Settled,           // Payouts available
-    Cancelled,         // Game cancelled, refunds available
-}
-
-pub enum GameMode {
-    Unknown,  // Not yet determined
-    Short,    // 2-7 participants (one winner selection)
-    Long,     // ≥8 participants (top 4 + spectator betting)
-}
-
-// Authority PDA - controls backend access
-pub struct Authority {
-    pub admin: Pubkey,    // Can emergency withdraw, update backend
-    pub backend: Pubkey,  // Can set winners, collect fees
-    pub bump: u8,
-}
-```
-
-#### VRF Transaction Strategy
-
-##### Demo Games (No Real Players)
-
-- **No VRF**: Uses Math.random() for simulated randomness
-- **Cost**: Free (no blockchain transactions)
-- **Purpose**: Entertainment and player attraction only
-
-##### Quick Games (2-7 total participants)
-
-- **Applies to**: 2+ players OR 1 player vs Bank bot
-- **Single VRF Transaction**: One seed determines the winner
-- **Timing**: Requested after waiting phase ends
-- **Cost**: ~0.0001 SOL per game
-
-##### Long Games (≥ 8 total participants)
-
-- **Requires**: 2+ human players
-- **Two VRF Transactions**: Separate seeds for each elimination round
-- **First VRF**: After arena phase - determines top 4
-- **Second VRF**: After betting phase closes - determines final winner
-- **Security**: Second seed doesn't exist during betting, preventing prediction
-- **Cost**: ~0.0002 SOL per game (two transactions)
-
-#### Why Two Transactions for Long Games?
-
-If we used a single seed and derived both results, players could:
-
-1. See the seed when top 4 is announced
-2. Calculate the final winner before betting
-3. Only bet on the guaranteed winner
-4. Break the game economy
-
-Two separate VRF requests ensure true unpredictability.
-
-#### VRF Flow
-
-1. **Backend Request**: Automatically requests VRF at appropriate phase
-2. **Blockchain Processing**: Solana generates verifiable random seed (1-3 seconds)
-3. **Seed Storage**: Random seed stored on-chain with gameId + round reference
-4. **Local Winner Calculation**: Backend uses seed + database data to determine winners
-5. **Verification**: Anyone can verify seeds exist on blockchain for fairness proof
-
-#### VRF Program Instructions
-
-1. **initialize**: One-time setup to create VrfState with authority
-2. **request_vrf(game_id, round)**: Generate and store random seed for a game/round
-3. **mark_seed_used**: Optional tracking to prevent seed reuse
-
-#### Randomness Generation
-
-- Multiple entropy sources: game_id, round, timestamp, slot, nonce, recent blockhashes
-- Uses Keccak hash for final seed generation
-- Practically impossible to predict or manipulate
-
-#### Implementation Status
-
-- **Current**: Simulated blockchain calls (3-8 second delay)
-- **Completed**: Real Solana VRF program with modular structure
-  - Located in: `programs/domin8-vrf/`
-  - Program ID: `96ZRCG9KRB7Js6AENkVpTtwNUXqaxF8ZAAWrmxa8U2QF`
-  - Structure: Separate files for state, instructions, and errors
-  - Tests: Comprehensive test suite in TypeScript
-- **Next Steps**: Deploy to devnet and integrate with Convex backend
-
-**Short Game (2-7 participants):**
-
-```
-Demo Mode → Player Bets → initialize_game →
-Entry Bets (place_entry_bet) → set_winner →
-claim_entry_winnings + collect_house_fees →
-Return to Demo
-```
-
-**Long Game (≥8 participants):**
-
-```
-Demo Mode → Player Bets → initialize_game →
-Entry Bets (place_entry_bet) → set_top_four →
-Spectator Bets (place_spectator_bet) → set_winner →
-claim_entry_winnings + claim_spectator_winnings + collect_house_fees →
-Return to Demo
-```
-
-#### Security Features
-
-**Non-Custodial:**
-
-- Funds held by smart contract PDA, not backend
-- Backend cannot steal funds (only trigger settlement)
-- Settlement requires valid VRF seed verification
-
-**Transparency:**
-
-- All bets visible on-chain via GamePool account
-- VRF seeds publicly verifiable
-- Anyone can audit game results
-
-**Trustless:**
-
-- Winner determined by blockchain VRF, not backend
-- Smart contract enforces payout rules
-- Cannot change rules mid-game
-
-#### Privy Integration
+### Game Phases (GamePhaseManager)
 
 ```typescript
-// Frontend: User places bet
-import { usePrivy } from "@privy-io/react-auth";
-
-async function placeBet(amount: number) {
-  const { wallet } = usePrivy();
-
-  // Privy handles signing smoothly
-  const tx = await program.methods
-    .placeBet(new BN(amount * LAMPORTS_PER_SOL), participantId)
-    .accounts({
-      gamePool: gamePda,
-      player: wallet.address,
-      systemProgram: SystemProgram.programId,
-    })
-    .rpc();
-
-  // User sees: "Bet placed! ✓" (1-2 seconds)
-  return tx;
+enum GamePhase {
+  IDLE = "idle",              // Show demo
+  WAITING = "waiting",        // Accepting bets (30s)
+  VRF_PENDING = "vrf_pending", // Waiting for end_game
+  CELEBRATING = "celebrating", // Winner celebration (15s)
+  FIGHTING = "fighting",      // Battle animations
+  CLEANUP = "cleanup"         // Preparing for next game
 }
 ```
 
-**User Experience:**
+### Demo Mode Details
 
-1. User clicks "Bet 0.5 SOL"
-2. Privy shows simple confirmation dialog
-3. Transaction signs automatically (embedded wallet)
-4. 1-2 second wait for confirmation
-5. "Bet confirmed! ✓" notification
-6. No complex wallet setup required
-
-## Game Flow by Type
-
-### Quick Games (2-7 total participants)
-
-- **Applies to**: 2+ human players with 2-7 total participants, OR 1 player vs Bank bot
-- **VRF Requests**: 1 transaction
-- **Dynamic Phase Timing**: Arena phase extends until VRF completes
-- **Flow**:
-  1. Players move to center (2.5 seconds)
-  2. Backend automatically triggers VRF request (round 1)
-  3. Blockchain randomness dialog shows progress
-  4. VRF seed received from blockchain
-  5. Winner calculated using seed + bet weights
-  6. Only eliminated participants explode
-  7. Winner remains in center for victory
-
-### Long Games (≥ 8 total participants)
-
-- **Requires**: 2+ human players with ≥8 total participants
-- **VRF Requests**: 2 transactions
-- **Fixed Timing**: Standard phase durations
-- **First VRF (Round 1)**:
-  - Triggered after arena phase
-  - Determines top 4 participants
-  - Seed visible but can't predict final winner
-- **Betting Phase**: Players bet on top 4 participants
-- **Second VRF (Round 2)**:
-  - Triggered after betting closes
-  - Determines final winner from top 4
-  - Completely unpredictable until requested
-- **Elimination**: Progressive (many → top 4 → final winner)
-
-### Return to Demo
-
-After any real game completes:
-
-1. Distribute winnings via smart contract
-2. Show results (5 seconds)
-3. Clean up server game state
-4. **Clients return to local demo**: Each browser restarts its own client-side demo
-5. Cycle continues (demo runs locally until next bet)
-
-### Frontend Integration
-
+**Configuration** (`demoTimings.ts`):
 ```typescript
-// Key files
-src/components/DemoModeIndicator.tsx          // "DEMO" badge/overlay
-src/components/BlockchainRandomnessDialog.tsx  // Progress indicator during VRF
-src/components/BetButton.tsx                  // Privy-powered betting interface
-src/game/managers/GamePhaseManager.ts          // Phase management
-src/game/managers/BotEvacuationManager.ts      // Bot runaway animations
-src/game/managers/AnimationManager.ts          // Smart explosions
-src/hooks/usePrivyWallet.ts                   // Privy wallet integration
-src/hooks/useBetEscrow.ts                     // Smart contract interactions
-src/App.tsx                                   // Event coordination
-
-// UI States
-"demo" → Shows "DEMO" badge, "Join Game" button enabled
-"waiting" → Shows countdown, "Join Game" active, bet confirmation (1-2s)
-"playing" → Game in progress, spectator mode for non-participants
-"settling" → Winner announced, smart contract payout in progress
+SPAWNING_PHASE_DURATION: 20_000ms      // 20 seconds
+BOT_SPAWN_MIN_INTERVAL: 200ms          // Fast bursts
+BOT_SPAWN_MAX_INTERVAL: 3_000ms        // Long pauses
+ARENA_PHASE_MIN_DURATION: 2_000ms      // 2s minimum
+ARENA_PHASE_MAX_DURATION: 3_000ms      // 3s maximum
+RESULTS_PHASE_DURATION: 15_000ms       // 15s celebration
+DEMO_PARTICIPANT_COUNT: 20             // Always 20 bots
 ```
 
-### Cost Analysis (Per Game)
+**Bot Generation**:
+- Random names (e.g., "Shadow847", "Blaze123")
+- Random characters from database
+- Random bet amounts: 0.001-10 SOL (exponential distribution)
+- Random color hues (0-360)
+- Unique spawn positions from pre-calculated grid
 
-#### Demo Games
+**Winner Selection**:
+- Weighted by bet amount (same algorithm as real games)
+- Uses Math.random() (not verifiable, demo only)
 
+### Key React Hooks
+
+**usePrivyWallet.ts**
+- Manages Privy wallet connection
+- Returns: `connected`, `publicKey`, `solBalance`, `wallet`
+
+**useGameContract.ts**
+- `placeBet(amount, skin, position, map)` - Send bet transaction
+- `validateBet(amount)` - Check bet validity
+- Builds Anchor instructions manually
+- Signs via Privy's `signAndSendAllTransactions()`
+- Supports both `create_game_round` and `bet` instructions
+
+**useActiveGame.ts**
+- Subscribes to `active_game` PDA via WebSocket
+- Real-time updates (<1s latency)
+- Returns blockchain game state + map lookup
+- Transforms Solana PublicKey → base58 string
+
+**useNFTCharacters.ts**
+- Checks NFT ownership for exclusive characters
+- Calls `verifyNFTOwnership` Convex action
+
+## Game Flow Diagram
+
+```
+┌──────────────────────┐
+│   Demo Mode (20 bots)│ Runs continuously in DemoScene
+│  No DB, No Blockchain│ Math.random() for all RNG
+└──────────────────────┘
+           ↓ [User clicks "Place Bet"]
+┌──────────────────────────────────────┐
+│ 1. User selects character + bet      │
+│ 2. Frontend calls placeBet()          │
+│ 3. Privy signs create_game_round     │ First bet = create game
+│ 4. Transaction includes:             │
+│    - round_id (auto-increment)       │
+│    - bet_amount (SOL)                │
+│    - skin (char ID)                  │
+│    - position (spawn coords)         │
+│    - map (background ID)             │
+└──────────────────────────────────────┘
+           ↓
+┌──────────────────────────────────────┐
+│ Smart Contract: create_game_round    │
+│ 1. Validate bet amount               │
+│ 2. Create game account (PDA)         │
+│ 3. Request Orao VRF seed             │
+│ 4. Lock system (prevent new games)   │
+│ 5. Transfer SOL to game vault        │
+│ 6. Return: first bet stored          │
+└──────────────────────────────────────┘
+           ↓ [Demo stops, real game starts]
+┌──────────────────────────────────────┐
+│ WAITING PHASE (30 seconds)           │
+│ - Other players call bet()           │
+│ - Each bet: skin + position          │
+│ - Status = 0 (open)                  │
+│ - Convex syncs every 45s             │
+│ - Frontend shows countdown           │
+└──────────────────────────────────────┘
+           ↓ [End time reached]
+┌──────────────────────────────────────┐
+│ gameScheduler.executeEndGame()       │
+│ 1. Convex scheduler triggers         │
+│ 2. Calls smart contract end_game()   │
+│ 3. Orao VRF used to select winner    │
+│ 4. Status = 1 (closed)               │
+│ 5. Winner stored in blockchain       │
+└──────────────────────────────────────┘
+           ↓ [Winner determined]
+┌──────────────────────────────────────┐
+│ CELEBRATING PHASE (15 seconds)       │
+│ - Animations show winner             │
+│ - Other participants explode         │
+│ - Celebration particles              │
+└──────────────────────────────────────┘
+           ↓ [15s elapsed]
+┌──────────────────────────────────────┐
+│ gameScheduler.executeSendPrize()     │
+│ 1. Calls smart contract send_prize   │
+│ 2. Distributes SOL to winner         │
+│ 3. Calculates prize (95% pool)       │
+│ 4. House fee (5%) to treasury        │
+└──────────────────────────────────────┘
+           ↓ [Prize sent]
+┌──────────────────────────────────────┐
+│ CLEANUP PHASE                        │
+│ 1. Fade out game                     │
+│ 2. Return to demo mode               │
+│ 3. DemoScene restarts locally        │
+└──────────────────────────────────────┘
+```
+
+## Cost Analysis
+
+### Demo Games
 - **Total Cost**: $0 (free)
-- **Breakdown**: No blockchain transactions, pure off-chain
+- **Breakdown**: No blockchain transactions, pure client-side
 
-#### Real Games with Smart Contract Escrow
+### Real Games
 
-##### Solo vs Bank (2 participants total)
-
-- Initialize GamePool: ~0.000005 SOL
-- Player bet: ~0.000005 SOL (user pays)
+**Per Game Costs** (Backend pays):
+- Create game: ~0.000005 SOL
 - Lock game: ~0.000005 SOL
-- VRF request: ~0.0001 SOL
-- Settle game: ~0.000005 SOL
-- **Backend Cost**: ~0.000115 SOL (~$0.025)
-- **User Cost**: ~0.000005 SOL (transaction fee only)
+- Orao VRF request: ~0.0001 SOL
+- End game: ~0.000005 SOL
+- Send prize: ~0.000005 SOL
+- **Total Backend Cost**: ~0.00012 SOL (~$0.025 at $200/SOL)
 
-##### Quick Game (2-7 participants)
+**Per Player Costs** (User pays):
+- Bet transaction: ~0.000005 SOL (~$0.001)
 
-- Initialize GamePool: ~0.000005 SOL
-- Bet transactions: ~0.000005 SOL × players (users pay)
-- Lock game: ~0.000005 SOL
-- VRF request: ~0.0001 SOL
-- Settle game: ~0.000005 SOL
-- **Backend Cost**: ~0.000115 SOL (~$0.025)
-- **User Cost per player**: ~0.000005 SOL (~$0.001)
+**Economic Model**:
+- House edge: 5% of pool
+- Example: 10 SOL pool = 0.5 SOL house fee (~$100)
+- Backend cost: ~$0.025
+- Net profit: ~$99.975 per game
+- Scalability: Costs stay flat, revenue scales with pool size
 
-##### Long Game (≥8 participants)
-
-- Initialize GamePool: ~0.000005 SOL
-- Bet transactions: ~0.000005 SOL × players (users pay)
-- Lock game: ~0.000005 SOL
-- First VRF (top 4): ~0.0001 SOL
-- Second VRF (winner): ~0.0001 SOL
-- Settle game: ~0.000005 SOL
-- **Backend Cost**: ~0.000215 SOL (~$0.045)
-- **User Cost per player**: ~0.000005 SOL (~$0.001)
-
-#### Economic Model
-
-- **House Edge**: 5% of pool covers blockchain costs + profit
-- **Example**: 10 SOL pool = 0.5 SOL house fee (~$105)
-- **Backend Cost**: ~$0.025-0.045 per game
-- **Net Profit**: $104+ per game
-- **Scalability**: Costs stay flat, revenue scales with pool size
-
-#### Setup Costs
-
-- **Smart Contract Audit**: $10-50k (one-time, recommended for production)
-- **Alternative**: Switchboard VRF (~0.002 SOL/game, $30k savings on audit)
-- **Break-even**: ~100-500 games depending on audit cost
-
-### Verification & Fairness
-
-#### Demo Games
-
-- **Randomness**: Math.random() (simulated, not verifiable)
-- **Purpose**: Entertainment and player attraction only
-- **Trust**: Not required (no real money)
-
-#### Real Games
-
-**Non-Custodial:**
-
-- All bets locked in smart contract (GamePool PDA)
-- Backend cannot access funds
-- Settlement requires valid VRF seed verification
-- Automatic payouts enforced by contract
-
-**Transparent:**
-
-- All bets publicly visible on-chain
-- GamePool account queryable by anyone
-- Transaction history permanent on Solana
-
-**Verifiable Randomness:**
-
-- VRF seeds stored on-chain (GameSeed accounts)
-- Anyone can verify seeds exist for each game
-- Reproducible: Same seed + participants = same winner
-- Multiple entropy sources (slot, blockhash, nonce, timestamp)
-
-**Audit Trail:**
-
-- Every game has on-chain GamePool account
-- Every winner has corresponding VRF seed
-- Complete transaction history accessible
-- Round separation for long games (independent seeds)
-
-### Error Handling
-
-#### Smart Contract Errors
-
-- **Insufficient Balance**: User shown clear error before transaction
-- **Bet After Lock**: Smart contract rejects with error
-- **Double Bet**: GamePool tracks bets, prevents duplicates
-- **Invalid Settlement**: Requires valid VRF seed account, reverts otherwise
-
-#### VRF Errors
-
-- **Timeout**: Retry once after 5 seconds
-- **Second Failure**: Backend calls refund_game(), all bets returned
-- **Network Issues**: Queue VRF requests for retry
-- **Typical Duration**: 1-3 seconds per VRF request
-
-#### Refund Scenarios
-
-All trigger refund_game() smart contract instruction:
-
-1. Solo player with insufficient bank balance
-2. VRF fails twice
-3. Game initialization error
-4. No players after waiting phase (should never happen, demo catches this)
-
-### Environment Variables
+## Environment Variables
 
 ```env
 # Convex Backend
@@ -667,25 +628,27 @@ CONVEX_DEPLOYMENT=
 
 # Solana
 SOLANA_RPC_URL=
-VITE_SOLANA_NETWORK=devnet           # Client-side (Vite exposes VITE_*)
-GAME_PROGRAM_ID=                     # domin8-game smart contract
-VRF_PROGRAM_ID=96ZRCG9KRB7Js6AENkVpTtwNUXqaxF8ZAAWrmxa8U2QF
-BACKEND_WALLET_SECRET=               # For VRF requests and settlements
+VITE_SOLANA_NETWORK=devnet                      # Client-side (Vite exposes VITE_*)
+GAME_PROGRAM_ID=D8zxCM4tehr4Aux9zvonwCCYjV71WEgFnssWxgpgEEb7
+ORAO_VRF_PROGRAM_ID=VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y
+BACKEND_WALLET_SECRET=                          # For settlements
 
 # Privy
-VITE_PRIVY_APP_ID=                   # Client-side (exposed to browser)
-PRIVY_APP_SECRET=                    # Backend-only (Convex uses this)
+VITE_PRIVY_APP_ID=                              # Client-side (exposed to browser)
+PRIVY_APP_SECRET=                               # Backend-only (Convex uses this)
 
 # Note: Vite only exposes variables prefixed with VITE_ to the browser
 # All other variables are only accessible server-side in Convex
 ```
 
-### Security
+## Security
 
 - Never commit secrets or private keys
 - Use environment variables for sensitive data
-- Validate all user inputs
-- Server-side game state management
+- Validate all user inputs on-chain
+- Smart contract enforces all game rules
+- Non-custodial: Backend cannot access player funds
+- Verifiable: Orao VRF provides cryptographic proofs
 
 ## Resources
 
@@ -693,6 +656,7 @@ PRIVY_APP_SECRET=                    # Backend-only (Convex uses this)
 - [Phaser.js Docs](https://phaser.io/docs)
 - [Solana Cookbook](https://solanacookbook.com/)
 - [Anchor Framework](https://www.anchor-lang.com/)
+- [Orao VRF Docs](https://docs.orao.network/)
 - [Privy Docs](https://docs.privy.io/)
 - [Bun Documentation](https://bun.sh/docs)
 
@@ -708,7 +672,7 @@ PRIVY_APP_SECRET=                    # Backend-only (Convex uses this)
 ├─────────────────────────────────────────────────────────────┤
 │ 1. Login with email/social (Privy)                          │
 │ 2. Watch demo game (20 bots, entertaining)                  │
-│ 3. Click "Bet 0.5 SOL" → Privy signs seamlessly            │
+│ 3. Click "Bet 0.5 SOL" → Privy signs seamlessly             │
 │ 4. Wait 30s for other players                               │
 │ 5. Watch game play (Phaser animations)                      │
 │ 6. Winner announced → SOL arrives in wallet                 │
@@ -720,18 +684,17 @@ PRIVY_APP_SECRET=                    # Backend-only (Convex uses this)
 ├─────────────────────────────────────────────────────────────┤
 │ Frontend (React + Vite + Phaser)                            │
 │   - Privy for auth + embedded wallets                       │
-│   - Real-time game state via Convex hooks                   │
+│   - Real-time blockchain updates (<1s via WebSocket)        │
 │   - 60fps animations on canvas                              │
 ├─────────────────────────────────────────────────────────────┤
 │ Backend (Convex Serverless)                                 │
-│   - Game loop (3s intervals)                                │
-│   - Phase management (demo ↔ real)                          │
-│   - Bot spawning/evacuation                                 │
-│   - Coordinates blockchain calls                            │
+│   - Blockchain sync (45s intervals)                         │
+│   - Scheduled jobs (end_game, send_prize)                   │
+│   - Player/character/map management                         │
 ├─────────────────────────────────────────────────────────────┤
 │ Blockchain (Solana)                                         │
-│   - domin8-game: Bet escrow (GamePool PDAs)                 │
-│   - domin8-vrf: Verifiable randomness (GameSeed)            │
+│   - domin8_prgm: Bet escrow (6 instructions)                │
+│   - Orao VRF: Verifiable randomness                         │
 │   - All bets locked in smart contracts                      │
 │   - Non-custodial, trustless, transparent                   │
 └─────────────────────────────────────────────────────────────┘
@@ -740,36 +703,78 @@ PRIVY_APP_SECRET=                    # Backend-only (Convex uses this)
 ### Key Architectural Decisions
 
 **1. Hybrid On/Off-Chain**
-
 - ✅ Bets: On-chain (trustless escrow)
-- ✅ VRF: On-chain (verifiable randomness)
+- ✅ VRF: On-chain (Orao VRF, verifiable randomness)
 - ✅ Game Logic: Off-chain (fast, flexible)
 - ✅ Animations: Off-chain (smooth, no blockchain lag)
 
 **2. Single Global Game**
-
 - One game instance for entire platform
 - Creates urgency and social dynamics
 - Simpler architecture than parallel games
 - Demo always running when no real players
 
-**3. Direct SOL (No Coins)**
-
+**3. Direct SOL (No Tokens)**
 - Users bet real SOL, not internal currency
 - Clearer value proposition
 - Less code complexity
 - No conversion confusion
 
 **4. Privy for Wallets**
-
 - Email/social login (no crypto knowledge required)
 - Embedded wallets (seamless transaction signing)
 - Users control keys (can export)
 - 1-2 second bet confirmations
 
-**5. Smart Contract Escrow**
+**5. Orao VRF (Not Custom)**
+- Production-grade randomness provider
+- No audit costs ($10-50k savings)
+- Battle-tested, reliable
+- Cryptographic verification built-in
 
+**6. Smart Contract Escrow**
 - Non-custodial (backend can't steal)
 - Transparent (all bets on-chain)
-- Verifiable (VRF seeds public)
+- Verifiable (Orao VRF proofs public)
 - Marketing advantage (provably fair)
+
+---
+
+## Notes
+
+### What's Implemented
+✅ Demo mode with 20 bots (client-side only)
+✅ Real game mode (blockchain-synced)
+✅ Orao VRF integration (production-grade)
+✅ 6-instruction smart contract (optimized)
+✅ Privy wallet integration (seamless UX)
+✅ Real-time blockchain updates (<1s)
+✅ 8 characters (some NFT-gated)
+✅ 2 maps (bg1, bg2)
+✅ Bet-to-size scaling
+✅ Smart explosion effects (winner stays)
+✅ Non-custodial escrow
+✅ 95/5 prize distribution
+
+### Not Implemented
+❌ Bank bot (solo player opponent)
+❌ Top-4 betting phase
+❌ Spectator betting
+❌ Multi-phase variable games
+❌ Custom VRF program
+❌ Multiple bets per player per game
+
+### Simplified vs Original Design
+The actual codebase is **simpler and more elegant** than originally documented:
+- Single-round games (not variable 3-7 phases)
+- One VRF call per game (not two)
+- Self-betting only (no spectator phase)
+- Orao VRF (not custom implementation)
+- Fixed 3 phases (waiting → arena → results)
+
+This simplification makes the game:
+- Easier to understand
+- Faster to play
+- Cheaper to run
+- More reliable (fewer edge cases)
+- Still provably fair (Orao VRF)

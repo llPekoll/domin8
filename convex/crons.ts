@@ -18,7 +18,7 @@ const crons = cronJobs();
  * 2. Syncs to Convex database
  * 3. Schedules endGame action when game expires
  */
-crons.interval("sync-blockchain-state", { seconds: 10 }, internal.syncService.syncBlockchainState);
+crons.interval("sync-blockchain-state", { seconds: 45 }, internal.syncService.syncBlockchainState);
 
 /**
  * Game recovery - self-healing system that catches unsent prizes

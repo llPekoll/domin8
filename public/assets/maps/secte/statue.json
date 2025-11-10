@@ -1,0 +1,440 @@
+{
+  "frames": [
+    {
+      "filename": "statue 0.aseprite",
+      "frame": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 1.aseprite",
+      "frame": { "x": 396, "y": 0, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 2.aseprite",
+      "frame": { "x": 792, "y": 0, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 3.aseprite",
+      "frame": { "x": 1188, "y": 0, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 4.aseprite",
+      "frame": { "x": 1584, "y": 0, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 5.aseprite",
+      "frame": { "x": 1980, "y": 0, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 6.aseprite",
+      "frame": { "x": 0, "y": 180, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 7.aseprite",
+      "frame": { "x": 396, "y": 180, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 8.aseprite",
+      "frame": { "x": 792, "y": 180, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 9.aseprite",
+      "frame": { "x": 1188, "y": 180, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 10.aseprite",
+      "frame": { "x": 1584, "y": 180, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 11.aseprite",
+      "frame": { "x": 1980, "y": 180, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 12.aseprite",
+      "frame": { "x": 0, "y": 360, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 13.aseprite",
+      "frame": { "x": 396, "y": 360, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 14.aseprite",
+      "frame": { "x": 792, "y": 360, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 15.aseprite",
+      "frame": { "x": 1188, "y": 360, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 16.aseprite",
+      "frame": { "x": 1584, "y": 360, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 17.aseprite",
+      "frame": { "x": 1980, "y": 360, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 18.aseprite",
+      "frame": { "x": 0, "y": 540, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 19.aseprite",
+      "frame": { "x": 396, "y": 540, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 20.aseprite",
+      "frame": { "x": 792, "y": 540, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 21.aseprite",
+      "frame": { "x": 1188, "y": 540, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 22.aseprite",
+      "frame": { "x": 1584, "y": 540, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 23.aseprite",
+      "frame": { "x": 1980, "y": 540, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 24.aseprite",
+      "frame": { "x": 0, "y": 720, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 25.aseprite",
+      "frame": { "x": 396, "y": 720, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 26.aseprite",
+      "frame": { "x": 792, "y": 720, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 27.aseprite",
+      "frame": { "x": 1188, "y": 720, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 28.aseprite",
+      "frame": { "x": 1584, "y": 720, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 29.aseprite",
+      "frame": { "x": 1980, "y": 720, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 30.aseprite",
+      "frame": { "x": 0, "y": 900, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 31.aseprite",
+      "frame": { "x": 396, "y": 900, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 32.aseprite",
+      "frame": { "x": 792, "y": 900, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 33.aseprite",
+      "frame": { "x": 1188, "y": 900, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 34.aseprite",
+      "frame": { "x": 1584, "y": 900, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 35.aseprite",
+      "frame": { "x": 1980, "y": 900, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 36.aseprite",
+      "frame": { "x": 0, "y": 1080, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 37.aseprite",
+      "frame": { "x": 396, "y": 1080, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 38.aseprite",
+      "frame": { "x": 792, "y": 1080, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 39.aseprite",
+      "frame": { "x": 1188, "y": 1080, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 40.aseprite",
+      "frame": { "x": 1584, "y": 1080, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 41.aseprite",
+      "frame": { "x": 1980, "y": 1080, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 42.aseprite",
+      "frame": { "x": 0, "y": 1260, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 43.aseprite",
+      "frame": { "x": 396, "y": 1260, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 44.aseprite",
+      "frame": { "x": 792, "y": 1260, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 45.aseprite",
+      "frame": { "x": 1188, "y": 1260, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    },
+    {
+      "filename": "statue 46.aseprite",
+      "frame": { "x": 1584, "y": 1260, "w": 396, "h": 180 },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
+      "sourceSize": { "w": 396, "h": 180 },
+      "duration": 90
+    }
+  ],
+  "meta": {
+    "app": "https://www.aseprite.org/",
+    "version": "1.3.15.2-arm64",
+    "image": "statue.png",
+    "format": "RGBA8888",
+    "size": { "w": 2376, "h": 1440 },
+    "scale": "1",
+    "frameTags": [
+      { "name": "boom", "from": 40, "to": 46, "direction": "forward", "color": "#000000ff" }
+    ],
+    "layers": [{ "name": "Layer 2", "opacity": 255, "blendMode": "normal" }],
+    "slices": []
+  }
+}

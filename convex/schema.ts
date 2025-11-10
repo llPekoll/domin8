@@ -22,24 +22,18 @@ export default defineSchema({
     capturedAt: v.number(), // When this state was captured (Unix timestamp)
 
     // Game configuration (selected when round is created)
-    mapId: v.optional(v.id("maps")), // Which map/arena this round uses (all players see same map)
+    mapId: v.optional(v.number()), // Map ID from blockchain (0-255) - matches smart contract
 
     // Game state (snapshot from blockchain)
-    betCount: v.number(), // Number of bets placed
-    betAmounts: v.array(v.number()), // Array of bet amounts
-    betSkin: v.array(v.number()), // Array of skin IDs (u8) - character customization
-    betPosition: v.array(v.array(v.number())), // Array of [x, y] positions (u16)
-    totalPot: v.number(), // Total accumulated pot in lamports
-    winner: v.union(v.string(), v.null()), // Winner wallet (base58), null if not determined
-    winningBetIndex: v.number(), // Index of winning bet
+    betCount: v.optional(v.number()), // Number of bets placed
+    betAmounts: v.optional(v.array(v.number())), // Array of bet amounts
+    betSkin: v.optional(v.array(v.number())), // Array of skin IDs (u8) - character customization
+    betPosition: v.optional(v.array(v.array(v.number()))), // Array of [x, y] positions (u16)
+    totalPot: v.optional(v.number()), // Total accumulated pot in lamports
+    winner: v.optional(v.union(v.string(), v.null())), // Winner wallet (base58), null if not determined
+    winningBetIndex: v.optional(v.number()), // Index of winning bet
 
-    // VRF data (simplified for risk architecture)
-    vrfRequestPubkey: v.union(v.string(), v.null()), // Always null (not used)
-    vrfSeed: v.array(v.number()), // Empty array (not used)
-    randomnessFulfilled: v.boolean(), // True when game is finished
-
-    // Prize tracking
-    winnerPrizeUnclaimed: v.optional(v.number()), // Unclaimed prize amount
+    prizeSent: v.optional(v.boolean()), // Whether prize has been sent to winner
   })
     .index("by_round_and_status", ["roundId", "status"]) // Prevent duplicate states (PRIMARY)
     .index("by_round_id", ["roundId"]) // Query all states for a round
@@ -77,20 +71,10 @@ export default defineSchema({
   characters: defineTable({
     name: v.string(),
     id: v.number(),
-    assetPath: v.string(), // Path to character spritesheet (e.g., "/characters/orc.png")
+    assetPath: v.optional(v.string()), // Path to character spritesheet (e.g., "/characters/orc.png")
     description: v.optional(v.string()), // Character description
-    animations: v.optional(
-      v.object({
-        idle: v.object({
-          start: v.number(),
-          end: v.number(),
-        }),
-        walk: v.object({
-          start: v.number(),
-          end: v.number(),
-        }),
-      })
-    ),
+    nftCollection: v.optional(v.string()), // NFT collection program address for special/exclusive characters
+    nftCollectionName: v.optional(v.string()), // Human-readable name of the NFT collection
     isActive: v.boolean(),
   }).index("by_active", ["isActive"]),
 
@@ -100,13 +84,15 @@ export default defineSchema({
   maps: defineTable({
     name: v.string(),
     id: v.number(),
-    background: v.string(), // Background identifier (e.g., "arena_classic")
-    assetPath: v.string(), // Path to map asset (e.g., "/maps/arena_classic.png")
     description: v.optional(v.string()), // Map description
     spawnConfiguration: v.object({
-      maxPlayers: v.number(), // Maximum players for this map
-      spawnRadius: v.number(), // Radius for spawn area
-      minSpacing: v.number(), // Minimum spacing between spawns
+      centerX: v.number(), // Center X position in pixels
+      centerY: v.number(), // Center Y position in pixels (from top of image)
+      radiusX: v.number(), // Horizontal ellipse radius (from Aseprite measurement)
+      radiusY: v.number(), // Vertical ellipse radius (max of top/bottom)
+      minSpawnRadius: v.number(), // Inner dead zone (avoid center clustering)
+      maxSpawnRadius: v.number(), // Outer spawn boundary (radiusY - character margin)
+      minSpacing: v.number(), // Minimum distance between character spawns
     }),
     isActive: v.boolean(),
   }).index("by_active", ["isActive"]),
@@ -116,6 +102,7 @@ export default defineSchema({
    */
   players: defineTable({
     walletAddress: v.string(),
+    externalWalletAddress: v.optional(v.string()), // External wallet (e.g., Phantom) for NFT verification
     displayName: v.optional(v.string()),
     lastActive: v.number(),
     totalGamesPlayed: v.number(),
