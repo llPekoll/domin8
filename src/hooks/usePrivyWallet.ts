@@ -26,6 +26,10 @@ export function usePrivyWallet() {
       account.walletClientType
   );
 
+  const externalWalletAccountType = externalWalletAccount && "walletClientType" in externalWalletAccount
+    ? externalWalletAccount.walletClientType
+    : null;
+
   const externalWalletAddress = externalWalletAccount && "address" in externalWalletAccount
     ? externalWalletAccount.address
     : null;
@@ -81,17 +85,18 @@ export function usePrivyWallet() {
     } finally {
       setIsLoadingBalance(false);
     }
+   
   };
-
-  return {
-    connected,
-    publicKey: walletAddress ? new PublicKey(walletAddress) : null,
-    walletAddress,
-    externalWalletAddress, // External wallet (e.g., Phantom) if connected
-    wallet: solanaWallet,
-    ready,
-    solBalance,
-    isLoadingBalance,
-    refreshBalance,
-  };
+   return {
+      connected,
+      publicKey: walletAddress ? new PublicKey(walletAddress) : null,
+      walletAddress,
+      externalWalletAddress,
+      externalWalletAccountType,
+      wallet: solanaWallet,
+      ready,
+      solBalance,
+      isLoadingBalance,
+      refreshBalance,
+    };
 }

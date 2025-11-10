@@ -502,8 +502,8 @@ const CharacterSelection = memo(function CharacterSelection({
                 />
               </div>
               <div>
-                <p className="text-amber-100 font-bold text-base uppercase tracking-wide">
-                  {currentCharacter.name}
+                <p className="text-amber-100 font-bold text-base uppercase tracking-wide truncate max-w-[80px]" title={currentCharacter.name}>
+                  {currentCharacter.name.length > 7 ? `${currentCharacter.name.slice(0, 7)}..` : currentCharacter.name}
                 </p>
               </div>
             </div>
