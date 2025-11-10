@@ -22,6 +22,9 @@ export let demoMapData: any = null;
 // Global storage for active game state from blockchain (useActiveGame)
 export let activeGameData: any = null;
 
+// Flag to track if blockchain data has been loaded (or timed out)
+export let blockchainDataReady: boolean = false;
+
 export const setCurrentMapData = (map: any) => {
   currentMapData = map;
 };
@@ -40,6 +43,11 @@ export const setDemoMapData = (map: any) => {
 
 export const setActiveGameData = (gameData: any) => {
   activeGameData = gameData;
+  blockchainDataReady = true; // Mark blockchain as loaded
+};
+
+export const setBlockchainDataReady = (ready: boolean) => {
+  blockchainDataReady = ready;
 };
 
 const config: Phaser.Types.Core.GameConfig = {

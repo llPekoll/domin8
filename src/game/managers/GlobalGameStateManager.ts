@@ -55,8 +55,8 @@ export class GlobalGameStateManager {
   private countdownInterval: NodeJS.Timeout | null = null;
 
   // Constants
-  private readonly CELEBRATION_DURATION = 4000; // 4 seconds (reduced from 15s)
-  private readonly BATTLE_DURATION = 3000; // 3 seconds
+  private readonly CELEBRATION_DURATION = 3000; // 4 seconds (reduced from 15s)
+  private readonly BATTLE_DURATION = 5000; // 3 seconds
 
   constructor(game: PhaserGame) {
     this.game = game;
@@ -203,7 +203,8 @@ export class GlobalGameStateManager {
     // ✅ Store endTimestamp for local countdown timer
     const endTimestamp = gameState?.endTimestamp || gameState?.endDate;
     if (endTimestamp && endTimestamp !== 0) {
-      this.currentGameEndTimestamp = endTimestamp > 10000000000 ? endTimestamp : endTimestamp * 1000;
+      this.currentGameEndTimestamp =
+        endTimestamp > 10000000000 ? endTimestamp : endTimestamp * 1000;
     }
 
     // Determine what phase we should be in
@@ -372,7 +373,6 @@ export class GlobalGameStateManager {
     this.handlePhaseActions(previousPhase, targetPhase, gameState);
   }
 
-
   /**
    * Check celebration progress and cleanup when done
    */
@@ -459,7 +459,9 @@ export class GlobalGameStateManager {
     // Transition to CELEBRATING after battle duration
     setTimeout(() => {
       if (this.currentPhase === GamePhase.FIGHTING) {
-        logger.game.debug("[GlobalGameStateManager] ⚔️ Battle complete, transitioning to CELEBRATING");
+        logger.game.debug(
+          "[GlobalGameStateManager] ⚔️ Battle complete, transitioning to CELEBRATING"
+        );
 
         this.currentPhase = GamePhase.CELEBRATING;
         EventBus.emit("game-phase-changed", GamePhase.CELEBRATING);

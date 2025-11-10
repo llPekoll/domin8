@@ -1,5 +1,5 @@
 import { Scene } from "phaser";
-import { currentMapData, charactersData, allMapsData, demoMapData, activeGameData } from "../main";
+import { currentMapData, charactersData, allMapsData, demoMapData, activeGameData, blockchainDataReady } from "../main";
 import { logger } from "../../lib/logger";
 import { loadBackgroundConfig } from "../config/backgrounds";
 import { EventBus } from "../EventBus";
@@ -401,25 +401,54 @@ export class Preloader extends Scene {
       frameRate: 24,
     });
 
-    // TODO : this might be null
-    const hasActiveGame =
-      activeGameData &&
-      activeGameData.bets &&
-      activeGameData.bets.length > 0 &&
-      activeGameData.status !== undefined;
+    // ✅ Wait for blockchain data before deciding which scene to start
+    this.waitForBlockchainThenStartScene();
+  }
 
-    console.log("-->hasActiveGame:", hasActiveGame);
-    if (hasActiveGame) {
-      if (this.scene.isActive("Demo")) {
-        this.scene.stop("Demo");
+  /**
+   * Wait for blockchain data (with timeout), then start appropriate scene
+   */
+  private waitForBlockchainThenStartScene() {
+    const maxWaitTime = 2000; // Wait max 2 seconds for blockchain
+    const checkInterval = 100; // Check every 100ms
+    let elapsedTime = 0;
+
+    const checkAndStart = () => {
+      if (blockchainDataReady || elapsedTime >= maxWaitTime) {
+        // Blockchain loaded or timeout reached, make decision
+        const hasActiveGame =
+          activeGameData &&
+          activeGameData.bets &&
+          activeGameData.bets.length > 0 &&
+          activeGameData.status !== undefined;
+
+        logger.game.debug("[Preloader] Starting scene decision:", {
+          blockchainReady: blockchainDataReady,
+          timedOut: elapsedTime >= maxWaitTime,
+          hasActiveGame,
+          elapsedMs: elapsedTime,
+        });
+
+        if (hasActiveGame) {
+          if (this.scene.isActive("Demo")) {
+            this.scene.stop("Demo");
+          }
+          this.scene.start("Game");
+        } else {
+          if (this.scene.isActive("Game")) {
+            this.scene.stop("Game");
+          }
+          this.scene.start("Demo");
+        }
+        EventBus.emit("preloader-complete");
+      } else {
+        // Still waiting for blockchain, check again
+        elapsedTime += checkInterval;
+        this.time.delayedCall(checkInterval, checkAndStart, [], this);
       }
-      this.scene.start("Game");
-    } else {
-      if (this.scene.isActive("Game")) {
-        this.scene.stop("Game");
-      }
-      this.scene.start("Demo");
-    }
-    EventBus.emit("preloader-complete");
+    };
+
+    // Start checking
+    checkAndStart();
   }
 }
