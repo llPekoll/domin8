@@ -1,16 +1,21 @@
-import { useRef, useEffect, useMemo } from "react";
+import { useRef, useEffect, useMemo, useState } from "react";
 import { IRefPhaserGame, PhaserGame } from "./PhaserGame";
 import { Header } from "./components/Header";
 import { PlayerOnboarding } from "./components/PlayerOnboarding";
-import { CharacterSelection } from "./components/CharacterSelection";
+import { CharacterSelection2 } from "./components/CharacterSelection2";
+import { BettingPanel } from "./components/BettingPanel";
 import { BlockchainDebugDialog } from "./components/BlockchainDebugDialog";
 import { MultiParticipantPanel } from "./components/MultiParticipantPanel";
 import { useActiveGame } from "./hooks/useActiveGame";
 import { EventBus } from "./game/EventBus";
 import { setActiveGameData } from "./game/main";
+import type { Character } from "./types/character";
 
 export default function App() {
   const phaserRef = useRef<IRefPhaserGame | null>(null);
+
+  // Track selected character from carousel
+  const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
 
   // Get current game state directly from blockchain (no Convex, <1s updates)
   const { activeGame: currentRoundState } = useActiveGame();
@@ -21,9 +26,10 @@ export default function App() {
     if (!currentRoundState) return null;
 
     // Serialize bet data to detect actual changes
-    const betSignature = currentRoundState.bets
-      ?.map(b => `${b.walletIndex}-${b.amount?.toString()}-${b.skin}`)
-      .join('|') || '';
+    const betSignature =
+      currentRoundState.bets
+        ?.map((b) => `${b.walletIndex}-${b.amount?.toString()}-${b.skin}`)
+        .join("|") || "";
 
     return {
       gameRound: currentRoundState.gameRound?.toString(),
@@ -40,7 +46,9 @@ export default function App() {
     currentRoundState?.gameRound?.toString(),
     currentRoundState?.status,
     currentRoundState?.bets?.length,
-    currentRoundState?.bets?.map(b => `${b.walletIndex}-${b.amount?.toString()}-${b.skin}`).join('|'),
+    currentRoundState?.bets
+      ?.map((b) => `${b.walletIndex}-${b.amount?.toString()}-${b.skin}`)
+      .join("|"),
     currentRoundState?.map,
     currentRoundState?.winner?.toBase58(),
     currentRoundState?.endDate?.toString(),
@@ -80,10 +88,15 @@ export default function App() {
         <div className="min-h-screen pt-16 pb-24">
           <div className="absolute right-4 top-20 w-72 max-h-[calc(100vh-6rem)] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 space-y-4">
             <PlayerOnboarding />
-            <CharacterSelection />
           </div>
         </div>
       </div>
+
+      {/* Character Selection Carousel - Bottom Left */}
+      <CharacterSelection2 onCharacterSelected={setSelectedCharacter} />
+
+      {/* Betting Panel - Bottom Center */}
+      <BettingPanel selectedCharacter={selectedCharacter} />
 
       <MultiParticipantPanel />
       <BlockchainDebugDialog />

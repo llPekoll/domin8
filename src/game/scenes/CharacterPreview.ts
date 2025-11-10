@@ -1,17 +1,14 @@
-import { Scene } from 'phaser';
+import { Scene } from "phaser";
 
 export class CharacterPreview extends Scene {
   private currentCharacterSprite?: Phaser.GameObjects.Sprite;
   private currentCharacterKey?: string;
 
   constructor() {
-    super('CharacterPreview');
+    super("CharacterPreview");
   }
 
   create() {
-    // Set background color
-    this.cameras.main.setBackgroundColor('#2d1810');
-
     // Initialize with no character
     this.currentCharacterSprite = undefined;
   }
@@ -36,7 +33,7 @@ export class CharacterPreview extends Scene {
     this.currentCharacterSprite = this.add.sprite(centerX, centerY, characterKey);
 
     // Scale the character appropriately for the preview
-    this.currentCharacterSprite.setScale(2);
+    this.currentCharacterSprite.setScale(4);
 
     // Keep pixel art crisp when scaling
     this.currentCharacterSprite.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
