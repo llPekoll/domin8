@@ -355,26 +355,36 @@ const BettingPanel = memo(function BettingPanel({
           </button>
         </div>
 
-        {/* Place bet button */}
+        {/* Place bet button with arcade press effect */}
         <button
           onClick={() => void handlePlaceBet()}
-          disabled={
-            isSubmitting || isLoadingBalance || !canPlaceBet || isVerifyingNFT || !selectedCharacter
-          }
-          className={`text-2xl cursor-pointer flex justify-center items-center w-1/3 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 disabled:from-gray-600 disabled:to-gray-700 rounded-lg font-bold text-white uppercase tracking-wider  transition-all shadow-lg shadow-amber-900/50 disabled:opacity-50 ${styles.shineButton}`}
+          disabled={isSubmitting || !canPlaceBet || isVerifyingNFT || !selectedCharacter}
+          className={`
+            text-2xl cursor-pointer flex justify-center items-center w-1/3 py-4
+            bg-gradient-to-b from-amber-500 to-amber-700
+            hover:from-amber-400 hover:to-amber-600
+            disabled:from-gray-600 disabled:to-gray-700
+            rounded font-bold text-white uppercase tracking-wider
+            transition-all duration-100
+            shadow-[0_10px_0_0_rgba(120,53,15,0.9)]
+            hover:shadow-[0_10px_0_0_rgba(120,53,15,0.9)]
+            active:shadow-[0_2px_0_0_rgba(120,53,15,0.9)]
+            active:translate-y-[8px]
+            disabled:opacity-50 disabled:cursor-not-allowed
+            disabled:shadow-[0_4px_0_0_rgba(75,85,99,0.7)]
+            ${styles.shineButton}
+          `}
         >
-          <img src="/assets/insert-coin.png" alt="Coin" className="h-6 cursor-pointer mr-2" />
+          <img src="/assets/insert-coin.png" alt="Coin" className="h-6 mr-2" />
           {!selectedCharacter
             ? "Select Character"
             : isVerifyingNFT
               ? "Verifying..."
               : isSubmitting
                 ? "Inserting..."
-                : isLoadingBalance
-                  ? "Loading..."
-                  : !canPlaceBet
-                    ? "Closed"
-                    : "Insert coin"}
+                : !canPlaceBet
+                  ? "Closed"
+                  : "Insert coin"}
         </button>
       </div>
     </div>
