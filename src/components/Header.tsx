@@ -7,7 +7,7 @@ import { PrivyWalletButton } from "./PrivyWalletButton";
 import { SoundControl } from "./SoundControl";
 import { toast } from "sonner";
 import { generateRandomName } from "../lib/nameGenerator";
-import { useActiveGame } from "../hooks/useActiveGame";
+// import { useActiveGame } from "../hooks/useActiveGame";
 import { logger } from "../lib/logger";
 
 export function Header() {
@@ -24,7 +24,7 @@ export function Header() {
   );
 
   // Get current game state directly from blockchain (not Convex)
-  const { activeGame: currentRoundState } = useActiveGame();
+  // const { activeGame: currentRoundState } = useActiveGame();
 
   // Create player with random name on first connect
   useEffect(() => {
@@ -67,8 +67,7 @@ export function Header() {
               </div>
 
               {/* Center - Empty (status moved to PotDisplayPanel) */}
-              <div className="flex-1 flex justify-center">
-              </div>
+              <div className="flex-1 flex justify-center"></div>
 
               {/* Right Side - User Controls */}
               <div className="flex items-center gap-4 flex-shrink-0">
