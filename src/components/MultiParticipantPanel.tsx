@@ -3,7 +3,7 @@ import { useActiveGame } from "../hooks/useActiveGame";
 import { usePlayerNames } from "../contexts/PlayerNamesContext";
 import { useMemo, useState } from "react";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Crown } from "lucide-react";
 
 export function MultiParticipantPanel() {
   const { walletAddress } = usePrivyWallet();
@@ -20,6 +20,9 @@ export function MultiParticipantPanel() {
   // Transform blockchain bet data into participant format
   const participants = useMemo(() => {
     if (!activeGame?.bets || !activeGame?.wallets) return [];
+    
+    // Get host wallet (first wallet in the array)
+    const hostWallet = activeGame.wallets[0]?.toString();
 
     return activeGame.bets.map((bet, index) => {
       const wallet = activeGame.wallets[bet.walletIndex];
@@ -30,6 +33,9 @@ export function MultiParticipantPanel() {
       // Find player name from playerNames context
       const playerData = playerNames?.find((p: any) => p.walletAddress === walletStr);
       const displayName = playerData?.displayName || `${walletStr.slice(0, 4)}...${walletStr.slice(-4)}`;
+      
+      // Check if this participant is the host
+      const isHost = walletStr === hostWallet;
 
       return {
         id: index,
@@ -38,6 +44,7 @@ export function MultiParticipantPanel() {
         amount,
         winChance,
         isOwn: walletStr === walletAddress,
+        isHost, // Add host flag
       };
     });
   }, [activeGame, totalPot, playerNames, walletAddress]);
@@ -100,6 +107,15 @@ export function MultiParticipantPanel() {
                   </span>
                   {participant.isOwn && (
                     <span className="text-green-400 text-xs">(You)</span>
+                  )}
+                  {participant.isHost && (
+                    <div 
+                      className="inline-flex items-center gap-1 bg-gradient-to-r from-yellow-500/90 to-amber-600/90 px-1.5 py-0.5 rounded text-xs font-bold text-amber-950 shadow-sm"
+                      title="Game Host"
+                    >
+                      <Crown className="w-3 h-3 fill-current" />
+                      <span className="tracking-wide">HOST</span>
+                    </div>
                   )}
                 </div>
                 <div className="text-amber-400 text-xs">
