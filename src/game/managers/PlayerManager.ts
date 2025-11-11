@@ -258,8 +258,8 @@ export class PlayerManager {
       })
       .setOrigin(0.5);
 
-    // Show names immediately in demo mode, hide in real games during spawn
-    nameText.setVisible(isBot);
+    // Show names immediately for both bots and real players
+    nameText.setVisible(true);
 
     // Add sprites in correct order for layering (render order matters):
     // 1. Back dust (behind character)
