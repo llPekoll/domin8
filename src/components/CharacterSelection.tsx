@@ -81,6 +81,7 @@ const CharacterSelection = memo(function CharacterSelection({
 
   // Derive game state from blockchain (not Convex, to avoid stale data)
   const canPlaceBet = useMemo(() => {
+    if (solBalance < 0.1) return false; // Insufficient balance
     if (!activeGame) return true; // No game = can create new one
 
     // Status: 0 = open/waiting, 1 = closed/determining winner, 2 = finished
