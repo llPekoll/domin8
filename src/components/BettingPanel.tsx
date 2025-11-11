@@ -308,12 +308,12 @@ const BettingPanel = memo(function BettingPanel({
   }
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
+    <div className="fixed items-center bottom-4 left-1/2 -translate-x-1/2 z-50">
       <span className="text-amber-400">Balance</span>
       <span className="text-amber-300 pl-2">
         {isLoadingBalance ? "..." : `${solBalance.toFixed(3)} SOL`}
       </span>
-      <div className="flex bg-gradient-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-lg shadow-2xl shadow-amber-900/50 min-w-[560px] px-4 py-2 space-x-2">
+      <div className="flex items-center justify-between bg-gradient-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-lg shadow-2xl shadow-amber-900/50 min-w-[560px] px-4 py-2 space-x-2">
         {/* Betting Section */}
         <div className="flex items-center justify-between text-sm uppercase tracking-wide"></div>
 
@@ -360,7 +360,7 @@ const BettingPanel = memo(function BettingPanel({
           onClick={() => void handlePlaceBet()}
           disabled={isSubmitting || !canPlaceBet || isVerifyingNFT || !selectedCharacter}
           className={`
-            text-2xl cursor-pointer flex justify-center items-center w-1/3 py-4
+            text-2xl cursor-pointer flex justify-center items-center w-1/3 py-2
             bg-gradient-to-b from-amber-500 to-amber-700
             hover:from-amber-400 hover:to-amber-600
             disabled:from-gray-600 disabled:to-gray-700

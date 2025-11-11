@@ -55,8 +55,8 @@ export class GlobalGameStateManager {
   private countdownInterval: NodeJS.Timeout | null = null;
 
   // Constants
-  private readonly CELEBRATION_DURATION = 3000; // 4 seconds (reduced from 15s)
-  private readonly BATTLE_DURATION = 5000; // 3 seconds
+  private readonly CELEBRATION_DURATION = 7000;
+  private readonly BATTLE_DURATION = 2000;
 
   constructor(game: PhaserGame) {
     this.game = game;
