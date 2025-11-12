@@ -13,8 +13,8 @@ orao_vrf = "VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y"
 url = "https://devnet.helius-rpc.com/?api-key=0df32d0b-da4f-49b3-b154-deaceac254c0"
 
 [provider]
-cluster = "mainnet"
-wallet = "~/.config/solana/mainnet/deployer.json"
+cluster = "devnet"
+wallet = "~/work/domin8/solana/7H9uSFKd1h4pvFPFfqzLpSZyLac7F9ax9ZcFtv9B5oDf.json"
 
 [scripts]
 rotate-force = "NODE_OPTIONS='--loader ts-node/esm' ts-node scripts/rotate-force.ts"
