@@ -313,7 +313,7 @@ const BettingPanel = memo(function BettingPanel({
       <span className="text-amber-300 pl-2">
         {isLoadingBalance ? "..." : `${solBalance.toFixed(3)} SOL`}
       </span>
-      <div className="flex items-center justify-between bg-gradient-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-lg shadow-2xl shadow-amber-900/50 min-w-[560px] px-4 py-2 space-x-2">
+      <div className="flex items-center justify-between bg-gradient-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-lg shadow-2xl shadow-amber-900/50 min-w-[560px] px-2 py-2 space-x-2">
         {/* Betting Section */}
         <div className="flex items-center justify-between text-sm uppercase tracking-wide"></div>
 
