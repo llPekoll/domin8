@@ -48,6 +48,7 @@ import bs58 from "bs58";
 import { type Domin8Prgm } from "../../target/types/domin8_prgm";
 import Domin8PrgmIDL from "../../target/idl/domin8_prgm.json";
 import { logger } from "../lib/logger";
+import { getSharedConnection } from "~/lib/sharedConnection";
 
 // Extract Program ID from IDL
 export const DOMIN8_PROGRAM_ID = new PublicKey(Domin8PrgmIDL.address);
@@ -326,12 +327,8 @@ export const useGameContract = () => {
     return wallets.length > 0 ? wallets[0] : null;
   }, [wallets]);
 
-  // RPC connection (use env variable)
-  const connection = useMemo(() => {
-    const rpcUrl = import.meta.env.VITE_SOLANA_RPC_URL || "http://127.0.0.1:8899";
-    // HELIUS BEST PRACTICE: Use 'confirmed' commitment for better reliability
-    return new Connection(rpcUrl, "confirmed");
-  }, []);
+  // RPC connection (use shared connection with confirmed commitment)
+  const connection = getSharedConnection();
 
   // Network configuration
   const network = useMemo(() => {
