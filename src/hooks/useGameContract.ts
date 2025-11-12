@@ -130,7 +130,7 @@ class PrivyWalletAdapter {
 }
 
 // Constants from smart contract
-const MIN_BET_LAMPORTS = 10_000_000; // 0.01 SOL
+const MIN_BET_LAMPORTS = 1_000_000; // 0.001 SOL
 const HOUSE_FEE_BPS = 500; // 5%
 
 // PDA Seeds (must match Rust program seeds exactly!)

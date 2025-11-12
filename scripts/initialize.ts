@@ -68,7 +68,9 @@ async function main() {
     console.log("⚠️  Program is already initialized!");
     console.log(`  Admin: ${existingConfig.admin.toString()}`);
     console.log(`  Treasury: ${existingConfig.treasury.toString()}`);
-    console.log(`  House Fee: ${existingConfig.houseFee} basis points (${existingConfig.houseFee / 100}%)`);
+    console.log(
+      `  House Fee: ${existingConfig.houseFee} basis points (${existingConfig.houseFee / 100}%)`
+    );
     console.log(`  Game Round: ${existingConfig.gameRound.toString()}`);
     console.log(`  Locked: ${existingConfig.lock}`);
     console.log("");
@@ -83,7 +85,7 @@ async function main() {
   }
 
   // Use the wallet's public key as treasury
-  const treasuryWallet = provider.wallet.publicKey;
+  const treasuryWallet = new PublicKey("53Xu7YeFmAZ7yYrq1ZknvSrXDbEqVBAeXSbpu5vrgbaT");
 
   console.log("💰 Configuration:");
   console.log(`  Treasury: ${treasuryWallet.toString()}`);
@@ -125,9 +127,15 @@ async function main() {
     console.log("📋 Game Configuration:");
     console.log(`  Admin: ${gameConfig.admin.toString()}`);
     console.log(`  Treasury: ${gameConfig.treasury.toString()}`);
-    console.log(`  House Fee: ${gameConfig.houseFee.toString()} basis points (${gameConfig.houseFee / 100}%)`);
-    console.log(`  Min Bet: ${gameConfig.minDepositAmount.toNumber() / anchor.web3.LAMPORTS_PER_SOL} SOL`);
-    console.log(`  Max Bet: ${gameConfig.maxDepositAmount.toNumber() / anchor.web3.LAMPORTS_PER_SOL} SOL`);
+    console.log(
+      `  House Fee: ${gameConfig.houseFee.toString()} basis points (${gameConfig.houseFee / 100}%)`
+    );
+    console.log(
+      `  Min Bet: ${gameConfig.minDepositAmount.toNumber() / anchor.web3.LAMPORTS_PER_SOL} SOL`
+    );
+    console.log(
+      `  Max Bet: ${gameConfig.maxDepositAmount.toNumber() / anchor.web3.LAMPORTS_PER_SOL} SOL`
+    );
     console.log(`  Round Time: ${gameConfig.roundTime.toString()} seconds`);
     console.log(`  Current Game Round: ${gameConfig.gameRound.toString()}`);
     console.log(`  System Locked: ${gameConfig.lock}`);
@@ -141,7 +149,9 @@ async function main() {
     console.log("🎉 Initialization complete! Your game is ready to accept bets.");
     console.log("");
     console.log("Next steps:");
-    console.log("  1. First player calls create_game_round(round_id: 1, bet_amount, skin, position)");
+    console.log(
+      "  1. First player calls create_game_round(round_id: 1, bet_amount, skin, position)"
+    );
     console.log("  2. Subsequent players call bet(round_id: 1, bet_amount, skin, position)");
     console.log("  3. Admin calls end_game(round_id: 1) after round_time expires");
     console.log("  4. Winner calls send_prize_winner(round_id: 1) to claim prize");

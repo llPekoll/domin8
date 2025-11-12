@@ -49,14 +49,16 @@ createRoot(document.getElementById("root")!).render(
             solana: {
               rpcs: {
                 "solana:mainnet": {
-                  rpc: createSolanaRpc("https://api.mainnet-beta.solana.com"),
+                  rpc: createSolanaRpc(import.meta.env.VITE_SOLANA_RPC_URL),
                   rpcSubscriptions: createSolanaRpcSubscriptions(
-                    "wss://api.mainnet-beta.solana.com"
+                    import.meta.env.VITE_SOLANA_RPC_URL.replace(/^https?:/, 'wss:')
                   ),
                 },
                 "solana:devnet": {
-                  rpc: createSolanaRpc("https://api.devnet.solana.com"),
-                  rpcSubscriptions: createSolanaRpcSubscriptions("wss://api.devnet.solana.com"),
+                  rpc: createSolanaRpc(import.meta.env.VITE_SOLANA_RPC_URL_DEVNET),
+                  rpcSubscriptions: createSolanaRpcSubscriptions(
+                    import.meta.env.VITE_SOLANA_RPC_URL_DEVNET.replace(/^https?:/, 'wss:')
+                  ),
                 },
                 // "solana:devnet": {
                 //   rpc: createSolanaRpc("http://127.0.0.1:8899"),

@@ -6,6 +6,13 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getSolanaRpcUrl(): string {
+  // Use custom RPC URL if provided (e.g., Helius, QuickNode)
+  const customRpcUrl = import.meta.env.VITE_SOLANA_RPC_URL;
+  if (customRpcUrl) {
+    return customRpcUrl;
+  }
+
+  // Fallback to network-based defaults
   const network = import.meta.env.VITE_SOLANA_NETWORK || "localnet";
 
   switch (network) {

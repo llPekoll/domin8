@@ -11,6 +11,11 @@ import { useAssets } from "../contexts/AssetsContext";
 import type { Character } from "../types/character";
 import styles from "./ButtonShine.module.css";
 
+// Betting limits
+const MIN_BET_AMOUNT = 0.001;
+const MAX_BET_AMOUNT = 10;
+const DEFAULT_BET_AMOUNT = 0.1;
+
 interface BettingPanelProps {
   selectedCharacter: Character | null;
   onBetPlaced?: () => void;
@@ -27,7 +32,7 @@ const BettingPanel = memo(function BettingPanel({
   // NFT verification action
   const verifyNFTOwnership = useAction(api.nft.verifyNFTOwnership);
 
-  const [betAmount, setBetAmount] = useState<string>("0.1");
+  const [betAmount, setBetAmount] = useState<string>(DEFAULT_BET_AMOUNT.toString());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVerifyingNFT, setIsVerifyingNFT] = useState(false);
 
@@ -83,8 +88,8 @@ const BettingPanel = memo(function BettingPanel({
   const handleIncrementBet = (increment: number) => {
     const currentAmount = parseFloat(betAmount) || 0;
     const newAmount = currentAmount + increment;
-    // Cap at max bet of 10 SOL
-    const cappedAmount = Math.min(newAmount, 10);
+    // Cap at max bet
+    const cappedAmount = Math.min(newAmount, MAX_BET_AMOUNT);
     setBetAmount(cappedAmount.toFixed(2));
   };
 
@@ -114,8 +119,8 @@ const BettingPanel = memo(function BettingPanel({
     }
 
     const amount = parseFloat(betAmount);
-    if (isNaN(amount) || amount < 0.1 || amount > 10) {
-      toast.error("Bet amount must be between 0.1 and 10 SOL");
+    if (isNaN(amount) || amount < MIN_BET_AMOUNT || amount > MAX_BET_AMOUNT) {
+      toast.error(`Bet amount must be between ${MIN_BET_AMOUNT} and ${MAX_BET_AMOUNT} SOL`);
       return;
     }
 
@@ -264,7 +269,7 @@ const BettingPanel = memo(function BettingPanel({
       EventBus.emit("player-bet-placed", eventData);
       logger.ui.debug("[BettingPanel] ✅ Event emitted successfully");
 
-      setBetAmount("0.1");
+      setBetAmount(DEFAULT_BET_AMOUNT.toString());
       onBetPlaced?.();
     } catch (error) {
       logger.ui.error("Failed to place bet:", error);
@@ -323,9 +328,9 @@ const BettingPanel = memo(function BettingPanel({
             value={betAmount}
             onChange={(e) => setBetAmount(e.target.value)}
             placeholder="Amount"
-            min={0.1}
-            max={10}
-            step={0.1}
+            min={MIN_BET_AMOUNT}
+            max={MAX_BET_AMOUNT}
+            step={DEFAULT_BET_AMOUNT}
             className="text-2xl w-full px-3 py-2 bg-black/30 border border-amber-700/50 rounded-lg text-amber-100 placeholder-amber-600 text-center  font-bold focus:outline-none focus:border-amber-500"
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-amber-500 text-xs font-bold">

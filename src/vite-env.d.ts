@@ -10,6 +10,7 @@ interface ImportMetaEnv {
   // Solana
   readonly VITE_SOLANA_NETWORK: string;
   readonly VITE_SOLANA_RPC_URL: string;
+  readonly VITE_SOLANA_RPC_URL_DEVNET: string;
   readonly VITE_GAME_PROGRAM_ID: string;
   
   // Logger Configuration
