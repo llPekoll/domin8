@@ -1,7 +1,15 @@
 // Solana integration layer for the Convex crank service
 "use node";
 import * as anchor from "@coral-xyz/anchor";
-import { Connection, PublicKey, Keypair, Transaction, VersionedTransaction } from "@solana/web3.js";
+import { 
+  Connection, 
+  PublicKey, 
+  Keypair, 
+  Transaction, 
+  VersionedTransaction, 
+  ComputeBudgetProgram,
+  TransactionMessage
+} from "@solana/web3.js";
 import { GameConfig, GameRound, DOMIN8_PROGRAM_ID, PDA_SEEDS, BetInfoStruct } from "./types";
 import { Buffer } from "buffer";
 import bs58 from "bs58";
@@ -323,6 +331,7 @@ export class SolanaClient {
   }
 
   // End game and lock for winner selection (risk-based architecture)
+  // HELIUS OPTIMIZED: Uses confirmed commitment, CU optimization, priority fees, and retry logic
   async endGame(roundId: number): Promise<string> {
     const { config, activeGame } = this.getPDAs();
     const { gameRound } = this.getPDAs(roundId);
@@ -331,7 +340,7 @@ export class SolanaClient {
       throw new Error("Failed to derive game round PDA");
     }
 
-    console.log(`Ending game for round ${roundId}`);
+    console.log(`Ending game for round ${roundId} with Helius optimizations`);
 
     // Fetch config to get treasury and force
     const configAccount = await this.program.account.domin8Config.fetch(config);
@@ -351,7 +360,8 @@ export class SolanaClient {
       ORAO_VRF_PROGRAM_ID
     );
 
-    const tx = await this.program.methods
+    // Build the instruction (instead of using .rpc() directly)
+    const instruction = await this.program.methods
       .endGame(new anchor.BN(roundId))
       .accounts({
         config,
@@ -362,12 +372,17 @@ export class SolanaClient {
         vrfRandomness,
         systemProgram: anchor.web3.SystemProgram.programId,
       } as any)
-      .rpc();
+      .instruction();
 
-    return tx;
+    // Send using Helius-optimized transaction flow
+    const signature = await this.sendOptimizedTransaction(instruction);
+    
+    console.log(`Game ${roundId} ended successfully: ${signature}`);
+    return signature;
   }
 
   // Send prize to winner (risk-based architecture)
+  // HELIUS OPTIMIZED: Uses confirmed commitment, CU optimization, priority fees, and retry logic
   async sendPrizeWinner(roundId: number): Promise<string> {
     const { config, gameRound } = this.getPDAs(roundId);
 
@@ -383,10 +398,11 @@ export class SolanaClient {
     }
 
     const winnerPubkey = gameAccount.winner;
-    console.log(`Sending prize to winner ${winnerPubkey.toBase58()} for round ${roundId}`);
+    console.log(`Sending prize to winner ${winnerPubkey.toBase58()} for round ${roundId} with Helius optimizations`);
     console.log(`Prize amount: ${gameAccount.winnerPrize.toString()} lamports`);
 
-    const tx = await this.program.methods
+    // Build the instruction (instead of using .rpc() directly)
+    const instruction = await this.program.methods
       .sendPrizeWinner(new anchor.BN(roundId))
       .accounts({
         config,
@@ -395,9 +411,13 @@ export class SolanaClient {
         winner: winnerPubkey,
         systemProgram: anchor.web3.SystemProgram.programId,
       } as any)
-      .rpc();
+      .instruction();
 
-    return tx;
+    // Send using Helius-optimized transaction flow
+    const signature = await this.sendOptimizedTransaction(instruction);
+    
+    console.log(`Prize sent successfully for round ${roundId}: ${signature}`);
+    return signature;
   }
 
   // Note: VRF functionality removed - risk architecture uses simpler randomness
@@ -673,5 +693,275 @@ export class SolanaClient {
         message: `Health check failed: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
+  }
+
+  // ========================================
+  // HELIUS TRANSACTION OPTIMIZATION HELPERS
+  // ========================================
+
+  /**
+   * Get dynamic priority fee estimate using Helius Priority Fee API
+   * HELIUS BEST PRACTICE: Use serialized transaction method for most accurate estimates
+   * 
+   * @param instruction - The instruction to estimate fee for
+   * @param payer - The payer public key
+   * @returns Priority fee in microlamports/CU, or fallback value if API fails
+   */
+  private async getPriorityFeeEstimate(
+    instruction: anchor.web3.TransactionInstruction,
+    payer: PublicKey
+  ): Promise<number> {
+    try {
+      // HELIUS BEST PRACTICE #1: Use 'confirmed' commitment for latest blockhash
+      const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
+
+      // Create temp transaction for fee estimation
+      const tempMessage = new TransactionMessage({
+        payerKey: payer,
+        recentBlockhash: blockhash,
+        instructions: [instruction],
+      }).compileToV0Message();
+
+      const tempTx = new VersionedTransaction(tempMessage);
+      const serializedTx = bs58.encode(tempTx.serialize());
+
+      // Call Helius Priority Fee API
+      const response = await fetch(this.connection.rpcEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "1",
+          method: "getPriorityFeeEstimate",
+          params: [{
+            transaction: serializedTx,
+            options: { 
+              recommended: true  // Use Helius recommended fee for staked connections
+            }
+          }]
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.result?.priorityFeeEstimate) {
+        // Add 20% safety buffer to recommended fee (Helius recommendation)
+        const estimatedFee = Math.ceil(data.result.priorityFeeEstimate * 1.2);
+        console.log(`Priority fee estimate: ${estimatedFee} microlamports/CU`);
+        return estimatedFee;
+      }
+
+      // Fallback to medium priority if result not found
+      console.warn("Priority fee API returned no estimate, using fallback");
+      return 50_000; // 50k microlamports - medium priority
+    } catch (error) {
+      console.warn("Priority fee estimation failed, using fallback:", error);
+      return 50_000; // Fallback fee - medium priority
+    }
+  }
+
+  /**
+   * Simulate transaction and optimize compute units
+   * HELIUS BEST PRACTICE: Simulate with high CU limit, then use actual consumption + 10% buffer
+   * 
+   * @param instruction - The instruction to simulate
+   * @param payer - The payer public key
+   * @param blockhash - Recent blockhash
+   * @returns Optimized compute unit limit
+   */
+  private async simulateAndOptimizeComputeUnits(
+    instruction: anchor.web3.TransactionInstruction,
+    payer: PublicKey,
+    blockhash: string
+  ): Promise<number> {
+    try {
+      // HELIUS BEST PRACTICE: Simulate with 1.4M CU limit to ensure simulation succeeds
+      const testInstructions = [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
+        instruction,
+      ];
+
+      const testMessage = new TransactionMessage({
+        payerKey: payer,
+        recentBlockhash: blockhash,
+        instructions: testInstructions,
+      }).compileToV0Message();
+
+      const testTransaction = new VersionedTransaction(testMessage);
+
+      const simulation = await this.connection.simulateTransaction(testTransaction, {
+        replaceRecentBlockhash: true,
+        sigVerify: false,
+      });
+
+      if (simulation.value.err) {
+        console.warn("Simulation returned error:", simulation.value.err);
+        // Return conservative estimate if simulation fails
+        return 200_000;
+      }
+
+      if (!simulation.value.unitsConsumed) {
+        console.warn("Simulation did not return unitsConsumed");
+        return 200_000;
+      }
+
+      // HELIUS BEST PRACTICE: Add 10% buffer to compute units
+      const optimizedCU = simulation.value.unitsConsumed < 1000 
+        ? 1000 
+        : Math.ceil(simulation.value.unitsConsumed * 1.1);
+
+      console.log(`Optimized compute units: ${optimizedCU} (consumed: ${simulation.value.unitsConsumed})`);
+      return optimizedCU;
+    } catch (error) {
+      console.warn("Compute unit simulation failed:", error);
+      // Return conservative fallback
+      return 200_000;
+    }
+  }
+
+  /**
+   * Build and send an optimized transaction with Helius best practices
+   * 
+   * @param instruction - The instruction to send
+   * @param extraSigners - Additional signers (if any)
+   * @returns Transaction signature
+   */
+  private async sendOptimizedTransaction(
+    instruction: anchor.web3.TransactionInstruction,
+    extraSigners: Keypair[] = []
+  ): Promise<string> {
+    // HELIUS BEST PRACTICE #1: Use 'confirmed' commitment for latest blockhash
+    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+
+    // HELIUS BEST PRACTICE #2: Simulate to optimize compute units
+    const computeUnits = await this.simulateAndOptimizeComputeUnits(
+      instruction, 
+      this.authority.publicKey, 
+      blockhash
+    );
+
+    // HELIUS BEST PRACTICE #3: Get dynamic priority fee estimate
+    const priorityFee = await this.getPriorityFeeEstimate(
+      instruction, 
+      this.authority.publicKey
+    );
+
+    // Build final optimized transaction with compute budget instructions
+    // Note: Compute budget instructions MUST come first
+    const finalInstructions = [
+      ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnits }),
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFee }),
+      instruction,
+    ];
+
+    const finalMessage = new TransactionMessage({
+      payerKey: this.authority.publicKey,
+      recentBlockhash: blockhash,
+      instructions: finalInstructions,
+    }).compileToV0Message();
+
+    const finalTransaction = new VersionedTransaction(finalMessage);
+
+    // Sign transaction
+    const allSigners = [this.authority, ...extraSigners];
+    finalTransaction.sign(allSigners);
+
+    // HELIUS BEST PRACTICE #4 & #5: Send with skipPreflight and implement custom retry logic
+    let signature: string | null = null;
+    const maxRetries = 3;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // Check if blockhash is still valid
+        const currentBlockHeight = await this.connection.getBlockHeight('confirmed');
+        if (currentBlockHeight > lastValidBlockHeight) {
+          throw new Error('Blockhash expired, need to rebuild transaction');
+        }
+
+        // Send with skipPreflight: true (Helius best practice)
+        signature = await this.connection.sendRawTransaction(
+          finalTransaction.serialize(),
+          {
+            skipPreflight: true,
+            maxRetries: 0,  // We handle retries ourselves
+          }
+        );
+
+        // Confirm transaction with polling
+        const confirmed = await this.confirmTransactionWithPolling(
+          signature, 
+          lastValidBlockHeight
+        );
+        
+        if (confirmed) {
+          console.log(`Transaction confirmed on attempt ${attempt + 1}: ${signature}`);
+          break;
+        } else {
+          console.warn(`Transaction confirmation timeout on attempt ${attempt + 1}`);
+        }
+      } catch (error: any) {
+        console.warn(`Transaction attempt ${attempt + 1} failed:`, error.message);
+        if (attempt === maxRetries - 1) {
+          throw error;
+        }
+        // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+      }
+    }
+
+    if (!signature) {
+      throw new Error("All retry attempts failed");
+    }
+
+    return signature;
+  }
+
+  /**
+   * Confirm transaction with polling and blockhash expiry check
+   * HELIUS BEST PRACTICE: Implement robust confirmation polling
+   * 
+   * @param signature - Transaction signature
+   * @param lastValidBlockHeight - Last valid block height for the transaction
+   * @returns True if confirmed, false otherwise
+   */
+  private async confirmTransactionWithPolling(
+    signature: string,
+    lastValidBlockHeight: number
+  ): Promise<boolean> {
+    const timeout = 30000; // 30 seconds (generous for crank operations)
+    const interval = 2000; // 2 seconds
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeout) {
+      try {
+        const statuses = await this.connection.getSignatureStatuses([signature]);
+        const status = statuses?.value?.[0];
+
+        if (status) {
+          if (status.err) {
+            console.error('Transaction failed with error:', status.err);
+            return false;
+          }
+          
+          if (status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized') {
+            return true;
+          }
+        }
+
+        // Check if blockhash expired
+        const currentBlockHeight = await this.connection.getBlockHeight('confirmed');
+        if (currentBlockHeight > lastValidBlockHeight) {
+          console.warn('Blockhash expired during confirmation polling');
+          return false;
+        }
+      } catch (error) {
+        console.warn('Status check failed:', error);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, interval));
+    }
+
+    console.warn('Transaction confirmation timeout');
+    return false;
   }
 }
