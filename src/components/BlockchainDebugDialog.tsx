@@ -8,12 +8,14 @@ import { useActiveGame } from "../hooks/useActiveGame";
 import { CircleHelp, X, Trophy, TrendingUp, Users, Clock, Coins, Share2 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { usePrivyWallet } from "../hooks/usePrivyWallet";
 
 export function BlockchainDebugDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [jsonCopied, setJsonCopied] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const { activeGame, activeGamePDA } = useActiveGame();
+  const { connected } = usePrivyWallet();
 
   // Get winner's display name if winner exists
   const winnerAddress = activeGame?.winner?.toString();
@@ -39,9 +41,9 @@ export function BlockchainDebugDialog() {
 
   // Auto-show tooltip when winner appears
   useEffect(() => {
-    if (shouldShowTooltip && !isOpen) {
+    if (shouldShowTooltip && !isOpen && connected) {
       // Set a timeout to delay a bit, for better UX
-     setTimeout(() => setShowTooltip(true), 2000);
+      setTimeout(() => setShowTooltip(true), 5000);
 
       setShowTooltip(true);
       // Auto-hide after 10 seconds

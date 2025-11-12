@@ -562,19 +562,19 @@ const CharacterSelection = memo(function CharacterSelection({
           <div className="grid grid-cols-3 gap-1">
             <button
               onClick={() => handleQuickBet(0.1)}
-              className="cursor-pointer py-1 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-sm font-bold transition-colors"
+              className="cursor-pointer py-1 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded-lg text-amber-300 text-sm font-bold transition-colors"
             >
               0.1
             </button>
             <button
               onClick={() => handleQuickBet(0.5)}
-              className="cursor-pointer py-1 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-sm font-bold transition-colors"
+              className="cursor-pointer py-1 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded-lg text-amber-300 text-sm font-bold transition-colors"
             >
               0.5
             </button>
             <button
               onClick={() => handleQuickBet(1)}
-              className="cursor-pointer py-1 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-sm font-bold transition-colors"
+              className="cursor-pointer py-1 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded-lg text-amber-300 text-sm font-bold transition-colors"
             >
               1
             </button>

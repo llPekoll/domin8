@@ -38,6 +38,8 @@ import {
   TransactionSignature,
   Transaction,
   VersionedTransaction,
+  TransactionMessage,
+  ComputeBudgetProgram,
 } from "@solana/web3.js";
 import { SystemProgram } from "@solana/web3.js";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
@@ -141,6 +143,142 @@ const ACTIVE_GAME_SEED = "active_game"; // matches b"active_game" in Rust
 const BET_ENTRY_SEED = "bet";
 const VAULT_SEED = "vault";
 
+/**
+ * HELIUS OPTIMIZATION: Get dynamic priority fee estimate
+ * Uses Helius Priority Fee API for optimal transaction fees
+ * @param connection - Solana connection
+ * @param transaction - Transaction to estimate (can be partially built)
+ * @returns Priority fee in microlamports (or fallback value)
+ */
+async function getPriorityFeeEstimate(
+  connection: Connection,
+  transaction: Transaction | VersionedTransaction
+): Promise<number> {
+  try {
+    // Serialize transaction for fee estimation
+    let serializedTx: string;
+    if (transaction instanceof Transaction) {
+      serializedTx = bs58.encode(transaction.serialize({ requireAllSignatures: false, verifySignatures: false }));
+    } else {
+      serializedTx = bs58.encode(transaction.message.serialize());
+    }
+
+    const response = await fetch(connection.rpcEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "helius-priority-fee",
+        method: "getPriorityFeeEstimate",
+        params: [{
+          transaction: serializedTx,
+          options: { 
+            recommended: true  // Use Helius recommended fee for staked connections
+          }
+        }]
+      })
+    });
+
+    const data = await response.json();
+    
+    if (data.result?.priorityFeeEstimate) {
+      // Add 20% buffer to recommended fee for safety
+      const estimatedFee = Math.ceil(data.result.priorityFeeEstimate * 1.2);
+      logger.solana.debug("[getPriorityFeeEstimate] Helius recommended fee:", estimatedFee);
+      return estimatedFee;
+    }
+
+    logger.solana.warn("[getPriorityFeeEstimate] No result from API, using fallback");
+    return 50_000; // Fallback to medium priority
+  } catch (error) {
+    logger.solana.warn("[getPriorityFeeEstimate] Failed to get priority fee, using fallback:", error);
+    return 50_000; // Fallback fee (50k microlamports = ~0.00005 SOL per 100k CU)
+  }
+}
+
+/**
+ * HELIUS OPTIMIZATION: Add compute budget instructions to a transaction
+ * Simulates transaction first to get exact compute units, then adds optimized instructions
+ * @param connection - Solana connection
+ * @param transaction - Base transaction to optimize
+ * @param payer - Transaction fee payer
+ * @returns Modified transaction with compute budget instructions added
+ */
+async function addComputeBudgetInstructions(
+  connection: Connection,
+  transaction: Transaction,
+  payer: PublicKey
+): Promise<{ transaction: Transaction; computeUnits: number; priorityFee: number }> {
+  try {
+    // STEP 1: Simulate with high compute limit to get actual usage
+    const testInstructions = [
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
+      ...transaction.instructions,
+    ];
+
+    const testMessage = new TransactionMessage({
+      payerKey: payer,
+      recentBlockhash: transaction.recentBlockhash!,
+      instructions: testInstructions,
+    }).compileToV0Message();
+
+    const testTx = new VersionedTransaction(testMessage);
+
+    const simulation = await connection.simulateTransaction(testTx, {
+      replaceRecentBlockhash: true,
+      sigVerify: false,
+    });
+
+    if (!simulation.value.unitsConsumed) {
+      logger.solana.warn("[addComputeBudgetInstructions] Simulation failed, using default values");
+      // Return transaction with default compute budget
+      const defaultComputeUnits = 200_000;
+      const defaultPriorityFee = 50_000;
+      
+      transaction.instructions.unshift(
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: defaultPriorityFee })
+      );
+      transaction.instructions.unshift(
+        ComputeBudgetProgram.setComputeUnitLimit({ units: defaultComputeUnits })
+      );
+      
+      return { transaction, computeUnits: defaultComputeUnits, priorityFee: defaultPriorityFee };
+    }
+
+    // STEP 2: Calculate optimized compute units (add 10% buffer per Helius recommendation)
+    const computeUnits = simulation.value.unitsConsumed < 1000 
+      ? 1000 
+      : Math.ceil(simulation.value.unitsConsumed * 1.1);
+
+    logger.solana.debug("[addComputeBudgetInstructions] Optimized compute units:", {
+      consumed: simulation.value.unitsConsumed,
+      withBuffer: computeUnits
+    });
+
+    // STEP 3: Get dynamic priority fee
+    const priorityFee = await getPriorityFeeEstimate(connection, testTx);
+
+    // STEP 4: Add compute budget instructions to original transaction (must be first!)
+    transaction.instructions.unshift(
+      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFee })
+    );
+    transaction.instructions.unshift(
+      ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnits })
+    );
+
+    logger.solana.debug("[addComputeBudgetInstructions] Added compute budget instructions", {
+      computeUnits,
+      priorityFee
+    });
+
+    return { transaction, computeUnits, priorityFee };
+  } catch (error) {
+    logger.solana.error("[addComputeBudgetInstructions] Error optimizing transaction:", error);
+    // Return original transaction without optimization on error
+    return { transaction, computeUnits: 0, priorityFee: 0 };
+  }
+}
+
 // Type definitions
 export interface GameRound {
   roundId: BN;
@@ -191,8 +329,8 @@ export const useGameContract = () => {
   // RPC connection (use env variable)
   const connection = useMemo(() => {
     const rpcUrl = import.meta.env.VITE_SOLANA_RPC_URL || "http://127.0.0.1:8899";
-    // return new Connection(rpcUrl, "confirmed");
-    return new Connection(rpcUrl, "processed");
+    // HELIUS BEST PRACTICE: Use 'confirmed' commitment for better reliability
+    return new Connection(rpcUrl, "confirmed");
   }, []);
 
   // Network configuration
@@ -213,8 +351,8 @@ export const useGameContract = () => {
     try {
       const wallet = new PrivyWalletAdapter(publicKey, selectedWallet, network);
       const provider = new AnchorProvider(connection, wallet, {
-        // commitment: "confirmed",
-        commitment: "processed",
+        // HELIUS BEST PRACTICE: Use 'confirmed' commitment
+        commitment: "confirmed",
       });
 
       const program = new Program<Domin8Prgm>(Domin8PrgmIDL as any, provider);

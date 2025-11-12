@@ -140,7 +140,7 @@ const CharacterSelection2 = memo(function CharacterSelection({
       <div className="fixed bottom-0 left-0 z-50">
         {/* Container with charSelect.png background */}
         <div
-          className="relative w-[220px] h-[280px] flex flex-col items-start justify-between p-4 pl-1"
+          className="relative w-[220px] h-[280px] flex flex-row items-start justify-between p-4 pl-1"
           style={{
             backgroundImage: "url(/assets/hud/charSelect.png)",
             backgroundSize: "100% 100%",
@@ -148,71 +148,84 @@ const CharacterSelection2 = memo(function CharacterSelection({
             imageRendering: "pixelated",
           }}
         >
+
+          <div>
+            {/* Character Preview - Center */}
+            <div className="flex-1 flex flex-col items-center justify-start ">
+              <div>
+                <CharacterPreviewScene
+                  characterId={currentCharacter._id}
+                  characterName={currentCharacter.name}
+                  isSpecial={!!currentCharacter.nftCollection}
+                />
+              </div>
+
+              {/* Character Name */}
+              <div className="text-center">
+                <p className="text-amber-100 font-bold text-lg uppercase tracking-wider drop-shadow-lg">
+                  {currentCharacter.name}
+                </p>
+                {/* Character Index */}
+                <p className="text-amber-300/70 -mt-2 ">
+                  {currentCharacterIndex + 1} / {availableCharacters.length}
+                </p>
+              </div>
+            </div>
+
+            {/* Navigation Arrows - Bottom */}
+            <div className="flex items-center justify-center gap-8 mb-4">
+              <button
+                onClick={goToPrevious}
+                disabled={availableCharacters.length <= 1}
+                className="w-10 h-10 flex items-center justify-center bg-amber-800/50 hover:bg-amber-700/60 disabled:bg-gray-700/30 disabled:opacity-50 border-2 border-amber-600/50 rounded-lg transition-all shadow-lg disabled:cursor-not-allowed"
+                title="Previous character (Arrow Left)"
+              >
+                <ChevronLeft className="w-6 h-6 text-amber-100" />
+              </button>
+
+              <button
+                onClick={goToNext}
+                disabled={availableCharacters.length <= 1}
+                className="w-10 h-10 flex items-center justify-center bg-amber-800/50 hover:bg-amber-700/60 disabled:bg-gray-700/30 disabled:opacity-50 border-2 border-amber-600/50 rounded-lg transition-all shadow-lg disabled:cursor-not-allowed"
+                title="Next character (Arrow Right)"
+              >
+                <ChevronRight className="w-6 h-6 text-amber-100" />
+              </button>
+            </div>
+          </div>
+
           {/* NFT Button - Top Right */}
           {externalWalletAddress && (
-            <div className="absolute top-3 right-3">
+            
               <button
                 onClick={() => setShowNFTModal(true)}
                 disabled={isLoadingNFTs}
-                className={`flex items-center gap-1 px-2 py-1.5 rounded-lg border ${selectedNFTCharacters.length > 0 ? "border-purple-400/50" : "border-amber-600/50"} transition-all shadow-lg ${isLoadingNFTs ? "opacity-70 cursor-wait bg-gray-700/40" : selectedNFTCharacters.length > 0 ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/20" : "bg-amber-800/30 hover:bg-amber-700/40 shadow-amber-900/20"}`}
+                className={`absolute flex-col items-center gap-1 px-2 py-1.5 ml-40 mt-1 border-2 transition-all ${selectedNFTCharacters.length > 0 ? "border-purple-400 bg-purple-700 hover:bg-purple-600 active:bg-purple-800" : "border-amber-600 bg-amber-800 hover:bg-amber-700 active:bg-amber-900"} ${isLoadingNFTs ? "opacity-70 cursor-wait" : "cursor-pointer"}`}
+                style={{
+                  imageRendering: "pixelated",
+                  boxShadow: selectedNFTCharacters.length > 0 
+                    ? "inset -2px -2px 0px rgba(139, 92, 246, 0.5), inset 2px 2px 0px rgba(216, 180, 254, 0.3)" 
+                    : "inset -2px -2px 0px rgba(120, 53, 15, 0.8), inset 2px 2px 0px rgba(251, 191, 36, 0.3)",
+                }}
                 title="Select exclusive NFT characters"
               >
                 {selectedNFTCharacters.length === 0 && <Star className="w-4 h-4 fill-yellow-400" />}
                 {selectedNFTCharacters.length > 0 && (
                   <BadgeCheck className="w-4 h-4 fill-purple-600 text-yellow-400" />
                 )}
-                <span className="text-xs text-white font-bold">NFT</span>
+                <span className="text-xs text-white font-bold uppercase" style={{ textShadow: "1px 1px 0px rgba(0,0,0,0.8)" }}>NFT</span>
                 {selectedNFTCharacters.length > 0 && (
-                  <span className="bg-purple-900/50 px-1.5 py-0.5 rounded-full text-xs font-bold text-white">
+                  <span className="border border-purple-300 px-1.5 py-0.5 text-xs font-bold text-white" style={{ 
+                    backgroundColor: "#581c87",
+                    imageRendering: "pixelated",
+                    textShadow: "1px 1px 0px rgba(0,0,0,0.8)"
+                  }}>
                     {selectedNFTCharacters.length}
                   </span>
                 )}
               </button>
-            </div>
+            
           )}
-
-          {/* Character Preview - Center */}
-          <div className="flex-1 flex flex-col items-center justify-start ">
-            <div>
-              <CharacterPreviewScene
-                characterId={currentCharacter._id}
-                characterName={currentCharacter.name}
-                isSpecial={!!currentCharacter.nftCollection}
-              />
-            </div>
-
-            {/* Character Name */}
-            <div className="text-center">
-              <p className="text-amber-100 font-bold text-lg uppercase tracking-wider drop-shadow-lg">
-                {currentCharacter.name}
-              </p>
-              {/* Character Index */}
-              <p className="text-amber-300/70 -mt-2 ">
-                {currentCharacterIndex + 1} / {availableCharacters.length}
-              </p>
-            </div>
-          </div>
-
-          {/* Navigation Arrows - Bottom */}
-          <div className="flex items-center justify-center gap-8 mb-4 pl-3">
-            <button
-              onClick={goToPrevious}
-              disabled={availableCharacters.length <= 1}
-              className="w-10 h-10 flex items-center justify-center bg-amber-800/50 hover:bg-amber-700/60 disabled:bg-gray-700/30 disabled:opacity-50 border-2 border-amber-600/50 rounded-lg transition-all shadow-lg disabled:cursor-not-allowed"
-              title="Previous character (Arrow Left)"
-            >
-              <ChevronLeft className="w-6 h-6 text-amber-100" />
-            </button>
-
-            <button
-              onClick={goToNext}
-              disabled={availableCharacters.length <= 1}
-              className="w-10 h-10 flex items-center justify-center bg-amber-800/50 hover:bg-amber-700/60 disabled:bg-gray-700/30 disabled:opacity-50 border-2 border-amber-600/50 rounded-lg transition-all shadow-lg disabled:cursor-not-allowed"
-              title="Next character (Arrow Right)"
-            >
-              <ChevronRight className="w-6 h-6 text-amber-100" />
-            </button>
-          </div>
         </div>
       </div>
 

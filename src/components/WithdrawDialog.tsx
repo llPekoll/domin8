@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { PublicKey, SystemProgram, LAMPORTS_PER_SOL, ComputeBudgetProgram, VersionedTransaction, TransactionMessage } from "@solana/web3.js";
 import { X, ArrowUpRight, AlertCircle, Wallet as WalletIcon } from "lucide-react";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { getSharedConnection } from "../lib/sharedConnection";
@@ -84,8 +84,8 @@ export function WithdrawDialog({ isOpen, onClose }: WithdrawDialogProps) {
       const recipientPubkey = new PublicKey(recipientAddress);
       const connection = getSharedConnection();
 
-      // Get latest blockhash
-      const latestBlockhash = await connection.getLatestBlockhash();
+      // HELIUS BEST PRACTICE #1: Use 'confirmed' commitment for latest blockhash
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
 
       // Create transfer instruction
       const transferInstruction = SystemProgram.transfer({
@@ -94,19 +94,58 @@ export function WithdrawDialog({ isOpen, onClose }: WithdrawDialogProps) {
         lamports: Math.floor(withdrawAmount * LAMPORTS_PER_SOL),
       });
 
-      // Create transaction
-      const transaction = new Transaction();
-      transaction.recentBlockhash = latestBlockhash.blockhash;
-      transaction.feePayer = new PublicKey(walletAddress);
-      transaction.add(transferInstruction);
+      // HELIUS BEST PRACTICE #2: Simulate transaction to optimize compute units
+      toast.loading("Optimizing transaction...", { id: "withdraw" });
+      
+      const testInstructions = [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
+        transferInstruction,
+      ];
+
+      const testMessage = new TransactionMessage({
+        payerKey: new PublicKey(walletAddress),
+        recentBlockhash: blockhash,
+        instructions: testInstructions,
+      }).compileToV0Message();
+
+      const testTransaction = new VersionedTransaction(testMessage);
+
+      const simulation = await connection.simulateTransaction(testTransaction, {
+        replaceRecentBlockhash: true,
+        sigVerify: false,
+      });
+
+      if (!simulation.value.unitsConsumed) {
+        throw new Error("Simulation failed to return compute units");
+      }
+
+      // Add 10% buffer to compute units (Helius recommendation)
+      const computeUnits = simulation.value.unitsConsumed < 1000 
+        ? 1000 
+        : Math.ceil(simulation.value.unitsConsumed * 1.1);
+
+      // HELIUS BEST PRACTICE #3: Get dynamic priority fee estimate
+      const priorityFee = await getPriorityFeeEstimate(connection, blockhash, walletAddress);
+
+      // Build final optimized transaction with compute budget instructions
+      const finalInstructions = [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnits }),
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFee }),
+        transferInstruction,
+      ];
+
+      const finalMessage = new TransactionMessage({
+        payerKey: new PublicKey(walletAddress),
+        recentBlockhash: blockhash,
+        instructions: finalInstructions,
+      }).compileToV0Message();
+
+      const finalTransaction = new VersionedTransaction(finalMessage);
 
       toast.loading("Signing and sending transaction...", { id: "withdraw" });
 
       // Serialize the transaction
-      const serializedTx = transaction.serialize({
-        requireAllSignatures: false,
-        verifySignatures: false,
-      });
+      const serializedTx = finalTransaction.serialize();
 
       // Determine network/chainId
       const network = import.meta.env.VITE_SOLANA_NETWORK || "devnet";
@@ -117,20 +156,52 @@ export function WithdrawDialog({ isOpen, onClose }: WithdrawDialogProps) {
         throw new Error("Wallet does not support signing and sending transactions");
       }
 
-      const results = await wallet.signAndSendAllTransactions([
-        {
-          chain: chainId,
-          transaction: serializedTx,
-        },
-      ]);
+      // HELIUS BEST PRACTICE #4: Send with skipPreflight (handled by Privy's internal logic)
+      // HELIUS BEST PRACTICE #5: Implement custom retry logic instead of relying on maxRetries
+      let signature: string | null = null;
+      const maxRetries = 3;
 
-      if (!results || results.length === 0 || !results[0].signature) {
-        throw new Error("Transaction failed - no signature returned");
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          // Check if blockhash is still valid
+          const currentBlockHeight = await connection.getBlockHeight('confirmed');
+          if (currentBlockHeight > lastValidBlockHeight) {
+            throw new Error('Blockhash expired, transaction failed.');
+          }
+
+          const results = await wallet.signAndSendAllTransactions([
+            {
+              chain: chainId,
+              transaction: serializedTx,
+            },
+          ]);
+
+          if (!results || results.length === 0 || !results[0].signature) {
+            throw new Error("Transaction failed - no signature returned");
+          }
+
+          // Convert signature from Uint8Array to base58 string
+          const signatureBytes = results[0].signature;
+          signature = bs58.encode(signatureBytes);
+
+          // Confirm transaction with polling
+          const confirmed = await confirmTransaction(connection, signature, lastValidBlockHeight);
+          if (confirmed) {
+            break;
+          }
+        } catch (error: any) {
+          console.warn(`Withdrawal attempt ${attempt + 1} failed:`, error);
+          if (attempt === maxRetries - 1) {
+            throw error;
+          }
+          // Wait before retry (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        }
       }
 
-      // Convert signature from Uint8Array to base58 string
-      const signatureBytes = results[0].signature;
-      const signature = bs58.encode(signatureBytes);
+      if (!signature) {
+        throw new Error("All retry attempts failed");
+      }
 
       toast.success(`Successfully withdrawn ${withdrawAmount} SOL!`, { id: "withdraw" });
       console.log("Withdrawal transaction:", signature);
@@ -148,6 +219,109 @@ export function WithdrawDialog({ isOpen, onClose }: WithdrawDialogProps) {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  /**
+   * Get dynamic priority fee estimate using Helius Priority Fee API
+   * @param connection - Solana connection
+   * @param blockhash - Recent blockhash
+   * @param payerKey - Payer public key
+   * @returns Priority fee in microlamports
+   */
+  const getPriorityFeeEstimate = async (
+    connection: any,
+    blockhash: string,
+    payerKey: string
+  ): Promise<number> => {
+    try {
+      // Create a temporary transaction for fee estimation
+      const tempInstructions = [
+        SystemProgram.transfer({
+          fromPubkey: new PublicKey(payerKey),
+          toPubkey: new PublicKey(recipientAddress),
+          lamports: Math.floor(parseFloat(amount) * LAMPORTS_PER_SOL),
+        }),
+      ];
+
+      const tempMessage = new TransactionMessage({
+        payerKey: new PublicKey(payerKey),
+        recentBlockhash: blockhash,
+        instructions: tempInstructions,
+      }).compileToV0Message();
+
+      const tempTx = new VersionedTransaction(tempMessage);
+      const serializedTx = bs58.encode(tempTx.serialize());
+
+      const response = await fetch(connection.rpcEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "1",
+          method: "getPriorityFeeEstimate",
+          params: [{
+            transaction: serializedTx,
+            options: { 
+              recommended: true  // Use Helius recommended fee for staked connections
+            }
+          }]
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.result?.priorityFeeEstimate) {
+        // Add 20% buffer to recommended fee for safety
+        return Math.ceil(data.result.priorityFeeEstimate * 1.2);
+      }
+
+      // Fallback to medium priority if API fails
+      return 50_000; // 50k microlamports
+    } catch (error) {
+      console.warn("Priority fee estimation failed, using fallback:", error);
+      return 50_000; // Fallback fee
+    }
+  };
+
+  /**
+   * Confirm transaction with polling and blockhash expiry check
+   * @param connection - Solana connection
+   * @param signature - Transaction signature
+   * @param lastValidBlockHeight - Last valid block height for the transaction
+   * @returns True if confirmed, false otherwise
+   */
+  const confirmTransaction = async (
+    connection: any,
+    signature: string,
+    lastValidBlockHeight: number
+  ): Promise<boolean> => {
+    const timeout = 15000; // 15 seconds
+    const interval = 2000; // 2 seconds
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeout) {
+      try {
+        const statuses = await connection.getSignatureStatuses([signature]);
+        const status = statuses?.value?.[0];
+
+        if (status && (status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized')) {
+          return true;
+        }
+
+        // Check if blockhash expired
+        const currentBlockHeight = await connection.getBlockHeight('confirmed');
+        if (currentBlockHeight > lastValidBlockHeight) {
+          console.warn('Blockhash expired during confirmation polling');
+          return false;
+        }
+      } catch (error) {
+        console.warn('Status check failed:', error);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, interval));
+    }
+
+    return false;
   };
 
   return (
