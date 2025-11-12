@@ -51,13 +51,13 @@ createRoot(document.getElementById("root")!).render(
                 "solana:mainnet": {
                   rpc: createSolanaRpc(import.meta.env.VITE_SOLANA_RPC_URL),
                   rpcSubscriptions: createSolanaRpcSubscriptions(
-                    import.meta.env.VITE_SOLANA_RPC_URL.replace(/^https?:/, 'wss:')
+                    import.meta.env.VITE_SOLANA_RPC_URL.replace(/^https?:/, "wss:")
                   ),
                 },
                 "solana:devnet": {
-                  rpc: createSolanaRpc(import.meta.env.VITE_SOLANA_RPC_URL_DEVNET),
+                  rpc: createSolanaRpc(import.meta.env.VITE_SOLANA_RPC_URL),
                   rpcSubscriptions: createSolanaRpcSubscriptions(
-                    import.meta.env.VITE_SOLANA_RPC_URL_DEVNET.replace(/^https?:/, 'wss:')
+                    import.meta.env.VITE_SOLANA_RPC_URL.replace(/^https?:/, "wss:")
                   ),
                 },
                 // "solana:devnet": {
