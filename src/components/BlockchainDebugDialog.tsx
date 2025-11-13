@@ -37,20 +37,35 @@ export function BlockchainDebugDialog() {
     : "0";
 
   // Show tooltip when there's a winner and game is in results/closed state
-  const shouldShowTooltip = hasWinner && activeGame?.status === 1;
+  const shouldShowTooltip = useMemo(() => {
+    if (!hasWinner || activeGame?.status !== 1 || !activeGame?.endTimestamp) {
+      return false;
+    }
+    
+    const endTime = Number(activeGame.endTimestamp) * 1000;
+    const now = Date.now();
+    const timeSinceEnd = now - endTime;
+    
+    // Only show tooltip if game ended within the last minute
+    const maxAgeMs = 60 * 1000; // 1 minute
+    return timeSinceEnd < maxAgeMs;
+    }, [hasWinner, activeGame?.status, activeGame?.endTimestamp]);
 
   // Auto-show tooltip when winner appears
   useEffect(() => {
     if (shouldShowTooltip && !isOpen && connected) {
       // Set a timeout to delay a bit, for better UX
-      setTimeout(() => setShowTooltip(true), 5000);
-
-      setShowTooltip(true);
-      // Auto-hide after 10 seconds
-      const timer = setTimeout(() => setShowTooltip(false), 10000);
-      return () => clearTimeout(timer);
+      const showTimer = setTimeout(() => setShowTooltip(true), 5000);
+      
+      // Auto-hide after 15 seconds total (5s delay + 10s shown)
+      const hideTimer = setTimeout(() => setShowTooltip(false), 15000);
+      
+      return () => {
+        clearTimeout(showTimer);
+        clearTimeout(hideTimer);
+      };
     }
-  }, [shouldShowTooltip, isOpen]);
+  }, [shouldShowTooltip, isOpen, connected]);
 
   const shareWinnerOnX = () => {
     if (!hasWinner) return;
