@@ -7,9 +7,11 @@ import { BettingPanel } from "./components/BettingPanel";
 import { BlockchainDebugDialog } from "./components/BlockchainDebugDialog";
 import { MultiParticipantPanel } from "./components/MultiParticipantPanel";
 import { PotDisplayPanel } from "./components/PotDisplayPanel";
+import { WinnerShareOverlay } from "./components/WinnerShareOverlay";
 import { useActiveGame } from "./hooks/useActiveGame";
+import { usePrivyWallet } from "./hooks/usePrivyWallet";
 import { EventBus } from "./game/EventBus";
-import { setActiveGameData } from "./game/main";
+import { setActiveGameData, setCurrentUserWallet } from "./game/main";
 import type { Character } from "./types/character";
 
 export default function App() {
@@ -17,6 +19,9 @@ export default function App() {
 
   // Track selected character from carousel
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
+
+  // Get current user's wallet
+  const { publicKey } = usePrivyWallet();
 
   // Get current game state directly from blockchain (no Convex, <1s updates)
   const { activeGame: currentRoundState } = useActiveGame();
@@ -54,6 +59,13 @@ export default function App() {
     currentRoundState?.winner?.toBase58(),
     currentRoundState?.endDate?.toString(),
   ]);
+
+  // Update current user wallet in Phaser
+  useEffect(() => {
+    const walletAddress = publicKey?.toBase58() || null;
+    setCurrentUserWallet(walletAddress);
+    console.log(`👤 [App] Current user wallet set:`, walletAddress);
+  }, [publicKey]);
 
   // Simple: Just pipe blockchain data to Phaser via EventBus
   // Only updates when key fields actually change
@@ -104,6 +116,7 @@ export default function App() {
 
       <MultiParticipantPanel />
       <BlockchainDebugDialog />
+      <WinnerShareOverlay />
     </div>
   );
 }

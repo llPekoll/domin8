@@ -1,6 +1,7 @@
 import { Scene } from "phaser";
 import { GamePhase } from "./GlobalGameStateManager";
 import { EventBus } from "../EventBus";
+import { currentUserWallet } from "../main";
 
 export class UIManager {
   private scene: Scene;
@@ -125,13 +126,54 @@ export class UIManager {
     this.vrfOverlay.setVisible(false);
     this.vrfContainer.setVisible(false);
 
-    // Show winner UI
+    // Get winner info from game state
+    const winnerWallet = this.gameState?.winner?.toBase58?.() || this.gameState?.winner;
+    const winnerPrize = this.gameState?.winnerPrize
+      ? (Number(this.gameState.winnerPrize) / 1e9).toFixed(2)
+      : "0";
+
+    // Check if current user is the winner
+    const isCurrentUserWinner = currentUserWallet && winnerWallet === currentUserWallet;
+
+    // Get winner display name from participant data
+    let winnerDisplayName = "Unknown Player";
+    if (this.gameState?.bets && this.gameState?.wallets && this.gameState?.winningBetIndex !== undefined) {
+      const winningBet = this.gameState.bets[this.gameState.winningBetIndex];
+      if (winningBet) {
+        const winnerWalletObj = this.gameState.wallets[winningBet.walletIndex];
+        const winnerWalletAddr = winnerWalletObj?.toBase58?.() || winnerWalletObj;
+
+        // Try to get display name from scene's player names map (passed from React)
+        const gameScene = this.scene as any;
+        if (gameScene.playerNames && gameScene.playerNames.has(winnerWalletAddr)) {
+          winnerDisplayName = gameScene.playerNames.get(winnerWalletAddr);
+        } else {
+          // Fallback to truncated wallet
+          winnerDisplayName = `${winnerWalletAddr?.slice(0, 4)}...${winnerWalletAddr?.slice(-4)}`;
+        }
+      }
+    }
+
+    // Show winner UI with personalized message
     this.winnerContainer.setVisible(true);
     this.winnerContainer.setAlpha(1); // Reset alpha in case it was faded
     this.phaseText.setVisible(true);
-    this.phaseText.setText("🏆 WINNER CROWNED!");
+
+    if (isCurrentUserWinner) {
+      this.phaseText.setText(`🏆 YOU WON ${winnerPrize} SOL!`);
+    } else {
+      this.phaseText.setText(`🏆 ${winnerDisplayName} WON ${winnerPrize} SOL!`);
+    }
+
     this.subText.setVisible(true);
     this.subText.setText("Restarting in 4s...");
+
+    // Emit event for React to show Twitter share button
+    EventBus.emit("show-winner-share", {
+      isCurrentUser: isCurrentUserWinner,
+      displayName: winnerDisplayName,
+      prize: winnerPrize,
+    });
   }
 
   /**
