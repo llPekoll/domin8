@@ -19,14 +19,24 @@ export function WinnerShareOverlay() {
 
   useEffect(() => {
     const handleShowWinnerShare = (data: WinnerData) => {
-      console.log("🎉 [WinnerShareOverlay] Showing winner share", data);
+      console.log("🎉 [WinnerShareOverlay] Received winner share event", data);
       setWinnerData(data);
-      setIsVisible(true);
 
-      // Auto-hide after 4 seconds (matches "Restarting in 4s...")
-      setTimeout(() => {
+      // Delay showing the overlay by 3 seconds
+      const showTimer = setTimeout(() => {
+        console.log("🎉 [WinnerShareOverlay] Showing winner share after 3s delay");
+        setIsVisible(true);
+      }, 3000);
+
+      // Auto-hide after 7 seconds total (3s delay + 4s shown)
+      const hideTimer = setTimeout(() => {
         setIsVisible(false);
-      }, 4000);
+      }, 7000);
+
+      return () => {
+        clearTimeout(showTimer);
+        clearTimeout(hideTimer);
+      };
     };
 
     EventBus.on("show-winner-share", handleShowWinnerShare);
@@ -40,7 +50,17 @@ export function WinnerShareOverlay() {
     if (!winnerData) return;
 
     const gameUrl = window.location.origin;
-    const tweetText = `🏆 ${winnerData.displayName} just won ${winnerData.prize} SOL in Domin8!
+
+    // Personalize message based on if it's the current user
+    const tweetText = winnerData.isCurrentUser
+      ? `🏆 I just won ${winnerData.prize} SOL in Domin8!
+
+Think you can beat me? Join the battle now! 👑
+
+${gameUrl}
+
+#Domin8 #Solana #Web3Gaming`
+      : `🏆 ${winnerData.displayName} just won ${winnerData.prize} SOL in Domin8!
 
 Think you can be the next champion? Join the battle now! 👑
 
@@ -55,14 +75,13 @@ ${gameUrl}
   if (!isVisible || !winnerData) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] pointer-events-none">
       <div className="pointer-events-auto">
         <button
           onClick={shareOnX}
-          className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all text-lg font-bold shadow-2xl shadow-purple-500/50 animate-bounce"
+          className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all text-lg font-bold shadow-2xl shadow-purple-500/50 animate-bounce"
           style={{
             fontFamily: "metal-slug",
-            textShadow: "2px 2px 0px rgba(0,0,0,0.5)",
           }}
         >
           <Share2 className="w-6 h-6" />
