@@ -524,11 +524,6 @@ const CharacterSelection = memo(function CharacterSelection({
                   <BadgeCheck className="w-3 h-3 fill-purple-600 text-yellow-400" />
                 )}
                 <span className="text-xs text-white font-bold">NFT</span>
-                {selectedNFTCharacters.length > 0 && (
-                  <span className="bg-purple-900/50 px-1.5 py-0.5 rounded-full text-xs font-bold text-white">
-                    {selectedNFTCharacters.length}
-                  </span>
-                )}
               </button>
             )}
           </div>
