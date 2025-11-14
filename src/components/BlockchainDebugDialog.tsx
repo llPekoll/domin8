@@ -5,7 +5,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useActiveGame } from "../hooks/useActiveGame";
-import { CircleHelp, X, Trophy, TrendingUp, Users, Clock, Coins, Share2 } from "lucide-react";
+import { X, Trophy, TrendingUp, Users, Clock, Coins, Share2 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";

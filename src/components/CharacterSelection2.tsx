@@ -18,6 +18,7 @@ const CharacterSelection2 = memo(function CharacterSelection({
   onCharacterSelected,
 }: CharacterSelectionProps) {
   const { connected, externalWalletAddress } = usePrivyWallet();
+  const { characters: allCharacters } = useAssets();
 
   // Carousel state
   const [currentCharacterIndex, setCurrentCharacterIndex] = useState<number>(0);
@@ -27,7 +28,6 @@ const CharacterSelection2 = memo(function CharacterSelection({
   const [selectedNFTCharacters, setSelectedNFTCharacters] = useState<Character[]>([]);
 
   // Get all available characters from assets context (shared across app)
-  const { characters: allCharacters } = useAssets();
 
   // NFT character checking
   const {
@@ -148,7 +148,6 @@ const CharacterSelection2 = memo(function CharacterSelection({
             imageRendering: "pixelated",
           }}
         >
-
           <div>
             {/* Character Preview - Center */}
             <div className="flex-1 flex flex-col items-center justify-start ">
@@ -196,26 +195,30 @@ const CharacterSelection2 = memo(function CharacterSelection({
 
           {/* NFT Button - Top Right */}
           {externalWalletAddress && (
-            
-              <button
-                onClick={() => setShowNFTModal(true)}
-                disabled={isLoadingNFTs}
-                className={`absolute flex-col items-center gap-1 px-2 py-1.5 ml-40 mt-1 border-2 transition-all ${selectedNFTCharacters.length > 0 ? "border-purple-400 bg-purple-700 hover:bg-purple-600 active:bg-purple-800" : "border-amber-600 bg-amber-800 hover:bg-amber-700 active:bg-amber-900"} ${isLoadingNFTs ? "opacity-70 cursor-wait" : "cursor-pointer"}`}
-                style={{
-                  imageRendering: "pixelated",
-                  boxShadow: selectedNFTCharacters.length > 0 
-                    ? "inset -2px -2px 0px rgba(139, 92, 246, 0.5), inset 2px 2px 0px rgba(216, 180, 254, 0.3)" 
+            <button
+              onClick={() => setShowNFTModal(true)}
+              disabled={isLoadingNFTs}
+              className={`absolute flex-col items-center gap-1 px-2 py-1.5 ml-40 mt-1 border-2 transition-all ${selectedNFTCharacters.length > 0 ? "border-purple-400 bg-purple-700 hover:bg-purple-600 active:bg-purple-800" : "border-amber-600 bg-amber-800 hover:bg-amber-700 active:bg-amber-900"} ${isLoadingNFTs ? "opacity-70 cursor-wait" : "cursor-pointer"}`}
+              style={{
+                imageRendering: "pixelated",
+                boxShadow:
+                  selectedNFTCharacters.length > 0
+                    ? "inset -2px -2px 0px rgba(139, 92, 246, 0.5), inset 2px 2px 0px rgba(216, 180, 254, 0.3)"
                     : "inset -2px -2px 0px rgba(120, 53, 15, 0.8), inset 2px 2px 0px rgba(251, 191, 36, 0.3)",
-                }}
-                title="Select exclusive NFT characters"
+              }}
+              title="Select exclusive NFT characters"
+            >
+              {selectedNFTCharacters.length === 0 && <Star className="w-4 h-4 fill-yellow-400" />}
+              {selectedNFTCharacters.length > 0 && (
+                <BadgeCheck className="w-4 h-4 fill-purple-600 text-yellow-400" />
+              )}
+              <span
+                className="text-xs text-white font-bold uppercase"
+                style={{ textShadow: "1px 1px 0px rgba(0,0,0,0.8)" }}
               >
-                {selectedNFTCharacters.length === 0 && <Star className="w-4 h-4 fill-yellow-400" />}
-                {selectedNFTCharacters.length > 0 && (
-                  <BadgeCheck className="w-4 h-4 fill-purple-600 text-yellow-400" />
-                )}
-                <span className="text-xs text-white font-bold uppercase" style={{ textShadow: "1px 1px 0px rgba(0,0,0,0.8)" }}>NFT</span>
-              </button>
-            
+                NFT
+              </span>
+            </button>
           )}
         </div>
       </div>

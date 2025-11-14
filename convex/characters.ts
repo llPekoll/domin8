@@ -9,7 +9,14 @@ export const getActiveCharacters = query({
       .withIndex("by_active", (q) => q.eq("isActive", true))
       .collect();
 
-    return characters;
+    // Shuffle the characters array using Fisher-Yates algorithm
+    const shuffled = [...characters];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    return shuffled;
   },
 });
 
