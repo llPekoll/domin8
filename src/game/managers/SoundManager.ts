@@ -161,6 +161,13 @@ export class SoundManager {
   }
 
   /**
+   * Play challenger sound (when a new player joins)
+   */
+  static playChallenger(scene: Scene, baseVolume: number = 0.6) {
+    this.playSound(scene, "challenger", baseVolume);
+  }
+
+  /**
    * Set global volume (0.0 to 1.0)
    */
   static setGlobalVolume(volume: number) {

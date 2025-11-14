@@ -117,6 +117,14 @@ export class Game extends Scene {
       SoundManager.playInsertCoin(this);
     });
 
+    // Listen for new player joining the game
+    EventBus.on("player-bet-placed", (data: any) => {
+      logger.game.debug("[Game] 🎮 Player bet placed event received:", data);
+      // Play challenger sound when a new player joins
+      // (Note: insert-coin plays for the player who placed the bet)
+      SoundManager.playChallenger(this);
+    });
+
     // Characters now spawn automatically via blockchain subscription (useActiveGame)
     // No need for separate event listener - updateGameState handles all spawning
 
