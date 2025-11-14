@@ -214,15 +214,6 @@ const CharacterSelection2 = memo(function CharacterSelection({
                   <BadgeCheck className="w-4 h-4 fill-purple-600 text-yellow-400" />
                 )}
                 <span className="text-xs text-white font-bold uppercase" style={{ textShadow: "1px 1px 0px rgba(0,0,0,0.8)" }}>NFT</span>
-                {selectedNFTCharacters.length > 0 && (
-                  <span className="border border-purple-300 px-1.5 py-0.5 text-xs font-bold text-white" style={{ 
-                    backgroundColor: "#581c87",
-                    imageRendering: "pixelated",
-                    textShadow: "1px 1px 0px rgba(0,0,0,0.8)"
-                  }}>
-                    {selectedNFTCharacters.length}
-                  </span>
-                )}
               </button>
             
           )}
