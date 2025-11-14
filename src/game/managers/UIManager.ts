@@ -129,7 +129,7 @@ export class UIManager {
     // Get winner info from game state
     const winnerWallet = this.gameState?.winner?.toBase58?.() || this.gameState?.winner;
     const winnerPrize = this.gameState?.winnerPrize
-      ? (Number(this.gameState.winnerPrize) / 1e9).toFixed(2)
+      ? (Number(this.gameState.winnerPrize) / 1e9).toFixed(3)
       : "0";
 
     // Check if current user is the winner

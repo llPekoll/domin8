@@ -364,7 +364,7 @@ export class Game extends Scene {
         };
 
         logger.game.debug("[Game] ✅ Spawning participant from blockchain:", participant);
-        this.playerManager.addParticipant(participant, false);
+        this.playerManager.addParticipant(participant);
       });
 
       logger.game.debug(

@@ -364,7 +364,7 @@ ${gameUrl}
                 label="Total Pot"
                 value={
                   activeGame?.totalPot
-                    ? `${(Number(activeGame.totalPot) / 1e9).toFixed(2)} SOL`
+                    ? `${(Number(activeGame.totalPot) / 1e9).toFixed(3)} SOL`
                     : "0 SOL"
                 }
               />
