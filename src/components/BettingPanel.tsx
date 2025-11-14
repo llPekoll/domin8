@@ -14,7 +14,7 @@ import styles from "./ButtonShine.module.css";
 // Betting limits
 const MIN_BET_AMOUNT = 0.001;
 const MAX_BET_AMOUNT = 10;
-const DEFAULT_BET_AMOUNT = 0.1;
+const DEFAULT_BET_AMOUNT = MIN_BET_AMOUNT;
 
 interface BettingPanelProps {
   selectedCharacter: Character | null;
@@ -319,7 +319,6 @@ const BettingPanel = memo(function BettingPanel({
         {isLoadingBalance ? "..." : `${solBalance.toFixed(3)} SOL`}
       </span>
       <div className="flex items-center justify-between bg-gradient-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-xl shadow-2xl shadow-amber-900/50 min-w-[560px] px-2 py-2 space-x-1">
-
         <div className="relative w-1/6">
           <input
             type="number"
@@ -356,12 +355,12 @@ const BettingPanel = memo(function BettingPanel({
           >
             +1
           </button>
-            <button
-              onClick={() => setBetAmount(Math.min(solBalance - 0.001, MAX_BET_AMOUNT + 0.001).toFixed(3))}
-              className={`cursor-pointer py-1.5 bg-gradient-to-b from-amber-500 to-amber-900 hover:to-amber-600/80  rounded-lg text-amber-300 text-2xl  transition-colors ${styles.shineButton}`}
-            >
-              All-In
-            </button>
+          <button
+            onClick={() => setBetAmount(Math.min(solBalance - 0.001, MAX_BET_AMOUNT).toFixed(3))}
+            className={`cursor-pointer py-1.5 bg-gradient-to-b from-amber-500 to-amber-900 hover:to-amber-600/80  rounded-lg text-amber-300 text-2xl  transition-colors ${styles.shineButton}`}
+          >
+            All-In
+          </button>
         </div>
 
         {/* Place bet button with arcade press effect */}
