@@ -7,6 +7,7 @@ import { Scene } from "phaser";
 export class WinnerCharacterPreview extends Scene {
   private currentCharacterSprite?: Phaser.GameObjects.Sprite;
   private currentCharacterKey?: string;
+  private winAnimationTimer?: Phaser.Time.TimerEvent;
 
   constructor() {
     super("WinnerCharacterPreview");
@@ -31,6 +32,12 @@ export class WinnerCharacterPreview extends Scene {
       this.currentCharacterSprite.destroy();
     }
 
+    // Clear existing timer if any
+    if (this.winAnimationTimer) {
+      this.winAnimationTimer.destroy();
+      this.winAnimationTimer = undefined;
+    }
+
     this.currentCharacterKey = characterKey;
 
     // Create the character sprite in the center
@@ -45,16 +52,48 @@ export class WinnerCharacterPreview extends Scene {
     // Keep pixel art crisp when scaling
     this.currentCharacterSprite.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
 
-    // Play win animation (loops by default based on Preloader.ts:268)
-    const winAnimKey = `${characterKey}-win`;
+    // Play idle animation by default
+    const idleAnimKey = `${characterKey}-idle`;
+    if (this.anims.exists(idleAnimKey)) {
+      this.currentCharacterSprite.play(idleAnimKey);
+    }
+
+    // Set up periodic win animation every 45 seconds
+    this.winAnimationTimer = this.time.addEvent({
+      delay: 45000, // 45 seconds
+      callback: () => this.playWinAnimation(),
+      loop: true,
+    });
+  }
+
+  /**
+   * Play the win animation 3 times, then return to idle
+   */
+  private playWinAnimation() {
+    if (!this.currentCharacterSprite || !this.currentCharacterKey) {
+      return;
+    }
+
+    const winAnimKey = `${this.currentCharacterKey}-win`;
     if (this.anims.exists(winAnimKey)) {
-      this.currentCharacterSprite.play(winAnimKey);
-    } else {
-      // Fallback to idle animation if win animation doesn't exist
-      const idleAnimKey = `${characterKey}-idle`;
-      if (this.anims.exists(idleAnimKey)) {
-        this.currentCharacterSprite.play(idleAnimKey);
-      }
+      // Stop current animation to ensure clean state
+      this.currentCharacterSprite.stop();
+
+      // Play win animation with repeat (will play 3 times total: 1 initial + 2 repeats)
+      this.currentCharacterSprite.play({
+        key: winAnimKey,
+        repeat: 2, // Play 3 times total (initial play + 2 repeats)
+      });
+
+      // Return to idle after all repeats complete
+      this.currentCharacterSprite.once("animationcomplete", () => {
+        if (this.currentCharacterSprite && this.currentCharacterKey) {
+          const idleAnimKey = `${this.currentCharacterKey}-idle`;
+          if (this.anims.exists(idleAnimKey)) {
+            this.currentCharacterSprite.play(idleAnimKey);
+          }
+        }
+      });
     }
   }
 
@@ -65,6 +104,10 @@ export class WinnerCharacterPreview extends Scene {
     if (this.currentCharacterSprite) {
       this.currentCharacterSprite.destroy();
       this.currentCharacterSprite = undefined;
+    }
+    if (this.winAnimationTimer) {
+      this.winAnimationTimer.destroy();
+      this.winAnimationTimer = undefined;
     }
     this.currentCharacterKey = undefined;
   }
