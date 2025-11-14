@@ -83,7 +83,7 @@ export function PotDisplayPanel() {
                 Total Pot
               </div>
               <div className="text-5xl font-bold text-amber-300 drop-shadow-[0_0_6px_rgba(251,191,36,0.6)] leading-none">
-                {(totalPot / LAMPORTS_PER_SOL).toFixed(2)} SOL
+                {(totalPot / LAMPORTS_PER_SOL).toFixed(3)} SOL
               </div>
             </div>
 

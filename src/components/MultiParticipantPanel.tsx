@@ -69,7 +69,7 @@ export function MultiParticipantPanel() {
             <div className="flex-1 text-center">
               <div className="text-amber-400 text-xs uppercase tracking-wider">Pot</div>
               <div className="text-xl font-bold text-amber-300">
-          {(totalPot / LAMPORTS_PER_SOL).toFixed(2)} SOL
+          {(totalPot / LAMPORTS_PER_SOL).toFixed(3)} SOL
               </div>
             </div>
             <button
@@ -119,7 +119,7 @@ export function MultiParticipantPanel() {
                   )}
                 </div>
                 <div className="text-amber-400 text-xs">
-                  {(participant.amount / LAMPORTS_PER_SOL).toFixed(2)} SOL
+                  {(participant.amount / LAMPORTS_PER_SOL).toFixed(3)} SOL
                 </div>
               </div>
 

@@ -1,5 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 /**
  * Get total SOL betted on a specific day
@@ -52,7 +53,7 @@ export const getTotalBettedForDay = query({
     }
 
     // Convert lamports to SOL (1 SOL = 1,000,000,000 lamports)
-    const totalSOL = totalLamports / 1_000_000_000;
+    const totalSOL = totalLamports / LAMPORTS_PER_SOL;
 
     return {
       date: targetDate.toISOString().split("T")[0],
@@ -95,7 +96,7 @@ export const getTodayStats = query({
       }
     }
 
-    const totalSOL = totalLamports / 1_000_000_000;
+    const totalSOL = totalLamports / LAMPORTS_PER_SOL;
     const averagePerGame = processedRounds.size > 0 ? totalSOL / processedRounds.size : 0;
     const averagePerBet = totalBets > 0 ? totalSOL / totalBets : 0;
 
@@ -160,10 +161,10 @@ export const getStatsForDateRange = query({
     // Convert daily stats to SOL
     const dailySOL: { [date: string]: number } = {};
     for (const [date, lamports] of Object.entries(dailyStats)) {
-      dailySOL[date] = lamports / 1_000_000_000;
+      dailySOL[date] = lamports / LAMPORTS_PER_SOL;
     }
 
-    const totalSOL = totalLamports / 1_000_000_000;
+    const totalSOL = totalLamports / LAMPORTS_PER_SOL;
 
     return {
       startDate: args.startDate,
@@ -199,7 +200,7 @@ export const getAllTimeStats = query({
       }
     }
 
-    const totalSOL = totalLamports / 1_000_000_000;
+    const totalSOL = totalLamports / LAMPORTS_PER_SOL;
     const averagePerGame = processedRounds.size > 0 ? totalSOL / processedRounds.size : 0;
     const averagePerBet = totalBets > 0 ? totalSOL / totalBets : 0;
 
@@ -259,7 +260,7 @@ export const getLastFinishedGame = query({
 
     // Calculate prize (95% of total pot)
     const prizeAmount = lastGame.totalPot ? lastGame.totalPot * 0.95 : 0;
-    const prizeSOL = prizeAmount / 1_000_000_000;
+    const prizeSOL = prizeAmount / LAMPORTS_PER_SOL;
 
     // Get the character info
     const character =
@@ -277,8 +278,8 @@ export const getLastFinishedGame = query({
       characterName: character?.name || "Unknown",
       characterAssetPath: character?.assetPath || null,
       prizeAmount: prizeSOL,
-      betAmount: winningAmount ? winningAmount / 1_000_000_000 : 0,
-      totalPot: lastGame.totalPot ? lastGame.totalPot / 1_000_000_000 : 0,
+      betAmount: winningAmount ? winningAmount / LAMPORTS_PER_SOL : 0,
+      totalPot: lastGame.totalPot ? lastGame.totalPot / LAMPORTS_PER_SOL : 0,
       endTimestamp: lastGame.endTimestamp,
     };
   },
