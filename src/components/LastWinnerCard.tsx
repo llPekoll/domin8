@@ -47,15 +47,26 @@ export function LastWinnerCard() {
             <h3 className="text-purple-400 text-2xl uppercase tracking-wider font-semibold flex ">
               Last Winner
             </h3>
-            <span className="text-purple-300 text-xl font-bold">
-              {lastFinishedGame.prizeAmount.toFixed(3)} SOL
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-purple-300 text-3xl font-bold">
+                {lastFinishedGame.prizeAmount.toFixed(3)}
+              </span>
+              <img
+                src="/sol-logo.svg"
+                alt="SOL"
+                className="w-5 h-5"
+                style={{
+                  filter:
+                    "brightness(0) saturate(100%) invert(77%) sepia(26%) saturate(444%) hue-rotate(213deg) brightness(95%) contrast(92%)",
+                }}
+              />
+            </div>
           </div>
 
           {/* Winner Info */}
-          <div className="mt-5 flex items-center gap-3 bg-purple-900/20 rounded-lg p-3 border border-purple-500/30">
+          <div className="mt-7 flex items-center  bg-purple-900/20 rounded-lg  border border-purple-500/30">
             {/* Character Avatar with Phaser Animation */}
-            <div className="relative w-16 h-16">
+            <div className="relative w-20 h-20 flex-shrink-0">
               <WinnerCharacterPreviewScene
                 characterName={lastFinishedGame.characterName}
                 width={128}
@@ -63,27 +74,44 @@ export function LastWinnerCard() {
               />
             </div>
 
-            {/* Winner Details */}
-            <div className="flex flex-col">
-              <div className="text-white font-bold text-lg truncate">{displayName}</div>
-              <div className="text-white/50 text-xs mt-1">
-                Bet: {lastFinishedGame.betAmount.toFixed(3)} SOL
+            {/* Winner Details - Name and Bet */}
+            <div className="flex-1 min-w-0">
+              <div className="text-white font-bold text-xl truncate">{displayName}</div>
+              <div className="text-white/50 text-lg flex items-center gap-1 -mt-2">
+                <span>Bet: {lastFinishedGame.betAmount.toFixed(3)}</span>
+                <img
+                  src="/sol-logo.svg"
+                  alt="SOL"
+                  className="w-2 h-2"
+                  style={{
+                    filter:
+                      "brightness(0) saturate(100%) invert(100%) sepia(0%) saturate(0%) hue-rotate(93deg) brightness(103%) contrast(103%) opacity(0.5)",
+                  }}
+                />
               </div>
             </div>
-            <div>
-              <div className="flex justify-between text-xs bg-black/40 rounded-lg p-2">
-                <div className="text-center flex-1">
-                  <div className="text-white/50">Total Pot</div>
-                  <div className="text-purple-300 font-semibold">
-                    {lastFinishedGame.totalPot.toFixed(3)} SOL
-                  </div>
+
+            {/* Stats - Vertical Layout */}
+            <div className="flex flex-col gap-2 text-right pr-3">
+              <div>
+                <div className="text-white/50 text-xs">Total Pot</div>
+                <div className="text-purple-300 -mt-2 font-semibold text-xl flex items-center justify-end gap-1">
+                  <span>{lastFinishedGame.totalPot.toFixed(3)}</span>
+                  <img
+                    src="/sol-logo.svg"
+                    alt="SOL"
+                    className="w-3 h-3"
+                    style={{
+                      filter:
+                        "brightness(0) saturate(100%) invert(77%) sepia(26%) saturate(444%) hue-rotate(213deg) brightness(95%) contrast(92%)",
+                    }}
+                  />
                 </div>
-                <div className="w-px bg-purple-500/30" />
-                <div className="text-center flex-1">
-                  <div className="text-white/50">Win Rate</div>
-                  <div className="text-purple-300 font-semibold">
-                    {((lastFinishedGame.betAmount / lastFinishedGame.totalPot) * 100).toFixed(1)}%
-                  </div>
+              </div>
+              <div>
+                <div className="text-white/50 text-xs">Win Rate</div>
+                <div className="text-purple-300 -mt-2 font-semibold text-xl">
+                  {((lastFinishedGame.betAmount / lastFinishedGame.totalPot) * 100).toFixed(1)}%
                 </div>
               </div>
             </div>
@@ -92,7 +120,7 @@ export function LastWinnerCard() {
           {/* Stats Row */}
         </CardContent>
       </Card>
-      <p className="text-white/60 text-lg">Round #{lastFinishedGame.roundId}</p>
+      <p className="text-white/60 text-lg flex justify-end">Round #{lastFinishedGame.roundId}</p>
     </div>
   );
 }
