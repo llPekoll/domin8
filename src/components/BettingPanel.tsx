@@ -318,11 +318,9 @@ const BettingPanel = memo(function BettingPanel({
       <span className="text-amber-300 pl-2">
         {isLoadingBalance ? "..." : `${solBalance.toFixed(3)} SOL`}
       </span>
-      <div className="flex items-center justify-between bg-gradient-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-lg shadow-2xl shadow-amber-900/50 min-w-[560px] px-2 py-2 space-x-2">
-        {/* Betting Section */}
-        <div className="flex items-center justify-between text-sm uppercase tracking-wide"></div>
+      <div className="flex items-center justify-between bg-gradient-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-xl shadow-2xl shadow-amber-900/50 min-w-[560px] px-2 py-2 space-x-1">
 
-        <div className="relative w-1/3">
+        <div className="relative w-1/6">
           <input
             type="number"
             value={betAmount}
@@ -331,7 +329,7 @@ const BettingPanel = memo(function BettingPanel({
             min={MIN_BET_AMOUNT}
             max={MAX_BET_AMOUNT}
             step={DEFAULT_BET_AMOUNT}
-            className="text-2xl w-full px-3 py-2 bg-black/30 border border-amber-700/50 rounded-lg text-amber-100 placeholder-amber-600 text-center  font-bold focus:outline-none focus:border-amber-500"
+            className="text-2xl w-full px-2 py-2 bg-black/30 border border-amber-700/50 rounded-lg text-amber-100 placeholder-amber-600 text-center  font-bold focus:outline-none focus:border-amber-500"
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-amber-500 text-xs font-bold">
             SOL
@@ -339,25 +337,31 @@ const BettingPanel = memo(function BettingPanel({
         </div>
 
         {/* Quick bet buttons */}
-        <div className="grid grid-cols-3 gap-2 w-1/3">
+        <div className="grid grid-cols-4 gap-2 w-2/5">
           <button
             onClick={() => handleIncrementBet(0.1)}
-            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-2xl font-bold transition-colors"
+            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded-lg text-amber-300 text-2xl font-bold transition-colors"
+          >
+            +0.01
+          </button>
+          <button
+            onClick={() => handleIncrementBet(0.5)}
+            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded-lg text-amber-300 text-2xl font-bold transition-colors"
           >
             +0.1
           </button>
           <button
             onClick={() => handleIncrementBet(0.5)}
-            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-2xl font-bold transition-colors"
-          >
-            +0.5
-          </button>
-          <button
-            onClick={() => handleIncrementBet(1)}
-            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-2xl font-bold transition-colors"
+            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded-lg text-amber-300 text-2xl font-bold transition-colors"
           >
             +1
           </button>
+            <button
+              onClick={() => setBetAmount(Math.min(solBalance - 0.001, MAX_BET_AMOUNT + 0.001).toFixed(3))}
+              className={`cursor-pointer py-1.5 bg-gradient-to-b from-amber-500 to-amber-900 hover:to-amber-600/80  rounded-lg text-amber-300 text-2xl  transition-colors ${styles.shineButton}`}
+            >
+              All-In
+            </button>
         </div>
 
         {/* Place bet button with arcade press effect */}
@@ -367,13 +371,12 @@ const BettingPanel = memo(function BettingPanel({
           className={`
             text-2xl cursor-pointer flex justify-center items-center w-1/3 py-2
             bg-gradient-to-b from-amber-500 to-amber-700
-            hover:from-amber-400 hover:to-amber-600
+            hover:to-amber-800 hover:text-amber-300
             disabled:from-gray-600 disabled:to-gray-700
-            rounded font-bold text-white uppercase tracking-wider
+            rounded-lg font-bold text-amber-100 uppercase tracking-wider
             transition-all duration-100
-            shadow-[0_10px_0_0_rgba(120,53,15,0.9)]
-            hover:shadow-[0_10px_0_0_rgba(120,53,15,0.9)]
-            active:shadow-[0_2px_0_0_rgba(120,53,15,0.9)]
+            hover:shadow-[0_5px_0_0_rgba(0,0,0,0.3)]
+            active:shadow-[0_2px_0_0_rgba(0,0,0,0.3)]
             active:translate-y-[8px]
             disabled:opacity-50 disabled:cursor-not-allowed
             disabled:shadow-[0_4px_0_0_rgba(75,85,99,0.7)]
