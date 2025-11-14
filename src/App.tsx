@@ -115,11 +115,11 @@ export default function App() {
       {/* Pot Display - Top Center */}
       <PotDisplayPanel />
 
-      {/* Last Winner Card - Top Left */}
-      <LastWinnerCard />
-
+      <div className="fixed top-18 right-4 ">
+        <BlockchainDebugDialog />
+        <LastWinnerCard />
+      </div>
       <MultiParticipantPanel />
-      <BlockchainDebugDialog />
       <WinnerShareOverlay />
     </div>
   );

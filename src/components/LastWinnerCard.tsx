@@ -36,7 +36,7 @@ export function LastWinnerCard() {
   }
 
   return (
-    <div className="fixed top-20 left-4 z-50">
+    <div className="-mr-7">
       <Card className="bg-black/60 pt-2 backdrop-blur-md border-purple-500/50 shadow-xl shadow-purple-500/20 w-80">
         <CardContent className=" space-y-3">
           {/* Header */}
@@ -118,7 +118,9 @@ export function LastWinnerCard() {
           {/* Stats Row */}
         </CardContent>
       </Card>
-      <p className="text-white/60 text-lg flex justify-end">Round #{lastFinishedGame.roundId}</p>
+      <p className="text-white/60 text-lg flex justify-end mr-6">
+        Round #{lastFinishedGame.roundId}
+      </p>
     </div>
   );
 }
