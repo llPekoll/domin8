@@ -87,14 +87,14 @@ ${gameUrl}
 
   if (!isOpen) {
     return (
-      <div className="flex gap-3 justify-end pb-4">
-        <button
+      <div className="flex gap-3 justify-end  float-right">
+        {/*<button
           onClick={() => setIsOpen(true)}
           className="p-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg transition-colors"
           title="Open Game Debug Panel"
         >
           <CircleHelp className="w-6 h-6" />
-        </button>
+        </button>*/}
 
         {/* Social Links */}
         <div className="flex  gap-2">
@@ -163,7 +163,7 @@ ${gameUrl}
                 </div>
 
                 {/* Tooltip Content */}
-                <div
+                {/*<div
                   className="bg-gray-900 border-2 border-yellow-400 rounded px-3 py-2 shadow-2xl whitespace-nowrap"
                   style={{
                     boxShadow:
@@ -200,7 +200,7 @@ ${gameUrl}
                   >
                     👆 SHARE ON X!
                   </button>
-                </div>
+                </div>*/}
               </div>
             )}
           </div>

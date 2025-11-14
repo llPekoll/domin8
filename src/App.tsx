@@ -110,13 +110,15 @@ export default function App() {
       <CharacterSelection2 onCharacterSelected={setSelectedCharacter} />
 
       {/* Betting Panel - Bottom Center */}
-      <BettingPanel selectedCharacter={selectedCharacter} />
+      <div className="fixed items-center bottom-4 left-1/2 -translate-x-1/2 z-50">
+        <BlockchainDebugDialog />
+        <BettingPanel selectedCharacter={selectedCharacter} />
+      </div>
 
       {/* Pot Display - Top Center */}
       <PotDisplayPanel />
 
       <div className="fixed top-18 right-4 ">
-        <BlockchainDebugDialog />
         <LastWinnerCard />
       </div>
       <MultiParticipantPanel />

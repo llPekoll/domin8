@@ -313,8 +313,9 @@ const BettingPanel = memo(function BettingPanel({
   }
 
   return (
-    <div className="fixed items-center bottom-4 left-1/2 -translate-x-1/2 z-50">
-      <span className="text-amber-400">Balance</span>
+    <div className="pt-2">
+      <span className="text-amber-400 ">Balance</span>
+
       <div className="inline-flex items-center gap-1 pl-2">
         {!isLoadingBalance && (
           <img
