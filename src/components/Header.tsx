@@ -89,7 +89,6 @@ export function Header() {
                           <span className="text-sm">Loading...</span>
                         ) : solBalance !== null ? (
                           <>
-                            {solBalance.toFixed(4)}
                             <img
                               src="/sol-logo.svg"
                               alt="SOL"
@@ -99,6 +98,7 @@ export function Header() {
                                   "brightness(0) saturate(100%) invert(81%) sepia(13%) saturate(891%) hue-rotate(196deg) brightness(95%) contrast(92%)",
                               }}
                             />
+                            {solBalance.toFixed(4)}
                           </>
                         ) : (
                           <span className="text-sm">--</span>

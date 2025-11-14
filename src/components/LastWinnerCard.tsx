@@ -48,9 +48,6 @@ export function LastWinnerCard() {
               Last Winner
             </h3>
             <div className="flex items-center gap-2">
-              <span className="text-purple-300 text-3xl font-bold">
-                {lastFinishedGame.prizeAmount.toFixed(3)}
-              </span>
               <img
                 src="/sol-logo.svg"
                 alt="SOL"
@@ -60,6 +57,9 @@ export function LastWinnerCard() {
                     "brightness(0) saturate(100%) invert(77%) sepia(26%) saturate(444%) hue-rotate(213deg) brightness(95%) contrast(92%)",
                 }}
               />
+              <span className="text-purple-300 text-3xl font-bold">
+                {lastFinishedGame.prizeAmount.toFixed(3)}
+              </span>
             </div>
           </div>
 
@@ -78,7 +78,7 @@ export function LastWinnerCard() {
             <div className="flex-1 min-w-0">
               <div className="text-white font-bold text-xl truncate">{displayName}</div>
               <div className="text-white/50 text-lg flex items-center gap-1 -mt-2">
-                <span>Bet: {lastFinishedGame.betAmount.toFixed(3)}</span>
+                <span>Bet:</span>
                 <img
                   src="/sol-logo.svg"
                   alt="SOL"
@@ -88,26 +88,12 @@ export function LastWinnerCard() {
                       "brightness(0) saturate(100%) invert(100%) sepia(0%) saturate(0%) hue-rotate(93deg) brightness(103%) contrast(103%) opacity(0.5)",
                   }}
                 />
+                <span>{lastFinishedGame.betAmount.toFixed(3)}</span>
               </div>
             </div>
 
             {/* Stats - Vertical Layout */}
             <div className="flex flex-col gap-2 text-right pr-3">
-              <div>
-                <div className="text-white/50 text-xs">Total Pot</div>
-                <div className="text-purple-300 -mt-2 font-semibold text-xl flex items-center justify-end gap-1">
-                  <span>{lastFinishedGame.totalPot.toFixed(3)}</span>
-                  <img
-                    src="/sol-logo.svg"
-                    alt="SOL"
-                    className="w-3 h-3"
-                    style={{
-                      filter:
-                        "brightness(0) saturate(100%) invert(77%) sepia(26%) saturate(444%) hue-rotate(213deg) brightness(95%) contrast(92%)",
-                    }}
-                  />
-                </div>
-              </div>
               <div>
                 <div className="text-white/50 text-xs">Win Rate</div>
                 <div className="text-purple-300 -mt-2 font-semibold text-xl">
