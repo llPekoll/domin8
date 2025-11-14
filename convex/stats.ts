@@ -152,9 +152,7 @@ export const getStatsForDateRange = query({
         totalBets += round.betCount || 0;
 
         // Track daily breakdown
-        const roundDate = new Date(round.startTimestamp * 1000)
-          .toISOString()
-          .split("T")[0];
+        const roundDate = new Date(round.startTimestamp * 1000).toISOString().split("T")[0];
         dailyStats[roundDate] = (dailyStats[roundDate] || 0) + (round.totalPot || 0);
       }
     }
@@ -235,13 +233,14 @@ export const getLastFinishedGame = query({
     }
 
     // Filter to only games with valid bet data
-    const validGames = finishedGames.filter(game =>
-      game.winner &&
-      game.winningBetIndex !== undefined &&
-      game.betSkin &&
-      game.betSkin.length > 0 &&
-      game.betAmounts &&
-      game.betAmounts.length > 0
+    const validGames = finishedGames.filter(
+      (game) =>
+        game.winner &&
+        game.winningBetIndex !== undefined &&
+        game.betSkin &&
+        game.betSkin.length > 0 &&
+        game.betAmounts &&
+        game.betAmounts.length > 0
     );
 
     if (validGames.length === 0) {
@@ -253,36 +252,23 @@ export const getLastFinishedGame = query({
       return current.roundId > latest.roundId ? current : latest;
     }, validGames[0]);
 
-    console.log("[getLastFinishedGame] Full lastGame data:", {
-      roundId: lastGame.roundId,
-      winningBetIndex: lastGame.winningBetIndex,
-      betSkin: lastGame.betSkin,
-      betAmounts: lastGame.betAmounts,
-      betCount: lastGame.betCount,
-    });
-
     // Get the winning bet details (we know these exist from the filter above)
     const winningBetIndex = lastGame.winningBetIndex!; // Non-null assertion - we filtered for this
     const winningBet = lastGame.betSkin![winningBetIndex];
     const winningAmount = lastGame.betAmounts![winningBetIndex];
-
-    console.log("[getLastFinishedGame] Winning bet skin ID:", winningBet);
-    console.log("[getLastFinishedGame] All bet skins:", lastGame.betSkin);
 
     // Calculate prize (95% of total pot)
     const prizeAmount = lastGame.totalPot ? lastGame.totalPot * 0.95 : 0;
     const prizeSOL = prizeAmount / 1_000_000_000;
 
     // Get the character info
-    const character = winningBet !== undefined
-      ? await ctx.db
-          .query("characters")
-          .filter((q) => q.eq(q.field("id"), winningBet))
-          .first()
-      : null;
-
-    console.log("[getLastFinishedGame] Character found:", character?.name || "NOT FOUND");
-    console.log("[getLastFinishedGame] Character ID searched:", winningBet);
+    const character =
+      winningBet !== undefined
+        ? await ctx.db
+            .query("characters")
+            .filter((q) => q.eq(q.field("id"), winningBet))
+            .first()
+        : null;
 
     return {
       roundId: lastGame.roundId,

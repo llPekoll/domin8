@@ -7,9 +7,6 @@ import { useMemo } from "react";
 export function LastWinnerCard() {
   const lastFinishedGame = useQuery(api.stats.getLastFinishedGame);
 
-  // Debug log
-  console.log("[LastWinnerCard] Last finished game data:", lastFinishedGame);
-
   // Get display name for the winner
   const playerInfo = useQuery(
     api.players.getPlayer,
@@ -47,25 +44,19 @@ export function LastWinnerCard() {
             <h3 className="text-purple-400 text-2xl uppercase tracking-wider font-semibold flex ">
               Last Winner
             </h3>
-            <div className="flex flex-col items-end">
-              <div className="flex items-center gap-2">
-                <img
-                  src="/sol-logo.svg"
-                  alt="SOL"
-                  className="w-5 h-5"
-                  style={{
-                    filter:
-                      "brightness(0) saturate(100%) invert(77%) sepia(26%) saturate(444%) hue-rotate(213deg) brightness(95%) contrast(92%)",
-                  }}
-                />
-                <span className="text-purple-300 text-3xl font-bold">
-                  {lastFinishedGame.prizeAmount.toFixed(3)}
-                </span>
-              </div>
-              <div className="text-white/50 text-xs -mt-1">
-                Win Rate:{" "}
-                {((lastFinishedGame.betAmount / lastFinishedGame.totalPot) * 100).toFixed(1)}%
-              </div>
+            <div className="flex items-center gap-2">
+              <img
+                src="/sol-logo.svg"
+                alt="SOL"
+                className="w-5 h-5"
+                style={{
+                  filter:
+                    "brightness(0) saturate(100%) invert(77%) sepia(26%) saturate(444%) hue-rotate(213deg) brightness(95%) contrast(92%)",
+                }}
+              />
+              <span className="text-purple-300 text-3xl font-bold">
+                {lastFinishedGame.prizeAmount.toFixed(3)}
+              </span>
             </div>
           </div>
 
@@ -95,6 +86,31 @@ export function LastWinnerCard() {
                   }}
                 />
                 <span>{lastFinishedGame.betAmount.toFixed(3)}</span>
+              </div>
+            </div>
+
+            {/* Stats - Vertical Layout */}
+            <div className="flex flex-col gap-2 text-right pr-3">
+              <div>
+                <div className="text-white/50 text-xs">Total Pot</div>
+                <div className="text-purple-300 -mt-2 font-semibold text-xl flex items-center justify-end gap-1">
+                  <img
+                    src="/sol-logo.svg"
+                    alt="SOL"
+                    className="w-3 h-3"
+                    style={{
+                      filter:
+                        "brightness(0) saturate(100%) invert(77%) sepia(26%) saturate(444%) hue-rotate(213deg) brightness(95%) contrast(92%)",
+                    }}
+                  />
+                  <span>{lastFinishedGame.totalPot.toFixed(3)}</span>
+                </div>
+              </div>
+              <div>
+                <div className="text-white/50 text-xs">Win Rate</div>
+                <div className="text-purple-300 -mt-2 font-semibold text-xl">
+                  {((lastFinishedGame.betAmount / lastFinishedGame.totalPot) * 100).toFixed(1)}%
+                </div>
               </div>
             </div>
           </div>

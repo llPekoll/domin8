@@ -25,8 +25,6 @@ export const WinnerCharacterPreviewScene: React.FC<WinnerCharacterPreviewScenePr
   useEffect(() => {
     if (!containerRef.current) return;
 
-    console.log("[WinnerCharacterPreviewScene] 🎮 Initializing Phaser game instance");
-
     // Create a minimal Phaser game instance for character preview
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
@@ -60,7 +58,6 @@ export const WinnerCharacterPreviewScene: React.FC<WinnerCharacterPreviewScenePr
 
     return () => {
       if (gameRef.current) {
-        console.log("[WinnerCharacterPreviewScene] 🧹 Cleaning up Phaser instance");
         gameRef.current.destroy(true);
         gameRef.current = null;
         sceneRef.current = null;
@@ -70,15 +67,7 @@ export const WinnerCharacterPreviewScene: React.FC<WinnerCharacterPreviewScenePr
 
   // Display character when characterName changes
   useEffect(() => {
-    console.log("[WinnerCharacterPreviewScene] 📋 Effect triggered:", {
-      isReady,
-      hasScene: !!sceneRef.current,
-      characterName,
-      charactersCount: characters?.length || 0,
-    });
-
     if (!isReady || !sceneRef.current || !characterName || !characters || characters.length === 0) {
-      console.log("[WinnerCharacterPreviewScene] ⏸️ Waiting for dependencies...");
       return;
     }
 
@@ -87,18 +76,9 @@ export const WinnerCharacterPreviewScene: React.FC<WinnerCharacterPreviewScenePr
       (char: any) => char.name.toLowerCase() === characterName.toLowerCase()
     );
 
-    console.log("[WinnerCharacterPreviewScene] 🔍 Looking for character:", characterName);
-    console.log(
-      "[WinnerCharacterPreviewScene] Available characters:",
-      characters.map((c: any) => c.name)
-    );
-
     if (!characterData) {
-      console.warn(`[WinnerCharacterPreviewScene] ❌ Character not found: ${characterName}`);
       return;
     }
-
-    console.log("[WinnerCharacterPreviewScene] ✅ Character found:", characterData);
 
     const characterKey = characterData.name.toLowerCase().replace(/\s+/g, "-");
     const scene = sceneRef.current;
@@ -106,13 +86,9 @@ export const WinnerCharacterPreviewScene: React.FC<WinnerCharacterPreviewScenePr
     // Check if character assets are already loaded
     if (scene.textures.exists(characterKey)) {
       // Assets already loaded, display character
-      console.log(
-        `[WinnerCharacterPreviewScene] ✅ Textures found for ${characterKey}, displaying character`
-      );
       scene.displayWinningCharacter(characterKey);
     } else {
       // Need to load character assets
-      console.log(`[WinnerCharacterPreviewScene] 📦 Loading textures for ${characterKey}`);
       const jsonPath = characterData.assetPath.replace(".png", ".json");
 
       scene.load.atlas(characterKey, `assets/${characterData.assetPath}`, `assets/${jsonPath}`);
