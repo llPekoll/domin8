@@ -8,6 +8,7 @@ import { BlockchainDebugDialog } from "./components/BlockchainDebugDialog";
 import { MultiParticipantPanel } from "./components/MultiParticipantPanel";
 import { PotDisplayPanel } from "./components/PotDisplayPanel";
 import { WinnerShareOverlay } from "./components/WinnerShareOverlay";
+import { LastWinnerCard } from "./components/LastWinnerCard";
 import { useActiveGame } from "./hooks/useActiveGame";
 import { usePrivyWallet } from "./hooks/usePrivyWallet";
 import { EventBus } from "./game/EventBus";
@@ -113,6 +114,9 @@ export default function App() {
 
       {/* Pot Display - Top Center */}
       <PotDisplayPanel />
+
+      {/* Last Winner Card - Top Left */}
+      <LastWinnerCard />
 
       <MultiParticipantPanel />
       <BlockchainDebugDialog />

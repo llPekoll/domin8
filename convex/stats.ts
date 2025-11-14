@@ -152,9 +152,7 @@ export const getStatsForDateRange = query({
         totalBets += round.betCount || 0;
 
         // Track daily breakdown
-        const roundDate = new Date(round.startTimestamp * 1000)
-          .toISOString()
-          .split("T")[0];
+        const roundDate = new Date(round.startTimestamp * 1000).toISOString().split("T")[0];
         dailyStats[roundDate] = (dailyStats[roundDate] || 0) + (round.totalPot || 0);
       }
     }
@@ -212,6 +210,76 @@ export const getAllTimeStats = query({
       totalBets: totalBets,
       averagePerGame: averagePerGame,
       averagePerBet: averagePerBet,
+    };
+  },
+});
+
+/**
+ * Get the last finished game round with winner information
+ * Returns the most recent completed game with winner details
+ */
+export const getLastFinishedGame = query({
+  args: {},
+  handler: async (ctx) => {
+    // Query all finished games, ordered by roundId descending
+    const finishedGames = await ctx.db
+      .query("gameRoundStates")
+      .withIndex("by_status", (q) => q.eq("status", "finished"))
+      .order("desc")
+      .collect();
+
+    if (finishedGames.length === 0) {
+      return null;
+    }
+
+    // Filter to only games with valid bet data
+    const validGames = finishedGames.filter(
+      (game) =>
+        game.winner &&
+        game.winningBetIndex !== undefined &&
+        game.betSkin &&
+        game.betSkin.length > 0 &&
+        game.betAmounts &&
+        game.betAmounts.length > 0
+    );
+
+    if (validGames.length === 0) {
+      return null;
+    }
+
+    // Get the most recent finished game with valid data (highest roundId)
+    const lastGame = validGames.reduce((latest, current) => {
+      return current.roundId > latest.roundId ? current : latest;
+    }, validGames[0]);
+
+    // Get the winning bet details (we know these exist from the filter above)
+    const winningBetIndex = lastGame.winningBetIndex!; // Non-null assertion - we filtered for this
+    const winningBet = lastGame.betSkin![winningBetIndex];
+    const winningAmount = lastGame.betAmounts![winningBetIndex];
+
+    // Calculate prize (95% of total pot)
+    const prizeAmount = lastGame.totalPot ? lastGame.totalPot * 0.95 : 0;
+    const prizeSOL = prizeAmount / 1_000_000_000;
+
+    // Get the character info
+    const character =
+      winningBet !== undefined
+        ? await ctx.db
+            .query("characters")
+            .filter((q) => q.eq(q.field("id"), winningBet))
+            .first()
+        : null;
+
+    return {
+      roundId: lastGame.roundId,
+      winnerAddress: lastGame.winner,
+      characterId: winningBet,
+      characterName: character?.name || "Unknown",
+      characterAssetPath: character?.assetPath || null,
+      prizeAmount: prizeSOL,
+      betAmount: winningAmount ? winningAmount / 1_000_000_000 : 0,
+      totalPot: lastGame.totalPot ? lastGame.totalPot / 1_000_000_000 : 0,
+      endTimestamp: lastGame.endTimestamp,
     };
   },
 });

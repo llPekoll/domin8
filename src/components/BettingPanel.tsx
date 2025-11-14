@@ -315,11 +315,31 @@ const BettingPanel = memo(function BettingPanel({
   return (
     <div className="fixed items-center bottom-4 left-1/2 -translate-x-1/2 z-50">
       <span className="text-amber-400">Balance</span>
-      <span className="text-amber-300 pl-2">
-        {isLoadingBalance ? "..." : `${solBalance.toFixed(3)} SOL`}
-      </span>
+      <div className="inline-flex items-center gap-1 pl-2">
+        {!isLoadingBalance && (
+          <img
+            src="/sol-logo.svg"
+            alt="SOL"
+            className="w-3 h-3"
+            style={{
+              filter:
+                "brightness(0) saturate(100%) invert(85%) sepia(23%) saturate(632%) hue-rotate(358deg) brightness(100%) contrast(92%)",
+            }}
+          />
+        )}
+        <span className="text-amber-300">{isLoadingBalance ? "..." : solBalance.toFixed(3)}</span>
+      </div>
       <div className="flex items-center justify-between bg-gradient-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-xl shadow-2xl shadow-amber-900/50 min-w-[560px] px-2 py-2 space-x-1">
-        <div className="relative w-1/6">
+        <div className="relative w-1/5">
+          <img
+            src="/sol-logo.svg"
+            alt="SOL"
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+            style={{
+              filter:
+                "brightness(0) saturate(100%) invert(66%) sepia(89%) saturate(470%) hue-rotate(359deg) brightness(97%) contrast(89%)",
+            }}
+          />
           <input
             type="number"
             value={betAmount}
@@ -328,11 +348,8 @@ const BettingPanel = memo(function BettingPanel({
             min={MIN_BET_AMOUNT}
             max={MAX_BET_AMOUNT}
             step={DEFAULT_BET_AMOUNT}
-            className="text-2xl w-full px-2 py-2 bg-black/30 border border-amber-700/50 rounded-lg text-amber-100 placeholder-amber-600 text-center  font-bold focus:outline-none focus:border-amber-500"
+            className="text-2xl w-full px-2 py-2 pl-8 bg-black/30 border border-amber-700/50 rounded-lg text-amber-100 placeholder-amber-600 text-center font-bold focus:outline-none focus:border-amber-500"
           />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-amber-500 text-xs font-bold">
-            SOL
-          </span>
         </div>
 
         {/* Quick bet buttons */}
