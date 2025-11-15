@@ -144,10 +144,24 @@ export class OneVOneScene extends Scene {
     // Show battle text
     this.battleText.setVisible(true);
 
-    // Spawn both players at fixed positions
-    const playerASpawnX = this.centerX * 0.5; // Left side
-    const playerBSpawnX = this.centerX * 1.5; // Right side
-    const spawnY = this.centerY;
+    // Play challenger sound for dramatic entrance
+    SoundManager.playChallenger(this, 0.8);
+
+    // Create map data for 1v1 (simple centered arena)
+    const oneVOneMapData = {
+      spawnConfiguration: {
+        centerX: this.centerX,
+        centerY: this.centerY,
+        radiusX: this.centerX * 0.4, // Compact spawn radius for 1v1
+        radiusY: this.centerY * 0.3,
+        minSpawnRadius: 0,
+        maxSpawnRadius: 100,
+        minSpacing: 50,
+      },
+    };
+
+    // Set map data on player manager
+    this.playerManager.setMapData(oneVOneMapData);
 
     // Create participants for Player A
     const participantA = {
@@ -159,8 +173,10 @@ export class OneVOneScene extends Scene {
         name: `Character ${data.characterA}`,
         key: `character_${data.characterA}`,
       },
+      spawnIndex: 0, // Left position
       isBot: false,
       eliminated: false,
+      size: 1.2, // Slightly larger for visibility
     };
 
     // Create participants for Player B
@@ -173,31 +189,23 @@ export class OneVOneScene extends Scene {
         name: `Character ${data.characterB}`,
         key: `character_${data.characterB}`,
       },
+      spawnIndex: 1, // Right position (opposite side)
       isBot: false,
       eliminated: false,
+      size: 1.2, // Slightly larger for visibility
     };
 
-    // Spawn characters
+    // Spawn characters - this will handle falling animation automatically
     this.playerManager.addParticipant(participantA);
     this.playerManager.addParticipant(participantB);
 
-    // Position them
-    const playerAObj = this.playerManager.getParticipant(participantA._id);
-    const playerBObj = this.playerManager.getParticipant(participantB._id);
+    // After characters land (400ms), play dramatic entrance
+    this.time.delayedCall(600, () => {
+      this.playEntranceAnimation();
+    });
 
-    if (playerAObj && playerBObj) {
-      // Move to spawn positions
-      playerAObj.container.setPosition(playerASpawnX, spawnY);
-      playerBObj.container.setPosition(playerBSpawnX, spawnY);
-
-      // Flip Player B's sprite
-      if (playerBObj.sprite) {
-        playerBObj.sprite.setFlipX(true);
-      }
-    }
-
-    // Start battle animation after a short delay
-    this.time.delayedCall(500, () => {
+    // Start battle animation sequence
+    this.time.delayedCall(1500, () => {
       this.runBattle();
     });
 
@@ -205,14 +213,40 @@ export class OneVOneScene extends Scene {
     this.tryStartMusic();
   }
 
+  private playEntranceAnimation() {
+    logger.game.debug("[OneVOneScene] Playing entrance animation");
+
+    const participants = Array.from(this.playerManager.getParticipants().values());
+
+    // Play run animation for both players towards center
+    participants.forEach((participant) => {
+      const runAnimKey = `${participant.characterKey}-run`;
+      if (this.anims.exists(runAnimKey)) {
+        participant.sprite.play(runAnimKey);
+      }
+
+      // Shake screen when they start charging
+      this.cameras.main.shake(200, 0.01);
+    });
+
+    // Play a dramatic sound effect
+    SoundManager.playInsertCoin(this, 0.6);
+  }
+
   private runBattle() {
     logger.game.debug("[OneVOneScene] Running battle animation");
 
-    // Use AnimationManager's battle sequence
-    this.animationManager.startBattlePhaseSequence(this.playerManager);
+    // Move participants to center for combat
+    this.playerManager.moveParticipantsToCenter();
 
-    // After battle phase (~3-4 seconds), show results
-    this.time.delayedCall(3500, () => {
+    // Use AnimationManager's comprehensive battle sequence
+    this.animationManager.startBattlePhaseSequence(this.playerManager, () => {
+      // Battle phase complete callback
+      logger.game.debug("[OneVOneScene] Battle phase sequence complete");
+    });
+
+    // After battle phase (~4 seconds), show results
+    this.time.delayedCall(4500, () => {
       this.showResults();
     });
   }
@@ -228,12 +262,12 @@ export class OneVOneScene extends Scene {
     // Hide battle text
     this.battleText.setVisible(false);
 
-    // Determine winner and loser participants
-    const players = this.playerManager.getParticipants();
+    // Find the winner participant
+    const players = Array.from(this.playerManager.getParticipants().values());
     let winnerParticipant: any = null;
 
     // Find the winner based on wallet address
-    players.forEach((participant: any) => {
+    players.forEach((participant) => {
       if (
         (participant.playerId === this.fightData!.playerA &&
           this.fightData!.playerA === this.fightData!.winner) ||
@@ -245,27 +279,39 @@ export class OneVOneScene extends Scene {
     });
 
     if (winnerParticipant) {
-      logger.game.debug("[OneVOneScene] Winner found:", (winnerParticipant as any).playerId);
+      logger.game.debug("[OneVOneScene] Winner found:", winnerParticipant.playerId);
 
-      // Show result animation
-      this.animationManager.startResultsPhaseSequence(this.playerManager, winnerParticipant);
+      // Use AnimationManager's comprehensive results phase sequence
+      // This handles: elimination marks, explosions, blood, winner celebration, confetti
+      this.animationManager.startResultsPhaseSequence(
+        this.playerManager,
+        winnerParticipant,
+        () => {
+          logger.game.debug(
+            "[OneVOneScene] Results phase complete, emitting completion event"
+          );
 
-      // Show result text
+          // Emit completion event to React component
+          this.time.delayedCall(1000, () => {
+            logger.game.debug("[OneVOneScene] 1v1 fight completed, emitting completion event");
+            EventBus.emit("1v1-complete");
+
+            // Clean up
+            this.cleanup();
+          });
+        }
+      );
+
+      // Show result text with winner info (shorter text for 1v1)
       this.resultText.setVisible(true);
       this.resultText.setText("🎉 Victory!");
-
-      // After celebration (~5 seconds), emit completion event
-      this.time.delayedCall(5000, () => {
-        logger.game.debug("[OneVOneScene] 1v1 fight completed, emitting completion event");
-        EventBus.emit("1v1-complete");
-
-        // Clean up
-        this.cleanup();
-      });
     } else {
       logger.game.error("[OneVOneScene] Could not determine winner");
       // Still emit completion but with error
-      this.time.delayedCall(2000, () => {
+      this.resultText.setVisible(true);
+      this.resultText.setText("Fight Complete");
+
+      this.time.delayedCall(3000, () => {
         EventBus.emit("1v1-complete");
         this.cleanup();
       });

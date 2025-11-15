@@ -87,16 +87,24 @@ export function OneVOneFightScene({
 
   return (
     <div className="w-full">
+      {/* Header: Status and Fight Info */}
+      <div className="mb-4 text-center">
+        <h2 className="text-2xl font-bold text-indigo-400 mb-1">1v1 Coinflip Battle</h2>
+        <p className="text-xs text-gray-400">
+          Lobby #{lobby.lobbyId} • {lobby.status === 0 ? "Pending..." : "Fighting..."}
+        </p>
+      </div>
+
       {/* Phaser Game Container */}
       <div
         ref={containerRef}
         id="phaser-1v1-container"
-        className="w-full aspect-video bg-black border-2 border-indigo-500 rounded-lg overflow-hidden mb-6"
+        className="w-full aspect-video bg-black border-2 border-indigo-500 rounded-lg overflow-hidden mb-6 relative"
       >
         {!fightStarted && (
-          <div className="flex items-center justify-center w-full h-full">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
             <div className="text-center">
-              <p className="text-indigo-300 mb-2">Loading fight...</p>
+              <p className="text-indigo-300 mb-4 text-lg">Initializing Arena...</p>
               <div className="inline-block">
                 <div className="animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
               </div>
@@ -107,42 +115,93 @@ export function OneVOneFightScene({
 
       {/* Fight Result Message */}
       {fightResult && (
-        <div className="text-center mb-6">
-          <p className="text-3xl font-bold text-yellow-400">🎉 Fight Complete!</p>
-          <p className="text-indigo-200 mt-2">
-            Winner: {fightResult.winner.slice(0, 8)}...
+        <div className="bg-gradient-to-r from-yellow-900 to-orange-900 border-2 border-yellow-400 rounded-lg p-6 mb-6 text-center animate-pulse">
+          <p className="text-4xl font-bold text-yellow-300 mb-2">� VICTORY! 🏆</p>
+          <p className="text-indigo-200 mb-2">
+            Winner: <span className="font-mono text-yellow-400">{fightResult.winner.slice(0, 16)}...</span>
+          </p>
+          <p className="text-yellow-400 text-sm">
+            Prize Pool: {formatAmount(lobby.amount * 2 * 0.98)} SOL
           </p>
         </div>
       )}
 
-      {/* Lobby Info */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      {/* Player Battle Stats */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
         {/* Player A */}
-        <div className="bg-gray-900 border border-indigo-400/50 rounded-lg p-4">
-          <p className="text-xs text-indigo-400 mb-2">Player A</p>
-          <p className="text-indigo-200 font-mono text-sm mb-1">{lobby.playerA.slice(0, 12)}...</p>
-          <p className="text-xs text-gray-400">Character: {lobby.characterA}</p>
+        <div className={`rounded-lg p-4 transition-all ${
+          lobby.status === 1 && lobby.winner === lobby.playerA 
+            ? "bg-green-900/50 border-2 border-green-400" 
+            : "bg-gray-900 border border-indigo-400/50"
+        }`}>
+          <p className="text-xs text-indigo-400 mb-2 font-semibold">PLAYER A</p>
+          <p className="text-indigo-200 font-mono text-xs mb-2 break-all">{lobby.playerA.slice(0, 20)}...</p>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">Character:</span>
+            <span className="text-xs text-indigo-300 font-bold">#{lobby.characterA}</span>
+          </div>
+          <div className="flex items-center justify-between mt-1">
+            <span className="text-xs text-gray-400">Bet:</span>
+            <span className="text-xs text-yellow-400 font-bold">{formatAmount(lobby.amount)} SOL</span>
+          </div>
+          {lobby.status === 1 && lobby.winner === lobby.playerA && (
+            <p className="text-xs text-green-400 font-bold mt-2">✓ WINNER</p>
+          )}
         </div>
 
         {/* Player B */}
-        <div className="bg-gray-900 border border-indigo-400/50 rounded-lg p-4">
-          <p className="text-xs text-indigo-400 mb-2">Player B</p>
-          <p className="text-indigo-200 font-mono text-sm mb-1">
-            {lobby.playerB ? lobby.playerB.slice(0, 12) + "..." : "Waiting..."}
+        <div className={`rounded-lg p-4 transition-all ${
+          lobby.status === 1 && lobby.winner === lobby.playerB 
+            ? "bg-green-900/50 border-2 border-green-400" 
+            : "bg-gray-900 border border-indigo-400/50"
+        }`}>
+          <p className="text-xs text-indigo-400 mb-2 font-semibold">PLAYER B</p>
+          <p className="text-indigo-200 font-mono text-xs mb-2 break-all">
+            {lobby.playerB ? lobby.playerB.slice(0, 20) + "..." : "Waiting for opponent..."}
           </p>
-          <p className="text-xs text-gray-400">
-            Character: {lobby.characterB ?? "N/A"}
-          </p>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">Character:</span>
+            <span className="text-xs text-indigo-300 font-bold">
+              {lobby.characterB !== undefined ? `#${lobby.characterB}` : "TBD"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between mt-1">
+            <span className="text-xs text-gray-400">Bet:</span>
+            <span className="text-xs text-yellow-400 font-bold">{formatAmount(lobby.amount)} SOL</span>
+          </div>
+          {lobby.status === 1 && lobby.winner === lobby.playerB && (
+            <p className="text-xs text-green-400 font-bold mt-2">✓ WINNER</p>
+          )}
         </div>
       </div>
 
-      {/* Prize Info */}
-      <div className="bg-gray-900 border border-indigo-500/50 rounded-lg p-4 text-center">
-        <p className="text-indigo-400 text-sm mb-1">Pot</p>
-        <p className="text-2xl font-bold text-yellow-400">
-          {formatAmount(lobby.amount * 2)} SOL
-        </p>
-        <p className="text-xs text-gray-400 mt-2">House fee: 2% | Winner gets: {formatAmount(lobby.amount * 2 * 0.98)} SOL</p>
+      {/* Prize Pool Info */}
+      <div className="bg-gradient-to-r from-indigo-900 to-purple-900 border border-indigo-500/50 rounded-lg p-4 text-center">
+        <div className="grid grid-cols-3 gap-4">
+          {/* Total Pot */}
+          <div>
+            <p className="text-xs text-indigo-400 mb-1">TOTAL POT</p>
+            <p className="text-xl font-bold text-yellow-400">
+              {formatAmount(lobby.amount * 2)} SOL
+            </p>
+          </div>
+
+          {/* House Fee */}
+          <div>
+            <p className="text-xs text-indigo-400 mb-1">HOUSE FEE</p>
+            <p className="text-lg font-bold text-red-400">
+              {formatAmount(lobby.amount * 2 * 0.02)} SOL
+            </p>
+          </div>
+
+          {/* Winner Prize */}
+          <div>
+            <p className="text-xs text-indigo-400 mb-1">WINNER PRIZE</p>
+            <p className="text-lg font-bold text-green-400">
+              {formatAmount(lobby.amount * 2 * 0.98)} SOL
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
