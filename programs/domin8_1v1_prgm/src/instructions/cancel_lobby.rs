@@ -40,14 +40,7 @@ pub fn handler(
         lobby.amount,
         player_a.key()
     );
-
-    // Close the lobby PDA by transferring all lamports to Player A
-    let lobby_lamports = ctx.accounts.lobby.to_account_info().lamports();
-    if lobby_lamports > 0 {
-        **ctx.accounts.lobby.to_account_info().lamports.borrow_mut() -= lobby_lamports;
-        **player_a.lamports.borrow_mut() += lobby_lamports;
-        msg!("Refunded {} lamports to Player A", lobby_lamports);
-    }
+    msg!("Lobby account will be closed and rent refunded by Anchor");
 
     Ok(())
 }
@@ -56,6 +49,7 @@ pub fn handler(
 pub struct CancelLobby<'info> {
     #[account(
         mut,
+        close = player_a,
         owner = crate::ID,
     )]
     pub lobby: Account<'info, Domin81v1Lobby>,

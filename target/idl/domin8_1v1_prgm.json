@@ -225,6 +225,23 @@
         {
           "name": "amount",
           "type": "u64"
+        },
+        {
+          "name": "skin_a",
+          "type": "u8"
+        },
+        {
+          "name": "position_a",
+          "type": {
+            "array": [
+              "u16",
+              2
+            ]
+          }
+        },
+        {
+          "name": "map",
+          "type": "u8"
         }
       ]
     },
@@ -374,6 +391,19 @@
         {
           "name": "amount",
           "type": "u64"
+        },
+        {
+          "name": "skin_b",
+          "type": "u8"
+        },
+        {
+          "name": "position_b",
+          "type": {
+            "array": [
+              "u16",
+              2
+            ]
+          }
         }
       ]
     }

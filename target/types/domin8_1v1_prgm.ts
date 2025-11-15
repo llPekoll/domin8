@@ -231,6 +231,23 @@ export type Domin81v1Prgm = {
         {
           "name": "amount",
           "type": "u64"
+        },
+        {
+          "name": "skinA",
+          "type": "u8"
+        },
+        {
+          "name": "positionA",
+          "type": {
+            "array": [
+              "u16",
+              2
+            ]
+          }
+        },
+        {
+          "name": "map",
+          "type": "u8"
         }
       ]
     },
@@ -380,6 +397,19 @@ export type Domin81v1Prgm = {
         {
           "name": "amount",
           "type": "u64"
+        },
+        {
+          "name": "skinB",
+          "type": "u8"
+        },
+        {
+          "name": "positionB",
+          "type": {
+            "array": [
+              "u16",
+              2
+            ]
+          }
         }
       ]
     }

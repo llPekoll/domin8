@@ -147,13 +147,7 @@ pub fn handler(
         msg!("Transferred {} lamports to winner {}", prize, winner);
     }
 
-    // Close the lobby PDA by transferring remaining lamports (rent) to payer
-    let remaining_lamports = lobby.to_account_info().lamports();
-    if remaining_lamports > 0 {
-        **lobby.to_account_info().lamports.borrow_mut() = 0;
-        **ctx.accounts.payer.lamports.borrow_mut() += remaining_lamports;
-        msg!("Refunded {} lamports (rent) to payer", remaining_lamports);
-    }
+    msg!("Lobby {} closed, account will be closed by Anchor", lobby.lobby_id);
 
     Ok(())
 }
@@ -169,6 +163,7 @@ pub struct JoinLobby<'info> {
 
     #[account(
         mut,
+        close = payer,
         owner = crate::ID,
     )]
     pub lobby: Account<'info, Domin81v1Lobby>,
