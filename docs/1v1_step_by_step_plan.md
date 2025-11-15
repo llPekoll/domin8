@@ -34,20 +34,22 @@ This document breaks down the full 1v1 Coinflip feature into clear, reviewable p
 
 ---
 
-## Phase 3: Convex Backend Schema & Actions
+## Phase 3: Convex Backend Schema & Actions ✅ COMPLETE
 
-- Update `convex/schema.ts` to add `oneVOneLobbies` table (fields: lobbyId, lobbyPda, playerA, playerB, amount, status [0 or 1], winner, characterA, characterB)
-- Create `convex/lobbies.ts`:
-  - `createLobby` action (calls on-chain, then updates Convex **immediately** after tx confirmation)
-  - `joinLobby` action (calls on-chain, then updates Convex **immediately** after tx confirmation)
-  - `cancelLobby` action
-  - `getOpenLobbies` query (filters status == 0)
-  - `getLobbyState` query (single lobby polling)
-  - `settleStuckLobbies` internalAction (cron job, reconciles status 0 & 1 lobbies)
-  - `getStuckLobbies` internalQuery (finds lobbies with status 0 or 1 that may need sync)
-  - Helper mutations: `internalCreateLobby`, `internalJoinLobby`, `internalDeleteLobby`
-- **Key Detail:** Frontend Convex calls update DB immediately after transaction confirmation. Cron (every 30s) is a backup safety net
-- Add cron job to `convex/crons.ts`: runs `settleStuckLobbies` every 30 seconds
+- ✅ Update `convex/schema.ts` to add `oneVOneLobbies` table (fields: lobbyId, lobbyPda, playerA, playerB, amount, status [0 or 1], winner, characterA, characterB, mapId, createdAt)
+- ✅ Create `convex/lib/solana_1v1.ts`:
+  - ✅ `Solana1v1QueryClient` for read-only blockchain queries
+  - ✅ Loads `domin8_1v1_prgm` IDL automatically
+  - ✅ Helper methods: `getLobbyAccount()`, `getConfigAccount()`, `getNextLobbyId()`, `getLobbyPdaForId()`
+- ✅ Create `convex/lobbies.ts`:
+  - ✅ Queries: `getOpenLobbies`, `getLobbyState`, `getPlayerLobbies`
+  - ✅ Mutations: `createLobbyMutation`, `joinLobbyMutation`, `cancelLobbyMutation`, `updateLobbyStatusMutation`
+  - ✅ Actions: `createLobby`, `joinLobby`, `cancelLobby` (verify tx on-chain, return data)
+  - ✅ Internal queries: `getStuckLobbies`
+  - ✅ Internal mutations: `syncLobbyFromBlockchain`
+- ✅ Add cron job to `convex/crons.ts`: runs `syncLobbyFromBlockchain` every 30 seconds (ready to uncomment after API regeneration)
+- **Key Detail:** Frontend Convex actions verify transactions on-chain, return data, then frontend calls mutations to update DB (immediate sync). Cron (every 30s) is a backup safety net.
+- ✅ Create `docs/PHASE_3_IMPLEMENTATION.md` with comprehensive documentation
 
 ---
 
