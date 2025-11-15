@@ -1,0 +1,691 @@
+{
+  "address": "11111111111111111111111111111111",
+  "metadata": {
+    "name": "domin8_1v1_prgm",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "cancel_lobby",
+      "docs": [
+        "Cancel a 1v1 lobby (Player A refunds if status = created)"
+      ],
+      "discriminator": [
+        241,
+        47,
+        118,
+        95,
+        81,
+        67,
+        137,
+        13
+      ],
+      "accounts": [
+        {
+          "name": "lobby",
+          "writable": true
+        },
+        {
+          "name": "player_a",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_lobby",
+      "docs": [
+        "Create a new 1v1 lobby (Player A creates, funds it, requests VRF)"
+      ],
+      "discriminator": [
+        116,
+        55,
+        74,
+        48,
+        40,
+        51,
+        135,
+        155
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  49,
+                  118,
+                  49,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "lobby",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  49,
+                  118,
+                  49,
+                  95,
+                  108,
+                  111,
+                  98,
+                  98,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config.lobby_count",
+                "account": "Domin81v1Config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player_a",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vrf_randomness",
+          "writable": true
+        },
+        {
+          "name": "vrf_treasury",
+          "writable": true
+        },
+        {
+          "name": "vrf_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  97,
+                  111,
+                  45,
+                  118,
+                  114,
+                  102,
+                  45,
+                  110,
+                  101,
+                  116,
+                  119,
+                  111,
+                  114,
+                  107,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103,
+                  117,
+                  114,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                7,
+                71,
+                177,
+                26,
+                250,
+                145,
+                180,
+                209,
+                249,
+                34,
+                242,
+                123,
+                14,
+                186,
+                193,
+                218,
+                178,
+                59,
+                33,
+                41,
+                164,
+                190,
+                243,
+                79,
+                50,
+                164,
+                123,
+                88,
+                245,
+                206,
+                252,
+                120
+              ]
+            }
+          }
+        },
+        {
+          "name": "vrf_program",
+          "address": "VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_config",
+      "docs": [
+        "Initialize the global configuration account"
+      ],
+      "discriminator": [
+        208,
+        127,
+        21,
+        1,
+        194,
+        190,
+        196,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  49,
+                  118,
+                  49,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "treasury"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "house_fee_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "join_lobby",
+      "docs": [
+        "Join an existing 1v1 lobby (Player B joins, funds it, resolves game)"
+      ],
+      "discriminator": [
+        127,
+        102,
+        119,
+        190,
+        215,
+        223,
+        212,
+        159
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  49,
+                  118,
+                  49,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "lobby",
+          "writable": true
+        },
+        {
+          "name": "player_a",
+          "writable": true
+        },
+        {
+          "name": "player_b",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vrf_randomness"
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Domin81v1Config",
+      "discriminator": [
+        171,
+        136,
+        42,
+        50,
+        175,
+        187,
+        107,
+        140
+      ]
+    },
+    {
+      "name": "Domin81v1Lobby",
+      "discriminator": [
+        14,
+        128,
+        181,
+        20,
+        193,
+        94,
+        51,
+        199
+      ]
+    },
+    {
+      "name": "NetworkState",
+      "discriminator": [
+        212,
+        237,
+        148,
+        56,
+        97,
+        245,
+        51,
+        169
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "LobbyNotFound",
+      "msg": "Lobby not found or invalid PDA"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidLobbyStatus",
+      "msg": "Lobby is not in the correct status"
+    },
+    {
+      "code": 6002,
+      "name": "UnauthorizedCancellation",
+      "msg": "Unauthorized: only player A can cancel"
+    },
+    {
+      "code": 6003,
+      "name": "UnauthorizedJoin",
+      "msg": "Unauthorized: only player B can join"
+    },
+    {
+      "code": 6004,
+      "name": "AlreadyJoined",
+      "msg": "Lobby is already joined by a second player"
+    },
+    {
+      "code": 6005,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds for bet"
+    },
+    {
+      "code": 6006,
+      "name": "RandomnessNotReady",
+      "msg": "VRF randomness not yet fulfilled"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidBetAmount",
+      "msg": "Invalid bet amount"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidHouseFee",
+      "msg": "House fee configuration error"
+    },
+    {
+      "code": 6009,
+      "name": "WinnerDeterminationError",
+      "msg": "Unable to determine winner from randomness"
+    },
+    {
+      "code": 6010,
+      "name": "DistributionError",
+      "msg": "Fund distribution failed"
+    }
+  ],
+  "types": [
+    {
+      "name": "Domin81v1Config",
+      "docs": [
+        "Global configuration account for the 1v1 program"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "house_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "lobby_count",
+            "type": "u64"
+          },
+          {
+            "name": "force",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Domin81v1Lobby",
+      "docs": [
+        "A single 1v1 lobby (coinflip game)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "lobby_id",
+            "type": "u64"
+          },
+          {
+            "name": "player_a",
+            "type": "pubkey"
+          },
+          {
+            "name": "player_b",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "vrf_force",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "winner",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "skin_a",
+            "type": "u8"
+          },
+          {
+            "name": "skin_b",
+            "type": {
+              "option": "u8"
+            }
+          },
+          {
+            "name": "position_a",
+            "type": {
+              "array": [
+                "u16",
+                2
+              ]
+            }
+          },
+          {
+            "name": "position_b",
+            "type": {
+              "option": {
+                "array": [
+                  "u16",
+                  2
+                ]
+              }
+            }
+          },
+          {
+            "name": "map",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NetworkConfiguration",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "request_fee",
+            "type": "u64"
+          },
+          {
+            "name": "fulfillment_authorities",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "token_fee_config",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "OraoTokenFeeConfig"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "NetworkState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "NetworkConfiguration"
+              }
+            }
+          },
+          {
+            "name": "num_received",
+            "docs": [
+              "Total number of received requests."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OraoTokenFeeConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "docs": [
+              "ORAO token mint address."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "docs": [
+              "ORAO token treasury account."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "fee",
+            "docs": [
+              "Fee in ORAO SPL token smallest units."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}
