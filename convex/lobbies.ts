@@ -342,7 +342,7 @@ export const createLobby = action({
     mapId: v.number(), // Map ID (0-255)
     transactionHash: v.string(), // Solana transaction hash (for verification)
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; lobbyPda: string; action: string }> => {
     try {
       // Get RPC endpoint from environment
       const rpcEndpoint = process.env.SOLANA_RPC_URL || "http://localhost:8899";
@@ -402,7 +402,7 @@ export const joinLobby = action({
     characterB: v.number(), // Character/skin ID (0-255)
     transactionHash: v.string(), // Solana transaction hash (for verification)
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; winner: string; action: string }> => {
     try {
       const rpcEndpoint = process.env.SOLANA_RPC_URL || "http://localhost:8899";
       const queryClient = new Solana1v1QueryClient(rpcEndpoint);
@@ -459,7 +459,7 @@ export const cancelLobby = action({
     lobbyId: v.number(),
     transactionHash: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; action: string }> => {
     try {
       const rpcEndpoint = process.env.SOLANA_RPC_URL || "http://localhost:8899";
       const queryClient = new Solana1v1QueryClient(rpcEndpoint);
@@ -525,13 +525,13 @@ export const _getOpenLobbiesForSync = internalQuery({
  */
 export const syncLobbyFromBlockchain = internalAction({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{ checked: number; synced: number; errors: number; fatalError?: string }> => {
     try {
       const rpcEndpoint = process.env.SOLANA_RPC_URL || "http://localhost:8899";
       const queryClient = new Solana1v1QueryClient(rpcEndpoint);
 
       // Get all open lobbies from Convex (waiting for Player B)
-      const openLobbies = await ctx.runQuery(internal.lobbies._getOpenLobbiesForSync);
+      const openLobbies = await ctx.runQuery(internal.lobbies._getOpenLobbiesForSync) as any[];
 
       console.log(`[1v1 Cron] Syncing ${openLobbies.length} open lobbies from blockchain`);
 
