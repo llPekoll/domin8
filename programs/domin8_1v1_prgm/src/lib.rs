@@ -1,0 +1,32 @@
+use anchor_lang::prelude::*;
+
+mod error;
+mod state;
+mod instructions;
+
+pub use error::*;
+pub use state::*;
+pub use instructions::*;
+
+declare_id!("11111111111111111111111111111111"); // TODO: Generate actual program ID
+
+#[program]
+pub mod domin8_1v1_prgm {
+    use super::*;
+
+    /// Initialize the global configuration account
+    pub fn initialize_config(
+        ctx: Context<InitializeConfig>,
+        house_fee_bps: u16,
+    ) -> Result<()> {
+        instructions::initialize_config::handler(ctx, house_fee_bps)
+    }
+
+    /// Create a new 1v1 lobby (Player A creates, funds it, requests VRF)
+    pub fn create_lobby(
+        ctx: Context<CreateLobby>,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::create_lobby::handler(ctx, amount)
+    }
+}

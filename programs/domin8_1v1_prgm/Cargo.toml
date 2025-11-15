@@ -1,0 +1,19 @@
+[package]
+name = "domin8_1v1_prgm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+anchor-lang = "0.29"
+anchor-spl = "0.29"
+orao-solana-vrf = "0.2"
+solana-program = "1.18"
+spl-token = "3.5"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

@@ -41,13 +41,14 @@ We will build a new, parallel system that co-exists with the current jackpot gam
 4. On-Chain (Solana): The create\_lobby instruction:  
    a. Increments the global Config's lobby\_count.  
    b. Creates a new Lobby PDA seeded by \[b"lobby", lobby\_count\].  
-   c. Requests ORAO VRF using a new vrf\_force seed.  
-   d. Saves all data to the Lobby account (player\_a, amount, vrf\_force, status \= WAITING).  
-   e. Transfers amount SOL from Player A into the new Lobby PDA.  
+   c. Generates a unique vrf\_force seed derived from lobby\_id: `hash(b"1v1_lobby_vrf" || lobby\_id.to\_le\_bytes())` to ensure each lobby has its own VRF randomness account.  
+   d. Requests ORAO VRF using this unique vrf\_force seed.  
+   e. Saves all data to the Lobby account (player\_a, amount, vrf\_force, status \= **0**).  
+   f. Transfers amount SOL from Player A into the new Lobby PDA.  
 5. Backend (Convex):  
    a. The createLobby action confirms the transaction.  
    b. It then calls ctx.runMutation(internal.lobbies.internalCreateLobby, ...).  
-   c. This mutation adds a new document to the oneVOneLobbies table in Convex, mirroring the on-chain state (lobbyId, playerA, amount, characterA, status \= "waiting\_for\_player").  
+   c. This mutation adds a new document to the oneVOneLobbies table in Convex, mirroring the on-chain state (lobbyId, playerA, amount, characterA, status \= **0**).  
 6. **Frontend (React):** The LobbyList component, which is running useQuery(api.lobbies.getOpenLobbies), instantly updates and shows Player A's new lobby to all other players.
 
 ### **Workflow B: Player B Joins a Lobby & Game Settles**
@@ -60,36 +61,23 @@ We will build a new, parallel system that co-exists with the current jackpot gam
 4. On-Chain (Solana): The join\_lobby instruction:  
    a. Transfers amount SOL from Player B into the Lobby PDA (which now holds 2x the amount).  
    b. Sets lobby.player\_b to Player B's wallet.  
-   c. Sets lobby.status \= JOINED (i.e., "waiting for randomness").  
+   c. **Reads ORAO VRF randomness and determines winner immediately (randomness % 2).**  
+   d. **Pays house fee to treasury, transfers full prize to winner.**  
+   e. **Closes Lobby PDA and sets lobby.status = 1 (resolved).**  
 5. Backend (Convex):  
    a. The joinLobby action confirms the transaction.  
-   b. It calls ctx.runMutation(internal.lobbies.internalJoinLobby, ...), which updates the Convex lobby document with playerB, characterB, and status \= "waiting\_for\_randomness".  
-   c. It finally schedules the internal.lobbies.settleLobby internal action to run immediately.  
+   b. It calls ctx.runMutation(internal.lobbies.internalJoinLobby, ...), which updates the Convex lobby document with playerB, characterB, winner, and status = **1** (resolved).  
+   c. The update is performed immediately after transaction confirmation, ensuring fast sync.  
 6. Frontend (React):  
    a. Player B's onLobbyJoined() callback is triggered, setting the fightingLobbyId in the OneVOnePage.  
    b. The page re-renders, hiding the LobbyList and showing the OneVOneFightScene component.  
-   c. OneVOneFightScene now polls useQuery(api.lobbies.getLobbyState, { lobbyId }). It sees status \= "waiting\_for\_randomness" and displays a "Waiting for VRF..." message.  
-7. Backend (Convex \- Crank):  
-   a. The settleLobby internal action starts.  
-   b. It enters a polling loop (e.g., every 2 seconds). In each loop, it calls solanaClient.settleLobby(lobbyPda).  
-   c. The solanaClient.settleLobby function sends the on-chain settle\_lobby transaction.  
-8. On-Chain (Solana \- Crank):  
-   a. The settle\_lobby instruction reads the ORAO VRF account.  
-   b. If not fulfilled: The instruction fails with LobbyError::RandomnessNotReady. The Convex settleLobby action catches this error and continues polling.  
-   c. If fulfilled: The instruction succeeds. It reads the randomness, determines the winner (randomness % 2), pays the house fee to treasury, pays the full prize to the winner, and closes the Lobby PDA, refunding the rent to the crank.  
-9. Backend (Convex \- Crank):  
-   a. The solanaClient.settleLobby call succeeds and returns the winner's Pubkey.  
-   b. The settleLobby action confirms the transaction.  
-   c. It calls ctx.runMutation(internal.lobbies.internalSettleLobby, ...), updating the Convex document with winner and status \= "settled".  
-10. Frontend (React):  
-    a. Player B's useQuery hook re-runs. It now sees status \= "settled" and has the winner.  
-    b. The OneVOneFightScene component passes this data to the Phaser scene (scene.startFight(...)).  
-11. Frontend (Phaser):  
-    a. The OneVOneScene.ts spawns both characters (Player A left, Player B right).  
-    b. It runs the fight animation (startBattlePhaseSequence).  
-    c. It runs the result animation (startResultsPhaseSequence), exploding the loser and celebrating the winner.  
-    d. After \~9 seconds, it emits EventBus.emit("1v1-complete").  
-12. **Frontend (React):** The OneVOneFightScene wrapper hears the event, calls onFightComplete(), which sets fightingLobbyId to null. The page re-renders, showing the LobbyList again.
+   c. OneVOneFightScene polls useQuery(api.lobbies.getLobbyState, { lobbyId }). It sees status = **1** and the winner, then immediately calls scene.startFight(data).  
+7. Frontend (Phaser):  
+   a. The OneVOneScene.ts spawns both characters (Player A left, Player B right).  
+   b. It runs the fight animation (startBattlePhaseSequence).  
+   c. It runs the result animation (startResultsPhaseSequence), exploding the loser and celebrating the winner.  
+   d. After \~9 seconds, it emits EventBus.emit("1v1-complete").  
+8. **Frontend (React):** The OneVOneFightScene wrapper hears the event, calls onFightComplete(), which sets fightingLobbyId to null. The page re-renders, showing the LobbyList again.
 
 ## **3\. Implementation Details**
 
@@ -101,16 +89,18 @@ We will create a new directory programs/domin8\_1v1\_prgm.
   * Will be similar to domin8\_prgm, including anchor-lang and orao-solana-vrf.  
 * **src/lib.rs:**  
   * Will define the new program ID.  
-  * Will contain the 5 new instructions:  
+  * Will contain 4 new instructions:  
     1. initialize\_config(ctx, house\_fee): Admin-only. Creates the Config PDA.  
     2. create\_lobby(ctx, amount): Player A. Creates Lobby PDA, funds it, and requests VRF.  
-    3. join\_lobby(ctx): Player B. Funds Lobby PDA, sets player\_b and status.  
-    4. settle\_lobby(ctx): Crank-only. Reads VRF, determines winner, pays winner & treasury, closes Lobby PDA.  
-    5. cancel\_lobby(ctx): Player A-only. Closes Lobby PDA and refunds Player A if status is still WAITING.  
+    3. join\_lobby(ctx): Player B. Funds Lobby PDA, sets player\_b, reads VRF, determines winner, distributes funds, closes account, and sets status = 1.  
+    4. cancel\_lobby(ctx): Player A-only. Closes Lobby PDA and refunds Player A if status is still 0.  
 * **src/state.rs:**  
   * Config account struct (admin, treasury, house\_fee, lobby\_count).  
   * Lobby account struct (lobby\_id, player\_a, player\_b, amount, vrf\_force, status, winner).  
-  * Constants for LOBBY\_STATUS\_....  
+  * **Status field is an integer:**
+    * 0 = Created, waiting for second player
+    * 1 = Resolved (both players joined, winner determined, funds distributed)
+  * **VRF Force Derivation:** Each lobby's vrf\_force is derived from lobby\_id: `hash(b"1v1_lobby_vrf" || lobby\_id.to\_le\_bytes())` to ensure unique randomness accounts.
 * **src/error.rs:**  
   * LobbyError::AlreadyJoined, LobbyError::NotReadyToSettle, LobbyError::RandomnessNotReady.
 
@@ -119,18 +109,16 @@ We will create a new directory programs/domin8\_1v1\_prgm.
 * **schema.ts (Modify):**  
   * Add the new oneVOneLobbies table as detailed in the workflow. It must include lobbyId, lobbyPda, playerA, playerB, amount, status, winner, characterA, characterB.  
 * **lobbies.ts (New File):**  
-  * getOpenLobbies: query that returns oneVOneLobbies where status \== "waiting\_for\_player".  
+  * getOpenLobbies: query that returns oneVOneLobbies where status == **0** (waiting for second player).  
   * getLobbyState: query that takes lobbyId and returns the specific lobby document. Used for polling by the fight scene.  
-  * createLobby: action (see workflow).  
-  * joinLobby: action (see workflow).  
+  * createLobby: action (see workflow; updates Convex immediately after transaction confirmation).  
+  * joinLobby: action (see workflow; updates Convex immediately after transaction confirmation).  
   * cancelLobby: action (see workflow).  
-  * settleLobby: internalAction (see workflow, this is the crank).  
-  * settleStuckLobbies: internalAction (cron job, see below).  
+  * settleStuckLobbies: internalAction (cron job, see below; runs every 30 seconds as a safety net).  
   * internalCreateLobby: internalMutation to insert a new lobby.  
-  * internalJoinLobby: internalMutation to update a lobby with Player B.  
-  * internalSettleLobby: internalMutation to update a lobby with the winner.  
+  * internalJoinLobby: internalMutation to update a lobby with Player B and winner.  
   * internalDeleteLobby: internalMutation to delete a lobby (on cancel).  
-  * getStuckLobbies: internalQuery that finds lobbies with status \== "waiting\_for\_randomness" to be checked by the cron.  
+  * getStuckLobbies: internalQuery that finds lobbies with status == 0 or 1 to be reconciled by the cron.  
 * **lib/solana\_1v1.ts (New File):**  
   * This will be a helper class, similar to lib/solana.ts.  
   * It will load the new domin8\_1v1\_prgm.json IDL and use the new Program ID.  
