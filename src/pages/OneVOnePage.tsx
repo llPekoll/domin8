@@ -5,9 +5,9 @@ import { CreateLobby } from "../components/onevone/CreateLobby";
 import { LobbyList } from "../components/onevone/LobbyList";
 import { OneVOneFightScene } from "../components/onevone/OneVOneFightScene";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import type { Character } from "../types/character";
-// import { useQuery } from "convex/react";
-// import { api } from "../../convex/_generated/api";
 
 interface LobbyData {
   _id: string;
@@ -33,17 +33,12 @@ export function OneVOnePage() {
   const [fightingLobbyId, setFightingLobbyId] = useState<number | null>(null);
   
   // Get open lobbies from Convex (real-time updates)
-  // TODO: Uncomment after Convex API is regenerated
-  // const openLobbies = useQuery(api.lobbies.getOpenLobbies) || [];
-  const openLobbies: LobbyData[] = [];
+  const openLobbies = useQuery(api.lobbies.getOpenLobbies) || [];
   
   // Get specific lobby state when fighting (for real-time updates during fight)
-  // TODO: Uncomment after Convex API is regenerated
-  // const lobbyState = useQuery(
-  //   fightingLobbyId !== null ? api.lobbies.getLobbyState : "skip",
-  //   fightingLobbyId !== null ? { lobbyId: fightingLobbyId } : "skip"
-  // );
-  const lobbyState = null;
+  const lobbyState = fightingLobbyId !== null 
+    ? useQuery(api.lobbies.getLobbyState, { lobbyId: fightingLobbyId })
+    : null;
 
   const handleCharacterSelected = useCallback((character: Character | null) => {
     setSelectedCharacter(character);

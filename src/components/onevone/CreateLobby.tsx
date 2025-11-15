@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { usePrivyWallet } from "../../hooks/usePrivyWallet";
-import { useSignTransaction } from "@privy-io/react-auth/solana";
+import { useAction } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { logger } from "../../lib/logger";
 import type { Character } from "../../types/character";
@@ -13,14 +14,11 @@ interface CreateLobbyProps {
 const DEFAULT_BET_AMOUNT_SOL = 0.01;
 
 export function CreateLobby({ selectedCharacter, onLobbyCreated }: CreateLobbyProps) {
-  const { connected, publicKey } = usePrivyWallet();
-  const signTransaction = useSignTransaction();
+  const { connected, publicKey, wallet } = usePrivyWallet();
+  const createLobbyAction = useAction(api.lobbies.createLobby);
 
   const [betAmount, setBetAmount] = useState<number>(DEFAULT_BET_AMOUNT_SOL);
   const [isLoading, setIsLoading] = useState(false);
-
-  // TODO: Uncomment after Convex API is regenerated
-  // const createLobby = useAction(api.lobbies.createLobby);
 
   const handleAmountChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,7 +31,7 @@ export function CreateLobby({ selectedCharacter, onLobbyCreated }: CreateLobbyPr
   );
 
   const handleCreateLobby = useCallback(async () => {
-    if (!connected || !publicKey || !selectedCharacter) {
+    if (!connected || !publicKey || !selectedCharacter || !wallet) {
       toast.error("Please connect wallet and select a character");
       return;
     }
@@ -45,33 +43,121 @@ export function CreateLobby({ selectedCharacter, onLobbyCreated }: CreateLobbyPr
 
     setIsLoading(true);
     try {
-      // TODO: Implement actual transaction creation and signing
-      // For now, just show a toast
-      toast.info("Create lobby functionality coming soon", {
-        description: "Waiting for on-chain program integration",
+      // Import utilities
+      const { getSharedConnection } = await import("../../lib/sharedConnection");
+      const {
+        buildCreateLobbyTransactionOptimized,
+        sendOptimizedTransaction,
+        waitForConfirmationOptimized,
+      } = await import("../../lib/solana-1v1-transactions-helius");
+
+      const connection = getSharedConnection();
+      const betAmountLamports = Math.floor(betAmount * 1e9); // Convert SOL to lamports
+
+      logger.ui.info("Building optimized create_lobby transaction", {
+        playerA: publicKey.toString(),
+        amount: betAmountLamports,
+        character: selectedCharacter.id,
       });
 
-      logger.ui.info("CreateLobby: Placeholder implementation", {
-        character: selectedCharacter.name,
-        amount: betAmount,
-        wallet: publicKey?.toString(),
+      // Build optimized transaction with Helius best practices
+      const { transaction, metrics } = await buildCreateLobbyTransactionOptimized(
+        publicKey,
+        betAmountLamports,
+        selectedCharacter.id,
+        0, // Default map ID
+        connection
+      );
+
+      // Store the block height for later validation
+      const { blockhash: _, lastValidBlockHeight } =
+        await connection.getLatestBlockhash("confirmed");
+
+      logger.ui.info("Transaction optimization metrics", {
+        computeUnits: metrics.optimizedCU,
+        priorityFee: metrics.priorityFee,
+        estimatedCost: (metrics.estimatedCost / 1e9).toFixed(6) + " SOL",
       });
 
-      // Example flow (to be implemented):
-      // 1. Build create_lobby transaction on-chain
-      // 2. Sign transaction with wallet
-      // 3. Send transaction
-      // 4. Wait for confirmation
-      // 5. Call Convex action with transaction hash
-      // 6. Call onLobbyCreated with lobby ID
-      // onLobbyCreated?.(lobbyId);
+      logger.ui.debug("Signing and sending optimized transaction with Privy wallet");
+
+      // Send with Helius optimizations (retry logic, blockhash checking)
+      const network = import.meta.env.VITE_SOLANA_NETWORK || "mainnet-beta";
+      const signature = await sendOptimizedTransaction(
+        connection,
+        transaction,
+        publicKey,
+        wallet,
+        lastValidBlockHeight,
+        network
+      );
+
+      logger.ui.info("Optimized transaction sent", {
+        signature: signature.slice(0, 8) + "...",
+      });
+      toast.loading("Waiting for transaction confirmation...", { id: "tx-confirm" });
+
+      // Wait for confirmation with Helius polling
+      const isConfirmed = await waitForConfirmationOptimized(
+        connection,
+        signature,
+        lastValidBlockHeight
+      );
+
+      if (!isConfirmed) {
+        toast.error("Transaction confirmation timeout", { id: "tx-confirm" });
+        logger.ui.error("Transaction confirmation timed out", { signature });
+        return;
+      }
+
+      toast.success("Transaction confirmed!", { id: "tx-confirm" });
+      logger.ui.info("Transaction confirmed on blockchain", { signature });
+
+      // Call Convex action to create lobby in database
+      logger.ui.debug("Calling Convex action to create lobby in database");
+
+      const result = await createLobbyAction({
+        playerAWallet: publicKey.toString(),
+        amount: betAmountLamports,
+        characterA: selectedCharacter.id,
+        mapId: 0,
+        transactionHash: signature,
+      });
+
+      if (result.success) {
+        logger.ui.info("Lobby created successfully", {
+          lobbyId: result.lobbyId,
+          lobbyPda: result.lobbyPda,
+        });
+
+        toast.success(`Lobby #${result.lobbyId} created! Waiting for Player B...`, {
+          duration: 5000,
+        });
+
+        // Callback to parent component
+        onLobbyCreated?.(result.lobbyId);
+      } else {
+        toast.error("Failed to create lobby in database");
+        logger.ui.error("Convex action failed");
+      }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
       logger.ui.error("Failed to create lobby:", error);
-      toast.error("Failed to create lobby");
+
+      // Provide user-friendly error messages
+      if (errorMsg.includes("User rejected")) {
+        toast.error("Transaction rejected by user");
+      } else if (errorMsg.includes("confirmation timeout")) {
+        toast.error("Transaction confirmation timed out. Please check your wallet.");
+      } else if (errorMsg.includes("insufficient funds")) {
+        toast.error("Insufficient SOL for transaction fee and bet amount");
+      } else {
+        toast.error("Failed to create lobby: " + errorMsg);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [connected, publicKey, selectedCharacter, betAmount, signTransaction, onLobbyCreated]);
+  }, [connected, publicKey, wallet, selectedCharacter, betAmount, createLobbyAction, onLobbyCreated]);
 
   if (!connected || !publicKey) {
     return (

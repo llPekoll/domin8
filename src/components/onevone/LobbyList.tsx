@@ -1,5 +1,7 @@
 import { useState, useCallback } from "react";
 import { usePrivyWallet } from "../../hooks/usePrivyWallet";
+import { useAction } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { logger } from "../../lib/logger";
 import type { Character } from "../../types/character";
@@ -31,15 +33,13 @@ export function LobbyList({
   selectedCharacter,
   onLobbyJoined,
 }: LobbyListProps) {
-  const { connected } = usePrivyWallet();
+  const { connected, wallet } = usePrivyWallet();
+  const joinLobbyAction = useAction(api.lobbies.joinLobby);
   const [joiningLobbies, setJoiningLobbies] = useState<Set<number>>(new Set());
-
-  // TODO: Uncomment after Convex API is regenerated
-  // const joinLobby = useAction(api.lobbies.joinLobby);
 
   const handleJoinLobby = useCallback(
     async (lobby: LobbyData) => {
-      if (!connected || !selectedCharacter) {
+      if (!connected || !selectedCharacter || !wallet) {
         toast.error("Please connect wallet and select a character");
         return;
       }
@@ -52,27 +52,118 @@ export function LobbyList({
       setJoiningLobbies((prev) => new Set(prev).add(lobby.lobbyId));
 
       try {
-        // TODO: Implement actual join transaction
-        toast.info("Join lobby functionality coming soon", {
-          description: "Waiting for on-chain program integration",
-        });
+        // Import utilities
+        const { getSharedConnection } = await import("../../lib/sharedConnection");
+        const {
+          buildJoinLobbyTransactionOptimized,
+          sendOptimizedTransaction,
+          waitForConfirmationOptimized,
+        } = await import("../../lib/solana-1v1-transactions-helius");
+        const { PublicKey } = await import("@solana/web3.js");
 
-        logger.ui.info("LobbyList: Join placeholder", {
+        const connection = getSharedConnection();
+
+        logger.ui.info("Joining lobby", {
           lobbyId: lobby.lobbyId,
-          character: selectedCharacter.name,
+          playerB: currentPlayerWallet,
+          character: selectedCharacter.id,
         });
 
-        // Example flow (to be implemented):
-        // 1. Build join_lobby transaction on-chain
-        // 2. Sign transaction with wallet
-        // 3. Send transaction
-        // 4. Wait for confirmation
-        // 5. Call Convex action with transaction hash
-        // 6. Call onLobbyJoined with lobby ID
-        // onLobbyJoined?.(lobby.lobbyId);
+        // Build optimized join transaction with Helius best practices
+        const lobbyPda = new PublicKey(lobby.lobbyPda);
+        const { transaction, metrics } = await buildJoinLobbyTransactionOptimized(
+          new PublicKey(currentPlayerWallet),
+          lobby.lobbyId,
+          selectedCharacter.id,
+          lobbyPda,
+          connection
+        );
+
+        // Store the block height for later validation
+        const { blockhash: _, lastValidBlockHeight } =
+          await connection.getLatestBlockhash("confirmed");
+
+        logger.ui.info("Transaction optimization metrics", {
+          computeUnits: metrics.optimizedCU,
+          priorityFee: metrics.priorityFee,
+          estimatedCost: (metrics.estimatedCost / 1e9).toFixed(6) + " SOL",
+        });
+
+        logger.ui.debug("Signing and sending optimized join transaction with Privy wallet");
+
+        // Send with Helius optimizations (retry logic, blockhash checking)
+        const network = import.meta.env.VITE_SOLANA_NETWORK || "mainnet-beta";
+        const signature = await sendOptimizedTransaction(
+          connection,
+          transaction,
+          new PublicKey(currentPlayerWallet),
+          wallet,
+          lastValidBlockHeight,
+          network
+        );
+
+        logger.ui.info("Optimized join transaction sent", {
+          signature: signature.slice(0, 8) + "...",
+          lobbyId: lobby.lobbyId,
+        });
+        toast.loading("Waiting for transaction confirmation...", { id: "join-tx-confirm" });
+
+        // Wait for confirmation with Helius polling
+        const isConfirmed = await waitForConfirmationOptimized(
+          connection,
+          signature,
+          lastValidBlockHeight
+        );
+
+        if (!isConfirmed) {
+          toast.error("Transaction confirmation timeout", { id: "join-tx-confirm" });
+          logger.ui.error("Join transaction confirmation timed out", { signature });
+          return;
+        }
+
+        toast.success("Transaction confirmed!", { id: "join-tx-confirm" });
+        logger.ui.info("Join transaction confirmed on blockchain", { signature });
+
+        // Call Convex action to update lobby in database
+        logger.ui.debug("Calling Convex action to update lobby in database");
+
+        const result = await joinLobbyAction({
+          playerBWallet: currentPlayerWallet,
+          lobbyId: lobby.lobbyId,
+          characterB: selectedCharacter.id,
+          transactionHash: signature,
+        });
+
+        if (result.success) {
+          logger.ui.info("Lobby joined successfully", {
+            lobbyId: result.lobbyId,
+            winner: result.winner,
+          });
+
+          toast.success("You joined the lobby! Starting fight...", {
+            duration: 5000,
+          });
+
+          // Callback to parent component to start fight
+          onLobbyJoined?.(result.lobbyId);
+        } else {
+          toast.error("Failed to update lobby in database");
+          logger.ui.error("Convex action failed");
+        }
       } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
         logger.ui.error("Failed to join lobby:", error);
-        toast.error("Failed to join lobby");
+
+        // Provide user-friendly error messages
+        if (errorMsg.includes("User rejected")) {
+          toast.error("Transaction rejected by user");
+        } else if (errorMsg.includes("confirmation timeout")) {
+          toast.error("Transaction confirmation timed out. Please check your wallet.");
+        } else if (errorMsg.includes("insufficient funds")) {
+          toast.error("Insufficient SOL for transaction fee and bet amount");
+        } else {
+          toast.error("Failed to join lobby: " + errorMsg);
+        }
       } finally {
         setJoiningLobbies((prev) => {
           const next = new Set(prev);
@@ -81,7 +172,7 @@ export function LobbyList({
         });
       }
     },
-    [connected, selectedCharacter, currentPlayerWallet, onLobbyJoined]
+    [connected, wallet, selectedCharacter, currentPlayerWallet, onLobbyJoined, joinLobbyAction]
   );
 
   // Convert SOL from lamports for display

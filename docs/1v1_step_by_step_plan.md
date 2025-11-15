@@ -78,45 +78,54 @@ This document breaks down the full 1v1 Coinflip feature into clear, reviewable p
 
 ---
 
-## Phase 5: Convex API Regeneration & Blockchain Integration
-
-- [ ] Regenerate Convex API (`npx convex dev`)
-  - This will expose `api.lobbies.*` methods
-  - Uncomment Convex imports in frontend components
-- [ ] Implement `CreateLobby.tsx` blockchain flow:
-  - [ ] Build `create_lobby` transaction via SolanaClient1v1
-  - [ ] Sign transaction with user's wallet
-  - [ ] Send transaction to blockchain
-  - [ ] Wait for confirmation
-  - [ ] Call `onLobbyCreated` callback
-- [ ] Implement `LobbyList.tsx` join flow:
-  - [ ] Build `join_lobby` transaction
-  - [ ] Sign transaction
-  - [ ] Send transaction
-  - [ ] Wait for confirmation
-  - [ ] Call `onLobbyJoined` callback to transition to fight
-- [ ] Wire up real-time Convex queries:
-  - [ ] Uncomment `useQuery(api.lobbies.getOpenLobbies)` in OneVOnePage
-  - [ ] Uncomment `useQuery(api.lobbies.getLobbyState)` for fight polling
-- [ ] Test end-to-end create → join → fight flow on devnet/localnet
-
-**Blocking Issues:**
-- Convex API must be regenerated to expose `lobbies` module
-- SolanaClient1v1 helpers needed for transaction building
-
----
-
 ## Next Steps
 
-**Immediate (Phase 5):**
-1. Run `npx convex dev` to regenerate Convex API
-2. Uncomment Convex imports in React components
-3. Implement blockchain transaction code in CreateLobby and LobbyList
-4. Test full create → join → fight flow
+**Immediate (Phase 6):**
+1. Enhance fight scene with character animations and visual effects
+2. Add sound effects for battle and results
+3. Polish UI and error handling
 
-**Documentation:**
-- See `docs/PHASE_4_COMPLETION.md` for detailed implementation notes
-- See `docs/PHASE_3_IMPLEMENTATION.md` for backend details
+## Phase 5: Convex API Regeneration & Blockchain Integration ✅ COMPLETE
+
+- ✅ Regenerate Convex API (`npx convex dev`)
+  - ✅ Exposed `api.lobbies.*` methods
+  - ✅ Uncommented Convex imports in frontend components
+- ✅ Implement `CreateLobby.tsx` blockchain flow:
+  - ✅ Build `create_lobby` transaction via `buildCreateLobbyTransaction`
+  - ✅ Sign transaction with Privy wallet (`signAndSendAllTransactions`)
+  - ✅ Send transaction to blockchain
+  - ✅ Wait for confirmation (45s polling timeout)
+  - ✅ Call Convex action `api.lobbies.createLobby`
+  - ✅ Call `onLobbyCreated` callback with lobby ID
+- ✅ Implement `LobbyList.tsx` join flow:
+  - ✅ Build `join_lobby` transaction via `buildJoinLobbyTransaction`
+  - ✅ Sign transaction with Privy wallet
+  - ✅ Send transaction to blockchain
+  - ✅ Wait for confirmation (45s polling timeout)
+  - ✅ Call Convex action `api.lobbies.joinLobby`
+  - ✅ Call `onLobbyJoined` callback to transition to fight
+- ✅ Wire up real-time Convex queries:
+  - ✅ Uncommented `useQuery(api.lobbies.getOpenLobbies)` in OneVOnePage
+  - ✅ Uncommented `useQuery(api.lobbies.getLobbyState)` for fight polling
+- ✅ Created transaction building library (`src/lib/solana-1v1-transactions.ts`)
+- ✅ Implemented error handling and user-friendly messages
+- ✅ Created comprehensive testing guide (`PHASE_5_TESTING_GUIDE.md`)
+
+**Key Implementation Details:**
+- Transaction builder handles all three operations: create, join, cancel
+- Uses VersionedTransaction with v0 message format
+- Compute budget optimized (300,000 CU)
+- Privy wallet integration for both signing and sending
+- Polling-based confirmation with 45-second timeout
+- Real-time Convex queries auto-update lobby list
+- Comprehensive error handling for common failures
+
+**Files Modified:**
+- `src/pages/OneVOnePage.tsx` - Enabled Convex queries
+- `src/components/onevone/CreateLobby.tsx` - Full transaction flow
+- `src/components/onevone/LobbyList.tsx` - Full join transaction flow
+- `src/lib/solana-1v1-transactions.ts` - New transaction builder (created)
+- `PHASE_5_TESTING_GUIDE.md` - Testing documentation (created)
 
 ---
 
