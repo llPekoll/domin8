@@ -81,6 +81,24 @@ export function Header() {
                     {/* Divider */}
                     <div className="h-8 w-px bg-indigo-500/30"></div>
 
+                    {/* Points */}
+                    <div className="flex flex-col">
+                      <div className="text-xs text-indigo-400/80 leading-tight">Points</div>
+                      <div className="text-indigo-200 font-bold text-base flex items-center gap-1 leading-tight">
+                        {playerData ? (
+                          <>
+                            <span className="text-yellow-400">🏆</span>
+                            {(playerData.totalPoints ?? 0).toLocaleString()}
+                          </>
+                        ) : (
+                          <span className="text-sm">--</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="h-8 w-px bg-indigo-500/30"></div>
+
                     {/* Wallet Balance */}
                     <div className="flex flex-col">
                       <div className="text-xs text-indigo-400/80 leading-tight">Balance</div>
