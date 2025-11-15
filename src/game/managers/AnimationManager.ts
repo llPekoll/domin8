@@ -135,7 +135,7 @@ export class AnimationManager {
     createExplosion(1200);
   }
 
-  addWinnerCelebration(winnerParticipant: any) {
+  addWinnerCelebration() {
     // Play victory sound when winner celebration starts
     SoundManager.playVictory(this.scene, 0.6);
 
@@ -982,7 +982,7 @@ export class AnimationManager {
 
       // Add celebration animations (confetti, text, bounce)
       if (winnerParticipant) {
-        this.addWinnerCelebration(winnerParticipant);
+        this.addWinnerCelebration();
       }
       // Call onComplete callback if provided
       if (onComplete) {
