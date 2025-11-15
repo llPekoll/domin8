@@ -18,7 +18,8 @@ Cargo.lock
 /coverage
 /dist
 /out/
-target/rust-analyzer/
+/target/rust-analyzer/
+/target/flycheck0
 # production
 /build
 
