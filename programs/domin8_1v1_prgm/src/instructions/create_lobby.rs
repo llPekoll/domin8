@@ -1,6 +1,5 @@
+use crate::*;
 use anchor_lang::prelude::*;
-use crate::error::Domin81v1Error;
-use crate::state::*;
 use orao_solana_vrf::{
     cpi::accounts::RequestV2,
     program::OraoVrf,
@@ -28,13 +27,8 @@ pub fn handler(
         Domin81v1Error::InsufficientFunds
     );
 
-    // Generate VRF force from lobby_id using hash
-    // vrf_force = hash(b"1v1_lobby_vrf" || lobby_id.to_le_bytes())
-    let lobby_id = config.lobby_count;
-    let mut hasher = anchor_lang::solana_program::hash::Hasher::default();
-    hasher.hash(b"1v1_lobby_vrf");
-    hasher.hash(&lobby_id.to_le_bytes());
-    let vrf_force = hasher.result().to_bytes();
+    // Get force from config for VRF request
+    let force = config.force;
 
     // Request VRF randomness
     let vrf_cpi = CpiContext::new(
@@ -47,14 +41,15 @@ pub fn handler(
             system_program: ctx.accounts.system_program.to_account_info(),
         },
     );
-    orao_solana_vrf::cpi::request_v2(vrf_cpi, vrf_force)?;
+    orao_solana_vrf::cpi::request_v2(vrf_cpi, force)?;
 
     // Initialize the lobby
+    let lobby_id = config.lobby_count;
     lobby.lobby_id = lobby_id;
     lobby.player_a = player_a.key();
     lobby.player_b = None;
     lobby.amount = amount;
-    lobby.vrf_force = vrf_force;
+    lobby.vrf_force = force;
     lobby.status = LOBBY_STATUS_CREATED;
     lobby.winner = None;
     lobby.created_at = clock.unix_timestamp;
@@ -79,17 +74,9 @@ pub fn handler(
         player_a.key()
     );
     msg!("Bet amount: {} lamports", amount);
-    msg!("VRF force (hex): {}", format_vrf_force(&vrf_force));
+    msg!("VRF force (hex): {}", Utils::bytes_to_hex(&force));
 
     Ok(())
-}
-
-fn format_vrf_force(force: &[u8; 32]) -> String {
-    force
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<Vec<_>>()
-        .join("")
 }
 
 #[derive(Accounts)]
@@ -117,16 +104,23 @@ pub struct CreateLobby<'info> {
     #[account(mut)]
     pub player_a: Signer<'info>,
 
-    // ---- VRF Accounts ----
-    /// CHECK: ORAO VRF randomness account
-    #[account(mut)]
+    // ---- VRF accounts ----
+
+    /// CHECK: Orao randomness account
+    #[account(
+        mut,
+        seeds = [RANDOMNESS_ACCOUNT_SEED, &config.force],
+        bump,
+        seeds::program = ORAO_VRF_ID
+    )]
     pub vrf_randomness: AccountInfo<'info>,
 
-    /// CHECK: ORAO treasury
+    /// CHECK: Orao treasury (devnet/mainnet address), used by VRF CPI
     #[account(mut)]
     pub vrf_treasury: AccountInfo<'info>,
 
     #[account(
+        mut,
         seeds = [CONFIG_ACCOUNT_SEED],
         bump,
         seeds::program = ORAO_VRF_ID

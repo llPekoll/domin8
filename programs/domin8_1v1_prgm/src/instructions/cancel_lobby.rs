@@ -44,7 +44,7 @@ pub fn handler(
     // Close the lobby PDA by transferring all lamports to Player A
     let lobby_lamports = ctx.accounts.lobby.to_account_info().lamports();
     if lobby_lamports > 0 {
-        **ctx.accounts.lobby.to_account_info_mut().lamports.borrow_mut() = 0;
+        **ctx.accounts.lobby.to_account_info().lamports.borrow_mut() -= lobby_lamports;
         **player_a.lamports.borrow_mut() += lobby_lamports;
         msg!("Refunded {} lamports to Player A", lobby_lamports);
     }

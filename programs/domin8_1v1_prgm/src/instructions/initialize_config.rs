@@ -16,6 +16,7 @@ pub fn handler(
     config.treasury = ctx.accounts.treasury.key();
     config.house_fee_bps = house_fee_bps;
     config.lobby_count = 0;
+    config.force = [0u8; 32]; // Initialize with zero force, can be updated later
 
     msg!(
         "Domin8 1v1 initialized: admin={}, treasury={}, house_fee_bps={}",

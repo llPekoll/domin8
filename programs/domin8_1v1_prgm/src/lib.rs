@@ -3,10 +3,12 @@ use anchor_lang::prelude::*;
 mod error;
 mod state;
 mod instructions;
+mod utils;
 
 pub use error::*;
 pub use state::*;
 pub use instructions::*;
+pub use utils::*;
 
 declare_id!("11111111111111111111111111111111"); // TODO: Generate actual program ID
 

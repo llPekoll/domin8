@@ -1,16 +1,25 @@
 [package]
 name = "domin8_1v1_prgm"
 version = "0.1.0"
+description = "Created with Anchor"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
+name = "domin8_1v1_prgm"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+localnet = []  # Enable mock VRF for localnet testing
+
 
 [dependencies]
 anchor-lang = "0.31.1"
-orao-solana-vrf = { version = "0.5", default-features = false, features = ["cpi"] }
+orao-solana-vrf = { version = "0.6.1", default-features = false, features = ["cpi"] }
 
-[dev-dependencies]
-tokio = { version = "1", features = ["full"] }
-solana-program-test = "1.18"
-solana-sdk = "1.18"
+
