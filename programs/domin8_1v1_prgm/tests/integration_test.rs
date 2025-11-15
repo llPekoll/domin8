@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
-use solana_program_test::*;
+use anchor_lang::solana_program;
 use solana_sdk::{
     account::Account,
     instruction::InstructionError,

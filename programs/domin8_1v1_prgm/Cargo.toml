@@ -7,18 +7,10 @@ edition = "2021"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-anchor-lang = "0.29"
-anchor-spl = "0.29"
-orao-solana-vrf = "0.2"
-solana-program = "1.18"
-spl-token = "3.5"
+anchor-lang = "0.31.1"
+orao-solana-vrf = { version = "0.5", default-features = false, features = ["cpi"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
 solana-program-test = "1.18"
 solana-sdk = "1.18"
-
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
