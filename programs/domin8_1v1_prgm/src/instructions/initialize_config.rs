@@ -16,7 +16,6 @@ pub fn handler(
     config.treasury = ctx.accounts.treasury.key();
     config.house_fee_bps = house_fee_bps;
     config.lobby_count = 0;
-    config.bump = ctx.bumps.config;
 
     msg!(
         "Domin8 1v1 initialized: admin={}, treasury={}, house_fee_bps={}",

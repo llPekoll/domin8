@@ -11,11 +11,10 @@ pub struct Domin81v1Config {
     pub treasury: Pubkey,           // Treasury to receive house fees
     pub house_fee_bps: u16,         // House fee in basis points (100 = 1%)
     pub lobby_count: u64,           // Counter for next lobby ID
-    pub bump: u8,                   // PDA bump
 }
 
 impl Domin81v1Config {
-    pub const SPACE: usize = 8 + 32 + 32 + 2 + 8 + 1; // discriminator + fields
+    pub const SPACE: usize = 8 + 32 + 32 + 2 + 8; // discriminator + fields
 }
 
 /// A single 1v1 lobby (coinflip game)
@@ -28,7 +27,6 @@ pub struct Domin81v1Lobby {
     pub vrf_force: [u8; 32],        // VRF force bytes (derived from lobby_id)
     pub status: u8,                 // 0 = created, 1 = resolved
     pub winner: Option<Pubkey>,     // Winner's wallet (None until resolved)
-    pub bump: u8,                   // PDA bump for this lobby
     pub created_at: i64,            // Creation timestamp
     pub skin_a: u8,                 // Player A's character skin ID (0-255)
     pub skin_b: Option<u8>,         // Player B's character skin ID (None until joined)
@@ -38,5 +36,5 @@ pub struct Domin81v1Lobby {
 }
 
 impl Domin81v1Lobby {
-    pub const SPACE: usize = 8 + 8 + 32 + 33 + 8 + 32 + 1 + 33 + 1 + 8 + 1 + 2 + 4 + 5 + 1; // discriminator + fields
+    pub const SPACE: usize = 8 + 8 + 32 + 33 + 8 + 32 + 1 + 33 + 8 + 1 + 2 + 4 + 5 + 1; // discriminator + fields
 }

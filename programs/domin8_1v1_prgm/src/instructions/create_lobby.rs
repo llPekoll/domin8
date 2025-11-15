@@ -57,7 +57,6 @@ pub fn handler(
     lobby.vrf_force = vrf_force;
     lobby.status = LOBBY_STATUS_CREATED;
     lobby.winner = None;
-    lobby.bump = ctx.bumps.lobby;
     lobby.created_at = clock.unix_timestamp;
 
     // Transfer SOL from Player A to the lobby PDA
