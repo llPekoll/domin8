@@ -9,6 +9,7 @@ import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
 import { AssetsProvider } from "./contexts/AssetsContext";
 import { PlayerNamesProvider } from "./contexts/PlayerNamesContext";
+import { Analytics } from "@vercel/analytics/react";
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
 
@@ -103,5 +104,6 @@ createRoot(document.getElementById("root")!).render(
         theme="dark"
       />
     </ConvexProvider>
+    <Analytics />
   </StrictMode>
 );

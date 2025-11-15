@@ -4,7 +4,7 @@ import { PlayerManager } from "../managers/PlayerManager";
 import { AnimationManager } from "../managers/AnimationManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
-import { charactersData, allMapsData } from "../main";
+import { charactersData, allMapsData, RESOLUTION_SCALE } from "../main";
 import { logger } from "../../lib/logger";
 import {
   generateDemoParticipant,
@@ -49,6 +49,8 @@ export class DemoScene extends Scene {
   private spawnCount: number = 0;
   private isSpawning: boolean = false;
   private initialStateReceived: boolean = false; // ✅ Track if we got initial state
+  private currentBackgroundId: number = 1; // Track current background for mask selection
+  private arenaMask: Phaser.Display.Masks.BitmapMask | null = null; // Arena mask
 
   // Timers
   private countdownTimer?: Phaser.Time.TimerEvent;
@@ -82,8 +84,12 @@ export class DemoScene extends Scene {
     const availableBackgrounds = [1, 2];
     const randomBgId =
       availableBackgrounds[Math.floor(Math.random() * availableBackgrounds.length)];
+    this.currentBackgroundId = randomBgId; // Store for mask selection
     logger.game.debug("[DemoScene] Randomly selected background ID:", randomBgId);
     this.backgroundManager.setBackgroundById(randomBgId);
+
+    // Create arena mask based on background
+    this.createArenaMask();
 
     // Load corresponding map config for spawn positions
     const selectedMap = allMapsData.find((map: any) => map.id === randomBgId);
@@ -345,6 +351,9 @@ export class DemoScene extends Scene {
     this.demoPhase = "arena";
     this.updateDemoUI(this.demoPhase, 0, this.participants.length);
 
+    // Remove arena masks from all participants before they move to center
+    this.removeArenaMasks();
+
     // Use shared battle phase animation sequence
     this.animationManager.startBattlePhaseSequence(this.playerManager);
 
@@ -566,6 +575,16 @@ export class DemoScene extends Scene {
     logger.game.debug(`[DemoScene] Adding participant ${participantId} to scene`);
     this.playerManager.addParticipant(participant);
     this.participants.push(participant);
+
+    // Apply arena mask to the newly spawned participant
+    if (this.arenaMask) {
+      const gameParticipant = this.playerManager.getParticipant(participantId);
+      if (gameParticipant) {
+        gameParticipant.container.setMask(this.arenaMask);
+        logger.game.debug(`[DemoScene] Arena mask applied to participant ${participantId}`);
+      }
+    }
+
     logger.game.debug(`[DemoScene] Participant ${participantId} added successfully`);
   }
 
@@ -577,6 +596,61 @@ export class DemoScene extends Scene {
     this.animationManager.clearCelebration();
     this.participants = [];
     logger.game.debug("[CLEANUP] Demo participants cleared");
+  }
+
+  /**
+   * Create arena mask based on current background
+   * bg1 (Classic Arena) uses mask_classic
+   * bg2 (Mystic Forest/Secte) uses mask_secte
+   */
+  private createArenaMask() {
+    // Map background IDs to mask keys
+    const maskKeys: { [key: number]: string } = {
+      1: "mask_classic",
+      2: "mask_secte",
+    };
+
+    const maskKey = maskKeys[this.currentBackgroundId];
+    if (!maskKey) {
+      logger.game.warn(`[DemoScene] No mask defined for background ID ${this.currentBackgroundId}`);
+      return;
+    }
+
+    // Check if mask texture exists
+    if (!this.textures.exists(maskKey)) {
+      logger.game.error(`[DemoScene] Mask texture '${maskKey}' not found!`);
+      return;
+    }
+
+    // Create mask image (hidden, used only for masking)
+    const maskImage = this.make.image({
+      x: this.centerX,
+      y: this.centerY,
+      key: maskKey,
+      add: false, // Don't add to display list
+    });
+
+    // Scale the mask to match the game's resolution scale
+    maskImage.setScale(RESOLUTION_SCALE);
+
+    // Create bitmap mask from the image
+    this.arenaMask = maskImage.createBitmapMask();
+    logger.game.debug(`[DemoScene] Arena mask created using ${maskKey} with scale ${RESOLUTION_SCALE}`);
+  }
+
+  /**
+   * Remove arena masks from all participants
+   * Called when transitioning to arena phase (when characters run to center)
+   */
+  private removeArenaMasks() {
+    logger.game.debug("[DemoScene] Removing arena masks from all participants");
+    const participants = this.playerManager.getParticipants();
+    participants.forEach((participant) => {
+      if (participant.container) {
+        participant.container.clearMask();
+      }
+    });
+    logger.game.debug("[DemoScene] Arena masks removed");
   }
 
   shutdown() {
