@@ -145,7 +145,7 @@ describe("domin8_1v1_prgm - 1v1 Coinflip Tests", () => {
       const playerABalanceBefore = await connection.getBalance(playerA.publicKey);
 
       const tx = await program.methods
-        .createLobby(new BN(BET_AMOUNT))
+        .createLobby(new BN(BET_AMOUNT), 0, [100, 100], 0)
         .accounts({
           config: configPda,
           lobby: lobbyPda,
@@ -166,6 +166,9 @@ describe("domin8_1v1_prgm - 1v1 Coinflip Tests", () => {
       console.log("Amount:", lobby.amount.toString(), "lamports");
       console.log("Status:", lobby.status, "(0=CREATED)");
       console.log("Winner:", lobby.winner ? "SET" : "UNRESOLVED");
+      console.log("Skin A:", lobby.skinA);
+      console.log("Position A: [", lobby.positionA[0], ",", lobby.positionA[1], "]");
+      console.log("Map:", lobby.map);
 
       expect(lobby.playerA.toString()).to.equal(playerA.publicKey.toString());
       expect(lobby.playerB).to.be.null;
@@ -201,7 +204,7 @@ describe("domin8_1v1_prgm - 1v1 Coinflip Tests", () => {
       let tx: string;
       try {
         tx = await program.methods
-          .joinLobby(new BN(BET_AMOUNT))
+          .joinLobby(new BN(BET_AMOUNT), 1, [200, 200])
           .accounts({
             config: configPda,
             lobby: lobbyPda,
@@ -276,7 +279,7 @@ describe("domin8_1v1_prgm - 1v1 Coinflip Tests", () => {
       [lobbyPda] = deriveLobbyPda(lobbyId);
 
       const tx = await program.methods
-        .createLobby(new BN(BET_AMOUNT))
+        .createLobby(new BN(BET_AMOUNT), 0, [100, 100], 0)
         .accounts({
           config: configPda,
           lobby: lobbyPda,
@@ -341,7 +344,7 @@ describe("domin8_1v1_prgm - 1v1 Coinflip Tests", () => {
 
       // Create lobby
       await program.methods
-        .createLobby(new BN(BET_AMOUNT))
+        .createLobby(new BN(BET_AMOUNT), 0, [100, 100], 0)
         .accounts({
           config: configPda,
           lobby: testLobbyPda,
@@ -356,7 +359,7 @@ describe("domin8_1v1_prgm - 1v1 Coinflip Tests", () => {
       // Try to have Player A join their own lobby
       try {
         await program.methods
-          .joinLobby(new BN(BET_AMOUNT))
+          .joinLobby(new BN(BET_AMOUNT), 1, [200, 200])
           .accounts({
             config: configPda,
             lobby: testLobbyPda,
@@ -384,7 +387,7 @@ describe("domin8_1v1_prgm - 1v1 Coinflip Tests", () => {
 
       try {
         await program.methods
-          .createLobby(new BN(0)) // Invalid: zero amount
+          .createLobby(new BN(0), 0, [100, 100], 0) // Invalid: zero amount
           .accounts({
             config: configPda,
             lobby: testLobbyPda,
@@ -408,7 +411,7 @@ describe("domin8_1v1_prgm - 1v1 Coinflip Tests", () => {
 
       // Create lobby with BET_AMOUNT
       await program.methods
-        .createLobby(new BN(BET_AMOUNT))
+        .createLobby(new BN(BET_AMOUNT), 0, [100, 100], 0)
         .accounts({
           config: configPda,
           lobby: testLobbyPda,
@@ -426,7 +429,7 @@ describe("domin8_1v1_prgm - 1v1 Coinflip Tests", () => {
 
       try {
         await program.methods
-          .joinLobby(new BN(differentAmount)) // Mismatch!
+          .joinLobby(new BN(differentAmount), 1, [200, 200]) // Mismatch!
           .accounts({
             config: configPda,
             lobby: testLobbyPda,

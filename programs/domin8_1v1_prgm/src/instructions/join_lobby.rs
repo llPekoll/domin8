@@ -15,6 +15,8 @@ use crate::state::*;
 pub fn handler(
     ctx: Context<JoinLobby>,
     amount: u64,
+    skin_b: u8,
+    position_b: [u16; 2],
 ) -> Result<()> {
     require!(amount > 0, Domin81v1Error::InvalidBetAmount);
 
@@ -114,6 +116,7 @@ pub fn handler(
         house_fee,
         prize
     );
+    msg!("Player B Skin: {}, Position B: [{}, {}]", skin_b, position_b[0], position_b[1]);
 
     // Re-borrow lobby mutably now that the transfer and VRF read are done
     let lobby = &mut ctx.accounts.lobby;
@@ -122,8 +125,8 @@ pub fn handler(
     lobby.player_b = Some(player_b.key());
     lobby.winner = Some(winner);
     lobby.status = LOBBY_STATUS_RESOLVED;
-
-    // Transfer house fee to treasury
+    lobby.skin_b = Some(skin_b);
+    lobby.position_b = Some(position_b);
     if house_fee > 0 {
         let treasury_info = &ctx.accounts.treasury;
         **lobby.to_account_info().lamports.borrow_mut() -= house_fee;

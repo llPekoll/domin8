@@ -13,6 +13,9 @@ use orao_solana_vrf::{
 pub fn handler(
     ctx: Context<CreateLobby>,
     amount: u64,
+    skin_a: u8,
+    position_a: [u16; 2],
+    map: u8,
 ) -> Result<()> {
     require!(amount > 0, Domin81v1Error::InvalidBetAmount);
 
@@ -53,6 +56,11 @@ pub fn handler(
     lobby.status = LOBBY_STATUS_CREATED;
     lobby.winner = None;
     lobby.created_at = clock.unix_timestamp;
+    lobby.skin_a = skin_a;
+    lobby.skin_b = None;
+    lobby.position_a = position_a;
+    lobby.position_b = None;
+    lobby.map = map;
 
     // Transfer SOL from Player A to the lobby PDA
     let transfer_instruction = anchor_lang::system_program::Transfer {
@@ -74,13 +82,14 @@ pub fn handler(
         player_a.key()
     );
     msg!("Bet amount: {} lamports", amount);
+    msg!("Skin A: {}, Position A: [{}, {}], Map: {}", skin_a, position_a[0], position_a[1], map);
     msg!("VRF force (hex): {}", Utils::bytes_to_hex(&force));
 
     Ok(())
 }
 
 #[derive(Accounts)]
-#[instruction(amount: u64)]
+#[instruction(amount: u64, skin_a: u8, position_a: [u16; 2], map: u8)]
 pub struct CreateLobby<'info> {
     #[account(
         mut,
