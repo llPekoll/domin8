@@ -29,4 +29,19 @@ pub mod domin8_1v1_prgm {
     ) -> Result<()> {
         instructions::create_lobby::handler(ctx, amount)
     }
+
+    /// Join an existing 1v1 lobby (Player B joins, funds it, resolves game)
+    pub fn join_lobby(
+        ctx: Context<JoinLobby>,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::join_lobby::handler(ctx, amount)
+    }
+
+    /// Cancel a 1v1 lobby (Player A refunds if status = created)
+    pub fn cancel_lobby(
+        ctx: Context<CancelLobby>,
+    ) -> Result<()> {
+        instructions::cancel_lobby::handler(ctx)
+    }
 }

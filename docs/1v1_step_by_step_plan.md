@@ -4,33 +4,33 @@ This document breaks down the full 1v1 Coinflip feature into clear, reviewable p
 
 ---
 
-## Phase 1: On-Chain Program Foundation
+## Phase 1: On-Chain Program Foundation ✅ COMPLETE
 
-- Create new directory: `programs/domin8_1v1_prgm/`
-- Scaffold Anchor program with:
-  - `Cargo.toml` (anchor-lang, orao-solana-vrf, dependencies matching domin8_prgm)
-  - `src/lib.rs` (program ID, 4 instruction stubs)
-  - `src/state.rs` (Config & Lobby account structs with status: 0/1)
-  - `src/error.rs` (basic error types)
+- ✅ Create new directory: `programs/domin8_1v1_prgm/`
+- ✅ Scaffold Anchor program with:
+  - ✅ `Cargo.toml` (anchor-lang, orao-solana-vrf, dependencies matching domin8_prgm)
+  - ✅ `src/lib.rs` (program ID, 4 instruction stubs)
+  - ✅ `src/state.rs` (Config & Lobby account structs with status: 0/1)
+  - ✅ `src/error.rs` (basic error types)
 - **Key Implementation Details:**
   - **Lobby Status:** Only 2 statuses (0 = waiting, 1 = resolved)
   - **VRF Force Derivation:** Each lobby's vrf_force = `hash(b"1v1_lobby_vrf" || lobby_id.to_le_bytes())` for unique randomness accounts
-- Implement `initialize_config` and `create_lobby` instructions
-- Add basic tests for account creation
+- ✅ Implement `initialize_config` and `create_lobby` instructions
+- ✅ Add basic tests for account creation
 
 ---
 
-## Phase 2: On-Chain Program - Join & Resolution
+## Phase 2: On-Chain Program - Join & Resolution ✅ COMPLETE
 
-- Implement `join_lobby` instruction:
-  - Accept Player B's bet
-  - Read ORAO VRF randomness (via existing vrf_force PDA)
-  - Determine winner immediately (randomness % 2)
-  - Distribute funds: house fee → treasury, prize → winner
-  - Close Lobby PDA, refund rent to payer
-  - Set status = 1 (resolved)
-- Implement `cancel_lobby` instruction (Player A refunds if status = 0)
-- Add tests for join, cancel, and resolution flows
+- ✅ Implement `join_lobby` instruction:
+  - ✅ Accept Player B's bet
+  - ✅ Read ORAO VRF randomness (via existing vrf_force PDA)
+  - ✅ Determine winner immediately (randomness % 2)
+  - ✅ Distribute funds: house fee → treasury, prize → winner
+  - ✅ Close Lobby PDA, refund rent to payer
+  - ✅ Set status = 1 (resolved)
+- ✅ Implement `cancel_lobby` instruction (Player A refunds if status = 0)
+- ✅ Add tests for join, cancel, and resolution flows
 
 ---
 
