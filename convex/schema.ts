@@ -107,6 +107,7 @@ export default defineSchema({
     lastActive: v.number(),
     totalGamesPlayed: v.number(),
     totalWins: v.number(),
+    totalPoints: v.optional(v.number()), // Points earned from bets and prizes (1 point per 0.001 SOL)
     achievements: v.array(v.string()),
   }).index("by_wallet", ["walletAddress"]),
 });

@@ -29,7 +29,7 @@
 import { useCallback, useMemo } from "react";
 import { usePrivyWallet } from "./usePrivyWallet";
 import { useWallets } from "@privy-io/react-auth/solana";
-import { useAction } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import {
   Connection,
@@ -488,6 +488,9 @@ export const useGameContract = () => {
   // Convex action for webhook notifications
   const notifyGameCreated = useAction(api.webhooks.notifyGameCreated);
 
+  // Convex mutation for awarding points
+  const awardPoints = useMutation(api.players.awardPoints);
+
   // Get selected wallet (first Solana wallet from Privy)
   const selectedWallet = useMemo(() => {
     return wallets.length > 0 ? wallets[0] : null;
@@ -789,6 +792,18 @@ export const useGameContract = () => {
           roundId: activeRoundId,
         });
 
+        // Award points for the bet (1 point per 0.001 SOL)
+        try {
+          await awardPoints({
+            walletAddress: publicKey.toString(),
+            amountLamports: amountLamports,
+          });
+          logger.solana.debug("[placeBet] Points awarded for bet");
+        } catch (pointsError) {
+          // Don't fail the bet if points award fails
+          logger.solana.error("[placeBet] Failed to award points:", pointsError);
+        }
+
         // Send webhook notification if this was a game creation (first bet)
         if (shouldCreateNewGame) {
           try {
@@ -848,6 +863,7 @@ export const useGameContract = () => {
       connection,
       network,
       notifyGameCreated,
+      awardPoints,
     ]
   );
 

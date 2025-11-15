@@ -356,19 +356,19 @@ const BettingPanel = memo(function BettingPanel({
         {/* Quick bet buttons */}
         <div className="grid grid-cols-4 gap-2 w-2/5">
           <button
-            onClick={() => handleIncrementBet(0.1)}
+            onClick={() => handleIncrementBet(0.01)}
             className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded-lg text-amber-300 text-2xl font-bold transition-colors"
           >
             +0.01
           </button>
           <button
-            onClick={() => handleIncrementBet(0.5)}
+            onClick={() => handleIncrementBet(0.1)}
             className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded-lg text-amber-300 text-2xl font-bold transition-colors"
           >
             +0.1
           </button>
           <button
-            onClick={() => handleIncrementBet(0.5)}
+            onClick={() => handleIncrementBet(1)}
             className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded-lg text-amber-300 text-2xl font-bold transition-colors"
           >
             +1

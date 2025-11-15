@@ -1,4 +1,4 @@
-import { mutation, query, action, internalQuery } from "./_generated/server";
+import { mutation, query, action, internalQuery, internalMutation } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import { v } from "convex/values";
 
@@ -112,6 +112,7 @@ export const createPlayer = mutation({
       lastActive: Date.now(),
       totalGamesPlayed: 0,
       totalWins: 0,
+      totalPoints: 0,
       achievements: [],
     });
 
@@ -293,4 +294,82 @@ export const verifyAndPlaceBet = action({
     // success so the client can proceed to submit the on-chain transaction.
     return { ok: true };
   },
+});
+
+/**
+ * Award points to a player (internal - called from backend)
+ *
+ * Awards points based on SOL amount (1 point per 0.001 SOL).
+ * Used for prize distribution from gameScheduler.
+ * Creates player record if it doesn't exist.
+ *
+ * @param walletAddress - Player's wallet address
+ * @param amountLamports - Amount in lamports to convert to points
+ */
+const awardPointsHandler = async (ctx: any, args: { walletAddress: string; amountLamports: number }) => {
+  // Calculate points: 1 point per 0.001 SOL
+  // 0.001 SOL = 1_000_000 lamports
+
+  // Ensure amountLamports is a valid number
+  const amount = Number(args.amountLamports);
+  if (isNaN(amount)) {
+    console.error('[awardPoints] Invalid amountLamports:', args.amountLamports);
+    return;
+  }
+
+  const points = Math.floor(amount / 1_000_000);
+
+  if (points <= 0) {
+    // No points to award
+    return;
+  }
+
+  // Find player
+  const player = await ctx.db
+    .query("players")
+    .withIndex("by_wallet", (q: any) => q.eq("walletAddress", args.walletAddress))
+    .first();
+
+  if (player) {
+    // Update existing player (handle case where totalPoints might be undefined for old players)
+    const currentPoints = Number(player.totalPoints) || 0;
+    await ctx.db.patch(player._id, {
+      totalPoints: currentPoints + points,
+      lastActive: Date.now(),
+    });
+  } else {
+    // Create new player with points
+    await ctx.db.insert("players", {
+      walletAddress: args.walletAddress,
+      displayName: undefined,
+      externalWalletAddress: undefined,
+      lastActive: Date.now(),
+      totalGamesPlayed: 0,
+      totalWins: 0,
+      totalPoints: points,
+      achievements: [],
+    });
+  }
+};
+
+/**
+ * Award points to a player (public mutation - called from frontend)
+ */
+export const awardPoints = mutation({
+  args: {
+    walletAddress: v.string(),
+    amountLamports: v.number(),
+  },
+  handler: awardPointsHandler,
+});
+
+/**
+ * Award points to a player (internal mutation - called from backend actions)
+ */
+export const awardPointsInternal = internalMutation({
+  args: {
+    walletAddress: v.string(),
+    amountLamports: v.number(),
+  },
+  handler: awardPointsHandler,
 });
