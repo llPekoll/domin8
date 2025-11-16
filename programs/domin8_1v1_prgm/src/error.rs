@@ -21,8 +21,11 @@ pub enum Domin81v1Error {
     #[msg("Insufficient funds for bet")]
     InsufficientFunds,
 
-    #[msg("VRF randomness not yet fulfilled")]
-    RandomnessNotReady,
+    #[msg("Switchboard randomness not yet resolved")]
+    RandomnessNotResolved,
+
+    #[msg("Switchboard randomness already revealed for this slot")]
+    RandomnessAlreadyRevealed,
 
     #[msg("Invalid bet amount")]
     InvalidBetAmount,

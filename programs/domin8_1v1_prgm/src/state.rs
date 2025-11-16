@@ -11,11 +11,10 @@ pub struct Domin81v1Config {
     pub treasury: Pubkey,           // Treasury to receive house fees
     pub house_fee_bps: u16,         // House fee in basis points (100 = 1%)
     pub lobby_count: u64,           // Counter for next lobby ID
-    pub force: [u8; 32],            // VRF force seed for lobbies
 }
 
 impl Domin81v1Config {
-    pub const SPACE: usize = 8 + 32 + 32 + 2 + 8 + 32; // discriminator + fields
+    pub const SPACE: usize = 8 + 32 + 32 + 2 + 8; // discriminator + fields
 }
 
 /// A single 1v1 lobby (coinflip game)
@@ -25,7 +24,7 @@ pub struct Domin81v1Lobby {
     pub player_a: Pubkey,           // Player A's wallet
     pub player_b: Option<Pubkey>,   // Player B's wallet (None until joined)
     pub amount: u64,                // Bet amount per player (in lamports)
-    pub vrf_force: [u8; 32],        // VRF force bytes (derived from lobby_id)
+    pub randomness_account: Pubkey, // Switchboard randomness account for this game
     pub status: u8,                 // 0 = created, 1 = resolved
     pub winner: Option<Pubkey>,     // Winner's wallet (None until resolved)
     pub created_at: i64,            // Creation timestamp

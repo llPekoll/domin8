@@ -2,16 +2,18 @@ use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 use crate::error::Domin81v1Error;
 use crate::state::*;
+use switchboard_on_demand::accounts::RandomnessAccountData;
 
 /// Join an existing 1v1 lobby (called by Player B)
 /// 
-/// This instruction:
-/// 1. Accepts Player B's bet
-/// 2. Reads ORAO VRF randomness from the vrf_randomness account
-/// 3. Determines winner based on randomness (randomness % 2 == 0 → Player A wins, else Player B wins)
-/// 4. Deducts house fee and distributes prize to winner
-/// 5. Closes the lobby PDA and refunds rent to the payer
-/// 6. Sets lobby status to RESOLVED
+/// This instruction follows the Switchboard Randomness pattern:
+/// 1. Validates the randomness_account has been revealed (seed_slot is not the current slot)
+/// 2. Accepts Player B's bet
+/// 3. Calls Switchboard's get_value() to retrieve the revealed random value
+/// 4. Determines winner based on randomness (randomness % 2 == 0 → Player A wins, else Player B wins)
+/// 5. Deducts house fee and distributes prize to winner
+/// 6. Closes the lobby PDA and refunds rent to the payer
+/// 7. Sets lobby status to RESOLVED
 pub fn handler(
     ctx: Context<JoinLobby>,
     amount: u64,
@@ -23,7 +25,7 @@ pub fn handler(
     let config = &ctx.accounts.config;
     let player_b = &ctx.accounts.player_b;
     let lobby = &ctx.accounts.lobby;
-    let _clock = Clock::get()?; // unused currently
+    let clock = Clock::get()?;
 
     // Verify lobby is in CREATED status (waiting for second player)
     require_eq!(
@@ -47,6 +49,30 @@ pub fn handler(
         Domin81v1Error::InsufficientFunds
     );
 
+    // Parse the Switchboard randomness account data
+    let randomness_data = RandomnessAccountData::parse(
+        ctx.accounts.randomness_account_data.data.borrow()
+    ).map_err(|_| Domin81v1Error::RandomnessNotResolved)?;
+
+    // IMPORTANT: Switchboard Randomness pattern requires checking that the seed_slot
+    // is not the current slot - this ensures the randomness has been revealed
+    if randomness_data.seed_slot == clock.slot {
+        return Err(Domin81v1Error::RandomnessAlreadyRevealed.into());
+    }
+
+    // Get the revealed random value using Switchboard's get_value() function
+    let revealed_random_value = randomness_data.get_value(clock.slot)
+        .map_err(|_| Domin81v1Error::RandomnessNotResolved)?;
+
+    // Determine winner based on randomness
+    // Use the first byte of randomness for winner determination
+    let randomness_u8 = revealed_random_value[0];
+    let winner = if randomness_u8 % 2 == 0 {
+        lobby.player_a
+    } else {
+        player_b.key()
+    };
+
     // Transfer SOL from Player B to the lobby PDA
     let transfer_instruction = system_program::Transfer {
         from: player_b.to_account_info(),
@@ -57,41 +83,6 @@ pub fn handler(
         transfer_instruction,
     );
     system_program::transfer(cpi_context, amount)?;
-
-    // Read VRF randomness directly from account data
-    // ORAO Randomness account structure: first bool (1 byte) is fulfilled flag, then 64 bytes of randomness
-    let vrf_randomness_info = &ctx.accounts.vrf_randomness;
-    let account_data = vrf_randomness_info.try_borrow_data()?;
-    
-    // Check if account is large enough (at least 65 bytes: 1 byte fulfilled + 64 bytes randomness)
-    require!(account_data.len() >= 65, Domin81v1Error::RandomnessNotReady);
-    
-    // Read fulfilled flag (first byte)
-    let fulfilled = account_data[0] != 0;
-    require!(fulfilled, Domin81v1Error::RandomnessNotReady);
-    
-    // Read randomness (64 bytes starting at offset 1)
-    let mut randomness = [0u8; 64];
-    randomness.copy_from_slice(&account_data[1..65]);
-
-    // Determine winner based on randomness
-    // Use the first 8 bytes of randomness for winner determination
-    let randomness_u64 = u64::from_le_bytes([
-        randomness[0],
-        randomness[1],
-        randomness[2],
-        randomness[3],
-        randomness[4],
-        randomness[5],
-        randomness[6],
-        randomness[7],
-    ]);
-
-    let winner = if randomness_u64 % 2 == 0 {
-        lobby.player_a
-    } else {
-        player_b.key()
-    };
 
     // Calculate total pot
     let total_pot = amount.checked_add(lobby.amount)
@@ -117,8 +108,9 @@ pub fn handler(
         prize
     );
     msg!("Player B Skin: {}, Position B: [{}, {}]", skin_b, position_b[0], position_b[1]);
+    msg!("Randomness value (first byte): {}", revealed_random_value[0]);
 
-    // Re-borrow lobby mutably now that the transfer and VRF read are done
+    // Re-borrow lobby mutably now that the transfer and randomness read are done
     let lobby = &mut ctx.accounts.lobby;
 
     // Update lobby before closing
@@ -179,9 +171,9 @@ pub struct JoinLobby<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    // ---- VRF Accounts ----
-    /// CHECK: ORAO VRF randomness account
-    pub vrf_randomness: AccountInfo<'info>,
+    // ---- Switchboard Randomness Accounts ----
+    /// CHECK: Switchboard randomness account - must match the one stored in the lobby
+    pub randomness_account_data: AccountInfo<'info>,
 
     /// CHECK: Treasury account
     #[account(mut)]

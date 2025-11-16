@@ -14,12 +14,12 @@ cpi = ["no-entrypoint"]
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
-idl-build = ["anchor-lang/idl-build"]
+idl-build = ["anchor-lang/idl-build", "switchboard-on-demand/idl-build"]
 localnet = []  # Enable mock VRF for localnet testing
 
 
 [dependencies]
 anchor-lang = "0.31.1"
-orao-solana-vrf = { version = "0.6.1", default-features = false, features = ["cpi"] }
+switchboard-on-demand = { version = "0.10.8", features = ["anchor"] }
 
 

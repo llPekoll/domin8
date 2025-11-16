@@ -1,15 +1,14 @@
 use crate::*;
 use anchor_lang::prelude::*;
-use orao_solana_vrf::{
-    cpi::accounts::RequestV2,
-    program::OraoVrf,
-    state::NetworkState,
-    CONFIG_ACCOUNT_SEED,
-    RANDOMNESS_ACCOUNT_SEED,
-    ID as ORAO_VRF_ID,
-};
+use switchboard_on_demand::accounts::RandomnessAccountData;
 
 /// Create a new 1v1 lobby (called by Player A)
+/// 
+/// This instruction follows the Switchboard Randomness pattern:
+/// 1. Player A creates and funds the lobby
+/// 2. A randomness account is passed in (caller must prepare this separately)
+/// 3. The randomness_account is stored in the lobby state
+/// 4. When Player B joins, the randomness will be revealed and used to determine winner
 pub fn handler(
     ctx: Context<CreateLobby>,
     amount: u64,
@@ -33,37 +32,12 @@ pub fn handler(
     // Get the current lobby ID from config
     let lobby_id = config.lobby_count;
 
-    // Generate unique force for this lobby by combining config force with lobby ID and program ID
-    // This MUST match the computation in the accounts macro
-    let mut unique_force = config.force;
-    for i in 0..8 {
-        unique_force[i] ^= ((lobby_id >> (i * 8)) & 0xFF) as u8;
-    }
-    // XOR with program ID to ensure uniqueness per program deployment
-    let program_id_bytes = ctx.program_id.to_bytes();
-    for i in 0..32 {
-        unique_force[i] ^= program_id_bytes[i];
-    }
-
-    // Request VRF randomness with the unique force
-    let vrf_cpi = CpiContext::new(
-        ctx.accounts.vrf_program.to_account_info(),
-        RequestV2 {
-            payer: player_a.to_account_info(),
-            network_state: ctx.accounts.vrf_config.to_account_info(),
-            treasury: ctx.accounts.vrf_treasury.to_account_info(),
-            request: ctx.accounts.vrf_randomness.to_account_info(),
-            system_program: ctx.accounts.system_program.to_account_info(),
-        },
-    );
-    orao_solana_vrf::cpi::request_v2(vrf_cpi, unique_force)?;
-
     // Initialize the lobby
     lobby.lobby_id = lobby_id;
     lobby.player_a = player_a.key();
     lobby.player_b = None;
     lobby.amount = amount;
-    lobby.vrf_force = unique_force;  // Store the unique force
+    lobby.randomness_account = ctx.accounts.randomness_account.key();
     lobby.status = LOBBY_STATUS_CREATED;
     lobby.winner = None;
     lobby.created_at = clock.unix_timestamp;
@@ -94,7 +68,7 @@ pub fn handler(
     );
     msg!("Bet amount: {} lamports", amount);
     msg!("Skin A: {}, Position A: [{}, {}], Map: {}", skin_a, position_a[0], position_a[1], map);
-    msg!("VRF force (hex): {}", Utils::bytes_to_hex(&unique_force));
+    msg!("Randomness Account: {}", ctx.accounts.randomness_account.key());
 
     Ok(())
 }
@@ -124,49 +98,10 @@ pub struct CreateLobby<'info> {
     #[account(mut)]
     pub player_a: Signer<'info>,
 
-    // ---- VRF accounts ----
+    /// CHECK: Switchboard randomness account for this game
+    /// The caller (frontend) is responsible for creating this account
+    /// and passing the correct randomness account here
+    pub randomness_account: AccountInfo<'info>,
 
-    /// CHECK: Orao randomness account - derived with unique force per lobby
-    /// We compute unique force from config.force XORed with config.lobby_count and program ID
-    /// This MUST match the same computation in the handler
-    #[account(
-        mut,
-        seeds = [RANDOMNESS_ACCOUNT_SEED, &CreateLobby::compute_unique_force_seed(&config.force, config.lobby_count, &PROGRAM_ID)],
-        bump,
-        seeds::program = ORAO_VRF_ID
-    )]
-    pub vrf_randomness: AccountInfo<'info>,
-
-    /// CHECK: Orao treasury (devnet/mainnet address), used by VRF CPI
-    #[account(mut)]
-    pub vrf_treasury: AccountInfo<'info>,
-
-    #[account(
-        mut,
-        seeds = [CONFIG_ACCOUNT_SEED],
-        bump,
-        seeds::program = ORAO_VRF_ID
-    )]
-    pub vrf_config: Account<'info, NetworkState>,
-
-    pub vrf_program: Program<'info, OraoVrf>,
     pub system_program: Program<'info, System>,
-}
-
-impl<'info> CreateLobby<'info> {
-    /// Compute unique force by XORing base force with lobby ID and program ID
-    /// Returns the unique force as a byte array suitable for use as a seed
-    /// Includes program ID to ensure uniqueness per program deployment
-    fn compute_unique_force_seed(base_force: &[u8; 32], lobby_id: u64, program_id: &Pubkey) -> [u8; 32] {
-        let mut unique_force = *base_force;
-        for i in 0..8 {
-            unique_force[i] ^= ((lobby_id >> (i * 8)) & 0xFF) as u8;
-        }
-        // XOR with program ID bytes to ensure uniqueness per program deployment
-        let program_id_bytes = program_id.to_bytes();
-        for i in 0..32 {
-            unique_force[i] ^= program_id_bytes[i];
-        }
-        unique_force
-    }
 }

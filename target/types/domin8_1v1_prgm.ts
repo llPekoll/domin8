@@ -131,100 +131,11 @@ export type Domin81v1Prgm = {
           "signer": true
         },
         {
-          "name": "vrfRandomness",
+          "name": "randomnessAccount",
           "docs": [
-            "We compute unique force from config.force XORed with config.lobby_count",
-            "This MUST match the same computation in the handler"
-          ],
-          "writable": true
-        },
-        {
-          "name": "vrfTreasury",
-          "writable": true
-        },
-        {
-          "name": "vrfConfig",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  111,
-                  114,
-                  97,
-                  111,
-                  45,
-                  118,
-                  114,
-                  102,
-                  45,
-                  110,
-                  101,
-                  116,
-                  119,
-                  111,
-                  114,
-                  107,
-                  45,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103,
-                  117,
-                  114,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              }
-            ],
-            "program": {
-              "kind": "const",
-              "value": [
-                7,
-                71,
-                177,
-                26,
-                250,
-                145,
-                180,
-                209,
-                249,
-                34,
-                242,
-                123,
-                14,
-                186,
-                193,
-                218,
-                178,
-                59,
-                33,
-                41,
-                164,
-                190,
-                243,
-                79,
-                50,
-                164,
-                123,
-                88,
-                245,
-                206,
-                252,
-                120
-              ]
-            }
-          }
-        },
-        {
-          "name": "vrfProgram",
-          "address": "VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y"
+            "The caller (frontend) is responsible for creating this account",
+            "and passing the correct randomness account here"
+          ]
         },
         {
           "name": "systemProgram",
@@ -386,7 +297,7 @@ export type Domin81v1Prgm = {
           "signer": true
         },
         {
-          "name": "vrfRandomness"
+          "name": "randomnessAccountData"
         },
         {
           "name": "treasury",
@@ -444,19 +355,6 @@ export type Domin81v1Prgm = {
         51,
         199
       ]
-    },
-    {
-      "name": "networkState",
-      "discriminator": [
-        212,
-        237,
-        148,
-        56,
-        97,
-        245,
-        51,
-        169
-      ]
     }
   ],
   "errors": [
@@ -492,26 +390,31 @@ export type Domin81v1Prgm = {
     },
     {
       "code": 6006,
-      "name": "randomnessNotReady",
-      "msg": "VRF randomness not yet fulfilled"
+      "name": "randomnessNotResolved",
+      "msg": "Switchboard randomness not yet resolved"
     },
     {
       "code": 6007,
+      "name": "randomnessAlreadyRevealed",
+      "msg": "Switchboard randomness already revealed for this slot"
+    },
+    {
+      "code": 6008,
       "name": "invalidBetAmount",
       "msg": "Invalid bet amount"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "invalidHouseFee",
       "msg": "House fee configuration error"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "winnerDeterminationError",
       "msg": "Unable to determine winner from randomness"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "distributionError",
       "msg": "Fund distribution failed"
     }
@@ -540,15 +443,6 @@ export type Domin81v1Prgm = {
           {
             "name": "lobbyCount",
             "type": "u64"
-          },
-          {
-            "name": "force",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
           }
         ]
       }
@@ -580,13 +474,8 @@ export type Domin81v1Prgm = {
             "type": "u64"
           },
           {
-            "name": "vrfForce",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
+            "name": "randomnessAccount",
+            "type": "pubkey"
           },
           {
             "name": "status",
@@ -635,94 +524,6 @@ export type Domin81v1Prgm = {
           {
             "name": "map",
             "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "networkConfiguration",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "pubkey"
-          },
-          {
-            "name": "treasury",
-            "type": "pubkey"
-          },
-          {
-            "name": "requestFee",
-            "type": "u64"
-          },
-          {
-            "name": "fulfillmentAuthorities",
-            "type": {
-              "vec": "pubkey"
-            }
-          },
-          {
-            "name": "tokenFeeConfig",
-            "type": {
-              "option": {
-                "defined": {
-                  "name": "oraoTokenFeeConfig"
-                }
-              }
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "networkState",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "config",
-            "type": {
-              "defined": {
-                "name": "networkConfiguration"
-              }
-            }
-          },
-          {
-            "name": "numReceived",
-            "docs": [
-              "Total number of received requests."
-            ],
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "oraoTokenFeeConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "mint",
-            "docs": [
-              "ORAO token mint address."
-            ],
-            "type": "pubkey"
-          },
-          {
-            "name": "treasury",
-            "docs": [
-              "ORAO token treasury account."
-            ],
-            "type": "pubkey"
-          },
-          {
-            "name": "fee",
-            "docs": [
-              "Fee in ORAO SPL token smallest units."
-            ],
-            "type": "u64"
           }
         ]
       }
