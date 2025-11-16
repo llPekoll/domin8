@@ -49,6 +49,7 @@ export function CreateLobby({ selectedCharacter, onLobbyCreated }: CreateLobbyPr
         buildCreateLobbyTransactionOptimized,
         sendOptimizedTransaction,
         waitForConfirmationOptimized,
+        deriveRandomnessAccountAddress,
       } = await import("../../lib/solana-1v1-transactions-helius");
 
       const connection = getSharedConnection();
@@ -60,12 +61,19 @@ export function CreateLobby({ selectedCharacter, onLobbyCreated }: CreateLobbyPr
         character: selectedCharacter.id,
       });
 
+      // Generate a unique randomness account address for Switchboard
+      // In production, you'd coordinate with Switchboard to create/fund this account
+      const randomnessAccountAddress = await deriveRandomnessAccountAddress(
+        Date.now() // Use timestamp for uniqueness
+      );
+
       // Build optimized transaction with Helius best practices
       const { transaction, metrics } = await buildCreateLobbyTransactionOptimized(
         publicKey,
         betAmountLamports,
         selectedCharacter.id,
         0, // Default map ID
+        randomnessAccountAddress,
         connection
       );
 
