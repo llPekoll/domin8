@@ -14,6 +14,12 @@ import { internal } from "./_generated/api";
 import { Solana1v1QueryClient } from "./lib/solana_1v1";
 
 // ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+const RPC_ENDPOINT = process.env.RPC_URL || process.env.VITE_SOLANA_RPC_URL || "https://devnet.helius-rpc.com/?api-key=0df32d0b-da4f-49b3-b154-deaceac254c0";
+
+// ============================================================================
 // QUERIES
 // ============================================================================
 
@@ -344,9 +350,7 @@ export const createLobby = action({
   },
   handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; lobbyPda: string; action: string }> => {
     try {
-      // Get RPC endpoint from environment
-      const rpcEndpoint = process.env.SOLANA_RPC_URL || "http://localhost:8899";
-      const queryClient = new Solana1v1QueryClient(rpcEndpoint);
+      const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
 
       // Get the transaction from blockchain to confirm
       const connection = queryClient.getConnection();
@@ -404,8 +408,7 @@ export const joinLobby = action({
   },
   handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; winner: string; action: string }> => {
     try {
-      const rpcEndpoint = process.env.SOLANA_RPC_URL || "http://localhost:8899";
-      const queryClient = new Solana1v1QueryClient(rpcEndpoint);
+      const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
 
       // Verify transaction
       const connection = queryClient.getConnection();
@@ -461,8 +464,7 @@ export const cancelLobby = action({
   },
   handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; action: string }> => {
     try {
-      const rpcEndpoint = process.env.SOLANA_RPC_URL || "http://localhost:8899";
-      const queryClient = new Solana1v1QueryClient(rpcEndpoint);
+      const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
 
       // Verify transaction
       const connection = queryClient.getConnection();
@@ -509,15 +511,259 @@ export const _getOpenLobbiesForSync = internalQuery({
 // INTERNAL ACTIONS (Used by Cron)
 // ============================================================================
 
+// ============================================================================
+// INTERNAL HELPERS FOR SYNC
+// ============================================================================
+
+/**
+ * Get all lobbies from Convex database
+ * Internal helper for sync operations
+ */
+const _getAllConvexLobbies = async (ctx: any): Promise<any[]> => {
+  return await ctx.runQuery(internal.lobbies._getOpenLobbiesForSync);
+};
+
+/**
+ * Get actual lobby count from blockchain
+ * @returns The total number of lobbies created on-chain
+ */
+const _getBlockchainLobbyCount = async (queryClient: any): Promise<number> => {
+  try {
+    console.log("[1v1 Sync] Attempting to fetch config account...");
+    const config = await queryClient.getConfigAccount();
+    
+    if (!config) {
+      throw new Error("Config account is null or undefined");
+    }
+
+    if (!config.lobbyCount) {
+      throw new Error("Config account missing lobbyCount field");
+    }
+
+    const count = typeof config.lobbyCount === 'number' 
+      ? config.lobbyCount 
+      : config.lobbyCount.toNumber();
+      
+    console.log(`[1v1 Sync] Successfully fetched blockchain lobby count: ${count}`);
+    return count;
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error(`[1v1 Sync] Failed to fetch lobby count: ${errorMsg}`);
+    throw error;
+  }
+};
+
+/**
+ * Find missing lobby IDs between blockchain and Convex
+ * @returns Array of lobby IDs that exist on-chain but not in Convex
+ */
+const _findMissingLobbies = (blockchainCount: number, convexLobbies: any[]): number[] => {
+  const convexIds = new Set(convexLobbies.map((l: any) => l.lobbyId));
+  const missing: number[] = [];
+
+  for (let i = 0; i < blockchainCount; i++) {
+    if (!convexIds.has(i)) {
+      missing.push(i);
+    }
+  }
+
+  if (missing.length > 0) {
+    console.log(`[1v1 Sync] Found ${missing.length} missing lobbies: ${missing.join(", ")}`);
+  }
+
+  return missing;
+};
+
+/**
+ * Sync a single resolved lobby from blockchain to Convex
+ * Updates Convex if lobby is resolved on-chain but still open in DB
+ */
+const _syncResolvedLobby = async (
+  ctx: any,
+  lobbyInConvex: any,
+  onChainLobby: any
+): Promise<boolean> => {
+  // Check if the on-chain status has progressed beyond what we have in Convex
+  if (onChainLobby.status === 1 && lobbyInConvex.status === 0) {
+    // Lobby has been resolved on-chain but we still have it as open
+    console.log(`[1v1 Sync] Syncing resolved lobby ${lobbyInConvex.lobbyId} to Convex`);
+
+    // Determine the winner
+    const winner = onChainLobby.winner.toString();
+
+    // Extract Player B info from on-chain state
+    const playerB = onChainLobby.playerB.toString();
+    const characterB = onChainLobby.characterB;
+
+    // Update Convex to reflect the resolved state
+    await ctx.runMutation(internal.lobbies._internalJoinLobby, {
+      lobbyId: lobbyInConvex.lobbyId,
+      playerB,
+      characterB,
+      winner,
+    });
+
+    return true;
+  }
+
+  return false;
+};
+
+/**
+ * Sync an open (missing) lobby from blockchain to Convex
+ * Adds a lobby that exists on-chain but is missing from Convex DB
+ */
+const _syncMissingLobby = async (
+  ctx: any,
+  lobbyId: number,
+  onChainLobby: any
+): Promise<boolean> => {
+  try {
+    console.log(`[1v1 Sync] Creating missing lobby ${lobbyId} in Convex`);
+
+    // Extract fields, handling both Anchor-parsed and raw-parsed formats
+    const playerA = onChainLobby.playerA;
+    const amount = typeof onChainLobby.amount === 'number' 
+      ? onChainLobby.amount 
+      : onChainLobby.amount.toNumber();
+    const characterA = onChainLobby.skinA;
+    const mapId = onChainLobby.map;
+    const lobbyPda = onChainLobby.publicKey?.toString() || `lobby_${lobbyId}`;
+
+    // Validate required fields
+    if (!playerA) {
+      throw new Error("Missing playerA in lobby account");
+    }
+
+    if (characterA === undefined) {
+      throw new Error("Missing skinA in lobby account");
+    }
+
+    // console.log(
+    //   `[1v1 Sync] Lobby ${lobbyId}: playerA=${playerA.toString().slice(0, 8)}..., amount=${amount}, char=${characterA}, map=${mapId}`
+    // );
+
+    // Create the lobby in Convex
+    await ctx.runMutation(internal.lobbies._internalCreateLobby, {
+      lobbyId,
+      lobbyPda,
+      playerA: playerA.toString(),
+      amount,
+      characterA,
+      mapId,
+    });
+
+    console.log(`[1v1 Sync] Successfully created missing lobby ${lobbyId}`);
+    return true;
+  } catch (error) {
+    console.error(
+      `[1v1 Sync] Failed to create missing lobby ${lobbyId}:`,
+      error instanceof Error ? error.message : String(error)
+    );
+    return false;
+  }
+};
+
+/**
+ * Process all open lobbies from Convex and sync their state
+ * @returns Object with sync statistics
+ */
+const _syncOpenLobbies = async (
+  ctx: any,
+  queryClient: any,
+  openLobbies: any[]
+): Promise<{ synced: number; errors: number }> => {
+  let synced = 0;
+  let errors = 0;
+
+  console.log(`[1v1 Sync] Checking ${openLobbies.length} open lobbies for state changes`);
+
+  for (const lobbyInConvex of openLobbies) {
+    try {
+      // Fetch the lobby account from blockchain
+      const lobbyPda = queryClient.getLobbyPdaForId(lobbyInConvex.lobbyId);
+      const onChainLobby = await queryClient.getLobbyAccount(lobbyPda);
+
+      if (!onChainLobby) {
+        throw new Error("Lobby account not found on blockchain");
+      }
+
+      // Try to sync if resolved
+      const wasSynced = await _syncResolvedLobby(ctx, lobbyInConvex, onChainLobby);
+      if (wasSynced) {
+        synced++;
+      }
+    } catch (error) {
+      errors++;
+      console.error(
+        `[1v1 Sync] Error syncing open lobby ${lobbyInConvex.lobbyId}:`,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  }
+
+  return { synced, errors };
+};
+
+/**
+ * Process missing lobbies from blockchain and add them to Convex
+ * @returns Object with sync statistics
+ */
+const _syncMissingLobbies = async (
+  ctx: any,
+  queryClient: any,
+  missingIds: number[]
+): Promise<{ synced: number; errors: number }> => {
+  let synced = 0;
+  let errors = 0;
+
+  if (missingIds.length === 0) {
+    return { synced: 0, errors: 0 };
+  }
+
+  console.log(`[1v1 Sync] Fetching and syncing ${missingIds.length} missing lobbies`);
+
+  for (const lobbyId of missingIds) {
+    try {
+      const lobbyPda = queryClient.getLobbyPdaForId(lobbyId);
+      const onChainLobby = await queryClient.getLobbyAccount(lobbyPda);
+
+      if (!onChainLobby) {
+        console.warn(`[1v1 Sync] Lobby ${lobbyId} not found on blockchain`);
+        errors++;
+        continue;
+      }
+
+      // Add the missing lobby to Convex
+      const wasAdded = await _syncMissingLobby(ctx, lobbyId, onChainLobby);
+      if (wasAdded) {
+        synced++;
+      } else {
+        errors++;
+      }
+    } catch (error) {
+      errors++;
+      console.error(
+        `[1v1 Sync] Error syncing missing lobby ${lobbyId}:`,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  }
+
+  return { synced, errors };
+};
+
 /**
  * Sync lobby state from blockchain to Convex - Recovery cron action
  * Runs every 30 seconds as a backup safety net to catch missed updates
  *
  * This function:
- * 1. Queries all open lobbies (status = 0) from Convex
- * 2. Fetches each lobby from the blockchain to get current state
- * 3. If a lobby has been resolved on-chain but not in Convex, updates Convex
- * 4. Handles edge cases: missing lobbies, network errors, etc.
+ * 1. Fetches actual lobby count from blockchain
+ * 2. Queries all lobbies from Convex
+ * 3. Detects missing lobbies (exist on-chain but not in Convex DB)
+ * 4. Syncs resolved lobbies (on-chain resolved but still open in Convex)
+ * 5. Syncs missing lobbies (adds them to Convex from blockchain)
+ * 6. Handles edge cases: network errors, missing accounts, etc.
  *
  * This is a backup mechanism - frontend should update Convex immediately
  * after confirming transactions. This cron catches the rare cases where
@@ -525,77 +771,82 @@ export const _getOpenLobbiesForSync = internalQuery({
  */
 export const syncLobbyFromBlockchain = internalAction({
   args: {},
-  handler: async (ctx): Promise<{ checked: number; synced: number; errors: number; fatalError?: string }> => {
+  handler: async (ctx): Promise<{
+    checked: number;
+    synced: number;
+    errors: number;
+    blockchainCount: number;
+    convexCount: number;
+    missingCount: number;
+    fatalError?: string;
+  }> => {
     try {
-      const rpcEndpoint = process.env.SOLANA_RPC_URL || "http://localhost:8899";
-      const queryClient = new Solana1v1QueryClient(rpcEndpoint);
+      const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
 
-      // Get all open lobbies from Convex (waiting for Player B)
-      const openLobbies = await ctx.runQuery(internal.lobbies._getOpenLobbiesForSync) as any[];
-
-      console.log(`[1v1 Cron] Syncing ${openLobbies.length} open lobbies from blockchain`);
-
-      let synced = 0;
-      let errors = 0;
-
-      for (const lobbyInConvex of openLobbies) {
-        try {
-          // Fetch the lobby account from blockchain
-          const lobbyPda = queryClient.getLobbyPdaForId(lobbyInConvex.lobbyId);
-          const onChainLobby = await queryClient.getLobbyAccount(lobbyPda);
-
-          // Check if the on-chain status has progressed beyond what we have in Convex
-          if (onChainLobby.status === 1 && lobbyInConvex.status === 0) {
-            // Lobby has been resolved on-chain but we still have it as open
-            console.log(
-              `[1v1 Cron] Syncing resolved lobby ${lobbyInConvex.lobbyId} to Convex`
-            );
-
-            // Determine the winner
-            const winner = onChainLobby.winner.toString();
-
-            // Extract Player B info from on-chain state
-            const playerB = onChainLobby.playerB.toString();
-            const characterB = onChainLobby.characterB;
-
-            // Update Convex to reflect the resolved state
-            await ctx.runMutation(internal.lobbies._internalJoinLobby, {
-              lobbyId: lobbyInConvex.lobbyId,
-              playerB,
-              characterB,
-              winner,
-            });
-
-            synced++;
-          }
-        } catch (error) {
-          errors++;
-          console.error(
-            `[1v1 Cron] Error syncing lobby ${lobbyInConvex.lobbyId}:`,
-            error instanceof Error ? error.message : String(error)
-          );
-
-          // Don't re-throw - continue with other lobbies
-          // This ensures one bad lobby doesn't break the entire sync
-        }
+      // Step 1: Get blockchain lobby count
+      let blockchainCount = 0;
+      try {
+        blockchainCount = await _getBlockchainLobbyCount(queryClient);
+      } catch (error) {
+        throw new Error(
+          `Failed to fetch blockchain lobby count: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
 
+      // Step 2: Get all lobbies from Convex
+      let convexLobbies: any[] = [];
+      try {
+        convexLobbies = await _getAllConvexLobbies(ctx);
+      } catch (error) {
+        throw new Error(
+          `Failed to fetch Convex lobbies: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+
+      const convexCount = convexLobbies.length;
+      console.log(
+        `[1v1 Sync] Blockchain: ${blockchainCount} lobbies, Convex: ${convexCount} lobbies`
+      );
+
+      // Step 3: Find missing lobbies
+      const missingIds = _findMissingLobbies(blockchainCount, convexLobbies);
+      const missingCount = missingIds.length;
+
+      let totalSynced = 0;
+      let totalErrors = 0;
+
+      // Step 4: Sync open lobbies (check for state changes)
+      const openSyncResult = await _syncOpenLobbies(ctx, queryClient, convexLobbies);
+      totalSynced += openSyncResult.synced;
+      totalErrors += openSyncResult.errors;
+
+      // Step 5: Sync missing lobbies (add to Convex from blockchain)
+      const missingSyncResult = await _syncMissingLobbies(ctx, queryClient, missingIds);
+      totalSynced += missingSyncResult.synced;
+      totalErrors += missingSyncResult.errors;
+
       const result = {
-        checked: openLobbies.length,
-        synced,
-        errors,
+        checked: convexCount,
+        synced: totalSynced,
+        errors: totalErrors,
+        blockchainCount,
+        convexCount,
+        missingCount,
       };
 
-      console.log(`[1v1 Cron] Sync complete: ${JSON.stringify(result)}`);
+      console.log(`[1v1 Sync] Complete: ${JSON.stringify(result)}`);
       return result;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error("[1v1 Cron] Error in syncLobbyFromBlockchain:", errorMsg);
+      console.error("[1v1 Sync] Fatal error in syncLobbyFromBlockchain:", errorMsg);
 
       return {
         checked: 0,
         synced: 0,
         errors: 1,
+        blockchainCount: 0,
+        convexCount: 0,
+        missingCount: 0,
         fatalError: errorMsg,
       };
     }

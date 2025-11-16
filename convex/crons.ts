@@ -27,11 +27,11 @@ crons.interval("sync-blockchain-state", { seconds: 45 }, internal.syncService.sy
  * on-chain and Convex state, and attempts to sync them
  * NOTE: Uncomment after Convex regenerates the API with lobbies module
  */
-// crons.interval(
-//   "sync-1v1-stuck-lobbies",
-//   { seconds: 30 },
-//   internal.lobbies.syncLobbyFromBlockchain
-// );
+crons.interval(
+  "sync-1v1-stuck-lobbies",
+  { seconds: 30 },
+  internal.lobbies.syncLobbyFromBlockchain
+);
 
 /**
  * Game recovery - self-healing system that catches unsent prizes
