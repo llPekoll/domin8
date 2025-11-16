@@ -101,8 +101,8 @@ async function main() {
     console.log(`  Explorer: https://explorer.solana.com/tx/${txSignature}?cluster=devnet`);
     console.log("");
 
-    // Fetch and display the configuration
-    const gameConfig = await (program.account as any).domin81v1Config.fetch(configPDA);
+    // Fetch and display the configuration (normal errors here)
+    const gameConfig = await program.account.domin81v1Config.fetch(configPDA);
 
     console.log("📋 1v1 Game Configuration:");
     console.log(`  Admin: ${gameConfig.admin.toString()}`);

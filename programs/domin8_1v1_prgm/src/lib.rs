@@ -10,7 +10,7 @@ pub use state::*;
 pub use instructions::*;
 pub use utils::*;
 
-declare_id!("2A7t8oJqXpSPNZxz92Ed9WaymzLg1yeUfiPymVFha9oh"); // TODO: Generate actual program ID
+declare_id!("BfxF6nhu5hgerSHmyedJegPqexK2M7VVykiSGgoT2T7v"); // TODO: Generate actual program ID
 
 #[program]
 pub mod domin8_1v1_prgm {
