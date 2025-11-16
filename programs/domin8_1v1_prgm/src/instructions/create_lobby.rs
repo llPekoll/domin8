@@ -30,13 +30,12 @@ pub fn handler(
         Domin81v1Error::InsufficientFunds
     );
 
-    // Get the lobby ID before incrementing
+    // Get the current lobby ID from config
     let lobby_id = config.lobby_count;
 
     // Generate unique force for this lobby by combining config force with lobby ID
-    // This ensures each lobby gets a unique VRF randomness account
+    // This MUST match the computation in the accounts macro
     let mut unique_force = config.force;
-    // Mix in lobby_id to make it unique per lobby
     for i in 0..8 {
         unique_force[i] ^= ((lobby_id >> (i * 8)) & 0xFF) as u8;
     }
@@ -122,10 +121,12 @@ pub struct CreateLobby<'info> {
 
     // ---- VRF accounts ----
 
-    /// CHECK: Orao randomness account
+    /// CHECK: Orao randomness account - derived with unique force per lobby
+    /// We compute unique force from config.force XORed with config.lobby_count
+    /// This MUST match the same computation in the handler
     #[account(
         mut,
-        seeds = [RANDOMNESS_ACCOUNT_SEED, &config.force],
+        seeds = [RANDOMNESS_ACCOUNT_SEED, &CreateLobby::compute_unique_force_seed(&config.force, config.lobby_count)],
         bump,
         seeds::program = ORAO_VRF_ID
     )]
@@ -145,4 +146,16 @@ pub struct CreateLobby<'info> {
 
     pub vrf_program: Program<'info, OraoVrf>,
     pub system_program: Program<'info, System>,
+}
+
+impl<'info> CreateLobby<'info> {
+    /// Compute unique force by XORing base force with lobby ID
+    /// Returns the unique force as a byte array suitable for use as a seed
+    fn compute_unique_force_seed(base_force: &[u8; 32], lobby_id: u64) -> [u8; 32] {
+        let mut unique_force = *base_force;
+        for i in 0..8 {
+            unique_force[i] ^= ((lobby_id >> (i * 8)) & 0xFF) as u8;
+        }
+        unique_force
+    }
 }

@@ -132,6 +132,10 @@ export type Domin81v1Prgm = {
         },
         {
           "name": "vrfRandomness",
+          "docs": [
+            "We compute unique force from config.force XORed with config.lobby_count",
+            "This MUST match the same computation in the handler"
+          ],
           "writable": true
         },
         {
