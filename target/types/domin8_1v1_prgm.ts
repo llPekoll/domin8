@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/domin8_1v1_prgm.json`.
  */
 export type Domin81v1Prgm = {
-  "address": "GNs99XRzawgkZ79wEvVX4TVUHzksGDViWFT5fZrhUNjs",
+  "address": "2A7t8oJqXpSPNZxz92Ed9WaymzLg1yeUfiPymVFha9oh",
   "metadata": {
     "name": "domin81v1Prgm",
     "version": "0.1.0",

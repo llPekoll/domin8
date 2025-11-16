@@ -68,7 +68,7 @@ export function Header() {
               </div>
 
               {/* Center - Navigation Links */}
-              <div className="flex-1 flex justify-center gap-6">
+              <div className="flex-1 flex gap-6">
                 <Link
                   to="/"
                   className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
