@@ -30,10 +30,18 @@ pub fn handler(
         Domin81v1Error::InsufficientFunds
     );
 
-    // Get force from config for VRF request
-    let force = config.force;
+    // Get the lobby ID before incrementing
+    let lobby_id = config.lobby_count;
 
-    // Request VRF randomness
+    // Generate unique force for this lobby by combining config force with lobby ID
+    // This ensures each lobby gets a unique VRF randomness account
+    let mut unique_force = config.force;
+    // Mix in lobby_id to make it unique per lobby
+    for i in 0..8 {
+        unique_force[i] ^= ((lobby_id >> (i * 8)) & 0xFF) as u8;
+    }
+
+    // Request VRF randomness with the unique force
     let vrf_cpi = CpiContext::new(
         ctx.accounts.vrf_program.to_account_info(),
         RequestV2 {
@@ -44,15 +52,14 @@ pub fn handler(
             system_program: ctx.accounts.system_program.to_account_info(),
         },
     );
-    orao_solana_vrf::cpi::request_v2(vrf_cpi, force)?;
+    orao_solana_vrf::cpi::request_v2(vrf_cpi, unique_force)?;
 
     // Initialize the lobby
-    let lobby_id = config.lobby_count;
     lobby.lobby_id = lobby_id;
     lobby.player_a = player_a.key();
     lobby.player_b = None;
     lobby.amount = amount;
-    lobby.vrf_force = force;
+    lobby.vrf_force = unique_force;  // Store the unique force
     lobby.status = LOBBY_STATUS_CREATED;
     lobby.winner = None;
     lobby.created_at = clock.unix_timestamp;
@@ -83,7 +90,7 @@ pub fn handler(
     );
     msg!("Bet amount: {} lamports", amount);
     msg!("Skin A: {}, Position A: [{}, {}], Map: {}", skin_a, position_a[0], position_a[1], map);
-    msg!("VRF force (hex): {}", Utils::bytes_to_hex(&force));
+    msg!("VRF force (hex): {}", Utils::bytes_to_hex(&unique_force));
 
     Ok(())
 }

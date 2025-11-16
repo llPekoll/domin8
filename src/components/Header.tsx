@@ -73,13 +73,13 @@ export function Header() {
                   to="/"
                   className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
                 >
-                  Jackpot
+                  Arena
                 </Link>
                 <Link
                   to="/1v1"
                   className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
                 >
-                  1v1
+                  1<span className="px-0.5">v</span>1
                 </Link>
               </div>
 

@@ -28,6 +28,9 @@ import { logger } from "./logger";
 // Extract Program ID from IDL
 const PROGRAM_ID = new PublicKey((IDL as any).address);
 
+// ORAO VRF Program ID
+const ORAO_VRF_PROGRAM_ID = new PublicKey("VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y");
+
 // PDA Seeds for 1v1 program
 const PDA_SEEDS_1V1 = {
   CONFIG: Buffer.from("domin8_1v1_config"),
@@ -110,13 +113,15 @@ async function simulateForComputeUnits(
     if (simulation.value.err) {
       logger.solana.warn("[Helius] Simulation error, using fallback CU", {
         error: simulation.value.err,
+        logs: simulation.value.logs,
       });
-      return 200_000; // Conservative fallback
+      // Return fallback for VRF-heavy transactions (create_lobby uses VRF CPI)
+      return 300_000; // Increased fallback for VRF operations
     }
 
     if (!simulation.value.unitsConsumed) {
       logger.solana.warn("[Helius] No unitsConsumed, using fallback CU");
-      return 200_000;
+      return 300_000;
     }
 
     // Apply buffer for safety (Helius recommendation: 10% buffer)
@@ -133,7 +138,7 @@ async function simulateForComputeUnits(
     return optimizedCU;
   } catch (error) {
     logger.solana.warn("[Helius] Simulation failed, using fallback CU:", error);
-    return 200_000; // Fallback
+    return 300_000; // Fallback for VRF operations
   }
 }
 
@@ -510,8 +515,79 @@ export async function buildCreateLobbyTransactionOptimized(
 
     const program = new Program<Domin81v1Prgm>(IDL as any, provider);
 
+    // Fetch config to get force bytes for VRF derivation
+    logger.ui.debug("[CreateLobby] Fetching config account for VRF force");
+    let baseForce: Uint8Array;
+    let nextLobbyId: number;
+    try {
+      const configAccount = await program.account.domin81v1Config.fetch(configPda);
+      // configAccount.force is number[], convert to Uint8Array
+      baseForce = new Uint8Array(configAccount.force);
+      nextLobbyId = configAccount.lobbyCount.toNumber();
+      logger.ui.debug("[CreateLobby] Config fetched", {
+        nextLobbyId,
+        baseForce: Array.from(baseForce).map(b => b.toString(16).padStart(2, '0')).join(''),
+      });
+    } catch (error) {
+      logger.ui.warn("[CreateLobby] Config not initialized, using fallback for VRF", error);
+      // If config doesn't exist yet, use defaults
+      baseForce = new Uint8Array(32);
+      nextLobbyId = 0;
+    }
+
+    // Generate unique force for this lobby by combining base force with lobby ID
+    // This matches the Rust logic: unique_force[i] ^= ((lobby_id >> (i * 8)) & 0xFF)
+    const uniqueForce = new Uint8Array(baseForce);
+    for (let i = 0; i < 8; i++) {
+      uniqueForce[i] ^= (nextLobbyId >> (i * 8)) & 0xFF;
+    }
+
+    logger.ui.debug("[CreateLobby] Generated unique force for lobby", {
+      lobbyId: nextLobbyId,
+      uniqueForce: Array.from(uniqueForce).map(b => b.toString(16).padStart(2, '0')).join(''),
+    });
+
     // Default position for simplicity: [0, 0]
     const positionA = [0, 0] as [number, number];
+
+    // ✅ FOLLOW USEGAMECONTRACT PATTERN: Fetch ORAO VRF accounts dynamically
+    // This ensures we use the correct, initialized ORAO accounts from the network
+    logger.ui.debug("[CreateLobby] Fetching ORAO VRF accounts from network");
+
+    let vrfRandomness: PublicKey;
+    let vrfTreasury: PublicKey;
+    let vrfConfigPda: PublicKey;
+
+    try {
+      const { Orao, networkStateAccountAddress, randomnessAccountAddress } = await import(
+        "@orao-network/solana-vrf"
+      );
+
+      const orao = new Orao(provider);
+      
+      // Get network state account address
+      vrfConfigPda = networkStateAccountAddress();
+      
+      // Get randomness account address using the unique force for this lobby
+      const forceBuf = Buffer.from(uniqueForce);
+      vrfRandomness = randomnessAccountAddress(forceBuf);
+      
+      // Fetch network state to get treasury
+      const networkStateData = await orao.getNetworkState();
+      vrfTreasury = networkStateData.config.treasury;
+
+      logger.ui.debug("[CreateLobby] ORAO VRF accounts resolved", {
+        lobbyId: nextLobbyId,
+        vrfRandomness: vrfRandomness.toString(),
+        vrfConfig: vrfConfigPda.toString(),
+        vrfTreasury: vrfTreasury.toString(),
+      });
+    } catch (error) {
+      logger.ui.error("[CreateLobby] Failed to fetch ORAO VRF accounts:", error);
+      throw new Error(
+        "Failed to initialize ORAO VRF accounts. Ensure the network is set up correctly."
+      );
+    }
 
     // Build the create_lobby instruction
     const createLobbyIx = await program.methods
@@ -519,6 +595,10 @@ export async function buildCreateLobbyTransactionOptimized(
       .accounts({
         config: configPda,
         playerA,
+        vrfRandomness,
+        vrfTreasury,
+        vrfConfig: vrfConfigPda,
+        vrfProgram: ORAO_VRF_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       } as any)
       .instruction();
@@ -577,16 +657,50 @@ export async function buildJoinLobbyTransactionOptimized(
 
     const program = new Program<Domin81v1Prgm>(IDL as any, provider);
 
-    // Fetch lobby to get Player A and other details
+    // Fetch lobby to get Player A and VRF force for deriving VRF accounts
     const lobbyAccount = await program.account.domin81v1Lobby.fetch(lobbyPda);
     const playerA = lobbyAccount.playerA;
+    const vrfForce = lobbyAccount.vrfForce; // Get force from lobby state
 
     // Default position for simplicity: [0, 0]
     const positionB = [0, 0] as [number, number];
 
-    // VRF placeholders
-    const vrfRandomness = new PublicKey("orao111111111111111111111111111111111111111");
-    const vrfTreasury = new PublicKey("11111111111111111111111111111111");
+    // ✅ FOLLOW USEGAMECONTRACT PATTERN: Fetch ORAO VRF accounts dynamically
+    logger.ui.debug("[JoinLobby] Fetching ORAO VRF accounts from network");
+
+    let vrfRandomness: PublicKey;
+    let vrfTreasury: PublicKey;
+    let vrfConfigPda: PublicKey;
+
+    try {
+      const { Orao, networkStateAccountAddress, randomnessAccountAddress } = await import(
+        "@orao-network/solana-vrf"
+      );
+
+      const orao = new Orao(provider);
+      
+      // Get network state account address
+      vrfConfigPda = networkStateAccountAddress();
+      
+      // Get randomness account address using the force from the lobby
+      const forceBuf = Buffer.from(vrfForce);
+      vrfRandomness = randomnessAccountAddress(forceBuf);
+      
+      // Fetch network state to get treasury
+      const networkStateData = await orao.getNetworkState();
+      vrfTreasury = networkStateData.config.treasury;
+
+      logger.ui.debug("[JoinLobby] ORAO VRF accounts resolved", {
+        vrfRandomness: vrfRandomness.toString(),
+        vrfConfig: vrfConfigPda.toString(),
+        vrfTreasury: vrfTreasury.toString(),
+      });
+    } catch (error) {
+      logger.ui.error("[JoinLobby] Failed to fetch ORAO VRF accounts:", error);
+      throw new Error(
+        "Failed to initialize ORAO VRF accounts. Ensure the network is set up correctly."
+      );
+    }
 
     // Build the join_lobby instruction
     const joinLobbyIx = await program.methods
