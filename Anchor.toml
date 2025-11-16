@@ -6,8 +6,8 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-domin8_1V1_prg = "2A7t8oJqXpSPNZxz92Ed9WaymzLg1yeUfiPymVFha9oh"
-domin8_prgm = "BfxF6nhu5hgerSHmyedJegPqexK2M7VVykiSGgoT2T7v"
+domin8_1V1_prg = "BfxF6nhu5hgerSHmyedJegPqexK2M7VVykiSGgoT2T7v"
+domin8_prgm = "7bHYHZVu7kWRU4xf7DWypCvefWvuDqW1CqVfsuwdGiR7"
 orao_vrf = "VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y"
 
 [registry]

@@ -535,11 +535,17 @@ export async function buildCreateLobbyTransactionOptimized(
       nextLobbyId = 0;
     }
 
-    // Generate unique force for this lobby by combining base force with lobby ID
+    // Generate unique force for this lobby by combining base force with lobby ID and program ID
     // This matches the Rust logic: unique_force[i] ^= ((lobby_id >> (i * 8)) & 0xFF)
+    // Plus XOR with program ID to ensure uniqueness per program deployment
     const uniqueForce = new Uint8Array(baseForce);
     for (let i = 0; i < 8; i++) {
       uniqueForce[i] ^= (nextLobbyId >> (i * 8)) & 0xFF;
+    }
+    // XOR with program ID bytes to ensure uniqueness per program deployment
+    const programIdBytes = PROGRAM_ID.toBuffer();
+    for (let i = 0; i < 32; i++) {
+      uniqueForce[i] ^= programIdBytes[i];
     }
 
     logger.ui.debug("[CreateLobby] Generated unique force for lobby", {
