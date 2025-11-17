@@ -214,18 +214,8 @@ export class AnimationManager {
     //   .setOrigin(0.5)
     //   .setDepth(200);
 
-    // // Track all celebration objects for cleanup
-    // this.celebrationObjects.push(backgroundOverlay, throne, nameText);
-
-    // // Animate name and bet text
-    // nameText.setAlpha(1);
-
-    // this.scene.tweens.add({
-    //   targets: nameText,
-    //   alpha: 1,
-    //   duration: 500,
-    //   delay: 300,
-    // });
+    // Track celebration objects for cleanup (throne and overlay)
+    this.celebrationObjects.push(backgroundOverlay, throne);
 
     // Bounce animation is now handled in PlayerManager.showResults()
 
