@@ -275,16 +275,17 @@ const BettingPanel = memo(function BettingPanel({
       logger.ui.error("Failed to place bet:", error);
 
       const errorMessage = error instanceof Error ? error.message : String(error);
+      const truncatedMessage = errorMessage.slice(0, 32);
       if (
         errorMessage.toLowerCase().includes("nft") ||
         errorMessage.toLowerCase().includes("collection")
       ) {
         toast.error("NFT Character Error", {
-          description: errorMessage,
+          description: truncatedMessage,
           duration: 6000,
         });
       } else {
-        toast.error(errorMessage || "Failed to place bet");
+        toast.error(truncatedMessage || "Failed to place bet");
       }
     } finally {
       setIsSubmitting(false);
