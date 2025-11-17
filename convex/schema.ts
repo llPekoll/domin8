@@ -38,6 +38,7 @@ export default defineSchema({
     .index("by_round_and_status", ["roundId", "status"]) // Prevent duplicate states (PRIMARY)
     .index("by_round_id", ["roundId"]) // Query all states for a round
     .index("by_status", ["status"]) // Query rounds by status
+    .index("by_status_and_round", ["status", "roundId"]) // Query by status, ordered by roundId
     .index("by_captured_at", ["capturedAt"]), // Chronological ordering
 
   // ============================================================================

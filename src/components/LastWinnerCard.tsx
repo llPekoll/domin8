@@ -6,10 +6,11 @@ import { useMemo } from "react";
 
 export function LastWinnerCard() {
   const lastFinishedGame = useQuery(api.stats.getLastFinishedGame);
-
+  console.log({ lastFinishedGame });
   // Get display name for the winner
   const playerInfo = useQuery(
     api.players.getPlayer,
+    // lastFinishedGame?.winnerAddress ? { walletAddress: lastFinishedGame.winnerAddress } : "skip"
     lastFinishedGame?.winnerAddress ? { walletAddress: lastFinishedGame.winnerAddress } : "skip"
   );
 
