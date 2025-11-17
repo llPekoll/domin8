@@ -678,6 +678,67 @@ export async function buildJoinLobbyTransactionOptimized(
 }
 
 /**
+ * Build a cancel_lobby transaction with Helius optimization
+ * Allows Player A to cancel their lobby if no one has joined yet
+ * 
+ * @param playerA - Player A's public key
+ * @param lobbyId - Lobby ID to cancel
+ * @param lobbyPda - Lobby PDA address
+ * @param connection - Solana connection
+ * @returns Promise<{ transaction: VersionedTransaction; metrics: OptimizationMetrics }>
+ */
+export async function buildCancelLobbyTransactionOptimized(
+  playerA: PublicKey,
+  lobbyId: number,
+  lobbyPda: PublicKey,
+  connection: Connection
+): Promise<{ transaction: VersionedTransaction; metrics: OptimizationMetrics }> {
+  try {
+    logger.ui.debug("[CancelLobby] Building optimized transaction", {
+      playerA: playerA.toString(),
+      lobbyId,
+      lobbyPda: lobbyPda.toString(),
+    });
+
+    // Create a read-only provider for instruction building
+    const provider = new AnchorProvider(
+      connection,
+      {
+        publicKey: playerA,
+      } as any,
+      { commitment: "confirmed" }
+    );
+
+    const program = new Program<Domin81v1Prgm>(IDL as any, provider);
+
+    logger.ui.debug("[CancelLobby] Building cancel_lobby instruction");
+
+    // Build the cancel_lobby instruction
+    const cancelLobbyIx = await program.methods
+      .cancelLobby()
+      .accounts({
+        lobby: lobbyPda,
+        playerA,
+        systemProgram: SystemProgram.programId,
+      } as any)
+      .instruction();
+
+    // Build optimized transaction with Helius best practices
+    const { transaction, metrics } = await buildOptimizedTransaction(
+      connection,
+      [cancelLobbyIx],
+      playerA
+    );
+
+    logger.ui.debug("[CancelLobby] Optimized transaction created", metrics);
+    return { transaction, metrics };
+  } catch (error) {
+    logger.ui.error("[CancelLobby] Failed to build optimized transaction:", error);
+    throw error;
+  }
+}
+
+/**
  * Send transaction with Helius optimizations and Privy wallet
  * @param connection - Solana connection
  * @param transaction - VersionedTransaction to send

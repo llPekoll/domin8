@@ -376,7 +376,16 @@ export const createLobby = action({
         throw new Error("Lobby not found after creation");
       }
 
-      // Create lobby in Convex via mutation
+      // Create lobby in Convex immediately after blockchain confirmation
+      await ctx.runMutation(internal.lobbies._internalCreateLobby, {
+        lobbyId,
+        lobbyPda: lobbyPda.toString(),
+        playerA: args.playerAWallet,
+        amount: args.amount,
+        characterA: args.characterA,
+        mapId: args.mapId,
+      });
+
       return {
         success: true,
         lobbyId,
@@ -475,6 +484,11 @@ export const cancelLobby = action({
       if (!tx) {
         throw new Error("Transaction not found on blockchain");
       }
+
+      // Delete the lobby from Convex database
+      await ctx.runMutation(internal.lobbies._internalDeleteLobby, {
+        lobbyId: args.lobbyId,
+      });
 
       return {
         success: true,

@@ -3,6 +3,7 @@ import { Header } from "../components/Header";
 import { CharacterSelection2 } from "../components/CharacterSelection2";
 import { CreateLobby } from "../components/onevone/CreateLobby";
 import { LobbyList } from "../components/onevone/LobbyList";
+import { MyLobbies } from "../components/onevone/MyLobbies";
 import { OneVOneFightScene } from "../components/onevone/OneVOneFightScene";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useQuery } from "convex/react";
@@ -35,6 +36,13 @@ export function OneVOnePage() {
   // Get open lobbies from Convex (real-time updates)
   const openLobbies = useQuery(api.lobbies.getOpenLobbies) || [];
   
+  // Get user's personal lobbies (for cancel functionality)
+  const userLobbies = connected && publicKey 
+    ? useQuery(api.lobbies.getPlayerLobbies, { playerWallet: publicKey.toString() })
+    : null;
+  
+  const userOpenLobbies = (userLobbies || []).filter((l: LobbyData) => l.status === 0);
+  
   // Get specific lobby state when fighting (for real-time updates during fight)
   const lobbyState = fightingLobbyId !== null 
     ? useQuery(api.lobbies.getLobbyState, { lobbyId: fightingLobbyId })
@@ -47,6 +55,11 @@ export function OneVOnePage() {
   const handleLobbyCreated = useCallback((lobbyId: number) => {
     // After creating a lobby, stay on the list so they can see it
     console.log("[1v1] Lobby created:", lobbyId);
+  }, []);
+
+  const handleLobbyCancelled = useCallback((lobbyId: number) => {
+    // Lobby was cancelled - the component will automatically refresh
+    console.log("[1v1] Lobby cancelled:", lobbyId);
   }, []);
 
   const handleLobbyJoined = useCallback((lobbyId: number) => {
@@ -109,6 +122,8 @@ export function OneVOnePage() {
                 <CreateLobby
                   selectedCharacter={selectedCharacter}
                   onLobbyCreated={handleLobbyCreated}
+                  userOpenLobbies={userOpenLobbies}
+                  onLobbyCancelled={handleLobbyCancelled}
                 />
               </div>
 

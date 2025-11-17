@@ -36,6 +36,7 @@ export function LobbyList({
   const { connected, wallet } = usePrivyWallet();
   const joinLobbyAction = useAction(api.lobbies.joinLobby);
   const [joiningLobbies, setJoiningLobbies] = useState<Set<number>>(new Set());
+  logger.solana.debug("Rendering LobbyList with lobbies:", lobbies);
 
   const handleJoinLobby = useCallback(
     async (lobby: LobbyData) => {
