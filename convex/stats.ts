@@ -233,9 +233,20 @@ export const getLastFinishedGame = query({
       return null;
     }
 
-    // Find the first valid game with a winner (highest roundId due to desc order)
+    // Current time in seconds
+    const currentTime = Math.floor(Date.now() / 1000);
+    // Minimum delay before showing a finished game (15 seconds for celebration phase)
+    const MIN_DISPLAY_DELAY = 15;
+
+    // Find the first valid game with a winner that ended at least 15 seconds ago
+    // This prevents spoiling the winner during the celebration phase
     const lastGame = finishedGames.find(
-      (game) => game.winner && game.winningBetIndex !== undefined && game.totalPot && game.totalPot > 0
+      (game) =>
+        game.winner &&
+        game.winningBetIndex !== undefined &&
+        game.totalPot &&
+        game.totalPot > 0 &&
+        currentTime - game.endTimestamp >= MIN_DISPLAY_DELAY
     );
 
     if (!lastGame) {
