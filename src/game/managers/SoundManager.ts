@@ -11,7 +11,7 @@ import { logger } from "~/lib/logger";
  * - Browser autoplay handling
  */
 export class SoundManager {
-  private static globalVolume: number = 1.0;
+  private static globalVolume: number = 0.2;
   private static isMuted: boolean = false;
   private static isAudioUnlocked: boolean = false;
   private static initialized: boolean = false;
