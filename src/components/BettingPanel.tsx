@@ -3,6 +3,7 @@ import { useQuery, useAction } from "convex/react";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useGameContract } from "../hooks/useGameContract";
 import { useActiveGame } from "../hooks/useActiveGame";
+import { useFundWallet } from "../hooks/useFundWallet";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { EventBus } from "../game/EventBus";
@@ -10,6 +11,7 @@ import { logger } from "../lib/logger";
 import { useAssets } from "../contexts/AssetsContext";
 import type { Character } from "../types/character";
 import styles from "./ButtonShine.module.css";
+import { Plus, Wallet } from "lucide-react";
 
 // Betting limits
 const MIN_BET_AMOUNT = 0.001;
@@ -28,6 +30,7 @@ const BettingPanel = memo(function BettingPanel({
   const { connected, publicKey, solBalance, isLoadingBalance, externalWalletAddress } =
     usePrivyWallet();
   const { placeBet, validateBet } = useGameContract();
+  const { handleAddFunds } = useFundWallet();
 
   // NFT verification action
   const verifyNFTOwnership = useAction(api.nft.verifyNFTOwnership);
@@ -84,6 +87,13 @@ const BettingPanel = memo(function BettingPanel({
     // Default: don't allow betting for unknown statuses
     return false;
   }, [activeGame]);
+
+  // Check if balance is insufficient
+  const hasInsufficientBalance = useMemo(() => {
+    // Don't hide the Add Funds UI while loading - keep showing it if balance was previously low
+    if (solBalance === null) return false;
+    return solBalance < MIN_BET_AMOUNT + 0.001; // Need 0.001 SOL + min bet + some for fees
+  }, [solBalance]);
 
   const handleIncrementBet = (increment: number) => {
     const currentAmount = parseFloat(betAmount) || 0;
@@ -311,6 +321,104 @@ const BettingPanel = memo(function BettingPanel({
   // Don't render if not connected
   if (!connected) {
     return null;
+  }
+
+  // Show greyed-out panel with Add Funds CTA if balance is insufficient
+  if (hasInsufficientBalance) {
+    return (
+      <div className="pt-2">
+        {/* Balance Display */}
+        <span className="text-amber-400/50">Balance</span>
+        <div className="inline-flex items-center gap-1 pl-2">
+          {!isLoadingBalance && (
+            <img
+              src="/sol-logo.svg"
+              alt="SOL"
+              className="w-3 h-3 opacity-50"
+              style={{
+                filter:
+                  "brightness(0) saturate(100%) invert(85%) sepia(23%) saturate(632%) hue-rotate(358deg) brightness(100%) contrast(92%)",
+              }}
+            />
+          )}
+          <span className="text-amber-300/50">
+            {isLoadingBalance ? "..." : solBalance !== null ? solBalance.toFixed(3) : "..."}
+          </span>
+        </div>
+
+        {/* Greyed Out Betting Panel */}
+        <div className="flex items-center justify-between bg-gradient-to-b from-gray-800/30 to-gray-900/30 backdrop-blur-xs rounded-xl shadow-2xl shadow-gray-900/50 min-w-[560px] px-2 py-2 space-x-1 relative overflow-hidden border-2 border-gray-700/30">
+          {/* Overlay with prominent Add Funds button */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-10 flex items-center justify-center">
+            <button
+              onClick={() => walletAddress && handleAddFunds(walletAddress)}
+              className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-xl font-bold text-xl uppercase tracking-wider transition-all shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+            >
+              <Plus className="w-6 h-6" />
+              Add Funds to Play
+              <Wallet className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Greyed out content underneath */}
+          <div className="relative w-1/5 opacity-30">
+            <img
+              src="/sol-logo.svg"
+              alt="SOL"
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+            />
+            <input
+              type="number"
+              value={betAmount}
+              disabled
+              className="text-2xl w-full px-2 py-2 pl-8 bg-black/30 border border-gray-700/50 rounded-lg text-gray-500 text-center font-bold"
+            />
+          </div>
+
+          {/* Quick bet buttons - greyed out */}
+          <div className="grid grid-cols-4 gap-2 w-2/5 opacity-30">
+            <button
+              disabled
+              className="py-1.5 bg-gray-800/30 border border-gray-600/50 rounded-lg text-gray-500 text-2xl font-bold cursor-not-allowed"
+            >
+              +0.01
+            </button>
+            <button
+              disabled
+              className="py-1.5 bg-gray-800/30 border border-gray-600/50 rounded-lg text-gray-500 text-2xl font-bold cursor-not-allowed"
+            >
+              +0.1
+            </button>
+            <button
+              disabled
+              className="py-1.5 bg-gray-800/30 border border-gray-600/50 rounded-lg text-gray-500 text-2xl font-bold cursor-not-allowed"
+            >
+              +1
+            </button>
+            <button
+              disabled
+              className="py-1.5 bg-gray-800/30 rounded-lg text-gray-500 text-2xl cursor-not-allowed"
+            >
+              All-In
+            </button>
+          </div>
+
+          {/* Place bet button - greyed out */}
+          <button
+            disabled
+            className="text-2xl flex justify-center items-center w-1/3 py-2 bg-gray-700 rounded-lg font-bold text-gray-500 uppercase tracking-wider opacity-30 cursor-not-allowed"
+          >
+            <img src="/assets/insert-coin.png" alt="Coin" className="h-6 mr-2 opacity-50" />
+            Insert coin
+          </button>
+        </div>
+
+        {/* Help text */}
+        <p className="text-center text-gray-400 text-sm mt-2">
+          Add funds to your wallet to start playing
+        </p>
+      </div>
+    );
   }
 
   return (
