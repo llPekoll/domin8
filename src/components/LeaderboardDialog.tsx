@@ -53,6 +53,11 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
     return publicKey && publicKey.toString() === walletAddress;
   };
 
+  const calculateWinRate = (wins: number, totalGames: number) => {
+    if (totalGames === 0) return "0%";
+    return `${((wins / totalGames) * 100).toFixed(1)}%`;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -98,6 +103,12 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
 
                 {/* Player Info */}
                 <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-xs text-indigo-400/80">Win Rate</span>
+                    <span className="text-sm font-bold text-indigo-200">
+                      {calculateWinRate(player.totalWins, player.totalGamesPlayed)}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="text-indigo-100 font-semibold truncate">
                       {player.displayName}
