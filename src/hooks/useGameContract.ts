@@ -491,6 +491,9 @@ export const useGameContract = () => {
   // Convex mutation for awarding points
   const awardPoints = useMutation(api.players.awardPoints);
 
+  // Convex mutation for tracking referral revenue
+  const updateReferralRevenue = useMutation(api.referrals.updateReferralRevenue);
+
   // Get selected wallet (first Solana wallet from Privy)
   const selectedWallet = useMemo(() => {
     return wallets.length > 0 ? wallets[0] : null;
@@ -802,6 +805,18 @@ export const useGameContract = () => {
         } catch (pointsError) {
           // Don't fail the bet if points award fails
           logger.solana.error("[placeBet] Failed to award points:", pointsError);
+        }
+
+        // Track referral revenue if this user was referred
+        try {
+          await updateReferralRevenue({
+            userId: publicKey.toString(),
+            betAmount: amountLamports,
+          });
+          logger.solana.debug("[placeBet] Referral revenue tracked");
+        } catch (referralError) {
+          // Don't fail the bet if referral tracking fails
+          logger.solana.error("[placeBet] Failed to track referral revenue:", referralError);
         }
 
         // Send webhook notification if this was a game creation (first bet)

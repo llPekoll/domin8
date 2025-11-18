@@ -3,50 +3,41 @@ import { Header } from "../components/Header";
 import { CharacterSelection2 } from "../components/CharacterSelection2";
 import { CreateLobby } from "../components/onevone/CreateLobby";
 import { LobbyList } from "../components/onevone/LobbyList";
-import { MyLobbies } from "../components/onevone/MyLobbies";
+// import { MyLobbies } from "../components/onevone/MyLobbies";
 import { OneVOneFightScene } from "../components/onevone/OneVOneFightScene";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Character } from "../types/character";
-
-interface LobbyData {
-  _id: string;
-  lobbyId: number;
-  lobbyPda: string;
-  playerA: string;
-  playerB?: string;
-  amount: number;
-  status: 0 | 1;
-  winner?: string;
-  characterA: number;
-  characterB?: number;
-  mapId: number;
-}
+import type { LobbyData } from "../types/lobby";
 
 export function OneVOnePage() {
   const { connected, publicKey } = usePrivyWallet();
-  
+
   // Track selected character for 1v1 lobbies
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
-  
+
   // Track which lobby we're currently fighting in (null = list view, number = fighting)
   const [fightingLobbyId, setFightingLobbyId] = useState<number | null>(null);
-  
+
   // Get open lobbies from Convex (real-time updates)
   const openLobbies = useQuery(api.lobbies.getOpenLobbies) || [];
-  
+
   // Get user's personal lobbies (for cancel functionality)
-  const userLobbies = connected && publicKey 
-    ? useQuery(api.lobbies.getPlayerLobbies, { playerWallet: publicKey.toString() })
-    : null;
-  
-  const userOpenLobbies = (userLobbies || []).filter((l: LobbyData) => l.status === 0);
-  
+  const userLobbies =
+    connected && publicKey
+      ? useQuery(api.lobbies.getPlayerLobbies, { playerWallet: publicKey.toString() })
+      : null;
+
+  const userOpenLobbies = userLobbies
+    ? [...userLobbies.asPlayerA, ...userLobbies.asPlayerB].filter((l: LobbyData) => l.status === 0)
+    : [];
+
   // Get specific lobby state when fighting (for real-time updates during fight)
-  const lobbyState = fightingLobbyId !== null 
-    ? useQuery(api.lobbies.getLobbyState, { lobbyId: fightingLobbyId })
-    : null;
+  const lobbyState =
+    fightingLobbyId !== null
+      ? useQuery(api.lobbies.getLobbyState, { lobbyId: fightingLobbyId })
+      : null;
 
   const handleCharacterSelected = useCallback((character: Character | null) => {
     setSelectedCharacter(character);
@@ -77,18 +68,18 @@ export function OneVOnePage() {
     if (!connected || !publicKey) {
       return "not-connected";
     }
-    
+
     if (fightingLobbyId !== null && lobbyState) {
       return "fighting";
     }
-    
+
     return "lobby-list";
   }, [connected, publicKey, fightingLobbyId, lobbyState]);
 
   return (
     <div className="min-h-screen w-full bg-black">
       <Header />
-      
+
       {/* Character Selection (fixed, always visible) */}
       <div className="fixed bottom-0 left-0 right-0 z-10">
         <CharacterSelection2 onCharacterSelected={handleCharacterSelected} />

@@ -5,20 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { logger } from "../../lib/logger";
 import type { Character } from "../../types/character";
-
-interface LobbyData {
-  _id: string;
-  lobbyId: number;
-  lobbyPda: string;
-  playerA: string;
-  playerB?: string;
-  amount: number;
-  status: 0 | 1;
-  winner?: string;
-  characterA: number;
-  characterB?: number;
-  mapId: number;
-}
+import type { LobbyData } from "../../types/lobby";
 
 interface LobbyListProps {
   lobbies: LobbyData[];

@@ -1,20 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { EventBus } from "../../game/EventBus";
 import type { Character } from "../../types/character";
-
-interface LobbyData {
-  _id: string;
-  lobbyId: number;
-  lobbyPda: string;
-  playerA: string;
-  playerB?: string;
-  amount: number;
-  status: 0 | 1;
-  winner?: string;
-  characterA: number;
-  characterB?: number;
-  mapId: number;
-}
+import type { LobbyData } from "../../types/lobby";
 
 interface OneVOneFightSceneProps {
   lobby: LobbyData;

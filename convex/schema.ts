@@ -113,6 +113,42 @@ export default defineSchema({
   }).index("by_wallet", ["walletAddress"]),
 
   // ============================================================================
+  // REFERRAL SYSTEM TABLES
+  // ============================================================================
+
+  /**
+   * Referrals - Individual referral relationships
+   * Tracks which users were referred by whom
+   */
+  referrals: defineTable({
+    referrerId: v.string(), // Wallet address of the person who referred
+    referredUserId: v.string(), // Wallet address of the person who signed up
+    referralCode: v.string(), // The referral code used
+    signupDate: v.number(), // Unix timestamp when they signed up
+    totalBetVolume: v.number(), // Total SOL (in lamports) bet by this referred user
+    status: v.string(), // "active" | "inactive"
+  })
+    .index("by_referrer", ["referrerId"]) // Query all users referred by someone
+    .index("by_referred_user", ["referredUserId"]) // Check if user was referred
+    .index("by_referral_code", ["referralCode"]), // Look up by code during signup
+
+  /**
+   * Referral Stats - Aggregated statistics per referrer
+   * Used for leaderboards and personal dashboards
+   * Rank is calculated on-demand, not stored
+   */
+  referralStats: defineTable({
+    walletAddress: v.string(), // Referrer's wallet address
+    referralCode: v.string(), // Their unique referral code
+    totalReferred: v.number(), // Count of users they've referred
+    totalRevenue: v.number(), // Sum of all referred users' bet volume (in lamports)
+    accumulatedRewards: v.number(), // 1.5% of totalRevenue - rewards earned (in lamports)
+    createdAt: v.number(), // When they created their referral link
+  }).index("by_wallet", ["walletAddress"])
+    .index("by_code", ["referralCode"])
+    .index("by_revenue", ["totalRevenue"]), // For leaderboard sorting
+
+  // ============================================================================
   // 1V1 LOBBY TABLES
   // ============================================================================
 

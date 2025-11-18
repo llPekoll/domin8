@@ -77,11 +77,17 @@ export function Header() {
                 >
                   Arena
                 </Link>
-                <Link
+                {/*<Link
                   to="/1v1"
                   className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
                 >
                   1<span className="px-0.5">v</span>1
+                </Link>*/}
+                <Link
+                  to="/referrals"
+                  className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
+                >
+                  Referrals
                 </Link>
               </div>
 
@@ -175,10 +181,7 @@ export function Header() {
         />
       )}
 
-      <LeaderboardDialog
-        open={showLeaderboardDialog}
-        onOpenChange={setShowLeaderboardDialog}
-      />
+      <LeaderboardDialog open={showLeaderboardDialog} onOpenChange={setShowLeaderboardDialog} />
     </>
   );
 }
