@@ -71,24 +71,24 @@ export function Header() {
 
               {/* Center - Navigation Links */}
               <div className="flex-1 flex gap-6">
-                <Link
+                {/*<Link
                   to="/"
                   className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
                 >
                   Arena
-                </Link>
+                </Link>*/}
                 {/*<Link
                   to="/1v1"
                   className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
                 >
                   1<span className="px-0.5">v</span>1
                 </Link>*/}
-                <Link
+                {/*<Link
                   to="/referrals"
                   className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
                 >
                   Referrals
-                </Link>
+                </Link>*/}
               </div>
 
               {/* Right Side - User Controls */}
