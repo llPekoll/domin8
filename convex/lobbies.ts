@@ -570,6 +570,7 @@ const _getBlockchainLobbyCount = async (queryClient: any): Promise<number> => {
 /**
  * Find missing lobby IDs between blockchain and Convex
  * @returns Array of lobby IDs that exist on-chain but not in Convex
+ * NOTE: Does NOT include closed/deleted lobby accounts - only checks Convex DB
  */
 const _findMissingLobbies = (blockchainCount: number, convexLobbies: any[]): number[] => {
   const convexIds = new Set(convexLobbies.map((l: any) => l.lobbyId));
@@ -582,7 +583,7 @@ const _findMissingLobbies = (blockchainCount: number, convexLobbies: any[]): num
   }
 
   if (missing.length > 0) {
-    console.log(`[1v1 Sync] Found ${missing.length} missing lobbies: ${missing.join(", ")}`);
+    console.log(`[1v1 Sync] Found ${missing.length} potential missing lobbies: ${missing.join(", ")}`);
   }
 
   return missing;
@@ -722,6 +723,8 @@ const _syncOpenLobbies = async (
 /**
  * Process missing lobbies from blockchain and add them to Convex
  * @returns Object with sync statistics
+ * NOTE: Closed/deleted lobby accounts (not found on-chain) are skipped silently
+ * since they represent canceled lobbies, not errors
  */
 const _syncMissingLobbies = async (
   ctx: any,
@@ -743,8 +746,9 @@ const _syncMissingLobbies = async (
       const onChainLobby = await queryClient.getLobbyAccount(lobbyPda);
 
       if (!onChainLobby) {
-        console.warn(`[1v1 Sync] Lobby ${lobbyId} not found on blockchain`);
-        errors++;
+        // Lobby account doesn't exist on-chain = it was closed/canceled
+        // This is normal and expected, so we skip it without counting as error
+        console.log(`[1v1 Sync] Lobby ${lobbyId} not found on blockchain (likely canceled/closed)`);
         continue;
       }
 
@@ -756,11 +760,20 @@ const _syncMissingLobbies = async (
         errors++;
       }
     } catch (error) {
-      errors++;
-      console.error(
-        `[1v1 Sync] Error syncing missing lobby ${lobbyId}:`,
-        error instanceof Error ? error.message : String(error)
-      );
+      // Only count as error if it's not a "not found" error
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      if (!errorMsg.includes("not found") && !errorMsg.includes("not exist")) {
+        errors++;
+        console.error(
+          `[1v1 Sync] Error syncing missing lobby ${lobbyId}:`,
+          errorMsg
+        );
+      } else {
+        // "Not found" errors are expected for closed lobbies, log as info
+        console.log(
+          `[1v1 Sync] Lobby ${lobbyId} not found on blockchain (likely canceled/closed)`
+        );
+      }
     }
   }
 
