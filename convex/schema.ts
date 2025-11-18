@@ -111,4 +111,44 @@ export default defineSchema({
     totalPoints: v.optional(v.number()), // Points earned from bets and prizes (1 point per 0.001 SOL)
     achievements: v.array(v.string()),
   }).index("by_wallet", ["walletAddress"]),
+
+  // ============================================================================
+  // 1V1 LOBBY TABLES
+  // ============================================================================
+
+  /**
+   * OneVOne Lobbies - Track 1v1 coinflip games
+   * Mirrors the on-chain Domin81v1Lobby PDA accounts
+   */
+  oneVOneLobbies: defineTable({
+    // Identifiers
+    lobbyId: v.number(), // Unique lobby ID from on-chain
+    lobbyPda: v.string(), // Public key of the Lobby PDA (base58)
+
+    // Players
+    playerA: v.string(), // Player A's wallet address (base58)
+    playerB: v.optional(v.string()), // Player B's wallet address (base58, None until joined)
+
+    // Game state
+    amount: v.number(), // Bet amount per player (in lamports)
+    status: v.number(), // 0 = created (waiting), 1 = resolved
+    winner: v.optional(v.string()), // Winner's wallet address (base58, None until resolved)
+
+    // Character & Map selection
+    characterA: v.number(), // Player A's character/skin ID (0-255)
+    characterB: v.optional(v.number()), // Player B's character/skin ID (0-255, None until joined)
+    mapId: v.number(), // Map/background ID (0-255)
+
+    // Positioning (optional, for future expansion)
+    positionA: v.optional(v.array(v.number())), // [x, y] spawn position for Player A
+    positionB: v.optional(v.array(v.number())), // [x, y] spawn position for Player B
+
+    // Timestamps
+    createdAt: v.number(), // When lobby was created (Unix timestamp)
+    resolvedAt: v.optional(v.number()), // When lobby was resolved (Unix timestamp)
+  })
+    .index("by_status", ["status"]) // Query open lobbies (status = 0)
+    .index("by_player_a", ["playerA"]) // Query lobbies by Player A
+    .index("by_player_b", ["playerB"]) // Query lobbies by Player B
+    .index("by_status_and_created", ["status", "createdAt"]), // For pagination and stuck lobby detection
 });

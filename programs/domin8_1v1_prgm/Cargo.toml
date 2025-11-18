@@ -1,0 +1,25 @@
+[package]
+name = "domin8_1v1_prgm"
+version = "0.1.0"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "domin8_1v1_prgm"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "switchboard-on-demand/idl-build"]
+localnet = []  # Enable mock VRF for localnet testing
+
+
+[dependencies]
+anchor-lang = "0.31.1"
+switchboard-on-demand = { version = "0.10.8", features = ["anchor"] }
+
+

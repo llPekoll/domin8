@@ -21,6 +21,19 @@ const crons = cronJobs();
 crons.interval("sync-blockchain-state", { seconds: 45 }, internal.syncService.syncBlockchainState);
 
 /**
+ * 1v1 Lobby Recovery - Reconciles stuck lobbies
+ * Runs every 30 seconds as a backup safety net
+ * Checks for lobbies that are stuck in status 0 or have discrepancies between
+ * on-chain and Convex state, and attempts to sync them
+ * NOTE: Uncomment after Convex regenerates the API with lobbies module
+ */
+crons.interval(
+  "sync-1v1-stuck-lobbies",
+  { seconds: 30 },
+  internal.lobbies.syncLobbyFromBlockchain
+);
+
+/**
  * Game recovery - self-healing system that catches unsent prizes
  * Runs every 30 seconds to check for finished games with unclaimed prizes
  * TODO: Implement recoverUnsentPrizes function in syncService.ts

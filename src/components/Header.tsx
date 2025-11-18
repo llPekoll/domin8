@@ -2,6 +2,7 @@ import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { ProfileDialog } from "./ProfileDialog";
 import { LeaderboardDialog } from "./LeaderboardDialog";
 import { PrivyWalletButton } from "./PrivyWalletButton";
@@ -68,8 +69,21 @@ export function Header() {
                 <img src="/assets/logo.webp" alt="Enrageded" className="h-12 w-auto" />
               </div>
 
-              {/* Center - Empty (status moved to PotDisplayPanel) */}
-              <div className="flex-1 flex justify-center"></div>
+              {/* Center - Navigation Links */}
+              <div className="flex-1 flex gap-6">
+                <Link
+                  to="/"
+                  className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
+                >
+                  Arena
+                </Link>
+                <Link
+                  to="/1v1"
+                  className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
+                >
+                  1<span className="px-0.5">v</span>1
+                </Link>
+              </div>
 
               {/* Right Side - User Controls */}
               <div className="flex items-center gap-4 flex-shrink-0">

@@ -1,6 +1,7 @@
 import { Boot } from "./scenes/Boot";
 import { Game as MainGame } from "./scenes/Game";
 import { DemoScene } from "./scenes/DemoScene";
+import { OneVOneScene } from "./scenes/OneVOneScene";
 import { AUTO, Game } from "phaser";
 import { Preloader } from "./scenes/Preloader";
 
@@ -77,7 +78,7 @@ const config: Phaser.Types.Core.GameConfig = {
     disableWebAudio: false, // Use Web Audio API (best quality)
     noAudio: false, // Enable audio
   },
-  scene: [Boot, Preloader, DemoScene, MainGame],
+  scene: [Boot, Preloader, DemoScene, OneVOneScene, MainGame],
 };
 
 const StartGame = (parent: string) => {
