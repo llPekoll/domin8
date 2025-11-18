@@ -373,3 +373,39 @@ export const awardPointsInternal = internalMutation({
   },
   handler: awardPointsHandler,
 });
+
+/**
+ * Get leaderboard (top players by points)
+ *
+ * @param limit - Number of top players to return (default: 100)
+ * @returns Array of players sorted by totalPoints (descending)
+ */
+export const getLeaderboard = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 100;
+
+    // Get all players with points
+    const allPlayers = await ctx.db
+      .query("players")
+      .collect();
+
+    // Filter and sort by totalPoints (descending)
+    const topPlayers = allPlayers
+      .filter(player => (player.totalPoints ?? 0) > 0)
+      .sort((a, b) => (b.totalPoints ?? 0) - (a.totalPoints ?? 0))
+      .slice(0, limit);
+
+    // Return with rank
+    return topPlayers.map((player, index) => ({
+      rank: index + 1,
+      walletAddress: player.walletAddress,
+      displayName: player.displayName || `Player ${player.walletAddress.slice(0, 6)}`,
+      totalPoints: player.totalPoints ?? 0,
+      totalWins: player.totalWins,
+      totalGamesPlayed: player.totalGamesPlayed,
+    }));
+  },
+});
