@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useState, useEffect } from "react";
 import { ProfileDialog } from "./ProfileDialog";
+import { LeaderboardDialog } from "./LeaderboardDialog";
 import { PrivyWalletButton } from "./PrivyWalletButton";
 import { SoundControl } from "./SoundControl";
 import { toast } from "sonner";
@@ -14,6 +15,7 @@ export function Header() {
   const { connected, publicKey, externalWalletAddress, solBalance, isLoadingBalance } =
     usePrivyWallet();
   const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [showLeaderboardDialog, setShowLeaderboardDialog] = useState(false);
   const [hasAttemptedCreation, setHasAttemptedCreation] = useState(false);
 
   const createPlayer = useMutation(api.players.createPlayer);
@@ -82,9 +84,15 @@ export function Header() {
                     <div className="h-8 w-px bg-indigo-500/30"></div>
 
                     {/* Points */}
-                    <div className="flex flex-col">
-                      <div className="text-xs text-indigo-400/80 leading-tight">Points</div>
-                      <div className="text-indigo-200 font-bold text-base flex items-center gap-1 leading-tight">
+                    <button
+                      onClick={() => setShowLeaderboardDialog(true)}
+                      className="flex flex-col hover:bg-indigo-800/30 px-2 py-1 rounded-lg transition-all cursor-pointer group"
+                      title="View Leaderboard"
+                    >
+                      <div className="text-xs text-indigo-400/80 leading-tight group-hover:text-indigo-300/90">
+                        Points
+                      </div>
+                      <div className="text-indigo-200 font-bold text-base flex items-center gap-1 leading-tight group-hover:text-indigo-100">
                         {playerData ? (
                           <>
                             <span className="text-yellow-400">🏆</span>
@@ -94,7 +102,7 @@ export function Header() {
                           <span className="text-sm">--</span>
                         )}
                       </div>
-                    </div>
+                    </button>
 
                     {/* Divider */}
                     <div className="h-8 w-px bg-indigo-500/30"></div>
@@ -152,6 +160,11 @@ export function Header() {
           walletAddress={publicKey.toString()}
         />
       )}
+
+      <LeaderboardDialog
+        open={showLeaderboardDialog}
+        onOpenChange={setShowLeaderboardDialog}
+      />
     </>
   );
 }
