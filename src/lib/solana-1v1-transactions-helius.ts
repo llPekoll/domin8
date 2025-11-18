@@ -96,7 +96,7 @@ export async function deriveRandomnessAccountAddress(lobbyId: number | string): 
     );
     return address;
   } catch (error) {
-    logger.ui.warn("[Randomness] Failed to derive address, using fallback:", error);
+    logger.solana.warn("[Randomness] Failed to derive address, using fallback:", error);
     // Fallback: return a deterministic PublicKey based on the input
     const hash = Buffer.alloc(32);
     const seedStr = String(lobbyId);
@@ -113,18 +113,27 @@ export async function deriveRandomnessAccountAddress(lobbyId: number | string): 
  * @param instructions - Transaction instructions
  * @param payer - Fee payer
  * @param blockhash - Recent blockhash
+ * @param skipSimulation - If true, skip simulation and use conservative estimate (for external account dependencies)
  * @returns Optimized compute unit limit (with buffer)
  */
 async function simulateForComputeUnits(
   connection: Connection,
   instructions: TransactionInstruction[],
   payer: PublicKey,
-  blockhash: string
+  blockhash: string,
+  skipSimulation: boolean = false
 ): Promise<number> {
   try {
     logger.solana.debug("[Helius] Simulating transaction for compute units", {
       instructionCount: instructions.length,
+      skipSimulation,
     });
+
+    // Skip simulation if requested (e.g., for join_lobby with Switchboard randomness account)
+    if (skipSimulation) {
+      logger.solana.info("[Helius] Skipping simulation per request, using conservative estimate");
+      return 100_000; // Conservative estimate for operations with external account dependencies
+    }
 
     // Build test message with high CU limit for safety
     const testInstructions = [
@@ -147,6 +156,15 @@ async function simulateForComputeUnits(
     });
 
     if (simulation.value.err) {
+      // Check if this is an AccountNotFound error (common for external accounts like Switchboard randomness)
+      const errorStr = String(simulation.value.err);
+      if (errorStr.includes("AccountNotFound")) {
+        logger.solana.info("[Helius] AccountNotFound during simulation (likely external account dependency), using conservative fallback", {
+          error: simulation.value.err,
+        });
+        return 100_000; // Conservative estimate for operations with external account dependencies
+      }
+
       logger.solana.warn("[Helius] Simulation error, using fallback CU", {
         error: simulation.value.err,
         logs: simulation.value.logs,
@@ -261,7 +279,8 @@ async function getPriorityFeeForInstructions(
 async function buildOptimizedTransaction(
   connection: Connection,
   instructions: TransactionInstruction[],
-  payer: PublicKey
+  payer: PublicKey,
+  skipSimulation: boolean = false
 ): Promise<{
   transaction: VersionedTransaction;
   metrics: OptimizationMetrics;
@@ -270,6 +289,7 @@ async function buildOptimizedTransaction(
     logger.solana.debug("[Helius] Building optimized transaction", {
       instructionCount: instructions.length,
       payer: payer.toString(),
+      skipSimulation,
     });
 
     // HELIUS BEST PRACTICE #1: Get blockhash with confirmed commitment
@@ -282,11 +302,13 @@ async function buildOptimizedTransaction(
     });
 
     // HELIUS BEST PRACTICE #2: Simulate for compute units
+    // Skip if requested (e.g., for join_lobby with Switchboard randomness account)
     const optimizedCU = await simulateForComputeUnits(
       connection,
       instructions,
       payer,
-      blockhash
+      blockhash,
+      skipSimulation
     );
 
     // HELIUS BEST PRACTICE #3: Estimate priority fee
@@ -532,7 +554,7 @@ export async function buildCreateLobbyTransactionOptimized(
   connection: Connection
 ): Promise<{ transaction: VersionedTransaction; metrics: OptimizationMetrics }> {
   try {
-    logger.ui.debug("[CreateLobby] Building optimized transaction", {
+    logger.solana.debug("[CreateLobby] Building optimized transaction", {
       playerA: playerA.toString(),
       amount,
       characterA,
@@ -557,7 +579,7 @@ export async function buildCreateLobbyTransactionOptimized(
     // Default position for simplicity: [0, 0]
     const positionA = [0, 0] as [number, number];
 
-    logger.ui.debug("[CreateLobby] Building instruction with Switchboard randomness account");
+    logger.solana.debug("[CreateLobby] Building instruction with Switchboard randomness account");
 
     // Build the create_lobby instruction
     const createLobbyIx = await program.methods
@@ -577,10 +599,10 @@ export async function buildCreateLobbyTransactionOptimized(
       playerA
     );
 
-    logger.ui.debug("[CreateLobby] Optimized transaction created", metrics);
+    logger.solana.debug("[CreateLobby] Optimized transaction created", metrics);
     return { transaction, metrics };
   } catch (error) {
-    logger.ui.error("[CreateLobby] Failed to build optimized transaction:", error);
+    logger.solana.error("[CreateLobby] Failed to build optimized transaction:", error);
     throw error;
   }
 }
@@ -603,7 +625,7 @@ export async function buildJoinLobbyTransactionOptimized(
   connection: Connection
 ): Promise<{ transaction: VersionedTransaction; metrics: OptimizationMetrics }> {
   try {
-    logger.ui.debug("[JoinLobby] Building optimized transaction", {
+    logger.solana.debug("[JoinLobby] Building optimized transaction", {
       playerB: playerB.toString(),
       lobbyId,
       characterB,
@@ -613,37 +635,155 @@ export async function buildJoinLobbyTransactionOptimized(
     // Get Config PDA
     const [configPda] = getConfigPDA();
 
-    // Create a read-only provider for instruction building
-    const provider = new AnchorProvider(
-      connection,
-      {
-        publicKey: playerB,
-      } as any,
-      { commitment: "confirmed" }
-    );
+    // IMPORTANT: Derive the lobby PDA from lobbyId to ensure correctness
+    // This prevents issues with incorrect PDAs stored in the database
+    const [derivedLobbyPda] = getLobbyPDA(lobbyId);
+    logger.solana.debug("[JoinLobby] Derived lobby PDA", {
+      provided: lobbyPda.toString(),
+      derived: derivedLobbyPda.toString(),
+      match: derivedLobbyPda.equals(lobbyPda),
+    });
+
+    // Use the derived PDA instead of the provided one to ensure correctness
+    const correctLobbyPda = derivedLobbyPda;
+
+    // Create program instance with a wallet-like object for instruction building
+    const provider = new AnchorProvider(connection, {
+      publicKey: playerB,
+    } as any);
 
     const program = new Program<Domin81v1Prgm>(IDL as any, provider);
 
     // Fetch lobby to get Player A and randomness account
-    const lobbyAccount = await program.account.domin81v1Lobby.fetch(lobbyPda);
+    logger.solana.debug("[JoinLobby] Fetching lobby account", { lobbyPda: correctLobbyPda.toString() });
+    
+    let lobbyAccount: any;
+    let lobbyAccountInfo = await connection.getAccountInfo(correctLobbyPda);
+    
+    if (!lobbyAccountInfo) {
+      throw new Error(`Lobby account not found at ${correctLobbyPda.toString()}`);
+    }
+
+    logger.solana.debug("[JoinLobby] Account info retrieved", {
+      owner: lobbyAccountInfo.owner.toString(),
+      lamports: lobbyAccountInfo.lamports,
+      dataLength: lobbyAccountInfo.data.length,
+    });
+
+    try {
+      // Try to decode the account data
+      lobbyAccount = program.coder.accounts.decode("Domin81v1Lobby", lobbyAccountInfo.data);
+      logger.solana.debug("[JoinLobby] Lobby account decoded successfully");
+    } catch (decodeError) {
+      logger.solana.error("[JoinLobby] Standard decode failed, attempting manual field extraction:", {
+        error: decodeError,
+        dataLength: lobbyAccountInfo.data.length,
+      });
+      
+      // Manual parsing of Domin81v1Lobby account data
+      // Structure: 8-byte discriminator, then fields in order
+      try {
+        const data = lobbyAccountInfo.data;
+        let offset = 8; // Skip discriminator
+        
+        // Helper to read PublicKey (32 bytes)
+        const readPublicKey = (): PublicKey => {
+          const key = new PublicKey(data.slice(offset, offset + 32));
+          offset += 32;
+          return key;
+        };
+        
+        // Helper to read u64
+        const readU64 = (): bigint => {
+          const value = data.readBigUInt64LE(offset);
+          offset += 8;
+          return value;
+        };
+        
+        // Helper to read option<T> - 1 byte flag + value if present
+        const readOption = (isPublicKey: boolean): PublicKey | null => {
+          const hasValue = data[offset] === 1;
+          offset += 1;
+          if (hasValue) {
+            if (isPublicKey) {
+              const key = new PublicKey(data.slice(offset, offset + 32));
+              offset += 32;
+              return key;
+            }
+          }
+          return null;
+        };
+        
+        // Parse fields in order (skip most, focus on what we need)
+        const lobbyId = readU64();
+        const playerA = readPublicKey();
+        const playerB = readOption(true); // Skip playerB
+        const amount = readU64();
+        const randomnessAccount = readPublicKey();
+        
+        lobbyAccount = {
+          lobbyId,
+          playerA,
+          playerB,
+          amount,
+          randomnessAccount,
+        };
+        
+        logger.solana.debug("[JoinLobby] Lobby account parsed successfully (manual extraction)");
+      } catch (manualDecodeError) {
+        logger.solana.error("[JoinLobby] Manual extraction failed:", {
+          error: manualDecodeError,
+          dataLength: lobbyAccountInfo.data.length,
+        });
+        throw new Error(`Failed to decode lobby account: ${decodeError instanceof Error ? decodeError.message : String(decodeError)}`);
+      }
+    }
+
     const playerA = lobbyAccount.playerA;
     const randomnessAccount = lobbyAccount.randomnessAccount;
 
     // Default position for simplicity: [0, 0]
     const positionB = [0, 0] as [number, number];
 
-    logger.ui.debug("[JoinLobby] Fetching treasury account for prize distribution");
+    logger.solana.debug("[JoinLobby] Fetching treasury account for prize distribution");
 
     // Get treasury address from config
     let treasuryAddress: PublicKey;
     try {
-      const configAccount = await program.account.domin81v1Config.fetch(configPda);
-      treasuryAddress = configAccount.treasury;
-      logger.ui.debug("[JoinLobby] Treasury address resolved", {
-        treasury: treasuryAddress.toString(),
-      });
+      // Try to fetch using program.account first
+      try {
+        const configAccount = await program.account.domin81v1Config.fetch(configPda);
+        treasuryAddress = configAccount.treasury;
+        logger.solana.debug("[JoinLobby] Treasury address resolved (program fetch)", {
+          treasury: treasuryAddress.toString(),
+        });
+      } catch (fetchError) {
+        // Fallback: manually parse config account
+        logger.solana.debug("[JoinLobby] Program fetch failed, attempting manual config parse");
+        
+        const configAccountInfo = await connection.getAccountInfo(configPda);
+        if (!configAccountInfo) {
+          throw new Error("Config account not found");
+        }
+        
+        // Manual parsing of Domin81v1Config account data
+        // Structure: 8-byte discriminator, then fields in order
+        const data = configAccountInfo.data;
+        let offset = 8; // Skip discriminator
+        
+        // admin: PublicKey (32 bytes)
+        offset += 32;
+        
+        // treasury: PublicKey (32 bytes) - this is what we need
+        treasuryAddress = new PublicKey(data.slice(offset, offset + 32));
+        offset += 32;
+        
+        logger.solana.debug("[JoinLobby] Treasury address resolved (manual parse)", {
+          treasury: treasuryAddress.toString(),
+        });
+      }
     } catch (error) {
-      logger.ui.error("[JoinLobby] Failed to fetch config account:", error);
+      logger.solana.error("[JoinLobby] Failed to fetch config account:", error);
       throw new Error("Failed to fetch 1v1 config account");
     }
 
@@ -652,7 +792,7 @@ export async function buildJoinLobbyTransactionOptimized(
       .joinLobby(new BN(lobbyAccount.amount), characterB, positionB)
       .accounts({
         config: configPda,
-        lobby: lobbyPda,
+        lobby: correctLobbyPda,
         playerA,
         playerB,
         payer: playerB,
@@ -663,16 +803,18 @@ export async function buildJoinLobbyTransactionOptimized(
       .instruction();
 
     // Build optimized transaction with Helius best practices
+    // Skip simulation for join_lobby because randomness_account may not exist during simulation
     const { transaction, metrics } = await buildOptimizedTransaction(
       connection,
       [joinLobbyIx],
-      playerB
+      playerB,
+      true // skipSimulation - randomness account is an external dependency
     );
 
-    logger.ui.debug("[JoinLobby] Optimized transaction created", metrics);
+    logger.solana.debug("[JoinLobby] Optimized transaction created", metrics);
     return { transaction, metrics };
   } catch (error) {
-    logger.ui.error("[JoinLobby] Failed to build optimized transaction:", error);
+    logger.solana.error("[JoinLobby] Failed to build optimized transaction:", error);
     throw error;
   }
 }
@@ -694,7 +836,7 @@ export async function buildCancelLobbyTransactionOptimized(
   connection: Connection
 ): Promise<{ transaction: VersionedTransaction; metrics: OptimizationMetrics }> {
   try {
-    logger.ui.debug("[CancelLobby] Building optimized transaction", {
+    logger.solana.debug("[CancelLobby] Building optimized transaction", {
       playerA: playerA.toString(),
       lobbyId,
       lobbyPda: lobbyPda.toString(),
@@ -711,7 +853,7 @@ export async function buildCancelLobbyTransactionOptimized(
 
     const program = new Program<Domin81v1Prgm>(IDL as any, provider);
 
-    logger.ui.debug("[CancelLobby] Building cancel_lobby instruction");
+    logger.solana.debug("[CancelLobby] Building cancel_lobby instruction");
 
     // Build the cancel_lobby instruction
     const cancelLobbyIx = await program.methods
@@ -730,10 +872,10 @@ export async function buildCancelLobbyTransactionOptimized(
       playerA
     );
 
-    logger.ui.debug("[CancelLobby] Optimized transaction created", metrics);
+    logger.solana.debug("[CancelLobby] Optimized transaction created", metrics);
     return { transaction, metrics };
   } catch (error) {
-    logger.ui.error("[CancelLobby] Failed to build optimized transaction:", error);
+    logger.solana.error("[CancelLobby] Failed to build optimized transaction:", error);
     throw error;
   }
 }
