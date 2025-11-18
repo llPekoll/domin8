@@ -135,7 +135,7 @@ export class AnimationManager {
     createExplosion(1200);
   }
 
-  addWinnerCelebration(winnerParticipant: any) {
+  addWinnerCelebration() {
     // Play victory sound when winner celebration starts
     SoundManager.playVictory(this.scene, 0.6);
 
@@ -175,57 +175,47 @@ export class AnimationManager {
     // Apply pixelated rendering - render at lower resolution for crisp pixel art look
 
     // Get screen height for positioning at bottom
-    const screenHeight = this.scene.scale.height;
+    // const screenHeight = this.scene.scale.height;
 
     // Get the displayName - first try from playerNamesMap using playerId, then fall back to participant.displayName
-    let winnerDisplayName = "Champion";
+    // let winnerDisplayName = "Champion";
 
-    if (winnerParticipant?.playerId) {
-      // Try to get display name from playerNamesMap using the wallet address (playerId)
-      const mappedName = this.playerNamesMap.get(winnerParticipant.playerId);
-      if (mappedName) {
-        winnerDisplayName = mappedName;
-        logger.game.debug("[AnimationManager] Found winner display name in map:", mappedName);
-      } else {
-        // Fall back to participant's displayName property
-        winnerDisplayName = winnerParticipant.displayName || "Champion";
-        logger.game.debug(
-          "[AnimationManager] Using participant.displayName:",
-          winnerParticipant.displayName
-        );
-      }
-    } else {
-      winnerDisplayName = winnerParticipant?.displayName || "Champion";
-    }
+    // if (winnerParticipant?.playerId) {
+    //   // Try to get display name from playerNamesMap using the wallet address (playerId)
+    //   const mappedName = this.playerNamesMap.get(winnerParticipant.playerId);
+    //   if (mappedName) {
+    //     winnerDisplayName = mappedName;
+    //     logger.game.debug("[AnimationManager] Found winner display name in map:", mappedName);
+    //   } else {
+    //     // Fall back to participant's displayName property
+    //     winnerDisplayName = winnerParticipant.displayName || "Champion";
+    //     logger.game.debug(
+    //       "[AnimationManager] Using participant.displayName:",
+    //       winnerParticipant.displayName
+    //     );
+    //   }
+    // } else {
+    //   winnerDisplayName = winnerParticipant?.displayName || "Champion";
+    // }
 
-    logger.game.debug("[AnimationManager] Final winner display name:", winnerDisplayName);
+    // logger.game.debug("[AnimationManager] Final winner display name:", winnerDisplayName);
 
-    // Winner name at bottom of screen
-    const nameText = this.scene.add
-      .text(this.centerX, screenHeight - 25, winnerDisplayName, {
-        fontFamily: "jersey",
-        fontSize: 12, // Scaled down from 32px
-        color: "#ffffff",
-        stroke: "#000000",
-        strokeThickness: 1, // Scaled down from 4
-        align: "center",
-        resolution: 4, // High resolution for crisp text when scaled
-      })
-      .setOrigin(0.5)
-      .setDepth(200);
+    // // Winner name at bottom of screen
+    // const nameText = this.scene.add
+    //   .text(this.centerX, screenHeight - 25, winnerDisplayName, {
+    //     fontFamily: "jersey",
+    //     fontSize: 12, // Scaled down from 32px
+    //     color: "#ffffff",
+    //     stroke: "#000000",
+    //     strokeThickness: 1, // Scaled down from 4
+    //     align: "center",
+    //     resolution: 4, // High resolution for crisp text when scaled
+    //   })
+    //   .setOrigin(0.5)
+    //   .setDepth(200);
 
-    // Track all celebration objects for cleanup
-    this.celebrationObjects.push(backgroundOverlay, throne, nameText);
-
-    // Animate name and bet text
-    nameText.setAlpha(0);
-
-    this.scene.tweens.add({
-      targets: nameText,
-      alpha: 1,
-      duration: 500,
-      delay: 300,
-    });
+    // Track celebration objects for cleanup (throne and overlay)
+    this.celebrationObjects.push(backgroundOverlay, throne);
 
     // Bounce animation is now handled in PlayerManager.showResults()
 
@@ -368,7 +358,11 @@ export class AnimationManager {
     });
   }
 
-  explodeParticipantsOutward(participants: Map<string, any>, explosionCenterX?: number, explosionCenterY?: number) {
+  explodeParticipantsOutward(
+    participants: Map<string, any>,
+    explosionCenterX?: number,
+    explosionCenterY?: number
+  ) {
     const config = this.EXPLOSION_CONFIG;
 
     // Use provided explosion center or fall back to screen center
@@ -978,12 +972,8 @@ export class AnimationManager {
 
       // Add celebration animations (confetti, text, bounce)
       if (winnerParticipant) {
-        logger.game.debug("[AnimationManager] 🏆 Calling addWinnerCelebration");
-        this.addWinnerCelebration(winnerParticipant);
-      } else {
-        logger.game.error("[AnimationManager] ❌ No winner participant returned!");
+        this.addWinnerCelebration();
       }
-
       // Call onComplete callback if provided
       if (onComplete) {
         onComplete();

@@ -1,6 +1,6 @@
 /**
  * Webhook Notifications Service
- * 
+ *
  * Provides Convex actions for sending webhook notifications to external services.
  * Called by frontend immediately after successful transactions for real-time notifications.
  */
@@ -15,7 +15,7 @@ const WEBHOOK_GAME_CREATED_URL = "https://n8n.gravity5.pro/webhook/prochain-comb
 /**
  * Send game creation webhook notification
  * Called by frontend immediately after successful game creation transaction
- * 
+ *
  * @param roundId - The round ID of the newly created game
  * @param transactionSignature - Solana transaction signature
  * @param startTimestamp - Game start timestamp (seconds)
@@ -36,7 +36,13 @@ export const notifyGameCreated = action({
     map: v.optional(v.number()),
   },
   handler: async (_ctx, args) => {
-    console.log(`[Webhook] Sending game creation notification for round ${args.roundId}`);
+    // Only send webhooks on mainnet
+    const rpcEndpoint = process.env.SOLANA_RPC_ENDPOINT || "";
+    const isMainnet = rpcEndpoint.includes("mainnet");
+
+    if (!isMainnet) {
+      return { success: true, skipped: true };
+    }
 
     try {
       const webhookData = {
@@ -66,14 +72,16 @@ export const notifyGameCreated = action({
         throw new Error(`Webhook failed: ${response.status}`);
       }
 
-      console.log(`[Webhook] ✅ Game creation notification sent successfully for round ${args.roundId}`);
+      console.log(
+        `[Webhook] ✅ Game creation notification sent successfully for round ${args.roundId}`
+      );
       return { success: true };
     } catch (error) {
       console.error(`[Webhook] Error sending game creation notification:`, error);
       // Don't throw - we don't want webhook failures to break the frontend
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : String(error) 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   },
@@ -82,7 +90,7 @@ export const notifyGameCreated = action({
 /**
  * Send game winner webhook notification
  * Called by game scheduler after winner is determined
- * 
+ *
  * @param roundId - The round ID of the completed game
  * @param winnerWalletAddress - Winner's wallet address
  * @param winnerDisplayName - Winner's display name (if available)
@@ -99,14 +107,19 @@ export const notifyGameWinner = internalAction({
     participantCount: v.number(),
   },
   handler: async (ctx, args) => {
-    console.log(`[Webhook] Sending game winner notification for round ${args.roundId}`);
+    // Only send webhooks on mainnet
+    const rpcEndpoint = process.env.SOLANA_RPC_ENDPOINT || "";
+    const isMainnet = rpcEndpoint.includes("mainnet");
+
+    if (!isMainnet) {
+      return { success: true, skipped: true };
+    }
 
     try {
       // Get winner display name from players table
-      const winnerDisplayName = await ctx.runQuery(
-        internal.players.getPlayerDisplayNameInternal,
-        { walletAddress: args.winnerWalletAddress }
-      );
+      const winnerDisplayName = await ctx.runQuery(internal.players.getPlayerDisplayNameInternal, {
+        walletAddress: args.winnerWalletAddress,
+      });
 
       const webhookData = {
         eventType: "game_winner",
@@ -134,14 +147,16 @@ export const notifyGameWinner = internalAction({
         throw new Error(`Webhook failed: ${response.status}`);
       }
 
-      console.log(`[Webhook] ✅ Game winner notification sent successfully for round ${args.roundId}`);
+      console.log(
+        `[Webhook] ✅ Game winner notification sent successfully for round ${args.roundId}`
+      );
       return { success: true };
     } catch (error) {
       console.error(`[Webhook] Error sending game winner notification:`, error);
       // Don't throw - we don't want webhook failures to break the scheduler
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : String(error) 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   },

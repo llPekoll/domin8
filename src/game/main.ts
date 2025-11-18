@@ -21,6 +21,8 @@ export let allMapsData: any[] = [];
 export let demoMapData: any = null;
 // Global storage for active game state from blockchain (useActiveGame)
 export let activeGameData: any = null;
+// Global storage for current user's wallet address
+export let currentUserWallet: string | null = null;
 
 // Flag to track if blockchain data has been loaded (or timed out)
 export let blockchainDataReady: boolean = false;
@@ -48,6 +50,10 @@ export const setActiveGameData = (gameData: any) => {
 
 export const setBlockchainDataReady = (ready: boolean) => {
   blockchainDataReady = ready;
+};
+
+export const setCurrentUserWallet = (wallet: string | null) => {
+  currentUserWallet = wallet;
 };
 
 const config: Phaser.Types.Core.GameConfig = {

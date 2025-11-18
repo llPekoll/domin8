@@ -11,6 +11,11 @@ import { useAssets } from "../contexts/AssetsContext";
 import type { Character } from "../types/character";
 import styles from "./ButtonShine.module.css";
 
+// Betting limits
+const MIN_BET_AMOUNT = 0.001;
+const MAX_BET_AMOUNT = 10;
+const DEFAULT_BET_AMOUNT = MIN_BET_AMOUNT;
+
 interface BettingPanelProps {
   selectedCharacter: Character | null;
   onBetPlaced?: () => void;
@@ -27,7 +32,7 @@ const BettingPanel = memo(function BettingPanel({
   // NFT verification action
   const verifyNFTOwnership = useAction(api.nft.verifyNFTOwnership);
 
-  const [betAmount, setBetAmount] = useState<string>("0.1");
+  const [betAmount, setBetAmount] = useState<string>(DEFAULT_BET_AMOUNT.toString());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVerifyingNFT, setIsVerifyingNFT] = useState(false);
 
@@ -83,8 +88,8 @@ const BettingPanel = memo(function BettingPanel({
   const handleIncrementBet = (increment: number) => {
     const currentAmount = parseFloat(betAmount) || 0;
     const newAmount = currentAmount + increment;
-    // Cap at max bet of 10 SOL
-    const cappedAmount = Math.min(newAmount, 10);
+    // Cap at max bet
+    const cappedAmount = Math.min(newAmount, MAX_BET_AMOUNT);
     setBetAmount(cappedAmount.toFixed(2));
   };
 
@@ -114,8 +119,8 @@ const BettingPanel = memo(function BettingPanel({
     }
 
     const amount = parseFloat(betAmount);
-    if (isNaN(amount) || amount < 0.1 || amount > 10) {
-      toast.error("Bet amount must be between 0.1 and 10 SOL");
+    if (isNaN(amount) || amount < MIN_BET_AMOUNT || amount > MAX_BET_AMOUNT) {
+      toast.error(`Bet amount must be between ${MIN_BET_AMOUNT} and ${MAX_BET_AMOUNT} SOL`);
       return;
     }
 
@@ -235,19 +240,19 @@ const BettingPanel = memo(function BettingPanel({
       });
 
       // Show toast
-      const hasRealSignature = signatureHex && !signatureHex.startsWith("transaction_");
-      toast.success(`Tx placed!`, {
-        description: hasRealSignature
-          ? `${signatureHex.slice(0, 3)}...${signatureHex.slice(-3)}`
-          : `Round ${roundId}, Bet ${betIndex}`,
-        duration: 5000,
-        action: hasRealSignature
-          ? {
-              label: "View",
-              onClick: () => window.open(`https://solscan.io/tx/${signatureHex}`, "_blank"),
-            }
-          : undefined,
-      });
+      // const hasRealSignature = signatureHex && !signatureHex.startsWith("transaction_");
+      // toast.success(`Tx placed!`, {
+      //   description: hasRealSignature
+      //     ? `${signatureHex.slice(0, 3)}...${signatureHex.slice(-3)}`
+      //     : `Round ${roundId}, Bet ${betIndex}`,
+      //   duration: 5000,
+      //   action: hasRealSignature
+      //     ? {
+      //         label: "View",
+      //         onClick: () => window.open(`https://solscan.io/tx/${signatureHex}`, "_blank"),
+      //       }
+      //     : undefined,
+      // });
 
       // Emit event for game scene
       const eventData = {
@@ -264,22 +269,23 @@ const BettingPanel = memo(function BettingPanel({
       EventBus.emit("player-bet-placed", eventData);
       logger.ui.debug("[BettingPanel] ✅ Event emitted successfully");
 
-      setBetAmount("0.1");
+      setBetAmount(DEFAULT_BET_AMOUNT.toString());
       onBetPlaced?.();
     } catch (error) {
       logger.ui.error("Failed to place bet:", error);
 
       const errorMessage = error instanceof Error ? error.message : String(error);
+      const truncatedMessage = errorMessage.slice(0, 32);
       if (
         errorMessage.toLowerCase().includes("nft") ||
         errorMessage.toLowerCase().includes("collection")
       ) {
         toast.error("NFT Character Error", {
-          description: errorMessage,
+          description: truncatedMessage,
           duration: 6000,
         });
       } else {
-        toast.error(errorMessage || "Failed to place bet");
+        toast.error(truncatedMessage || "Failed to place bet");
       }
     } finally {
       setIsSubmitting(false);
@@ -308,73 +314,103 @@ const BettingPanel = memo(function BettingPanel({
   }
 
   return (
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
-      <span className="text-amber-400">Balance</span>
-      <span className="text-amber-300 pl-2">
-        {isLoadingBalance ? "..." : `${solBalance.toFixed(3)} SOL`}
-      </span>
-      <div className="flex bg-gradient-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-lg shadow-2xl shadow-amber-900/50 min-w-[560px] px-4 py-2 space-x-2">
-        {/* Betting Section */}
-        <div className="flex items-center justify-between text-sm uppercase tracking-wide"></div>
+    <div className="pt-2">
+      <span className="text-amber-400 ">Balance</span>
 
-        <div className="relative w-1/3">
+      <div className="inline-flex items-center gap-1 pl-2">
+        {!isLoadingBalance && (
+          <img
+            src="/sol-logo.svg"
+            alt="SOL"
+            className="w-3 h-3"
+            style={{
+              filter:
+                "brightness(0) saturate(100%) invert(85%) sepia(23%) saturate(632%) hue-rotate(358deg) brightness(100%) contrast(92%)",
+            }}
+          />
+        )}
+        <span className="text-amber-300">{isLoadingBalance ? "..." : solBalance.toFixed(3)}</span>
+      </div>
+      <div className="flex items-center justify-between bg-gradient-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-xl shadow-2xl shadow-amber-900/50 min-w-[560px] px-2 py-2 space-x-1">
+        <div className="relative w-1/5">
+          <img
+            src="/sol-logo.svg"
+            alt="SOL"
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+            style={{
+              filter:
+                "brightness(0) saturate(100%) invert(66%) sepia(89%) saturate(470%) hue-rotate(359deg) brightness(97%) contrast(89%)",
+            }}
+          />
           <input
             type="number"
             value={betAmount}
             onChange={(e) => setBetAmount(e.target.value)}
             placeholder="Amount"
-            min={0.1}
-            max={10}
-            step={0.1}
-            className="text-2xl w-full px-3 py-2 bg-black/30 border border-amber-700/50 rounded-lg text-amber-100 placeholder-amber-600 text-center  font-bold focus:outline-none focus:border-amber-500"
+            min={MIN_BET_AMOUNT}
+            max={MAX_BET_AMOUNT}
+            step={DEFAULT_BET_AMOUNT}
+            className="text-2xl w-full px-2 py-2 pl-8 bg-black/30 border border-amber-700/50 rounded-lg text-amber-100 placeholder-amber-600 text-center font-bold focus:outline-none focus:border-amber-500"
           />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-amber-500 text-xs font-bold">
-            SOL
-          </span>
         </div>
 
         {/* Quick bet buttons */}
-        <div className="grid grid-cols-3 gap-2 w-1/3">
+        <div className="grid grid-cols-4 gap-2 w-2/5">
+          <button
+            onClick={() => handleIncrementBet(0.01)}
+            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded-lg text-amber-300 text-2xl font-bold transition-colors"
+          >
+            +0.01
+          </button>
           <button
             onClick={() => handleIncrementBet(0.1)}
-            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-2xl font-bold transition-colors"
+            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded-lg text-amber-300 text-2xl font-bold transition-colors"
           >
             +0.1
           </button>
           <button
-            onClick={() => handleIncrementBet(0.5)}
-            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-2xl font-bold transition-colors"
-          >
-            +0.5
-          </button>
-          <button
             onClick={() => handleIncrementBet(1)}
-            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded text-amber-300 text-2xl font-bold transition-colors"
+            className="cursor-pointer py-1.5 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded-lg text-amber-300 text-2xl font-bold transition-colors"
           >
             +1
           </button>
+          <button
+            onClick={() => setBetAmount(Math.min(solBalance - 0.001, MAX_BET_AMOUNT).toFixed(3))}
+            className={`cursor-pointer py-1.5 bg-gradient-to-b from-amber-500 to-amber-900 hover:to-amber-600/80  rounded-lg text-amber-300 text-2xl  transition-colors ${styles.shineButton}`}
+          >
+            All-In
+          </button>
         </div>
 
-        {/* Place bet button */}
+        {/* Place bet button with arcade press effect */}
         <button
           onClick={() => void handlePlaceBet()}
-          disabled={
-            isSubmitting || isLoadingBalance || !canPlaceBet || isVerifyingNFT || !selectedCharacter
-          }
-          className={`text-2xl cursor-pointer flex justify-center items-center w-1/3 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 disabled:from-gray-600 disabled:to-gray-700 rounded-lg font-bold text-white uppercase tracking-wider  transition-all shadow-lg shadow-amber-900/50 disabled:opacity-50 ${styles.shineButton}`}
+          disabled={isSubmitting || !canPlaceBet || isVerifyingNFT || !selectedCharacter}
+          className={`
+            text-2xl cursor-pointer flex justify-center items-center w-1/3 py-2
+            bg-gradient-to-b from-amber-500 to-amber-700
+            hover:to-amber-800 hover:text-amber-300
+            disabled:from-gray-600 disabled:to-gray-700
+            rounded-lg font-bold text-amber-100 uppercase tracking-wider
+            transition-all duration-100
+            hover:shadow-[0_5px_0_0_rgba(0,0,0,0.3)]
+            active:shadow-[0_2px_0_0_rgba(0,0,0,0.3)]
+            active:translate-y-[8px]
+            disabled:opacity-50 disabled:cursor-not-allowed
+            disabled:shadow-[0_4px_0_0_rgba(75,85,99,0.7)]
+            ${styles.shineButton}
+          `}
         >
-          <img src="/assets/insert-coin.png" alt="Coin" className="h-6 cursor-pointer mr-2" />
+          <img src="/assets/insert-coin.png" alt="Coin" className="h-6 mr-2" />
           {!selectedCharacter
             ? "Select Character"
             : isVerifyingNFT
               ? "Verifying..."
               : isSubmitting
                 ? "Inserting..."
-                : isLoadingBalance
-                  ? "Loading..."
-                  : !canPlaceBet
-                    ? "Closed"
-                    : "Insert coin"}
+                : !canPlaceBet
+                  ? "Closed"
+                  : "Insert coin"}
         </button>
       </div>
     </div>

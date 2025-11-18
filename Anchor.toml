@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-domin8_prgm = "D8zxCM4tehr4Aux9zvonwCCYjV71WEgFnssWxgpgEEb7"
+domin8_prgm = "7bHYHZVu7kWRU4xf7DWypCvefWvuDqW1CqVfsuwdGiR7"
 orao_vrf = "VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y"
 
 [registry]

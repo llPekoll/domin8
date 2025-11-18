@@ -1,7 +1,7 @@
 { "frames": [
    {
     "filename": "fight-effect 0.ase",
-    "frame": { "x": 0, "y": 0, "w": 12, "h": 11 },
+    "frame": { "x": 1946, "y": 180, "w": 12, "h": 11 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 187, "y": 94, "w": 12, "h": 11 },
@@ -10,7 +10,7 @@
    },
    {
     "filename": "fight-effect 1.ase",
-    "frame": { "x": 12, "y": 0, "w": 85, "h": 81 },
+    "frame": { "x": 1181, "y": 568, "w": 85, "h": 81 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 153, "y": 54, "w": 85, "h": 81 },
@@ -19,7 +19,7 @@
    },
    {
     "filename": "fight-effect 2.ase",
-    "frame": { "x": 97, "y": 0, "w": 100, "h": 85 },
+    "frame": { "x": 1081, "y": 568, "w": 100, "h": 85 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 141, "y": 42, "w": 100, "h": 85 },
@@ -28,7 +28,7 @@
    },
    {
     "filename": "fight-effect 3.ase",
-    "frame": { "x": 197, "y": 0, "w": 52, "h": 46 },
+    "frame": { "x": 1289, "y": 474, "w": 52, "h": 46 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 163, "y": 81, "w": 52, "h": 46 },
@@ -37,7 +37,7 @@
    },
    {
     "filename": "fight-effect 4.ase",
-    "frame": { "x": 249, "y": 0, "w": 55, "h": 53 },
+    "frame": { "x": 1905, "y": 473, "w": 55, "h": 53 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 160, "y": 78, "w": 55, "h": 53 },
@@ -46,7 +46,7 @@
    },
    {
     "filename": "fight-effect 5.ase",
-    "frame": { "x": 304, "y": 0, "w": 113, "h": 70 },
+    "frame": { "x": 548, "y": 570, "w": 113, "h": 70 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 149, "y": 73, "w": 113, "h": 70 },
@@ -55,7 +55,7 @@
    },
    {
     "filename": "fight-effect 6.ase",
-    "frame": { "x": 417, "y": 0, "w": 120, "h": 83 },
+    "frame": { "x": 1421, "y": 563, "w": 120, "h": 83 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 147, "y": 70, "w": 120, "h": 83 },
@@ -64,7 +64,7 @@
    },
    {
     "filename": "fight-effect 7.ase",
-    "frame": { "x": 537, "y": 0, "w": 132, "h": 91 },
+    "frame": { "x": 1289, "y": 563, "w": 132, "h": 91 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 145, "y": 71, "w": 132, "h": 91 },
@@ -73,7 +73,7 @@
    },
    {
     "filename": "fight-effect 8.ase",
-    "frame": { "x": 669, "y": 0, "w": 133, "h": 83 },
+    "frame": { "x": 262, "y": 360, "w": 133, "h": 83 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 143, "y": 61, "w": 133, "h": 83 },
@@ -82,7 +82,7 @@
    },
    {
     "filename": "fight-effect 9.ase",
-    "frame": { "x": 802, "y": 0, "w": 145, "h": 99 },
+    "frame": { "x": 936, "y": 546, "w": 145, "h": 99 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 142, "y": 45, "w": 145, "h": 99 },
@@ -91,7 +91,7 @@
    },
    {
     "filename": "fight-effect 10.ase",
-    "frame": { "x": 947, "y": 0, "w": 166, "h": 107 },
+    "frame": { "x": 940, "y": 439, "w": 166, "h": 107 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 127, "y": 37, "w": 166, "h": 107 },
@@ -100,7 +100,7 @@
    },
    {
     "filename": "fight-effect 11.ase",
-    "frame": { "x": 1113, "y": 0, "w": 177, "h": 114 },
+    "frame": { "x": 1188, "y": 360, "w": 177, "h": 114 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 117, "y": 30, "w": 177, "h": 114 },
@@ -109,7 +109,7 @@
    },
    {
     "filename": "fight-effect 12.ase",
-    "frame": { "x": 1290, "y": 0, "w": 181, "h": 120 },
+    "frame": { "x": 579, "y": 353, "w": 181, "h": 120 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 115, "y": 24, "w": 181, "h": 120 },
@@ -118,7 +118,7 @@
    },
    {
     "filename": "fight-effect 13.ase",
-    "frame": { "x": 1471, "y": 0, "w": 176, "h": 97 },
+    "frame": { "x": 1546, "y": 516, "w": 176, "h": 97 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 121, "y": 47, "w": 176, "h": 97 },
@@ -127,7 +127,7 @@
    },
    {
     "filename": "fight-effect 14.ase",
-    "frame": { "x": 1647, "y": 0, "w": 179, "h": 97 },
+    "frame": { "x": 579, "y": 473, "w": 179, "h": 97 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 120, "y": 47, "w": 179, "h": 97 },
@@ -136,7 +136,7 @@
    },
    {
     "filename": "fight-effect 15.ase",
-    "frame": { "x": 1826, "y": 0, "w": 181, "h": 97 },
+    "frame": { "x": 1365, "y": 466, "w": 181, "h": 97 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 119, "y": 47, "w": 181, "h": 97 },
@@ -145,7 +145,7 @@
    },
    {
     "filename": "fight-effect 16.ase",
-    "frame": { "x": 2007, "y": 0, "w": 183, "h": 96 },
+    "frame": { "x": 0, "y": 444, "w": 183, "h": 96 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 118, "y": 48, "w": 183, "h": 96 },
@@ -154,7 +154,7 @@
    },
    {
     "filename": "fight-effect 17.ase",
-    "frame": { "x": 2190, "y": 0, "w": 183, "h": 96 },
+    "frame": { "x": 183, "y": 444, "w": 183, "h": 96 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 118, "y": 48, "w": 183, "h": 96 },
@@ -163,7 +163,7 @@
    },
    {
     "filename": "fight-effect 18.ase",
-    "frame": { "x": 2373, "y": 0, "w": 183, "h": 106 },
+    "frame": { "x": 1365, "y": 360, "w": 183, "h": 106 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 118, "y": 38, "w": 183, "h": 106 },
@@ -172,7 +172,7 @@
    },
    {
     "filename": "fight-effect 19.ase",
-    "frame": { "x": 2556, "y": 0, "w": 183, "h": 124 },
+    "frame": { "x": 396, "y": 353, "w": 183, "h": 124 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 118, "y": 21, "w": 183, "h": 124 },
@@ -181,7 +181,7 @@
    },
    {
     "filename": "fight-effect 20.ase",
-    "frame": { "x": 2739, "y": 0, "w": 183, "h": 94 },
+    "frame": { "x": 1106, "y": 474, "w": 183, "h": 94 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 118, "y": 50, "w": 183, "h": 94 },
@@ -190,7 +190,7 @@
    },
    {
     "filename": "fight-effect 21.ase",
-    "frame": { "x": 2922, "y": 0, "w": 183, "h": 93 },
+    "frame": { "x": 1722, "y": 516, "w": 183, "h": 93 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 118, "y": 51, "w": 183, "h": 93 },
@@ -199,7 +199,7 @@
    },
    {
     "filename": "fight-effect 22.ase",
-    "frame": { "x": 3105, "y": 0, "w": 182, "h": 94 },
+    "frame": { "x": 366, "y": 477, "w": 182, "h": 94 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 118, "y": 49, "w": 182, "h": 94 },
@@ -208,7 +208,7 @@
    },
    {
     "filename": "fight-effect 23.ase",
-    "frame": { "x": 3287, "y": 0, "w": 180, "h": 102 },
+    "frame": { "x": 760, "y": 439, "w": 180, "h": 102 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 119, "y": 40, "w": 180, "h": 102 },
@@ -217,7 +217,7 @@
    },
    {
     "filename": "fight-effect 24.ase",
-    "frame": { "x": 3467, "y": 0, "w": 179, "h": 88 },
+    "frame": { "x": 0, "y": 540, "w": 179, "h": 88 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 119, "y": 53, "w": 179, "h": 88 },
@@ -226,7 +226,7 @@
    },
    {
     "filename": "fight-effect 25.ase",
-    "frame": { "x": 3646, "y": 0, "w": 178, "h": 86 },
+    "frame": { "x": 179, "y": 540, "w": 178, "h": 86 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 119, "y": 54, "w": 178, "h": 86 },
@@ -235,7 +235,7 @@
    },
    {
     "filename": "fight-effect 26.ase",
-    "frame": { "x": 3824, "y": 0, "w": 178, "h": 84 },
+    "frame": { "x": 758, "y": 541, "w": 178, "h": 84 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 119, "y": 55, "w": 178, "h": 84 },
@@ -244,7 +244,7 @@
    },
    {
     "filename": "fight-effect 27.ase",
-    "frame": { "x": 4002, "y": 0, "w": 262, "h": 84 },
+    "frame": { "x": 0, "y": 360, "w": 262, "h": 84 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 64, "y": 55, "w": 262, "h": 84 },
@@ -253,7 +253,7 @@
    },
    {
     "filename": "fight-effect 28.ase",
-    "frame": { "x": 4264, "y": 0, "w": 396, "h": 87 },
+    "frame": { "x": 792, "y": 352, "w": 396, "h": 87 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 0, "y": 52, "w": 396, "h": 87 },
@@ -262,7 +262,7 @@
    },
    {
     "filename": "fight-effect 29.ase",
-    "frame": { "x": 4660, "y": 0, "w": 396, "h": 173 },
+    "frame": { "x": 396, "y": 180, "w": 396, "h": 173 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 173 },
@@ -271,7 +271,7 @@
    },
    {
     "filename": "fight-effect 30.ase",
-    "frame": { "x": 5056, "y": 0, "w": 396, "h": 172 },
+    "frame": { "x": 792, "y": 180, "w": 396, "h": 172 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 172 },
@@ -280,7 +280,7 @@
    },
    {
     "filename": "fight-effect 31.ase",
-    "frame": { "x": 5452, "y": 0, "w": 396, "h": 156 },
+    "frame": { "x": 1550, "y": 180, "w": 396, "h": 156 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 156 },
@@ -289,7 +289,7 @@
    },
    {
     "filename": "fight-effect 32.ase",
-    "frame": { "x": 5848, "y": 0, "w": 362, "h": 180 },
+    "frame": { "x": 1188, "y": 180, "w": 362, "h": 180 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 34, "y": 0, "w": 362, "h": 180 },
@@ -298,7 +298,7 @@
    },
    {
     "filename": "fight-effect 33.ase",
-    "frame": { "x": 6210, "y": 0, "w": 396, "h": 180 },
+    "frame": { "x": 0, "y": 180, "w": 396, "h": 180 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
@@ -307,7 +307,7 @@
    },
    {
     "filename": "fight-effect 34.ase",
-    "frame": { "x": 6606, "y": 0, "w": 283, "h": 180 },
+    "frame": { "x": 1550, "y": 336, "w": 283, "h": 180 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 18, "y": 0, "w": 283, "h": 180 },
@@ -316,7 +316,7 @@
    },
    {
     "filename": "fight-effect 35.ase",
-    "frame": { "x": 6889, "y": 0, "w": 396, "h": 180 },
+    "frame": { "x": 1584, "y": 0, "w": 396, "h": 180 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
@@ -325,7 +325,7 @@
    },
    {
     "filename": "fight-effect 36.ase",
-    "frame": { "x": 7285, "y": 0, "w": 396, "h": 180 },
+    "frame": { "x": 1188, "y": 0, "w": 396, "h": 180 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
@@ -334,7 +334,7 @@
    },
    {
     "filename": "fight-effect 37.ase",
-    "frame": { "x": 7681, "y": 0, "w": 396, "h": 180 },
+    "frame": { "x": 792, "y": 0, "w": 396, "h": 180 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
@@ -343,7 +343,7 @@
    },
    {
     "filename": "fight-effect 38.ase",
-    "frame": { "x": 8077, "y": 0, "w": 396, "h": 180 },
+    "frame": { "x": 396, "y": 0, "w": 396, "h": 180 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
@@ -352,7 +352,7 @@
    },
    {
     "filename": "fight-effect 39.ase",
-    "frame": { "x": 8473, "y": 0, "w": 396, "h": 180 },
+    "frame": { "x": 0, "y": 0, "w": 396, "h": 180 },
     "rotated": false,
     "trimmed": false,
     "spriteSourceSize": { "x": 0, "y": 0, "w": 396, "h": 180 },
@@ -361,7 +361,7 @@
    },
    {
     "filename": "fight-effect 40.ase",
-    "frame": { "x": 8869, "y": 0, "w": 115, "h": 137 },
+    "frame": { "x": 1833, "y": 336, "w": 115, "h": 137 },
     "rotated": false,
     "trimmed": true,
     "spriteSourceSize": { "x": 152, "y": 16, "w": 115, "h": 137 },
@@ -374,7 +374,7 @@
   "version": "1.3.15.2-arm64",
   "image": "fight-effect.png",
   "format": "RGBA8888",
-  "size": { "w": 8984, "h": 180 },
+  "size": { "w": 1980, "h": 654 },
   "scale": "1",
   "frameTags": [
    { "name": "3", "from": 0, "to": 40, "direction": "forward", "color": "#000000ff" }

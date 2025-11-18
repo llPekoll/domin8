@@ -29,7 +29,7 @@
 import { useCallback, useMemo } from "react";
 import { usePrivyWallet } from "./usePrivyWallet";
 import { useWallets } from "@privy-io/react-auth/solana";
-import { useAction } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import {
   Connection,
@@ -38,6 +38,9 @@ import {
   TransactionSignature,
   Transaction,
   VersionedTransaction,
+  TransactionMessage,
+  ComputeBudgetProgram,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import { SystemProgram } from "@solana/web3.js";
 import { Program, AnchorProvider, BN } from "@coral-xyz/anchor";
@@ -46,6 +49,7 @@ import bs58 from "bs58";
 import { type Domin8Prgm } from "../../target/types/domin8_prgm";
 import Domin8PrgmIDL from "../../target/idl/domin8_prgm.json";
 import { logger } from "../lib/logger";
+import { getSharedConnection } from "~/lib/sharedConnection";
 
 // Extract Program ID from IDL
 export const DOMIN8_PROGRAM_ID = new PublicKey(Domin8PrgmIDL.address);
@@ -130,16 +134,317 @@ class PrivyWalletAdapter {
 }
 
 // Constants from smart contract
-const MIN_BET_LAMPORTS = 10_000_000; // 0.01 SOL
+const MIN_BET_LAMPORTS = 1_000_000; // 0.001 SOL
 const HOUSE_FEE_BPS = 500; // 5%
 
 // PDA Seeds (must match Rust program seeds exactly!)
 const GAME_CONFIG_SEED = "domin8_config"; // matches b"domin8_config" in Rust
-const GAME_COUNTER_SEED = "game_counter";
 const GAME_ROUND_SEED = "domin8_game"; // matches b"domin8_game" in Rust
 const ACTIVE_GAME_SEED = "active_game"; // matches b"active_game" in Rust
 const BET_ENTRY_SEED = "bet";
-const VAULT_SEED = "vault";
+
+// ========================================
+// HELIUS TRANSACTION OPTIMIZATION HELPERS
+// ========================================
+
+/**
+ * HELIUS OPTIMIZATION: Build and send optimized transaction with Privy
+ * This helper wraps Privy's signAndSendAllTransactions with Helius best practices
+ * 
+ * @param connection - Solana connection
+ * @param instructions - Array of transaction instructions
+ * @param payer - Transaction fee payer
+ * @param privyWallet - Privy wallet instance
+ * @param network - Network name for chain ID
+ * @returns Transaction signature (base58 string)
+ */
+async function sendOptimizedTransactionWithPrivy(
+  connection: Connection,
+  instructions: TransactionInstruction[],
+  payer: PublicKey,
+  privyWallet: any,
+  network: string
+): Promise<string> {
+  // HELIUS BEST PRACTICE #1: Use 'confirmed' commitment for blockhash
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+
+  logger.solana.debug("[sendOptimizedTx] Got blockhash", {
+    blockhash: blockhash.slice(0, 8) + '...',
+    lastValidBlockHeight
+  });
+
+  // HELIUS BEST PRACTICE #2: Simulate to optimize compute units
+  const computeUnits = await simulateForComputeUnits(
+    connection,
+    instructions,
+    payer,
+    blockhash
+  );
+
+  // HELIUS BEST PRACTICE #3: Get dynamic priority fee
+  const priorityFee = await getPriorityFeeForInstructions(
+    connection,
+    instructions,
+    payer,
+    blockhash
+  );
+
+  logger.solana.debug("[sendOptimizedTx] Optimized parameters", {
+    computeUnits,
+    priorityFee
+  });
+
+  // Build final optimized transaction with compute budget instructions
+  // IMPORTANT: Compute budget instructions MUST come first
+  const optimizedInstructions = [
+    ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnits }),
+    ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFee }),
+    ...instructions,
+  ];
+
+  // Create versioned transaction (Privy supports both Transaction and VersionedTransaction)
+  const message = new TransactionMessage({
+    payerKey: payer,
+    recentBlockhash: blockhash,
+    instructions: optimizedInstructions,
+  }).compileToV0Message();
+
+  const transaction = new VersionedTransaction(message);
+
+  // HELIUS BEST PRACTICE #4 & #5: Send with skipPreflight + custom retry logic
+  let signature: string | null = null;
+  const maxRetries = 3;
+  const chainId = `solana:${network}` as `${string}:${string}`;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      logger.solana.debug(`[sendOptimizedTx] Attempt ${attempt + 1}/${maxRetries}`);
+
+      // Check blockhash validity before retry
+      const currentBlockHeight = await connection.getBlockHeight('confirmed');
+      if (currentBlockHeight > lastValidBlockHeight) {
+        throw new Error('Blockhash expired, need to rebuild transaction');
+      }
+
+      // Sign and send with Privy
+      const results = await privyWallet.signAndSendAllTransactions([
+        {
+          chain: chainId,
+          transaction: transaction.serialize(),
+        },
+      ]);
+
+      if (!results || results.length === 0 || !results[0].signature) {
+        throw new Error("No signature returned from Privy");
+      }
+
+      // Convert Uint8Array signature to base58 string
+      const signatureBytes = results[0].signature;
+      signature = bs58.encode(signatureBytes);
+
+      logger.solana.debug(`[sendOptimizedTx] Transaction sent: ${signature}`);
+
+      // Confirm with polling
+      const confirmed = await confirmTransactionWithPolling(
+        connection,
+        signature,
+        lastValidBlockHeight
+      );
+
+      if (confirmed) {
+        logger.solana.info(`[sendOptimizedTx] Transaction confirmed on attempt ${attempt + 1}: ${signature}`);
+        break;
+      } else {
+        logger.solana.warn(`[sendOptimizedTx] Confirmation timeout on attempt ${attempt + 1}`);
+      }
+    } catch (error: any) {
+      logger.solana.warn(`[sendOptimizedTx] Attempt ${attempt + 1} failed:`, error.message);
+      
+      if (attempt === maxRetries - 1) {
+        throw error;
+      }
+
+      // Exponential backoff: 1s, 2s, 3s
+      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+    }
+  }
+
+  if (!signature) {
+    throw new Error("All retry attempts failed");
+  }
+
+  return signature;
+}
+
+/**
+ * HELIUS OPTIMIZATION: Simulate transaction to get exact compute units
+ * @param connection - Solana connection
+ * @param instructions - Transaction instructions
+ * @param payer - Fee payer
+ * @param blockhash - Recent blockhash
+ * @returns Optimized compute unit limit (with 10% buffer)
+ */
+async function simulateForComputeUnits(
+  connection: Connection,
+  instructions: TransactionInstruction[],
+  payer: PublicKey,
+  blockhash: string
+): Promise<number> {
+  try {
+    // HELIUS BEST PRACTICE: Simulate with 1.4M CU to ensure success
+    const testInstructions = [
+      ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
+      ...instructions,
+    ];
+
+    const testMessage = new TransactionMessage({
+      payerKey: payer,
+      recentBlockhash: blockhash,
+      instructions: testInstructions,
+    }).compileToV0Message();
+
+    const testTx = new VersionedTransaction(testMessage);
+
+    const simulation = await connection.simulateTransaction(testTx, {
+      replaceRecentBlockhash: true,
+      sigVerify: false,
+    });
+
+    if (simulation.value.err) {
+      logger.solana.warn("[simulateForComputeUnits] Simulation error:", simulation.value.err);
+      return 200_000; // Conservative fallback
+    }
+
+    if (!simulation.value.unitsConsumed) {
+      logger.solana.warn("[simulateForComputeUnits] No unitsConsumed in simulation");
+      return 200_000;
+    }
+
+    // Add 10% buffer (Helius recommendation)
+    const optimizedCU = simulation.value.unitsConsumed < 1000 
+      ? 1000 
+      : Math.ceil(simulation.value.unitsConsumed * 1.1);
+
+    logger.solana.debug("[simulateForComputeUnits] Optimized CU", {
+      consumed: simulation.value.unitsConsumed,
+      withBuffer: optimizedCU
+    });
+
+    return optimizedCU;
+  } catch (error) {
+    logger.solana.warn("[simulateForComputeUnits] Simulation failed:", error);
+    return 200_000; // Fallback
+  }
+}
+
+/**
+ * HELIUS OPTIMIZATION: Get priority fee for specific instructions
+ * Uses Helius Priority Fee API with serialized transaction method
+ * @param connection - Solana connection
+ * @param instructions - Transaction instructions
+ * @param payer - Fee payer
+ * @param blockhash - Recent blockhash
+ * @returns Priority fee in microlamports
+ */
+async function getPriorityFeeForInstructions(
+  connection: Connection,
+  instructions: TransactionInstruction[],
+  payer: PublicKey,
+  blockhash: string
+): Promise<number> {
+  try {
+    // Create temp transaction for fee estimation
+    const tempMessage = new TransactionMessage({
+      payerKey: payer,
+      recentBlockhash: blockhash,
+      instructions: instructions,
+    }).compileToV0Message();
+
+    const tempTx = new VersionedTransaction(tempMessage);
+    const serializedTx = bs58.encode(tempTx.serialize());
+
+    // Call Helius Priority Fee API
+    const response = await fetch(connection.rpcEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "helius-priority-fee",
+        method: "getPriorityFeeEstimate",
+        params: [{
+          transaction: serializedTx,
+          options: { 
+            recommended: true  // Use Helius recommended fee
+          }
+        }]
+      })
+    });
+
+    const data = await response.json();
+    
+    if (data.result?.priorityFeeEstimate) {
+      // Add 20% safety buffer
+      const estimatedFee = Math.ceil(data.result.priorityFeeEstimate * 1.2);
+      logger.solana.debug("[getPriorityFeeForInstructions] Helius fee:", estimatedFee);
+      return estimatedFee;
+    }
+
+    logger.solana.warn("[getPriorityFeeForInstructions] No result from API, using fallback");
+    return 50_000; // Medium priority fallback
+  } catch (error) {
+    logger.solana.warn("[getPriorityFeeForInstructions] API failed, using fallback:", error);
+    return 50_000;
+  }
+}
+
+/**
+ * HELIUS OPTIMIZATION: Confirm transaction with robust polling
+ * @param connection - Solana connection
+ * @param signature - Transaction signature
+ * @param lastValidBlockHeight - Last valid block height
+ * @returns True if confirmed, false if timeout/expired
+ */
+async function confirmTransactionWithPolling(
+  connection: Connection,
+  signature: string,
+  lastValidBlockHeight: number
+): Promise<boolean> {
+  const timeout = 30000; // 30 seconds (generous for user transactions)
+  const interval = 2000; // 2 seconds
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeout) {
+    try {
+      const statuses = await connection.getSignatureStatuses([signature]);
+      const status = statuses?.value?.[0];
+
+      if (status) {
+        if (status.err) {
+          logger.solana.error('[confirmTransactionWithPolling] Transaction failed:', status.err);
+          return false;
+        }
+        
+        if (status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized') {
+          return true;
+        }
+      }
+
+      // Check blockhash expiry
+      const currentBlockHeight = await connection.getBlockHeight('confirmed');
+      if (currentBlockHeight > lastValidBlockHeight) {
+        logger.solana.warn('[confirmTransactionWithPolling] Blockhash expired during polling');
+        return false;
+      }
+    } catch (error) {
+      logger.solana.warn('[confirmTransactionWithPolling] Status check failed:', error);
+    }
+
+    await new Promise(resolve => setTimeout(resolve, interval));
+  }
+
+  logger.solana.warn('[confirmTransactionWithPolling] Confirmation timeout');
+  return false;
+}
 
 // Type definitions
 export interface GameRound {
@@ -183,17 +488,16 @@ export const useGameContract = () => {
   // Convex action for webhook notifications
   const notifyGameCreated = useAction(api.webhooks.notifyGameCreated);
 
+  // Convex mutation for awarding points
+  const awardPoints = useMutation(api.players.awardPoints);
+
   // Get selected wallet (first Solana wallet from Privy)
   const selectedWallet = useMemo(() => {
     return wallets.length > 0 ? wallets[0] : null;
   }, [wallets]);
 
-  // RPC connection (use env variable)
-  const connection = useMemo(() => {
-    const rpcUrl = import.meta.env.VITE_SOLANA_RPC_URL || "http://127.0.0.1:8899";
-    // return new Connection(rpcUrl, "confirmed");
-    return new Connection(rpcUrl, "processed");
-  }, []);
+  // RPC connection (use shared connection with confirmed commitment)
+  const connection = getSharedConnection();
 
   // Network configuration
   const network = useMemo(() => {
@@ -213,8 +517,8 @@ export const useGameContract = () => {
     try {
       const wallet = new PrivyWalletAdapter(publicKey, selectedWallet, network);
       const provider = new AnchorProvider(connection, wallet, {
-        // commitment: "confirmed",
-        commitment: "processed",
+        // HELIUS BEST PRACTICE: Use 'confirmed' commitment
+        commitment: "confirmed",
       });
 
       const program = new Program<Domin8Prgm>(Domin8PrgmIDL as any, provider);
@@ -232,22 +536,12 @@ export const useGameContract = () => {
       DOMIN8_PROGRAM_ID
     );
 
-    const [gameCounterPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from(GAME_COUNTER_SEED)],
-      DOMIN8_PROGRAM_ID
-    );
-
     const [activeGamePda] = PublicKey.findProgramAddressSync(
       [Buffer.from(ACTIVE_GAME_SEED)],
       DOMIN8_PROGRAM_ID
     );
 
-    const [vaultPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from(VAULT_SEED)],
-      DOMIN8_PROGRAM_ID
-    );
-
-    return { gameConfigPda, gameCounterPda, activeGamePda, vaultPda };
+    return { gameConfigPda, activeGamePda };
   }, []);
 
   const deriveGameRoundPda = useCallback((roundId: number) => {
@@ -260,18 +554,6 @@ export const useGameContract = () => {
     );
 
     return gameRoundPda;
-  }, []);
-
-  // Derive mock VRF PDA for localnet: seeds = [b"mock_vrf", force]
-  const deriveMockVrfPda = useCallback((force: Buffer | Uint8Array) => {
-    const seedPrefix = Buffer.from("mock_vrf");
-    const forceBuf = Buffer.from(force);
-
-    const [mockVrfPda] = PublicKey.findProgramAddressSync(
-      [seedPrefix, forceBuf],
-      DOMIN8_PROGRAM_ID
-    );
-    return mockVrfPda;
   }, []);
 
   const deriveBetEntryPda = useCallback((roundId: number, betIndex: number) => {
@@ -359,10 +641,19 @@ export const useGameContract = () => {
   // Smart contract instruction functions
 
   /**
-   * Place a bet in the current game using Anchor Program
+   * Place a bet in the current game using OPTIMIZED manual transaction building
    * This function handles both creating a new game (if needed) and placing additional bets
+   * 
+   * HELIUS OPTIMIZATIONS APPLIED:
+   * - Confirmed commitment for blockhash
+   * - Compute unit simulation and optimization
+   * - Dynamic priority fees via Helius API
+   * - Custom retry logic with blockhash expiry checks
+   * - Transaction confirmation polling
+   * 
    * @param amount - Bet amount in SOL
    * @param skin - Character skin ID (0-255)
+   * @param displayName - Player display name for webhooks
    * @param position - Spawn position [x, y] in game coordinates
    * @param map - Map/background ID (0-255), defaults to 0
    * @returns Object with transaction signature, round ID, and bet index
@@ -375,7 +666,7 @@ export const useGameContract = () => {
       position: [number, number] = [0, 0],
       map: number = 0
     ): Promise<{ signature: TransactionSignature; roundId: number; betIndex: number }> => {
-      logger.solana.group("[placeBet] Starting placeBet function");
+      logger.solana.group("[placeBet] Starting OPTIMIZED placeBet function");
       logger.solana.debug("Connection status", {
         connected,
         publicKey: publicKey?.toString(),
@@ -383,7 +674,7 @@ export const useGameContract = () => {
         walletAdapter: walletAdapter ? "initialized" : "null",
       });
 
-      if (!connected || !publicKey || !program) {
+      if (!connected || !publicKey || !program || !selectedWallet) {
         throw new Error("Wallet not connected or program not initialized");
       }
 
@@ -391,7 +682,6 @@ export const useGameContract = () => {
         throw new Error(`Minimum bet is ${MIN_BET_LAMPORTS / LAMPORTS_PER_SOL} SOL`);
       }
 
-      // Initialize variables outside try/catch so they're accessible in both
       let activeRoundId = 0;
       let betIndex = 0;
       let shouldCreateNewGame = false;
@@ -399,135 +689,65 @@ export const useGameContract = () => {
       try {
         logger.solana.debug("[placeBet] Placing bet of", amount, "SOL");
 
-        // Convert SOL to lamports
         const amountLamports = Math.floor(amount * LAMPORTS_PER_SOL);
         const amountBN = new BN(amountLamports);
-        logger.solana.debug("[placeBet] Amount in lamports:", amountLamports);
 
         // Derive PDAs
-        logger.solana.debug("[placeBet] Deriving PDAs...");
-        const { gameConfigPda, gameCounterPda, activeGamePda } = derivePDAs();
-        logger.solana.debug("[placeBet] PDAs derived", {
-          gameConfig: gameConfigPda.toString(),
-          activeGame: activeGamePda.toString(),
-        });
+        const { gameConfigPda, activeGamePda } = derivePDAs();
 
-        let tx: string;
-
-        // OPTIMIZATION: Fetch both active game AND config in parallel (saves ~200-300ms)
-        logger.solana.debug("[placeBet] Fetching game state in parallel...");
+        // OPTIMIZATION: Fetch state in parallel
         const [activeGameAccount, configAccount] = await Promise.all([
           program.account.domin8Game.fetch(activeGamePda).catch(() => null),
           program.account.domin8Config.fetch(gameConfigPda)
         ]);
 
-        // STEP 1: Determine game state and bet strategy
+        // Determine game state and strategy
         if (activeGameAccount && activeGameAccount.status === 0) {
-          // Game is open - check if betting window is still open
           const endTimestamp = activeGameAccount.endDate.toNumber();
           const currentTime = Math.floor(Date.now() / 1000);
           const betCount = activeGameAccount.bets?.length || 0;
 
           if (currentTime < endTimestamp) {
-            // Active game is open and accepting bets!
-            logger.solana.debug("[placeBet] Found open game, placing bet");
             shouldCreateNewGame = false;
             activeRoundId = activeGameAccount.gameRound.toNumber();
-            betIndex = betCount; // Set betIndex here for existing game
+            betIndex = betCount;
           } else if (betCount === 0) {
-            // Empty expired game
-            logger.solana.debug("[placeBet] Empty expired game, creating new one");
             shouldCreateNewGame = true;
             activeRoundId = configAccount.gameRound.toNumber();
           } else {
-            throw new Error(
-              "Betting window closed. Please wait for the current game to finish."
-            );
+            throw new Error("Betting window closed. Please wait for the current game to finish.");
           }
         } else {
-          // No active game or game is closed - create new game
-          logger.solana.debug("[placeBet] No active game found or game closed, creating new game");
           shouldCreateNewGame = true;
           activeRoundId = configAccount.gameRound.toNumber();
         }
 
         logger.solana.debug("[placeBet] Decision", { shouldCreateNewGame, activeRoundId });
 
-        if (shouldCreateNewGame) {
-          // Creating new game means this is the first bet (index 0)
-          betIndex = 0;
+        // BUILD INSTRUCTION (instead of using .rpc())
+        let instruction: TransactionInstruction;
 
-          // OPTIMIZATION: Use configAccount already fetched above (no extra RPC call)
+        if (shouldCreateNewGame) {
+          betIndex = 0;
           const forceArr = configAccount.force;
           const forceBuf = Buffer.from(forceArr);
-
-          // Derive all required PDAs for createGame
-          const { vaultPda } = derivePDAs();
           const gameRoundPdaForCreate = deriveGameRoundPda(activeRoundId);
-          const betEntryPda = deriveBetEntryPda(activeRoundId, 0); // First bet index = 0
+          const roundIdBN = new BN(activeRoundId);
 
-          logger.solana.debug("[placeBet] CreateGame PDAs", {
-            gameConfig: gameConfigPda.toString(),
-            gameCounter: gameCounterPda.toString(),
-            gameRound: gameRoundPdaForCreate.toString(),
-            activeGame: activeGamePda.toString(),
-            betEntry: betEntryPda.toString(),
-            vault: vaultPda.toString(),
-          });
-
-          // Network check: localnet uses mockVrf, devnet/mainnet use ORAO VRF
-          // Check both network name AND RPC URL to determine if we're on localnet
-          const rpcEndpoint = connection.rpcEndpoint;
-          const isLocalnet =
-            network === "localnet" ||
-            rpcEndpoint.includes("localhost") ||
-            rpcEndpoint.includes("127.0.0.1");
-
-          logger.solana.debug("[placeBet] Network detection", {
-            networkEnv: network,
-            rpcEndpoint,
-            isLocalnet,
-          });
-
-          
-          // DEVNET/MAINNET: Use ORAO VRF (real verifiable randomness)
-          logger.solana.debug("[placeBet] Devnet/Mainnet: Using ORAO VRF");
-
-          // Import ORAO SDK dynamically
+          // DEVNET/MAINNET: ORAO VRF
           const { Orao, networkStateAccountAddress, randomnessAccountAddress } = await import(
             "@orao-network/solana-vrf"
           );
-
-          // Initialize ORAO VRF SDK
           const orao = new Orao(provider as any);
-          logger.solana.debug("[placeBet] ORAO VRF Program ID:", orao.programId.toString());
-
-          // Derive ORAO VRF accounts
           const networkState = networkStateAccountAddress();
           const vrfRequest = randomnessAccountAddress(forceBuf);
-
-          // Fetch treasury from network state
           const networkStateData = await orao.getNetworkState();
           const treasury = networkStateData.config.treasury;
 
-          logger.solana.debug("[placeBet] ORAO VRF Accounts", {
-            networkState: networkState.toString(),
-            treasury: treasury.toString(),
-            vrfRequest: vrfRequest.toString(),
-            amount: amountBN.toString(),
-            skin,
-            position,
-            map,
-          });
-
-          // Convert activeRoundId to BN for Anchor instruction
-          const roundIdBN = new BN(activeRoundId);
-
-          // Call create_game_round with ORAO VRF accounts
-          tx = await program.methods
+          instruction = await program.methods
             .createGameRound(roundIdBN, amountBN, skin, position, map)
             .accounts({
-              // @ts-expect-error - this works fine
+              // @ts-expect-error - Anchor type issue
               config: gameConfigPda,
               game: gameRoundPdaForCreate,
               activeGame: activeGamePda,
@@ -538,68 +758,51 @@ export const useGameContract = () => {
               vrfProgram: orao.programId,
               systemProgram: SystemProgram.programId,
             })
-            .rpc({ skipPreflight: true });
-
-          logger.solana.info(
-            "[placeBet] Created new devnet/mainnet game with first bet (ORAO VRF)",
-            tx
-          );
-        
-          // Transaction variable 'tx' is now set in the network-specific branches above
+            .instruction(); // ✅ Get instruction instead of .rpc()
         } else {
-          // Game exists - PLACE an additional bet
-          logger.solana.debug(
-            `[placeBet] Game exists (round ${activeRoundId}), placing additional bet`
-          );
-
-          // OPTIMIZATION: Use activeGameAccount already fetched above (no extra RPC call)
-          // betIndex was already set in the initial decision logic
-
-          // Derive all required PDAs for placeBet
+          // PLACE ADDITIONAL BET
           const gameRoundPda = deriveGameRoundPda(activeRoundId);
-          const { vaultPda } = derivePDAs();
-          const betEntryPda = deriveBetEntryPda(activeRoundId, betIndex);
-
-          logger.solana.debug("[placeBet] PlaceBet PDAs", {
-            gameConfig: gameConfigPda.toString(),
-            gameCounter: gameCounterPda.toString(),
-            gameRound: gameRoundPda.toString(),
-            activeGame: activeGamePda.toString(),
-            betEntry: betEntryPda.toString(),
-            vault: vaultPda.toString(),
-            betIndex,
-          });
-
-          // Convert activeRoundId to BN for Anchor instruction
           const roundIdBN = new BN(activeRoundId);
 
-          // Call bet instruction with all required accounts
-          tx = await program.methods
-            .bet(
-              roundIdBN, // round_id parameter as BN
-              amountBN,
-              skin, // Character skin ID from frontend
-              position // Spawn position [x, y] from frontend
-            )
+          instruction = await program.methods
+            .bet(roundIdBN, amountBN, skin, position)
             .accounts({
-              // @ts-expect-error - this works fine
+              // @ts-expect-error - Anchor type issue
               config: gameConfigPda,
               game: gameRoundPda,
               activeGame: activeGamePda,
               user: publicKey,
               systemProgram: SystemProgram.programId,
             })
-            .rpc({ skipPreflight: true });
+            .instruction(); // ✅ Get instruction instead of .rpc()
         }
 
-        // Get the actual signature from Privy wallet adapter
-        // (since Privy signs+sends, the tx variable from .rpc() might not be accurate)
-        const actualSignature = walletAdapter?.lastSignature || tx;
+        // ✅ HELIUS OPTIMIZATION: Send with all optimizations
+        const signature = await sendOptimizedTransactionWithPrivy(
+          connection,
+          [instruction],
+          publicKey,
+          selectedWallet,
+          network
+        );
+
         logger.solana.info("[placeBet] Transaction successful", {
-          signature: actualSignature,
+          signature,
           betIndex,
           roundId: activeRoundId,
         });
+
+        // Award points for the bet (1 point per 0.001 SOL)
+        try {
+          await awardPoints({
+            walletAddress: publicKey.toString(),
+            amountLamports: amountLamports,
+          });
+          logger.solana.debug("[placeBet] Points awarded for bet");
+        } catch (pointsError) {
+          // Don't fail the bet if points award fails
+          logger.solana.error("[placeBet] Failed to award points:", pointsError);
+        }
 
         // Send webhook notification if this was a game creation (first bet)
         if (shouldCreateNewGame) {
@@ -612,7 +815,7 @@ export const useGameContract = () => {
             // Call Convex action to send webhook (keeps webhook URL secure in backend)
             await notifyGameCreated({
               roundId: activeRoundId,
-              transactionSignature: actualSignature,
+              transactionSignature: signature,
               startTimestamp: gameAccount.startDate.toNumber(),
               endTimestamp: gameAccount.endDate.toNumber(),
               totalPot: gameAccount.totalDeposit.toNumber(),
@@ -631,7 +834,7 @@ export const useGameContract = () => {
         logger.solana.groupEnd();
 
         return {
-          signature: actualSignature,
+          signature,
           roundId: activeRoundId,
           betIndex,
         };
@@ -639,71 +842,7 @@ export const useGameContract = () => {
         logger.solana.groupEnd();
         logger.solana.error("[placeBet] Error:", error);
 
-        // WORKAROUND: Privy signing sometimes throws "signature verification failed"
-        // but the transaction actually succeeds on-chain. Check if it's just a signing error.
-        const errorMessage = error?.message || error?.toString() || "";
-        const isSignatureError =
-          errorMessage.toLowerCase().includes("signature verification") ||
-          errorMessage.toLowerCase().includes("missing signature") ||
-          errorMessage.toLowerCase().includes("signature") ||
-          errorMessage.includes("Signature");
-
-        if (isSignatureError) {
-          logger.solana.error(
-            "[placeBet] ✅ Privy signature verification error (expected behavior with skipPreflight)"
-          );
-          logger.solana.error(
-            "[placeBet] Transaction succeeded on-chain, ignoring client-side error"
-          );
-          logger.solana.error("[placeBet] Error details:", errorMessage);
-
-          // Extract transaction signature from error or use a placeholder
-          // The transaction HAS succeeded, we just need a signature for tracking
-          let extractedSignature = "tx_" + Date.now();
-
-          // Try to extract from Privy wallet
-          if (walletAdapter?.lastSignature) {
-            extractedSignature = walletAdapter.lastSignature;
-            logger.solana.debug("[placeBet] Using signature from Privy:", extractedSignature);
-          }
-
-          // Send webhook notification if this was a game creation (first bet)
-          // This code runs in catch block because Privy signature error happens before webhook
-          if (shouldCreateNewGame) {
-            try {
-              // Fetch the newly created game data
-              const gameAccount = await program.account.domin8Game.fetch(activeGamePda);
-              
-              logger.solana.debug("[placeBet] Calling webhook notification for game creation (from catch block)");
-              
-              // Call Convex action to send webhook (keeps webhook URL secure in backend)
-              await notifyGameCreated({
-                roundId: activeRoundId,
-                transactionSignature: extractedSignature,
-                startTimestamp: gameAccount.startDate.toNumber(),
-                endTimestamp: gameAccount.endDate.toNumber(),
-                totalPot: gameAccount.totalDeposit.toNumber(),
-                creatorAddress: publicKey.toString(),
-                creatorDisplayName: displayName,
-                map: gameAccount.map,
-              });
-              
-              logger.solana.debug("[placeBet] Webhook notification sent successfully");
-            } catch (webhookError) {
-              // Don't fail the bet if webhook fails
-              logger.solana.error("[placeBet] Failed to send webhook notification:", webhookError);
-            }
-          }
-
-          // Return success - transaction went through on-chain
-          return {
-            signature: extractedSignature,
-            roundId: activeRoundId,
-            betIndex,
-          };
-        }
-
-        // Try to extract useful error message
+        // Extract useful error message
         if (error.error) {
           throw new Error(
             `Smart contract error: ${error.error.errorMessage || error.error.errorCode?.code || "Unknown error"}`
@@ -719,14 +858,12 @@ export const useGameContract = () => {
       connected,
       publicKey,
       program,
-      walletAdapter,
-      fetchCurrentRoundId,
-      derivePDAs,
+      selectedWallet,
       deriveGameRoundPda,
-      deriveBetEntryPda,
-      deriveMockVrfPda,
       connection,
       network,
+      notifyGameCreated,
+      awardPoints,
     ]
   );
 

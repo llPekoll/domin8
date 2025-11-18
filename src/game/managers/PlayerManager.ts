@@ -81,7 +81,7 @@ export class PlayerManager {
     });
   }
 
-  addParticipant(participant: any, withFanfare: boolean = false) {
+  addParticipant(participant: any) {
     const participantId = participant._id || participant.id;
 
     logger.game.debug("[PlayerManager] addParticipant called", {
@@ -100,14 +100,6 @@ export class PlayerManager {
     const spawnX = targetX;
     const spawnY = -50;
 
-    logger.game.info(`[PlayerManager] 🎯 Character spawn positions:`, {
-      participantId,
-      spawnIndex: participant.spawnIndex,
-      startPosition: { x: spawnX, y: spawnY },
-      finalPosition: { x: targetX, y: targetY },
-      distance: Math.abs(spawnY - targetY).toFixed(1) + "px",
-    });
-
     let characterKey = "warrior";
     if (participant.character) {
       if (participant.character.key) {
@@ -117,7 +109,6 @@ export class PlayerManager {
       }
     }
 
-    logger.game.debug("[PlayerManager] Creating container for", participantId);
     const container = this.scene.add.container(spawnX, spawnY);
 
     // Set depth based on Y position - higher Y = further back = lower depth
@@ -157,12 +148,6 @@ export class PlayerManager {
     // Apply base 3x multiplier + bet scaling FIRST
     const betScale = participant.size || this.calculateParticipantScale(participant.betAmount);
     const scale = betScale * this.BASE_SCALE_MULTIPLIER;
-    logger.ui.debug(`[PlayerManager] Character scale calculated:`, {
-      participantId,
-      betAmount: participant.betAmount,
-      betScale,
-      finalScale: scale,
-    });
     sprite.setScale(scale);
     sprite.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
 
@@ -258,8 +243,8 @@ export class PlayerManager {
       })
       .setOrigin(0.5);
 
-    // Show names immediately in demo mode, hide in real games during spawn
-    nameText.setVisible(isBot);
+    // Show names immediately for both bots and real players
+    nameText.setVisible(true);
 
     // Add sprites in correct order for layering (render order matters):
     // 1. Back dust (behind character)
@@ -270,30 +255,6 @@ export class PlayerManager {
     container.add(sprite);
     container.add(dustFrontSprite);
     container.add(nameText);
-    if (participant.colorHue !== undefined && !participant.isBot) {
-      const hue = participant.colorHue / 360;
-      const tint = Phaser.Display.Color.HSVToRGB(hue, 0.3, 1.0).color;
-      sprite.setTint(tint);
-    }
-    if (withFanfare) {
-      sprite.setTint(0xffd700);
-      this.scene.time.delayedCall(200, () => {
-        if (participant.colorHue !== undefined && !participant.isBot) {
-          const hue = participant.colorHue / 360;
-          const tint = Phaser.Display.Color.HSVToRGB(hue, 0.3, 1.0).color;
-          sprite.setTint(tint);
-        } else {
-          sprite.clearTint();
-        }
-      });
-    }
-
-    logger.game.info(`[PlayerManager] 🎨 Initial opacity:`, {
-      participantId,
-      containerAlpha: container.alpha,
-      spriteAlpha: sprite.alpha,
-      visible: container.visible,
-    });
 
     // Consistent falling animation for all characters
     this.scene.tweens.add({
@@ -328,7 +289,9 @@ export class PlayerManager {
         // Play landing animation, then transition to idle
         // Safety check: ensure sprite still exists before playing animations
         if (!sprite || !sprite.active) {
-          logger.game.warn(`[PlayerManager] Sprite no longer exists for ${participantId}, skipping animation`);
+          logger.game.warn(
+            `[PlayerManager] Sprite no longer exists for ${participantId}, skipping animation`
+          );
           return;
         }
 
@@ -607,7 +570,7 @@ export class PlayerManager {
 
       // Position container so feet align with throne anchor
       // Need to ADD offset to move container down to account for sprite's internal offset
-      const targetThroneY = this.centerY + 100;
+      const targetThroneY = this.centerY + 120;
       const containerY = targetThroneY + spriteOffset;
 
       this.scene.tweens.add({

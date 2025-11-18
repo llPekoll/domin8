@@ -6,7 +6,7 @@ import { UIManager } from "../managers/UIManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
 import { logger } from "../../lib/logger";
-import { activeGameData, allMapsData } from "../main";
+import { activeGameData, allMapsData, RESOLUTION_SCALE } from "../main";
 
 export class Game extends Scene {
   camera!: Phaser.Cameras.Scene2D.Camera;
@@ -23,6 +23,10 @@ export class Game extends Scene {
   private introPlayed: boolean = false;
   private characters: any[] = [];
   private playerNames: Map<string, string> = new Map(); // wallet -> displayName
+
+  // Arena mask
+  private currentMapId: number | null = null;
+  private arenaMask: Phaser.Display.Masks.BitmapMask | null = null;
 
   constructor() {
     super("Game");
@@ -117,6 +121,14 @@ export class Game extends Scene {
       SoundManager.playInsertCoin(this);
     });
 
+    // Listen for new player joining the game
+    EventBus.on("player-bet-placed", (data: any) => {
+      logger.game.debug("[Game] 🎮 Player bet placed event received:", data);
+      // Play challenger sound when a new player joins
+      // (Note: insert-coin plays for the player who placed the bet)
+      SoundManager.playChallenger(this);
+    });
+
     // Characters now spawn automatically via blockchain subscription (useActiveGame)
     // No need for separate event listener - updateGameState handles all spawning
 
@@ -131,6 +143,10 @@ export class Game extends Scene {
     // Listen for battle phase start
     EventBus.on("start-battle-phase", () => {
       logger.game.debug("[Game] ⚔️ Battle phase triggered");
+
+      // Remove arena masks before battle starts
+      this.removeArenaMasks();
+
       const participantsMap = this.playerManager.getParticipants();
       if (participantsMap.size > 0) {
         this.animationManager.startBattlePhaseSequence(this.playerManager);
@@ -287,6 +303,11 @@ export class Game extends Scene {
       logger.game.debug("[Game] 🗺️ Setting background and map config by ID:", mapId);
       this.backgroundManager.setBackgroundById(mapId);
 
+      // Create arena mask for the map (only if map changed)
+      if (this.currentMapId !== mapId) {
+        this.createArenaMask(mapId);
+      }
+
       // Load map config for spawn positions from global allMapsData
       const selectedMap = allMapsData.find((map: any) => map.id === mapId);
       if (selectedMap) {
@@ -356,7 +377,16 @@ export class Game extends Scene {
         };
 
         logger.game.debug("[Game] ✅ Spawning participant from blockchain:", participant);
-        this.playerManager.addParticipant(participant, false);
+        this.playerManager.addParticipant(participant);
+
+        // Apply arena mask to the newly spawned participant
+        if (this.arenaMask) {
+          const gameParticipant = this.playerManager.getParticipant(participantId);
+          if (gameParticipant) {
+            gameParticipant.container.setMask(this.arenaMask);
+            logger.game.debug(`[Game] Arena mask applied to participant ${participantId}`);
+          }
+        }
       });
 
       logger.game.debug(
@@ -401,6 +431,68 @@ export class Game extends Scene {
 
     // ✅ Phase detection is now handled by GlobalGameStateManager
     // No need to continuously check phases here
+  }
+
+  /**
+   * Create arena mask based on current map
+   * bg1 (Classic Arena) uses mask_classic
+   * bg2 (Mystic Forest/Secte) uses mask_secte
+   */
+  private createArenaMask(mapId: number) {
+    // Map background IDs to mask keys
+    const maskKeys: { [key: number]: string } = {
+      1: "mask_classic",
+      2: "mask_secte",
+    };
+
+    const maskKey = maskKeys[mapId];
+    if (!maskKey) {
+      logger.game.warn(`[Game] No mask defined for map ID ${mapId}`);
+      return;
+    }
+
+    // Check if mask texture exists
+    if (!this.textures.exists(maskKey)) {
+      logger.game.error(`[Game] Mask texture '${maskKey}' not found!`);
+      return;
+    }
+
+    // Destroy old mask if it exists
+    if (this.arenaMask) {
+      this.arenaMask.destroy();
+      this.arenaMask = null;
+    }
+
+    // Create mask image (hidden, used only for masking)
+    const maskImage = this.make.image({
+      x: this.centerX,
+      y: this.centerY,
+      key: maskKey,
+      add: false, // Don't add to display list
+    });
+
+    // Scale the mask to match the game's resolution scale
+    maskImage.setScale(RESOLUTION_SCALE);
+
+    // Create bitmap mask from the image
+    this.arenaMask = maskImage.createBitmapMask();
+    this.currentMapId = mapId;
+    logger.game.debug(`[Game] Arena mask created using ${maskKey} with scale ${RESOLUTION_SCALE}`);
+  }
+
+  /**
+   * Remove arena masks from all participants
+   * Called when transitioning to battle phase (when characters run to center)
+   */
+  private removeArenaMasks() {
+    logger.game.debug("[Game] Removing arena masks from all participants");
+    const participants = this.playerManager.getParticipants();
+    participants.forEach((participant) => {
+      if (participant.container) {
+        participant.container.clearMask();
+      }
+    });
+    logger.game.debug("[Game] Arena masks removed");
   }
 
   shutdown() {

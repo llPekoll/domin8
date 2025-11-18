@@ -3,17 +3,19 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useState, useEffect } from "react";
 import { ProfileDialog } from "./ProfileDialog";
+import { LeaderboardDialog } from "./LeaderboardDialog";
 import { PrivyWalletButton } from "./PrivyWalletButton";
 import { SoundControl } from "./SoundControl";
 import { toast } from "sonner";
 import { generateRandomName } from "../lib/nameGenerator";
-import { useActiveGame } from "../hooks/useActiveGame";
+// import { useActiveGame } from "../hooks/useActiveGame";
 import { logger } from "../lib/logger";
 
 export function Header() {
   const { connected, publicKey, externalWalletAddress, solBalance, isLoadingBalance } =
     usePrivyWallet();
   const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [showLeaderboardDialog, setShowLeaderboardDialog] = useState(false);
   const [hasAttemptedCreation, setHasAttemptedCreation] = useState(false);
 
   const createPlayer = useMutation(api.players.createPlayer);
@@ -24,7 +26,7 @@ export function Header() {
   );
 
   // Get current game state directly from blockchain (not Convex)
-  const { activeGame: currentRoundState } = useActiveGame();
+  // const { activeGame: currentRoundState } = useActiveGame();
 
   // Create player with random name on first connect
   useEffect(() => {
@@ -66,18 +68,8 @@ export function Header() {
                 <img src="/assets/logo.webp" alt="Enrageded" className="h-12 w-auto" />
               </div>
 
-              {/* Center - Game Status */}
-              <div className="flex-1 flex justify-center">
-                {currentRoundState && (
-                  <div className="flex items-center gap-3 xl:ml-60">
-                    <div className="text-amber-400 text-3xl font-bold flex items-center gap-2 leading-tight animate-pulse">
-                      {/* Hide text if there's a winner (celebration/cleanup phase) */}
-                      {!currentRoundState.winner && currentRoundState.status === 0 && "Waiting for Players to Join"}
-                      {!currentRoundState.winner && currentRoundState.status === 1 && "Place Your Bet Now!"}
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* Center - Empty (status moved to PotDisplayPanel) */}
+              <div className="flex-1 flex justify-center"></div>
 
               {/* Right Side - User Controls */}
               <div className="flex items-center gap-4 flex-shrink-0">
@@ -91,16 +83,48 @@ export function Header() {
                     {/* Divider */}
                     <div className="h-8 w-px bg-indigo-500/30"></div>
 
+                    {/* Points */}
+                    <button
+                      onClick={() => setShowLeaderboardDialog(true)}
+                      className="flex flex-col hover:bg-indigo-800/30 px-2 py-1 rounded-lg transition-all cursor-pointer group"
+                      title="View Leaderboard"
+                    >
+                      <div className="text-xs text-indigo-400/80 leading-tight group-hover:text-indigo-300/90">
+                        Points
+                      </div>
+                      <div className="text-indigo-200 font-bold text-base flex items-center gap-1 leading-tight group-hover:text-indigo-100">
+                        {playerData ? (
+                          <>
+                            <span className="text-yellow-400">🏆</span>
+                            {(playerData.totalPoints ?? 0).toLocaleString()}
+                          </>
+                        ) : (
+                          <span className="text-sm">--</span>
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Divider */}
+                    <div className="h-8 w-px bg-indigo-500/30"></div>
+
                     {/* Wallet Balance */}
                     <div className="flex flex-col">
                       <div className="text-xs text-indigo-400/80 leading-tight">Balance</div>
-                      <div className="text-indigo-200 font-bold text-base flex items-center leading-tight">
+                      <div className="text-indigo-200 font-bold text-base flex items-center gap-1 leading-tight">
                         {isLoadingBalance ? (
                           <span className="text-sm">Loading...</span>
                         ) : solBalance !== null ? (
                           <>
-                            {solBalance.toFixed(4)}{" "}
-                            <span className="text-indigo-300 ml-1 text-sm">SOL</span>
+                            <img
+                              src="/sol-logo.svg"
+                              alt="SOL"
+                              className="w-3 h-3"
+                              style={{
+                                filter:
+                                  "brightness(0) saturate(100%) invert(81%) sepia(13%) saturate(891%) hue-rotate(196deg) brightness(95%) contrast(92%)",
+                              }}
+                            />
+                            {solBalance.toFixed(4)}
                           </>
                         ) : (
                           <span className="text-sm">--</span>
@@ -136,6 +160,11 @@ export function Header() {
           walletAddress={publicKey.toString()}
         />
       )}
+
+      <LeaderboardDialog
+        open={showLeaderboardDialog}
+        onOpenChange={setShowLeaderboardDialog}
+      />
     </>
   );
 }

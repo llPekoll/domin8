@@ -149,6 +149,10 @@ export class Preloader extends Scene {
     this.load.atlas("dust", "dust_char.png", "dust_char.json");
     this.load.image("logo", "logo.webp");
 
+    // Load arena masks for each map
+    this.load.image("mask_classic", "maps/classic/mask_classic.png");
+    this.load.image("mask_secte", "maps/secte/mask_secte.png");
+
     // Load winner throne
     this.load.image("throne", "misc/throne.png");
 
@@ -158,6 +162,7 @@ export class Preloader extends Scene {
     this.load.audio("explosion-dust", "sounds/explosion-dust.wav");
     this.load.audio("victory", "sounds/victory2.mp3");
     this.load.audio("insert-coin", "sounds/insert-coin.mp3");
+    this.load.audio("challenger", "sounds/challenger.mp3");
 
     // Load impact sounds for character landing
     this.load.audio("impact-1", "sounds/impacts/sfx_sounds_impact1.wav");

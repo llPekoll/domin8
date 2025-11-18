@@ -1,6 +1,7 @@
 import { Scene } from "phaser";
 import { GamePhase } from "./GlobalGameStateManager";
 import { EventBus } from "../EventBus";
+import { currentUserWallet } from "../main";
 
 export class UIManager {
   private scene: Scene;
@@ -125,13 +126,30 @@ export class UIManager {
     this.vrfOverlay.setVisible(false);
     this.vrfContainer.setVisible(false);
 
-    // Show winner UI
-    this.winnerContainer.setVisible(true);
-    this.winnerContainer.setAlpha(1); // Reset alpha in case it was faded
-    this.phaseText.setVisible(true);
-    this.phaseText.setText("🏆 WINNER CROWNED!");
-    this.subText.setVisible(true);
-    this.subText.setText("Restarting in 4s...");
+    // Get winner info from game state
+    const winnerWallet = this.gameState?.winner?.toBase58?.() || this.gameState?.winner;
+    const winnerPrize = this.gameState?.winnerPrize
+      ? (Number(this.gameState.winnerPrize) / 1e9).toFixed(3)
+      : "0";
+
+    // Check if current user is the winner
+    const isCurrentUserWinner = currentUserWallet && winnerWallet === currentUserWallet;
+
+    if (isCurrentUserWinner) {
+      // Show winner UI with personalized message
+      this.winnerContainer.setVisible(true);
+      this.winnerContainer.setAlpha(1); // Reset alpha in case it was faded
+      this.phaseText.setVisible(true);
+      this.phaseText.setText(`🏆 YOU WON ${winnerPrize} SOL!`);
+      this.subText.setVisible(true);
+      this.subText.setText("Restarting in 4s...");
+
+      // Emit event for React to show Twitter share button
+      EventBus.emit("show-winner-share", {
+        isCurrentUser: isCurrentUserWinner,
+        prize: winnerPrize,
+      });
+    }
   }
 
   /**

@@ -16,7 +16,7 @@ pub use error::*;
 pub use state::*;
 pub use utils::*;
 
-declare_id!("D8zxCM4tehr4Aux9zvonwCCYjV71WEgFnssWxgpgEEb7");
+declare_id!("7bHYHZVu7kWRU4xf7DWypCvefWvuDqW1CqVfsuwdGiR7");
 
 #[program]
 pub mod domin8_prgm {
@@ -38,7 +38,14 @@ pub mod domin8_prgm {
         max_deposit_amount: u64,
         round_time: u64,
     ) -> Result<()> {
-        initialize_config::handler(ctx, treasury, house_fee, min_deposit_amount, max_deposit_amount, round_time)
+        initialize_config::handler(
+            ctx,
+            treasury,
+            house_fee,
+            min_deposit_amount,
+            max_deposit_amount,
+            round_time,
+        )
     }
 
     /// Create new game round with first bet

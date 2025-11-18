@@ -11,7 +11,7 @@ import { logger } from "~/lib/logger";
  * - Browser autoplay handling
  */
 export class SoundManager {
-  private static globalVolume: number = 1.0;
+  private static globalVolume: number = 0.2;
   private static isMuted: boolean = false;
   private static isAudioUnlocked: boolean = false;
   private static initialized: boolean = false;
@@ -109,7 +109,15 @@ export class SoundManager {
    */
   static playRandomImpact(scene: Scene, baseVolume: number = 0.4) {
     // Available impact sounds (missing impact-2)
-    const impactSounds = ["impact-1", "impact-3", "impact-4", "impact-5", "impact-6", "impact-7", "impact-8"];
+    const impactSounds = [
+      "impact-1",
+      "impact-3",
+      "impact-4",
+      "impact-5",
+      "impact-6",
+      "impact-7",
+      "impact-8",
+    ];
 
     // Pick a random impact sound
     const randomIndex = Math.floor(Math.random() * impactSounds.length);
@@ -125,10 +133,20 @@ export class SoundManager {
   static playRandomDeathScream(scene: Scene, baseVolume: number = 0.5) {
     // Available death scream sounds (14 total)
     const deathScreams = [
-      "death-scream-1", "death-scream-2", "death-scream-3", "death-scream-4",
-      "death-scream-5", "death-scream-6", "death-scream-7", "death-scream-8",
-      "death-scream-9", "death-scream-10", "death-scream-11", "death-scream-12",
-      "death-scream-13", "death-scream-14"
+      "death-scream-1",
+      "death-scream-2",
+      "death-scream-3",
+      "death-scream-4",
+      "death-scream-5",
+      "death-scream-6",
+      "death-scream-7",
+      "death-scream-8",
+      "death-scream-9",
+      "death-scream-10",
+      "death-scream-11",
+      "death-scream-12",
+      "death-scream-13",
+      "death-scream-14",
     ];
 
     // Pick a random death scream
@@ -161,6 +179,13 @@ export class SoundManager {
   }
 
   /**
+   * Play challenger sound (when a new player joins)
+   */
+  static playChallenger(scene: Scene, baseVolume: number = 0.6) {
+    this.playSound(scene, "challenger", baseVolume / 3);
+  }
+
+  /**
    * Set global volume (0.0 to 1.0)
    */
   static setGlobalVolume(volume: number) {
@@ -168,9 +193,11 @@ export class SoundManager {
     localStorage.setItem("sound-volume", this.globalVolume.toString());
 
     // Update battle music volume immediately if it's playing
-    if (this.battleMusic && typeof (this.battleMusic as any).setVolume === 'function') {
+    if (this.battleMusic && typeof (this.battleMusic as any).setVolume === "function") {
       (this.battleMusic as any).setVolume(this.globalVolume * 0.2); // 0.2 is the base volume for battle music
-      logger.ui.debug(`[SoundManager] Updated battle music volume to ${this.globalVolume.toFixed(2)}`);
+      logger.ui.debug(
+        `[SoundManager] Updated battle music volume to ${this.globalVolume.toFixed(2)}`
+      );
     }
   }
 

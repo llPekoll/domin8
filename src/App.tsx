@@ -1,21 +1,35 @@
 import { useRef, useEffect, useMemo, useState } from "react";
 import { IRefPhaserGame, PhaserGame } from "./PhaserGame";
 import { Header } from "./components/Header";
-import { PlayerOnboarding } from "./components/PlayerOnboarding";
 import { CharacterSelection2 } from "./components/CharacterSelection2";
 import { BettingPanel } from "./components/BettingPanel";
 import { BlockchainDebugDialog } from "./components/BlockchainDebugDialog";
 import { MultiParticipantPanel } from "./components/MultiParticipantPanel";
+import { PotDisplayPanel } from "./components/PotDisplayPanel";
+import { WinnerShareOverlay } from "./components/WinnerShareOverlay";
+import { LastWinnerCard } from "./components/LastWinnerCard";
 import { useActiveGame } from "./hooks/useActiveGame";
+import { usePrivyWallet } from "./hooks/usePrivyWallet";
 import { EventBus } from "./game/EventBus";
-import { setActiveGameData } from "./game/main";
+import { setActiveGameData, setCurrentUserWallet } from "./game/main";
 import type { Character } from "./types/character";
+import { useAutoCreatePlayer } from "./hooks/useAutoCreatePlayer";
 
 export default function App() {
   const phaserRef = useRef<IRefPhaserGame | null>(null);
 
   // Track selected character from carousel
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
+
+  // Get current user's wallet
+  const { connected, publicKey, externalWalletAddress } = usePrivyWallet();
+
+  // Auto-create player when wallet connects
+  useAutoCreatePlayer(
+    connected,
+    publicKey?.toBase58() || null,
+    externalWalletAddress || undefined
+  );
 
   // Get current game state directly from blockchain (no Convex, <1s updates)
   const { activeGame: currentRoundState } = useActiveGame();
@@ -54,6 +68,13 @@ export default function App() {
     currentRoundState?.endDate?.toString(),
   ]);
 
+  // Update current user wallet in Phaser
+  useEffect(() => {
+    const walletAddress = publicKey?.toBase58() || null;
+    setCurrentUserWallet(walletAddress);
+    console.log(`👤 [App] Current user wallet set:`, walletAddress);
+  }, [publicKey]);
+
   // Simple: Just pipe blockchain data to Phaser via EventBus
   // Only updates when key fields actually change
   useEffect(() => {
@@ -85,21 +106,25 @@ export default function App() {
 
       <div className="relative z-10">
         <Header />
-        <div className="min-h-screen pt-16 pb-24">
-          <div className="absolute right-4 top-20 w-72 max-h-[calc(100vh-6rem)] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 space-y-4">
-            <PlayerOnboarding />
-          </div>
-        </div>
       </div>
 
       {/* Character Selection Carousel - Bottom Left */}
       <CharacterSelection2 onCharacterSelected={setSelectedCharacter} />
 
       {/* Betting Panel - Bottom Center */}
-      <BettingPanel selectedCharacter={selectedCharacter} />
+      <div className="fixed items-center bottom-4 left-1/2 -translate-x-1/2 z-50">
+        <BlockchainDebugDialog />
+        <BettingPanel selectedCharacter={selectedCharacter} />
+      </div>
 
+      {/* Pot Display - Top Center */}
+      <PotDisplayPanel />
+
+      <div className="fixed top-18 right-4 ">
+        <LastWinnerCard />
+      </div>
       <MultiParticipantPanel />
-      <BlockchainDebugDialog />
+      <WinnerShareOverlay />
     </div>
   );
 }

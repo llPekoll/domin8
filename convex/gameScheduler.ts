@@ -337,6 +337,19 @@ export const executeSendPrize = internalAction({
         const updatedGame = await solanaClient.getGameRound(roundId);
 
         if (updatedGame?.winnerPrize === 0) {
+          // Award points to winner for the prize amount
+          if (gameRound.winner) {
+            try {
+              await ctx.runMutation(internal.players.awardPointsInternal, {
+                walletAddress: gameRound.winner.toString(),
+                amountLamports: gameRound.winnerPrize,
+              });
+              console.log(`Round ${roundId}: Points awarded to winner for prize`);
+            } catch (pointsError) {
+              console.error(`Round ${roundId}: Failed to award points to winner:`, pointsError);
+            }
+          }
+
           await ctx.runMutation(internal.syncServiceMutations.upsertGameState, {
             gameRound: {
               roundId: updatedGame.gameRound,
