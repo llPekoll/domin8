@@ -61,7 +61,7 @@ export class DemoScene extends Scene {
 
   // Demo UI elements
   private demoUIContainer!: Phaser.GameObjects.Container;
-  private insertCoinText!: Phaser.GameObjects.Text;
+  // private insertCoinText!: Phaser.GameObjects.Text;
   private demoModeText!: Phaser.GameObjects.Text; // "Demo mode!" - larger text
   private instructionText!: Phaser.GameObjects.Text; // "please insert coin..." - smaller text
   private countdownText!: Phaser.GameObjects.Text;
@@ -475,7 +475,7 @@ export class DemoScene extends Scene {
     this.instructionText.setOrigin(0.5);
 
     // Keep old insertCoinText for backwards compatibility (hidden)
-    this.insertCoinText = this.demoModeText;
+    // this.insertCoinText = this.demoModeText;
 
     // Countdown text - scaled for native resolution
     this.countdownText = this.add.text(0, 35, "30", {
