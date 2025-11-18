@@ -3,7 +3,6 @@ import { Header } from "../components/Header";
 import { CharacterSelection2 } from "../components/CharacterSelection2";
 import { CreateLobby } from "../components/onevone/CreateLobby";
 import { LobbyList } from "../components/onevone/LobbyList";
-import { MyLobbies } from "../components/onevone/MyLobbies";
 import { OneVOneFightScene } from "../components/onevone/OneVOneFightScene";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useQuery } from "convex/react";
@@ -37,11 +36,17 @@ export function OneVOnePage() {
   const openLobbies = useQuery(api.lobbies.getOpenLobbies) || [];
   
   // Get user's personal lobbies (for cancel functionality)
-  const userLobbies = connected && publicKey 
-    ? useQuery(api.lobbies.getPlayerLobbies, { playerWallet: publicKey.toString() })
-    : null;
+  // Must always pass a value to useQuery - pass empty string as default
+  const userLobbies = useQuery(
+    api.lobbies.getPlayerLobbies,
+    publicKey ? { playerWallet: publicKey.toString() } : { playerWallet: "" }
+  );
   
-  const userOpenLobbies = (userLobbies || []).filter((l: LobbyData) => l.status === 0);
+  const userOpenLobbies = useMemo(() => {
+    if (!publicKey || !userLobbies?.asPlayerA) return [];
+    // Filter to only lobbies user created (as Player A) that are still open (status = 0)
+    return userLobbies.asPlayerA.filter((l: any) => l.status === 0);
+  }, [publicKey, userLobbies]);
   
   // Get specific lobby state when fighting (for real-time updates during fight)
   const lobbyState = fightingLobbyId !== null 
