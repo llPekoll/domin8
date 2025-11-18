@@ -8,6 +8,7 @@ import { MultiParticipantPanel } from "./components/MultiParticipantPanel";
 import { PotDisplayPanel } from "./components/PotDisplayPanel";
 import { WinnerShareOverlay } from "./components/WinnerShareOverlay";
 import { LastWinnerCard } from "./components/LastWinnerCard";
+import { LandscapeEnforcer } from "./components/LandscapeEnforcer";
 import { useActiveGame } from "./hooks/useActiveGame";
 import { usePrivyWallet } from "./hooks/usePrivyWallet";
 import { EventBus } from "./game/EventBus";
@@ -100,6 +101,9 @@ export default function App() {
 
   return (
     <div className="relative min-h-screen overflow-hidden">
+      {/* Landscape Enforcer - Highest priority overlay */}
+      <LandscapeEnforcer />
+
       <div className="fixed inset-0 w-full h-full">
         <PhaserGame ref={phaserRef} />
       </div>

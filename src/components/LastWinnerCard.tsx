@@ -3,6 +3,7 @@ import { api } from "../../convex/_generated/api";
 import { Card, CardContent } from "./ui/card";
 import { WinnerCharacterPreviewScene } from "./WinnerCharacterPreviewScene";
 import { useMemo } from "react";
+import { isMobile, isTablet } from "react-device-detect";
 
 export function LastWinnerCard() {
   const lastFinishedGame = useQuery(api.stats.getLastFinishedGame);
@@ -30,6 +31,11 @@ export function LastWinnerCard() {
 
     return wallet || "Unknown";
   }, [lastFinishedGame, playerInfo]);
+
+  // Don't show on mobile/tablet devices
+  if (isMobile || isTablet) {
+    return null;
+  }
 
   // Don't show if no winner data
   if (!lastFinishedGame) {
