@@ -741,6 +741,11 @@ export async function buildJoinLobbyTransactionOptimized(
 
     const playerA = lobbyAccount.playerA;
     const randomnessAccount = lobbyAccount.randomnessAccount;
+    logger.solana.debug("[JoinLobby] Lobby account details", {
+      playerA: playerA.toString(),
+      randomnessAccount: randomnessAccount.toString(),
+      amount: lobbyAccount.amount.toString(),
+    });
 
     // Default position for simplicity: [0, 0]
     const positionB = [0, 0] as [number, number];

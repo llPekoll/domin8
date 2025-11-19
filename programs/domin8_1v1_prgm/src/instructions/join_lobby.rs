@@ -55,13 +55,15 @@ pub fn handler(
     ).map_err(|_| Domin81v1Error::RandomnessNotResolved)?;
 
     // IMPORTANT: Switchboard Randomness pattern requires checking that the seed_slot
-    // is not the current slot - this ensures the randomness has been revealed
+    // is NOT the current slot - this ensures the randomness has been revealed
+    // The randomness must be from the previous slot (seed_slot should be clock.slot - 1)
     if randomness_data.seed_slot == clock.slot {
         return Err(Domin81v1Error::RandomnessAlreadyRevealed.into());
     }
 
     // Get the revealed random value using Switchboard's get_value() function
-    let revealed_random_value = randomness_data.get_value(clock.slot)
+    // Pass a reference to the clock, not the slot number
+    let revealed_random_value = randomness_data.get_value(&clock)
         .map_err(|_| Domin81v1Error::RandomnessNotResolved)?;
 
     // Determine winner based on randomness
