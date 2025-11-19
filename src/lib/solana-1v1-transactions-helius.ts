@@ -20,6 +20,7 @@ import {
   TransactionInstruction,
   ComputeBudgetProgram,
   SystemProgram,
+  Keypair,
 } from "@solana/web3.js";
 import { BN, Program, AnchorProvider } from "@coral-xyz/anchor";
 import { Buffer } from "buffer";
@@ -44,6 +45,20 @@ const HELIUS_POLL_TIMEOUT_MS = 30_000; // 30 seconds
 const HELIUS_POLL_INTERVAL_MS = 2_000; // 2 seconds
 const HELIUS_MAX_RETRIES = 3; // Retry up to 3 times
 const HELIUS_BLOCKHASH_VALIDITY_CHECK = true; // Check blockhash before retry
+
+// SWITCHBOARD RANDOMNESS CONSTANTS
+const SWITCHBOARD_PROGRAM_IDS = {
+  mainnet: new PublicKey("SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv"),
+  devnet: new PublicKey("Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2"),
+} as const;
+
+const SWITCHBOARD_QUEUE_IDS = {
+  mainnet: new PublicKey("A43DyUGA7s8eXPxqEjJY6EBu1KKbNgfxF8h17VAHn13w"),
+  devnet: new PublicKey("EYiAmGSdsQTuCw413V5BzaruWuCCSDgTPtBGvLkXHbe7"),
+} as const;
+
+const SWITCHBOARD_RANDOMNESS_TIMEOUT_MS = 60_000; // 60 seconds for randomness to be revealed
+const SWITCHBOARD_RANDOMNESS_POLL_INTERVAL_MS = 2_000; // Poll every 2 seconds
 
 // Helper types
 interface OptimizationMetrics {
@@ -104,6 +119,256 @@ export async function deriveRandomnessAccountAddress(lobbyId: number | string): 
       hash[i] = seedStr.charCodeAt(i);
     }
     return new PublicKey(hash);
+  }
+}
+
+// ============================================================================
+// SWITCHBOARD RANDOMNESS FUNCTIONS
+// ============================================================================
+
+/**
+ * Helper to get the correct Switchboard Queue based on network
+ * @param connection - Solana connection
+ * @returns PublicKey of the appropriate Switchboard queue
+ */
+function getSwitchboardQueueId(connection: Connection): PublicKey {
+  const endpoint = connection.rpcEndpoint;
+  if (endpoint.includes("devnet")) {
+    return SWITCHBOARD_QUEUE_IDS.devnet;
+  }
+  if (endpoint.includes("localhost") || endpoint.includes("127.0.0.1")) {
+    // For local testing, use devnet queue
+    return SWITCHBOARD_QUEUE_IDS.devnet;
+  }
+  // Default to mainnet
+  return SWITCHBOARD_QUEUE_IDS.mainnet;
+}
+
+/**
+ * Helper to get the correct Switchboard Program ID based on network
+ * @param connection - Solana connection
+ * @returns PublicKey of the appropriate Switchboard program
+ */
+function getSwitchboardProgramId(connection: Connection): PublicKey {
+  const endpoint = connection.rpcEndpoint;
+  if (endpoint.includes("devnet")) {
+    return SWITCHBOARD_PROGRAM_IDS.devnet;
+  }
+  if (endpoint.includes("localhost") || endpoint.includes("127.0.0.1")) {
+    // For local testing, use devnet program
+    return SWITCHBOARD_PROGRAM_IDS.devnet;
+  }
+  // Default to mainnet
+  return SWITCHBOARD_PROGRAM_IDS.mainnet;
+}
+
+/**
+ * Create and commit a Switchboard randomness account
+ * 
+ * This function:
+ * 1. Generates a new Keypair for the randomness account
+ * 2. Creates the randomness account via Switchboard
+ * 3. Builds a commit instruction that locks it to the current slot
+ * 
+ * @param connection - Solana connection
+ * @param payer - Fee payer's public key
+ * @returns Object containing randomness keypair, pubkey, and commit instruction
+ */
+export async function createAndCommitRandomnessAccount(
+  connection: Connection,
+  payer: PublicKey
+): Promise<{
+  randomnessKeypair: Keypair;
+  randomnessPubkey: PublicKey;
+  commitIx: TransactionInstruction;
+}> {
+  try {
+    logger.solana.debug("[Switchboard] Creating and committing randomness account", {
+      payer: payer.toString(),
+    });
+
+    // Get network-appropriate Switchboard program ID
+    const sbProgramId = getSwitchboardProgramId(connection);
+    
+    // Dynamic import of Switchboard SDK
+    const { Randomness } = await import("@switchboard-xyz/on-demand");
+    
+    // Create a minimal provider for Anchor compatibility
+    const provider = new AnchorProvider(
+      connection,
+      {
+        publicKey: payer,
+        signAllTransactions: async (txs: any) => txs,
+        signTransaction: async (tx: any) => tx,
+      } as any,
+      { commitment: "confirmed" }
+    );
+
+    // Load the Switchboard program
+    const sbProgram = await Program.at(sbProgramId, provider);
+
+    // Get the queue for this network
+    const queueId = getSwitchboardQueueId(connection);
+
+    // Create a new randomness account keypair
+    const randomnessKeypair = Keypair.generate();
+    logger.solana.debug("[Switchboard] Generated randomness keypair", {
+      pubkey: randomnessKeypair.publicKey.toString(),
+    });
+
+    // Create randomness account using Switchboard SDK
+    // Note: This returns a Randomness wrapper and an instruction to create the account
+    const [randomness] = await Randomness.create(sbProgram, randomnessKeypair, queueId);
+
+    logger.solana.debug("[Switchboard] Created Randomness wrapper", {
+      pubkey: randomness.pubkey.toString(),
+    });
+
+    // Build the commit instruction
+    // This commits the randomness account to the current slot
+    const commitIx = await randomness.commitIx(queueId);
+
+    logger.solana.info("[Switchboard] Successfully created randomness account and built commit instruction", {
+      randomnessPubkey: randomness.pubkey.toString(),
+    });
+
+    return {
+      randomnessKeypair,
+      randomnessPubkey: randomness.pubkey,
+      commitIx,
+    };
+  } catch (error) {
+    logger.solana.error("[Switchboard] Failed to create and commit randomness account:", error);
+    throw new Error(`Failed to create Switchboard randomness account: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Build and execute a reveal instruction for a committed randomness account
+ * 
+ * @param connection - Solana connection
+ * @param randomnessPubkey - Public key of the randomness account to reveal
+ * @returns Reveal instruction to be included in a transaction
+ */
+export async function buildRevealInstruction(
+  connection: Connection,
+  randomnessPubkey: PublicKey
+): Promise<TransactionInstruction> {
+  try {
+    logger.solana.debug("[Switchboard] Building reveal instruction", {
+      randomnessPubkey: randomnessPubkey.toString(),
+    });
+
+    // Get network-appropriate Switchboard program ID
+    const sbProgramId = getSwitchboardProgramId(connection);
+
+    // Dynamic import of Switchboard SDK
+    const { Randomness } = await import("@switchboard-xyz/on-demand");
+
+    // Create a minimal provider for Anchor compatibility
+    const provider = new AnchorProvider(
+      connection,
+      {
+        publicKey: PublicKey.default,
+        signAllTransactions: async (txs: any) => txs,
+        signTransaction: async (tx: any) => tx,
+      } as any,
+      { commitment: "confirmed" }
+    );
+
+    // Load the Switchboard program
+    const sbProgram = await Program.at(sbProgramId, provider);
+
+    // Load the randomness account
+    const randomness = new Randomness(sbProgram, randomnessPubkey);
+
+    // Build the reveal instruction
+    const revealIx = await randomness.revealIx();
+
+    logger.solana.debug("[Switchboard] Built reveal instruction", {
+      randomnessPubkey: randomnessPubkey.toString(),
+    });
+
+    return revealIx;
+  } catch (error) {
+    logger.solana.error("[Switchboard] Failed to build reveal instruction:", error);
+    throw new Error(`Failed to build reveal instruction: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Wait for a randomness account to be revealed
+ * Polls the randomness account until it's revealed (seed_slot != current slot)
+ * 
+ * @param connection - Solana connection
+ * @param randomnessPubkey - Public key of the randomness account
+ * @param timeout - Maximum time to wait in milliseconds (default: 60 seconds)
+ * @returns True if randomness is revealed, false if timeout
+ */
+export async function waitForRandomnessRevealed(
+  connection: Connection,
+  randomnessPubkey: PublicKey,
+  timeout: number = SWITCHBOARD_RANDOMNESS_TIMEOUT_MS
+): Promise<boolean> {
+  try {
+    logger.solana.debug("[Switchboard] Waiting for randomness to be revealed", {
+      randomnessPubkey: randomnessPubkey.toString(),
+      timeoutMs: timeout,
+    });
+
+    const startTime = Date.now();
+    const sbModule = await import("@switchboard-xyz/on-demand");
+    const RandomnessAccountData = (sbModule as any).RandomnessAccountData;
+
+    while (Date.now() - startTime < timeout) {
+      try {
+        // Fetch the account
+        const accountInfo = await connection.getAccountInfo(randomnessPubkey);
+        
+        if (!accountInfo) {
+          logger.solana.debug("[Switchboard] Randomness account not yet created");
+          await new Promise((resolve) =>
+            setTimeout(resolve, SWITCHBOARD_RANDOMNESS_POLL_INTERVAL_MS)
+          );
+          continue;
+        }
+
+        // Parse the randomness account data
+        const randomnessData = RandomnessAccountData.parse(accountInfo.data);
+        
+        // Get current slot
+        const clock = await connection.getSlot();
+
+        // Check if revealed (seed_slot should NOT be the current slot)
+        if (randomnessData.seed_slot !== clock) {
+          logger.solana.info("[Switchboard] Randomness revealed", {
+            seedSlot: randomnessData.seed_slot,
+            currentSlot: clock,
+          });
+          return true;
+        }
+
+        logger.solana.debug("[Switchboard] Randomness not yet revealed, polling...", {
+          seedSlot: randomnessData.seed_slot,
+          currentSlot: clock,
+        });
+      } catch (parseError) {
+        logger.solana.debug("[Switchboard] Error parsing randomness account, retrying...", {
+          error: parseError,
+        });
+      }
+
+      // Wait before polling again
+      await new Promise((resolve) =>
+        setTimeout(resolve, SWITCHBOARD_RANDOMNESS_POLL_INTERVAL_MS)
+      );
+    }
+
+    logger.solana.warn("[Switchboard] Timeout waiting for randomness to be revealed");
+    return false;
+  } catch (error) {
+    logger.solana.error("[Switchboard] Error waiting for randomness:", error);
+    throw new Error(`Failed while waiting for randomness: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -545,24 +810,51 @@ async function sendTransactionWithHeliusRetry(
  * @param connection - Solana connection
  * @returns Promise<{ transaction: VersionedTransaction; metrics: OptimizationMetrics }>
  */
+/**
+ * Build a create_lobby transaction with Helius optimization and Switchboard randomness commitment
+ * 
+ * IMPORTANT: This function now handles the full Switchboard commit-reveal pattern:
+ * 1. Creates a randomness account via Switchboard
+ * 2. Builds and includes the commit instruction
+ * 3. Builds the create_lobby instruction
+ * 4. Combines them into an optimized transaction
+ * 
+ * @param playerA - Player A's public key
+ * @param amount - Bet amount in lamports
+ * @param characterA - Character ID (0-255)
+ * @param mapId - Map ID (0-255)
+ * @param connection - Solana connection
+ * @returns Promise with transaction, metrics, and randomness pubkey for later reveal
+ */
 export async function buildCreateLobbyTransactionOptimized(
   playerA: PublicKey,
   amount: number,
   characterA: number,
   mapId: number,
-  randomnessAccount: PublicKey,
   connection: Connection
-): Promise<{ transaction: VersionedTransaction; metrics: OptimizationMetrics }> {
+): Promise<{
+  transaction: VersionedTransaction;
+  metrics: OptimizationMetrics;
+  randomnessPubkey: PublicKey;
+  randomnessKeypair: Keypair;
+}> {
   try {
-    logger.solana.debug("[CreateLobby] Building optimized transaction", {
+    logger.solana.info("[CreateLobby] Building optimized transaction with Switchboard randomness", {
       playerA: playerA.toString(),
       amount,
       characterA,
       mapId,
-      randomnessAccount: randomnessAccount.toString(),
     });
 
-    // Get Config PDA
+    // Step 1: Create and commit randomness account with Switchboard
+    const { randomnessKeypair, randomnessPubkey, commitIx } =
+      await createAndCommitRandomnessAccount(connection, playerA);
+
+    logger.solana.debug("[CreateLobby] Switchboard randomness account created and committed", {
+      randomnessPubkey: randomnessPubkey.toString(),
+    });
+
+    // Step 2: Build create_lobby instruction
     const [configPda] = getConfigPDA();
 
     // Create a read-only provider for instruction building
@@ -579,7 +871,9 @@ export async function buildCreateLobbyTransactionOptimized(
     // Default position for simplicity: [0, 0]
     const positionA = [0, 0] as [number, number];
 
-    logger.solana.debug("[CreateLobby] Building instruction with Switchboard randomness account");
+    logger.solana.debug("[CreateLobby] Building create_lobby instruction", {
+      randomnessPubkey: randomnessPubkey.toString(),
+    });
 
     // Build the create_lobby instruction
     const createLobbyIx = await program.methods
@@ -587,20 +881,26 @@ export async function buildCreateLobbyTransactionOptimized(
       .accounts({
         config: configPda,
         playerA,
-        randomnessAccount,
+        randomnessAccount: randomnessPubkey,
         systemProgram: SystemProgram.programId,
       } as any)
       .instruction();
 
-    // Build optimized transaction with Helius best practices
+    // Step 3: Build optimized transaction with BOTH commit and create_lobby instructions
+    // Order is important: commit MUST come before create_lobby
     const { transaction, metrics } = await buildOptimizedTransaction(
       connection,
-      [createLobbyIx],
-      playerA
+      [commitIx, createLobbyIx], // commitIx FIRST, then createLobbyIx
+      playerA,
+      true // skipSimulation - randomness account is external dependency
     );
 
-    logger.solana.debug("[CreateLobby] Optimized transaction created", metrics);
-    return { transaction, metrics };
+    logger.solana.info("[CreateLobby] Optimized transaction created with Switchboard commit", {
+      randomnessPubkey: randomnessPubkey.toString(),
+      metrics,
+    });
+
+    return { transaction, metrics, randomnessPubkey, randomnessKeypair };
   } catch (error) {
     logger.solana.error("[CreateLobby] Failed to build optimized transaction:", error);
     throw error;
@@ -608,13 +908,20 @@ export async function buildCreateLobbyTransactionOptimized(
 }
 
 /**
- * Build a join_lobby transaction with Helius optimization
+ * Build a join_lobby transaction with Helius optimization and Switchboard randomness reveal
+ * 
+ * IMPORTANT: This function is the second half of the Switchboard commit-reveal pattern:
+ * 1. Accepts an optional revealIx instruction
+ * 2. If provided, includes the reveal instruction FIRST
+ * 3. Then includes the join_lobby instruction
+ * 4. This ensures randomness is revealed before join_lobby uses it
  * 
  * @param playerB - Player B's public key
  * @param lobbyId - Lobby ID to join
  * @param characterB - Character ID (0-255)
  * @param lobbyPda - Lobby PDA address
  * @param connection - Solana connection
+ * @param revealIx - Optional reveal instruction from Switchboard (must be called before join)
  * @returns Promise<{ transaction: VersionedTransaction; metrics: OptimizationMetrics }>
  */
 export async function buildJoinLobbyTransactionOptimized(
@@ -622,7 +929,8 @@ export async function buildJoinLobbyTransactionOptimized(
   lobbyId: number,
   characterB: number,
   lobbyPda: PublicKey,
-  connection: Connection
+  connection: Connection,
+  revealIx?: TransactionInstruction
 ): Promise<{ transaction: VersionedTransaction; metrics: OptimizationMetrics }> {
   try {
     logger.solana.debug("[JoinLobby] Building optimized transaction", {
@@ -630,6 +938,7 @@ export async function buildJoinLobbyTransactionOptimized(
       lobbyId,
       characterB,
       lobbyPda: lobbyPda.toString(),
+      hasRevealIx: !!revealIx,
     });
 
     // Get Config PDA
@@ -807,16 +1116,28 @@ export async function buildJoinLobbyTransactionOptimized(
       } as any)
       .instruction();
 
+    // Build transaction instructions with optional reveal
+    // IMPORTANT: revealIx must come FIRST, then joinLobbyIx
+    const instructions = revealIx ? [revealIx, joinLobbyIx] : [joinLobbyIx];
+
+    logger.solana.debug("[JoinLobby] Building transaction with instructions", {
+      count: instructions.length,
+      hasReveal: !!revealIx,
+    });
+
     // Build optimized transaction with Helius best practices
     // Skip simulation for join_lobby because randomness_account may not exist during simulation
     const { transaction, metrics } = await buildOptimizedTransaction(
       connection,
-      [joinLobbyIx],
+      instructions,
       playerB,
       true // skipSimulation - randomness account is an external dependency
     );
 
-    logger.solana.debug("[JoinLobby] Optimized transaction created", metrics);
+    logger.solana.info("[JoinLobby] Optimized transaction created", {
+      metrics,
+      hasReveal: !!revealIx,
+    });
     return { transaction, metrics };
   } catch (error) {
     logger.solana.error("[JoinLobby] Failed to build optimized transaction:", error);
