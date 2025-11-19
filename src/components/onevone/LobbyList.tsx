@@ -18,6 +18,7 @@ interface LobbyData {
   characterA: number;
   characterB?: number;
   mapId: number;
+  randomnessAccountPubkey: string; // Switchboard randomness account for reveal
 }
 
 interface LobbyListProps {
@@ -57,6 +58,8 @@ export function LobbyList({
         const { getSharedConnection } = await import("../../lib/sharedConnection");
         const {
           buildJoinLobbyTransactionOptimized,
+          buildRevealInstruction,
+          waitForRandomnessRevealed,
           sendOptimizedTransaction,
           waitForConfirmationOptimized,
         } = await import("../../lib/solana-1v1-transactions-helius");
@@ -68,16 +71,59 @@ export function LobbyList({
           lobbyId: lobby.lobbyId,
           playerB: currentPlayerWallet,
           character: selectedCharacter.id,
+          randomnessAccount: lobby.randomnessAccountPubkey,
         });
 
-        // Build optimized join transaction with Helius best practices
+        // ============================================================================
+        // Phase 1: Reveal Preparation (Commit-Reveal Pattern)
+        // ============================================================================
+        
+        logger.ui.debug("Switchboard reveal phase starting", {
+          randomnessAccount: lobby.randomnessAccountPubkey,
+        });
+
+        const randomnessAccountPubkey = new PublicKey(lobby.randomnessAccountPubkey);
+
+        // Build the reveal instruction that will commit to revealing the randomness
+        logger.ui.debug("Building Switchboard reveal instruction");
+        const revealIx = await buildRevealInstruction(connection, randomnessAccountPubkey);
+
+        // Poll until the randomness is actually revealed
+        // This waits for the committed slot to pass and the randomness to be available
+        logger.ui.debug("Waiting for randomness to be revealed", {
+          timeout: "60s",
+          pollInterval: "2s",
+        });
+
+        const isRevealed = await waitForRandomnessRevealed(
+          connection,
+          randomnessAccountPubkey,
+          60000 // 60 second timeout
+        );
+
+        if (!isRevealed) {
+          throw new Error(
+            "Randomness did not reveal in time. This may happen if the randomness account seed slot has already passed."
+          );
+        }
+
+        logger.ui.info("Randomness revealed successfully", {
+          randomnessAccount: randomnessAccountPubkey.toString(),
+        });
+
+        // ============================================================================
+        // Phase 2: Build Join Transaction with Reveal Instruction
+        // ============================================================================
+
+        // Build optimized join transaction with reveal instruction prepended
         const lobbyPda = new PublicKey(lobby.lobbyPda);
         const { transaction, metrics } = await buildJoinLobbyTransactionOptimized(
           new PublicKey(currentPlayerWallet),
           lobby.lobbyId,
           selectedCharacter.id,
           lobbyPda,
-          connection
+          connection,
+          revealIx // Pass the reveal instruction to be prepended
         );
 
         // Store the block height for later validation
