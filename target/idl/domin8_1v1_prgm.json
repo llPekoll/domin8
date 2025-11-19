@@ -291,7 +291,10 @@
           "signer": true
         },
         {
-          "name": "randomness_account_data"
+          "name": "randomness_account_data",
+          "docs": [
+            "The account data is validated to be from Switchboard and parsed for randomness value"
+          ]
         },
         {
           "name": "treasury",
@@ -411,6 +414,21 @@
       "code": 6011,
       "name": "DistributionError",
       "msg": "Fund distribution failed"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidRandomnessAccountOwner",
+      "msg": "Randomness account is not owned by Switchboard program"
+    },
+    {
+      "code": 6013,
+      "name": "RandomnessAccountParseError",
+      "msg": "Failed to parse Switchboard randomness account data"
+    },
+    {
+      "code": 6014,
+      "name": "RandomnessConversionError",
+      "msg": "Randomness value conversion to winner failed"
     }
   ],
   "types": [

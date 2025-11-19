@@ -221,12 +221,12 @@ export function CreateLobby({
       });
 
       // Step 1: Create a production-ready Switchboard randomness account
-      logger.ui.debug("Step 1: Creating Switchboard randomness account...");
+      logger.solana.debug("Step 1: Creating Switchboard randomness account...");
       
-      const { randomnessKeypair: _, randomnessPubkey, creationIx: __ } =
+      const { randomnessKeypair, randomnessPubkey, creationIx } =
         await createSwitchboardRandomnessAccount(connection, publicKey);
 
-      logger.ui.info("Switchboard randomness account created", {
+      logger.solana.info("Switchboard randomness account created", {
         randomnessPubkey: randomnessPubkey.toString(),
       });
 
@@ -234,7 +234,13 @@ export function CreateLobby({
       setRandomnessAccountPubkey(randomnessPubkey.toString());
 
       // Step 2: Build create_lobby transaction with the randomness account
-      logger.ui.debug("Step 2: Building create_lobby transaction...");
+      logger.solana.debug("Step 2: Building create_lobby transaction...");
+
+      // IMPORTANT: We must sign with the randomness keypair as well!
+      // The buildCreateLobbyTransactionOptimized function will include the creationIx
+      // but we need to handle the signing part.
+      // Wait, sendOptimizedTransaction uses Privy which only signs with the user's wallet.
+      // We need to add the randomness keypair signature to the transaction.
 
       const { transaction, metrics } =
         await buildCreateLobbyTransactionOptimized(
@@ -243,17 +249,21 @@ export function CreateLobby({
           selectedCharacter.id,
           0, // Default map ID
           randomnessPubkey,
-          connection
+          connection,
+          creationIx // Pass the creation instruction!
         );
 
-      logger.ui.info("Transaction built successfully", {
+      // Sign with the randomness keypair (required for account creation)
+      transaction.sign([randomnessKeypair]);
+
+      logger.solana.info("Transaction built successfully", {
         computeUnits: metrics.optimizedCU,
         priorityFee: metrics.priorityFee,
         estimatedCost: (metrics.estimatedCost / 1e9).toFixed(6) + " SOL",
       });
 
       // Step 3: Get blockhash and send transaction
-      logger.ui.debug("Step 3: Getting blockhash and sending transaction...");
+      logger.solana.debug("Step 3: Getting blockhash and sending transaction...");
 
       const { blockhash: _blockhash, lastValidBlockHeight } =
         await connection.getLatestBlockhash("confirmed");
@@ -269,14 +279,14 @@ export function CreateLobby({
         network
       );
 
-      logger.ui.info("Transaction sent to blockchain", {
+      logger.solana.info("Transaction sent to blockchain", {
         signature: signature.slice(0, 8) + "...",
       });
 
       toast.loading("Waiting for transaction confirmation...", { id: "tx-confirm" });
 
       // Step 4: Wait for confirmation
-      logger.ui.debug("Step 4: Waiting for transaction confirmation...");
+      logger.solana.debug("Step 4: Waiting for transaction confirmation...");
 
       const isConfirmed = await waitForConfirmationOptimized(
         connection,
@@ -286,15 +296,15 @@ export function CreateLobby({
 
       if (!isConfirmed) {
         toast.error("Transaction confirmation timeout", { id: "tx-confirm" });
-        logger.ui.error("Transaction confirmation timed out", { signature });
+        logger.solana.error("Transaction confirmation timed out", { signature });
         return;
       }
 
       toast.success("Transaction confirmed!", { id: "tx-confirm" });
-      logger.ui.info("Transaction confirmed on blockchain", { signature });
+      logger.solana.info("Transaction confirmed on blockchain", { signature });
 
       // Step 5: Call Convex action to create lobby in database
-      logger.ui.debug("Step 5: Creating lobby record in database...", {
+      logger.solana.debug("Step 5: Creating lobby record in database...", {
         randomnessPubkey: randomnessPubkey.toString(),
       });
 
@@ -308,7 +318,7 @@ export function CreateLobby({
       });
 
       if (result.success) {
-        logger.ui.info("Lobby created successfully", {
+        logger.solana.info("Lobby created successfully", {
           lobbyId: result.lobbyId,
           lobbyPda: result.lobbyPda,
         });
@@ -321,12 +331,11 @@ export function CreateLobby({
         onLobbyCreated?.(result.lobbyId);
       } else {
         toast.error("Failed to create lobby in database");
-        logger.ui.error("Convex action failed");
+        logger.solana.error("Convex action failed");
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.ui.error("Failed to create lobby:", error);
-
+      logger.solana.error("Failed to create lobby:", error);
       // Provide user-friendly error messages with recovery guidance
       if (errorMsg.includes("User rejected")) {
         toast.error("Transaction rejected by user");

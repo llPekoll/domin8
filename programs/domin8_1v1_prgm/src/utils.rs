@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use rust_decimal::Decimal;
 use crate::error::Domin81v1Error;
 
 /// Utility functions for the domin8_1v1 program
@@ -15,20 +14,22 @@ impl Utils {
             .join("")
     }
 
-    /// Convert Switchboard randomness (Decimal) to a winner determination
+    /// Convert Switchboard randomness bytes to a winner determination
     /// 
-    /// Takes the integer part of the Decimal and uses modulo 2 to determine winner:
+    /// Takes the raw randomness bytes [u8; 32] and uses modulo 2 to determine winner:
     /// - Even (0) → Player A wins
     /// - Odd (1) → Player B wins
     /// 
-    /// @param randomness - Decimal value from Switchboard
+    /// Converts the first 8 bytes to a u64 in little-endian format,
+    /// then uses modulo 2 for fair coin flip outcome.
+    /// 
+    /// @param randomness - Raw [u8; 32] randomness bytes from Switchboard
     /// @return true if Player A wins, false if Player B wins
-    pub fn determine_winner_from_randomness(randomness: Decimal) -> Result<bool> {
-        // Convert Decimal to u64 for modulo operation
-        // We use the integer part of the decimal value
-        let randomness_int = randomness
-            .to_u64()
-            .ok_or(Domin81v1Error::RandomnessConversionError)?;
+    pub fn determine_winner_from_randomness(randomness: &[u8; 32]) -> Result<bool> {
+        // Convert first 8 bytes to u64 in little-endian
+        let mut bytes_array = [0u8; 8];
+        bytes_array.copy_from_slice(&randomness[0..8]);
+        let randomness_int = u64::from_le_bytes(bytes_array);
 
         // Use modulo 2 to determine winner
         // Even (0) = Player A wins (true)
@@ -36,19 +37,15 @@ impl Utils {
         Ok(randomness_int % 2 == 0)
     }
 
-    /// Alternative winner determination using the mantissa for better distribution
+    /// Alternative winner determination using XOR of all bytes for better distribution
     /// This provides a more uniform distribution across the full randomness range
     /// 
-    /// Takes the bytes representation of the Decimal and XORs the first 4 bytes
-    /// then uses modulo 2 to determine winner
-    pub fn determine_winner_from_randomness_xor(randomness: Decimal) -> Result<bool> {
-        // Get the mantissa bytes from the Decimal
-        let bits = randomness.to_bits();
-        let bytes = bits.to_le_bytes();
+    /// XORs all 32 bytes together, then uses modulo 2 to determine winner
+    pub fn determine_winner_from_randomness_xor(randomness: &[u8; 32]) -> Result<bool> {
+        // XOR all bytes together for better distribution
+        let xor_result = randomness.iter().fold(0u8, |acc, &b| acc ^ b);
 
-        // XOR the first 4 bytes for better distribution
-        let xor_result = bytes[0] ^ bytes[1] ^ bytes[2] ^ bytes[3];
-
+        // Use modulo 2 to determine winner
         Ok(xor_result % 2 == 0)
     }
 }

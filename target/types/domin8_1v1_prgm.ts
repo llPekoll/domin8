@@ -297,7 +297,10 @@ export type Domin81v1Prgm = {
           "signer": true
         },
         {
-          "name": "randomnessAccountData"
+          "name": "randomnessAccountData",
+          "docs": [
+            "The account data is validated to be from Switchboard and parsed for randomness value"
+          ]
         },
         {
           "name": "treasury",
@@ -417,6 +420,21 @@ export type Domin81v1Prgm = {
       "code": 6011,
       "name": "distributionError",
       "msg": "Fund distribution failed"
+    },
+    {
+      "code": 6012,
+      "name": "invalidRandomnessAccountOwner",
+      "msg": "Randomness account is not owned by Switchboard program"
+    },
+    {
+      "code": 6013,
+      "name": "randomnessAccountParseError",
+      "msg": "Failed to parse Switchboard randomness account data"
+    },
+    {
+      "code": 6014,
+      "name": "randomnessConversionError",
+      "msg": "Randomness value conversion to winner failed"
     }
   ],
   "types": [

@@ -22,7 +22,7 @@ import {
   SystemProgram,
   Keypair,
 } from "@solana/web3.js";
-import { BN, Program, AnchorProvider } from "@coral-xyz/anchor";
+import { BN, Program, AnchorProvider, BorshAccountsCoder } from "@coral-xyz/anchor";
 import { Buffer } from "buffer";
 import type { Domin81v1Prgm } from "../../target/types/domin8_1v1_prgm";
 import IDL from "../../target/idl/domin8_1v1_prgm.json";
@@ -95,6 +95,16 @@ function getLobbyPDA(lobbyId: number): [PublicKey, number] {
  * @returns PublicKey of the appropriate Switchboard program
  */
 function getSwitchboardProgramId(connection: Connection): PublicKey {
+  // Check environment variable first to handle custom RPC URLs
+  const network = import.meta.env.VITE_SOLANA_NETWORK;
+  if (network === "devnet" || network === "localnet" || network === "localhost") {
+    logger.solana.debug("[Switchboard] Using devnet program ID from environment");
+    return SWITCHBOARD_PROGRAM_IDS.devnet;
+  }
+  if (network === "mainnet-beta" || network === "mainnet") {
+    return SWITCHBOARD_PROGRAM_IDS.mainnet;
+  }
+
   const endpoint = connection.rpcEndpoint;
   if (endpoint.includes("devnet")) {
     return SWITCHBOARD_PROGRAM_IDS.devnet;
@@ -185,14 +195,26 @@ export async function createSwitchboardRandomnessAccount(
     // Get the default queue for this network
     // For devnet: EYiAmGSdsQTuCw413V5BzaruWuCCSDgTPtBGvLkXHbe7
     // For mainnet: A43DyUGA7s8eXPxqEjJY6EBu1KKbNgfxF8h17VAHn13w
+    
+    // Determine network for Queue ID (consistent with getSwitchboardProgramId)
+    const network = import.meta.env.VITE_SOLANA_NETWORK;
+    let isDevnet = false;
+    
+    if (network === "devnet" || network === "localnet" || network === "localhost") {
+      isDevnet = true;
+    } else if (connection.rpcEndpoint.includes("devnet")) {
+      isDevnet = true;
+    }
+
     const queueId = new PublicKey(
-      connection.rpcEndpoint.includes("devnet")
+      isDevnet
         ? "EYiAmGSdsQTuCw413V5BzaruWuCCSDgTPtBGvLkXHbe7"
         : "A43DyUGA7s8eXPxqEjJY6EBu1KKbNgfxF8h17VAHn13w"
     );
 
     logger.solana.debug("[Switchboard] Using queue", {
       queueId: queueId.toString(),
+      isDevnet,
     });
 
     // Create randomness account using Switchboard SDK
@@ -270,6 +292,42 @@ export async function buildRevealInstruction(
 
     // Load the randomness account
     const randomness = new Randomness(sbProgram, randomnessPubkey);
+
+    // Verify account exists and has correct owner before attempting to build instruction
+    const accountInfo = await connection.getAccountInfo(randomnessPubkey);
+    if (!accountInfo) {
+      throw new Error(`Randomness account ${randomnessPubkey.toString()} does not exist`);
+    }
+    
+    if (!accountInfo.owner.equals(sbProgramId)) {
+      logger.solana.error("[Switchboard] Randomness account owner mismatch", {
+        expected: sbProgramId.toString(),
+        actual: accountInfo.owner.toString(),
+      });
+      throw new Error(`Randomness account owner mismatch. Expected ${sbProgramId.toString()}, got ${accountInfo.owner.toString()}`);
+    }
+
+    logger.solana.debug("[Switchboard] Randomness account verified", {
+      pubkey: randomnessPubkey.toString(),
+      owner: accountInfo.owner.toString(),
+      dataLength: accountInfo.data.length,
+      discriminator: accountInfo.data.slice(0, 8).toString('hex')
+    });
+
+    // Try to decode the account manually to see if it's valid
+    try {
+      const coder = new BorshAccountsCoder(sbProgram.idl);
+      const decoded = coder.decode("RandomnessAccountData", accountInfo.data);
+      logger.solana.debug("[Switchboard] Account decoded successfully", {
+        seedSlot: decoded.seedSlot.toString(),
+        queue: decoded.queue.toString()
+      });
+    } catch (decodeError) {
+      logger.solana.warn("[Switchboard] Failed to decode account manually", {
+        error: decodeError,
+        discriminator: accountInfo.data.slice(0, 8).toString('hex')
+      });
+    }
 
     // Build the reveal instruction
     const revealIx = await randomness.revealIx();
@@ -848,7 +906,8 @@ export async function buildCreateLobbyTransactionOptimized(
   characterA: number,
   mapId: number,
   randomnessAccount: PublicKey,
-  connection: Connection
+  connection: Connection,
+  creationIx?: TransactionInstruction
 ): Promise<{
   transaction: VersionedTransaction;
   metrics: OptimizationMetrics;
@@ -861,6 +920,7 @@ export async function buildCreateLobbyTransactionOptimized(
       characterA,
       mapId,
       randomnessPubkey: randomnessAccount.toString(),
+      hasCreationIx: !!creationIx,
     });
 
     // Build create_lobby instruction
@@ -895,10 +955,14 @@ export async function buildCreateLobbyTransactionOptimized(
       } as any)
       .instruction();
 
-    // Build optimized transaction with just the create_lobby instruction
+    // Build transaction instructions
+    // If creationIx is provided, it must come BEFORE createLobbyIx
+    const instructions = creationIx ? [creationIx, createLobbyIx] : [createLobbyIx];
+
+    // Build optimized transaction
     const { transaction, metrics } = await buildOptimizedTransaction(
       connection,
-      [createLobbyIx],
+      instructions,
       playerA,
       false
     );
@@ -906,6 +970,7 @@ export async function buildCreateLobbyTransactionOptimized(
     logger.solana.info("[CreateLobby] Optimized transaction created", {
       randomnessPubkey: randomnessAccount.toString(),
       metrics,
+      instructionCount: instructions.length,
     });
 
     return { transaction, metrics, randomnessPubkey: randomnessAccount };

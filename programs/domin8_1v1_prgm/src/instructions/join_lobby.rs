@@ -1,10 +1,14 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
+use anchor_lang::solana_program::pubkey::Pubkey;
 use crate::error::Domin81v1Error;
 use crate::state::*;
 use crate::Utils;
 use switchboard_on_demand::accounts::RandomnessAccountData;
-use switchboard_on_demand::PROGRAM_ID as SWITCHBOARD_PROGRAM_ID;
+
+/// Switchboard Program IDs
+const SWITCHBOARD_PROGRAM_ID_DEVNET: &str = "Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2";
+const SWITCHBOARD_PROGRAM_ID_MAINNET: &str = "SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv";
 
 /// Join an existing 1v1 lobby (called by Player B)
 /// 
@@ -53,10 +57,11 @@ pub fn handler(
     );
 
     // ---- Switchboard Account Validation ----
-    // Verify the randomness account belongs to Switchboard program
+    // Verify the randomness account belongs to Switchboard program (using devnet program ID for now)
+    let switchboard_program_id = Pubkey::try_from(SWITCHBOARD_PROGRAM_ID_DEVNET).unwrap();
     require_eq!(
-        ctx.accounts.randomness_account_data.owner,
-        SWITCHBOARD_PROGRAM_ID,
+        *ctx.accounts.randomness_account_data.owner,
+        switchboard_program_id,
         Domin81v1Error::InvalidRandomnessAccountOwner
     );
 
@@ -73,17 +78,14 @@ pub fn handler(
     }
 
     // Get the revealed random value using Switchboard's get_value() function
-    // Parameters:
-    // - clock: clock sysvar to check staleness
-    // - max_stale_slots: 100 = randomness can be up to 100 slots old
-    // - min_samples: 1 = minimum samples required
-    // - require_result: false = don't require perfect result, allow reasonable values
-    let revealed_random_value = randomness_data.get_value(&clock, 100, 1, false)
+    // Returns a [u8; 32] array of random bytes
+    // Parameter: max_stale_slots - randomness can be up to 100 slots old
+    let revealed_random_value = randomness_data.get_value(100)
         .map_err(|_| Domin81v1Error::RandomnessNotResolved)?;
 
     // Determine winner based on randomness using utility function
-    // This converts the Decimal randomness to a bool (true = Player A wins, false = Player B wins)
-    let player_a_wins = Utils::determine_winner_from_randomness(revealed_random_value)
+    // This converts the raw randomness bytes to a bool (true = Player A wins, false = Player B wins)
+    let player_a_wins = Utils::determine_winner_from_randomness(&revealed_random_value)
         .map_err(|_| Domin81v1Error::RandomnessConversionError)?;
 
     let winner = if player_a_wins {
@@ -127,7 +129,7 @@ pub fn handler(
         prize
     );
     msg!("Player B Skin: {}, Position B: [{}, {}]", skin_b, position_b[0], position_b[1]);
-    msg!("Randomness value: {}", revealed_random_value);
+    msg!("Randomness value: {}", Utils::bytes_to_hex(&revealed_random_value));
     msg!("Player A wins: {}", player_a_wins);
 
     // Re-borrow lobby mutably now that the transfer and randomness read are done
