@@ -25,7 +25,7 @@ export function useNFTCharacters(externalWalletAddress: string | null, embeddedW
     const walletsToCheck = [
       externalWalletAddress,
       embeddedWalletAddress
-    ].filter(Boolean);
+    ].filter((addr): addr is string => Boolean(addr));
     
     console.log('[useNFTCharacters] Checking wallets:', walletsToCheck);
     
