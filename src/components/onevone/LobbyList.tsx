@@ -37,6 +37,7 @@ export function LobbyList({
   const { connected, wallet } = usePrivyWallet();
   const joinLobbyAction = useAction(api.lobbies.joinLobby);
   const [joiningLobbies, setJoiningLobbies] = useState<Set<number>>(new Set());
+  const [retryingLobbies, setRetryingLobbies] = useState<Set<number>>(new Set());
   logger.solana.debug("Rendering LobbyList with lobbies:", lobbies);
 
   const handleJoinLobby = useCallback(
@@ -201,15 +202,50 @@ export function LobbyList({
         const errorMsg = error instanceof Error ? error.message : String(error);
         logger.ui.error("Failed to join lobby:", error);
 
-        // Provide user-friendly error messages
+        // Enhanced error messages with recovery guidance
         if (errorMsg.includes("User rejected")) {
           toast.error("Transaction rejected by user");
         } else if (errorMsg.includes("confirmation timeout")) {
-          toast.error("Transaction confirmation timed out. Please check your wallet.");
-        } else if (errorMsg.includes("insufficient funds")) {
-          toast.error("Insufficient SOL for transaction fee and bet amount");
+          toast.error("Transaction confirmation timed out. Please retry.");
+        } else if (
+          errorMsg.includes("insufficient funds") ||
+          errorMsg.includes("insufficient lamports")
+        ) {
+          toast.error(
+            `Insufficient SOL. Need: ~${(
+              lobby.amount / 1e9 + 0.01
+            ).toFixed(4)} SOL (bet + transaction fees)`
+          );
+        } else if (errorMsg.includes("Randomness did not reveal in time")) {
+          toast.error(
+            "Randomness reveal timeout. The commit slot may have already passed. Try again."
+          );
+          // Offer automatic retry after a short delay
+          setRetryingLobbies((prev) => new Set(prev).add(lobby.lobbyId));
+          setTimeout(() => {
+            setRetryingLobbies((prev) => {
+              const next = new Set(prev);
+              next.delete(lobby.lobbyId);
+              return next;
+            });
+          }, 3000);
+        } else if (errorMsg.includes("Failed to build reveal instruction")) {
+          toast.error(
+            "Failed to build reveal instruction. This may be a network issue. Please retry."
+          );
+        } else if (errorMsg.includes("Failed while waiting for randomness")) {
+          toast.error("Error waiting for randomness. Please retry or try a different lobby.");
+        } else if (
+          errorMsg.includes("Lobby has not been resolved yet") ||
+          errorMsg.includes("InvalidLobbyStatus")
+        ) {
+          toast.error("Lobby state error. Please try again or choose a different lobby.");
         } else {
-          toast.error("Failed to join lobby: " + errorMsg);
+          // For unknown errors, show truncated message
+          toast.error(
+            "Failed to join lobby: " +
+              (errorMsg.length > 80 ? errorMsg.substring(0, 80) + "..." : errorMsg)
+          );
         }
       } finally {
         setJoiningLobbies((prev) => {
@@ -263,13 +299,18 @@ export function LobbyList({
                 onClick={() => handleJoinLobby(lobby)}
                 disabled={
                   joiningLobbies.has(lobby.lobbyId) ||
+                  retryingLobbies.has(lobby.lobbyId) ||
                   !connected ||
                   !selectedCharacter ||
                   lobby.playerA === currentPlayerWallet
                 }
                 className="ml-4 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-bold rounded transition-colors whitespace-nowrap"
               >
-                {joiningLobbies.has(lobby.lobbyId) ? "Joining..." : "Join"}
+                {joiningLobbies.has(lobby.lobbyId)
+                  ? "Joining..."
+                  : retryingLobbies.has(lobby.lobbyId)
+                    ? "Retrying..."
+                    : "Join"}
               </button>
             </div>
 

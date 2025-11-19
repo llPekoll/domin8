@@ -187,6 +187,17 @@ export async function createAndCommitRandomnessAccount(
       payer: payer.toString(),
     });
 
+    // Verify payer has sufficient balance for randomness account creation
+    // Randomness accounts typically cost ~0.002 SOL in rent
+    const payerBalance = await connection.getBalance(payer);
+    const RANDOMNESS_ACCOUNT_RENT = 2_000_000; // 0.002 SOL in lamports
+    
+    if (payerBalance < RANDOMNESS_ACCOUNT_RENT) {
+      throw new Error(
+        `insufficient lamports: got ${payerBalance}, need at least ${RANDOMNESS_ACCOUNT_RENT} for randomness account creation`
+      );
+    }
+
     // Get network-appropriate Switchboard program ID
     const sbProgramId = getSwitchboardProgramId(connection);
     
@@ -239,7 +250,27 @@ export async function createAndCommitRandomnessAccount(
     };
   } catch (error) {
     logger.solana.error("[Switchboard] Failed to create and commit randomness account:", error);
-    throw new Error(`Failed to create Switchboard randomness account: ${error instanceof Error ? error.message : String(error)}`);
+    
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    
+    // Provide specific error messages for common failure cases
+    if (errorMsg.includes("insufficient lamports")) {
+      throw new Error(
+        `Failed to create Switchboard randomness account: Insufficient SOL (need ~0.002 SOL for account creation)`
+      );
+    } else if (errorMsg.includes("InvalidQueueId") || errorMsg.includes("queue")) {
+      throw new Error(
+        `Failed to create Switchboard randomness account: Invalid or unavailable queue for this network`
+      );
+    } else if (errorMsg.includes("network") || errorMsg.includes("request failed")) {
+      throw new Error(
+        `Failed to create Switchboard randomness account: Network error. Please check your connection and retry.`
+      );
+    } else {
+      throw new Error(
+        `Failed to create Switchboard randomness account: ${errorMsg}`
+      );
+    }
   }
 }
 
@@ -292,7 +323,23 @@ export async function buildRevealInstruction(
     return revealIx;
   } catch (error) {
     logger.solana.error("[Switchboard] Failed to build reveal instruction:", error);
-    throw new Error(`Failed to build reveal instruction: ${error instanceof Error ? error.message : String(error)}`);
+    
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    
+    // Provide specific error messages for common failure cases
+    if (errorMsg.includes("Account does not exist") || errorMsg.includes("Invalid public key")) {
+      throw new Error(
+        `Failed to build reveal instruction: Randomness account not found. It may not have been created or has expired.`
+      );
+    } else if (errorMsg.includes("network") || errorMsg.includes("request failed")) {
+      throw new Error(
+        `Failed to build reveal instruction: Network error. Please check your connection and retry.`
+      );
+    } else {
+      throw new Error(
+        `Failed to build reveal instruction: ${errorMsg}`
+      );
+    }
   }
 }
 
@@ -351,6 +398,7 @@ export async function waitForRandomnessRevealed(
         logger.solana.debug("[Switchboard] Randomness not yet revealed, polling...", {
           seedSlot: randomnessData.seed_slot,
           currentSlot: clock,
+          elapsedMs: Date.now() - startTime,
         });
       } catch (parseError) {
         logger.solana.debug("[Switchboard] Error parsing randomness account, retrying...", {
@@ -364,11 +412,30 @@ export async function waitForRandomnessRevealed(
       );
     }
 
-    logger.solana.warn("[Switchboard] Timeout waiting for randomness to be revealed");
+    logger.solana.warn("[Switchboard] Timeout waiting for randomness to be revealed", {
+      timeoutMs: timeout,
+      elapsedMs: Date.now() - startTime,
+    });
     return false;
   } catch (error) {
     logger.solana.error("[Switchboard] Error waiting for randomness:", error);
-    throw new Error(`Failed while waiting for randomness: ${error instanceof Error ? error.message : String(error)}`);
+    
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    
+    // Provide specific error messages for common failure cases
+    if (errorMsg.includes("Account does not exist")) {
+      throw new Error(
+        `Failed while waiting for randomness: Randomness account not found. It may have been deleted or expired.`
+      );
+    } else if (errorMsg.includes("network") || errorMsg.includes("request failed")) {
+      throw new Error(
+        `Failed while waiting for randomness: Network error. Please check your connection and retry.`
+      );
+    } else {
+      throw new Error(
+        `Failed while waiting for randomness: ${errorMsg}`
+      );
+    }
   }
 }
 

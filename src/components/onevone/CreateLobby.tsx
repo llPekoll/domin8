@@ -323,15 +323,28 @@ export function CreateLobby({
       const errorMsg = error instanceof Error ? error.message : String(error);
       logger.ui.error("Failed to create lobby:", error);
 
-      // Provide user-friendly error messages
+      // Provide user-friendly error messages with recovery guidance
       if (errorMsg.includes("User rejected")) {
         toast.error("Transaction rejected by user");
       } else if (errorMsg.includes("confirmation timeout")) {
         toast.error("Transaction confirmation timed out. Please check your wallet.");
-      } else if (errorMsg.includes("insufficient funds")) {
-        toast.error("Insufficient SOL for transaction fee and bet amount");
+      } else if (
+        errorMsg.includes("insufficient funds") ||
+        errorMsg.includes("insufficient lamports")
+      ) {
+        toast.error(
+          `Insufficient SOL. Need: ~${(betAmount + 0.01).toFixed(4)} SOL (bet + fees + randomness rent)`
+        );
+      } else if (errorMsg.includes("Failed to create Switchboard randomness account")) {
+        toast.error(
+          "Switchboard randomness account creation failed. Please retry or contact support."
+        );
+      } else if (errorMsg.includes("Failed to create lobby")) {
+        // Generic lobby creation error
+        toast.error("Failed to create lobby. Please try again.");
       } else {
-        toast.error("Failed to create lobby: " + errorMsg);
+        // For unknown errors, show a generic message but log the full error
+        toast.error("Failed to create lobby: " + (errorMsg.length > 100 ? errorMsg.substring(0, 100) + "..." : errorMsg));
       }
     } finally {
       setIsLoading(false);
