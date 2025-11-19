@@ -34,6 +34,7 @@ export function CreateLobby({
   const [betAmount, setBetAmount] = useState<number>(DEFAULT_BET_AMOUNT_SOL);
   const [isLoading, setIsLoading] = useState(false);
   const [cancellingLobbies, setCancellingLobbies] = useState<Set<number>>(new Set());
+  const [randomnessAccountPubkey, setRandomnessAccountPubkey] = useState<string | null>(null);
 
   const handleAmountChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -207,7 +208,6 @@ export function CreateLobby({
         buildCreateLobbyTransactionOptimized,
         sendOptimizedTransaction,
         waitForConfirmationOptimized,
-        deriveRandomnessAccountAddress,
       } = await import("../../lib/solana-1v1-transactions-helius");
 
       const connection = getSharedConnection();
@@ -219,21 +219,26 @@ export function CreateLobby({
         character: selectedCharacter.id,
       });
 
-      // Generate a unique randomness account address for Switchboard
-      // In production, you'd coordinate with Switchboard to create/fund this account
-      const randomnessAccountAddress = await deriveRandomnessAccountAddress(
-        Date.now() // Use timestamp for uniqueness
-      );
-
       // Build optimized transaction with Helius best practices
-      const { transaction, metrics } = await buildCreateLobbyTransactionOptimized(
-        publicKey,
-        betAmountLamports,
-        selectedCharacter.id,
-        0, // Default map ID
-        randomnessAccountAddress,
-        connection
-      );
+      // This now handles the full Switchboard commit-reveal pattern:
+      // 1. Creates a randomness account via Switchboard
+      // 2. Builds and includes the commit instruction
+      // 3. Builds the create_lobby instruction
+      const { transaction, metrics, randomnessPubkey } =
+        await buildCreateLobbyTransactionOptimized(
+          publicKey,
+          betAmountLamports,
+          selectedCharacter.id,
+          0, // Default map ID
+          connection
+        );
+
+      // Store randomness account for later reveal phase
+      setRandomnessAccountPubkey(randomnessPubkey.toString());
+
+      logger.ui.info("Switchboard randomness account created", {
+        randomnessPubkey: randomnessPubkey.toString(),
+      });
 
       // Store the block height for later validation
       const { blockhash: _, lastValidBlockHeight } =
@@ -280,7 +285,14 @@ export function CreateLobby({
       logger.ui.info("Transaction confirmed on blockchain", { signature });
 
       // Call Convex action to create lobby in database
-      logger.ui.debug("Calling Convex action to create lobby in database");
+      logger.ui.debug("Calling Convex action to create lobby in database", {
+        randomnessPubkey: randomnessAccountPubkey,
+      });
+
+      // Verify randomness account was created
+      if (!randomnessAccountPubkey) {
+        throw new Error("Failed to create randomness account");
+      }
 
       const result = await createLobbyAction({
         playerAWallet: publicKey.toString(),
@@ -288,6 +300,7 @@ export function CreateLobby({
         characterA: selectedCharacter.id,
         mapId: 0,
         transactionHash: signature,
+        randomnessAccountPubkey: randomnessAccountPubkey,
       });
 
       if (result.success) {

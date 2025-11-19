@@ -121,6 +121,10 @@ export const getStuckLobbies = internalQuery({
 /**
  * Public mutation wrapper for creating lobbies
  * Used by the createLobby action
+ * 
+ * Now includes Switchboard randomness account tracking:
+ * - randomnessAccountPubkey: The on-chain Switchboard randomness account address
+ *   This account will be used for deterministic randomness in the join_lobby instruction
  */
 export const createLobbyInDb = mutation({
   args: {
@@ -130,6 +134,7 @@ export const createLobbyInDb = mutation({
     amount: v.number(),
     characterA: v.number(),
     mapId: v.number(),
+    randomnessAccountPubkey: v.string(),
   },
   handler: async (ctx, args) => {
     const docId = await ctx.db.insert("oneVOneLobbies", {
@@ -143,6 +148,7 @@ export const createLobbyInDb = mutation({
       characterA: args.characterA,
       characterB: undefined,
       mapId: args.mapId,
+      randomnessAccountPubkey: args.randomnessAccountPubkey,
       createdAt: Date.now(),
       resolvedAt: undefined,
     });
@@ -218,6 +224,7 @@ export const _internalCreateLobby = internalMutation({
     amount: v.number(),
     characterA: v.number(),
     mapId: v.number(),
+    randomnessAccountPubkey: v.string(),
   },
   handler: async (ctx, args) => {
     const docId = await ctx.db.insert("oneVOneLobbies", {
@@ -231,6 +238,7 @@ export const _internalCreateLobby = internalMutation({
       characterA: args.characterA,
       characterB: undefined,
       mapId: args.mapId,
+      randomnessAccountPubkey: args.randomnessAccountPubkey,
       createdAt: Date.now(),
       resolvedAt: undefined,
     });
@@ -346,6 +354,7 @@ export const createLobby = action({
     amount: v.number(), // Bet amount in lamports
     characterA: v.number(), // Character/skin ID (0-255)
     mapId: v.number(), // Map ID (0-255)
+    randomnessAccountPubkey: v.string(), // Switchboard randomness account pubkey (base58)
     transactionHash: v.string(), // Solana transaction hash (for verification)
   },
   handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; lobbyPda: string; action: string }> => {
@@ -384,6 +393,7 @@ export const createLobby = action({
         amount: args.amount,
         characterA: args.characterA,
         mapId: args.mapId,
+        randomnessAccountPubkey: args.randomnessAccountPubkey,
       });
 
       return {
