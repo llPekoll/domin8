@@ -86,6 +86,8 @@ class PrivyWalletAdapter {
     }
 
     // Sign and send with Privy (Privy doesn't have sign-only method)
+    // TODO SING: and send via FAST
+    // const result = await this.privyWallet.
     const result = await this.privyWallet.signAndSendAllTransactions([
       {
         chain: chainId,
@@ -115,6 +117,7 @@ class PrivyWalletAdapter {
       }
     });
 
+    // TODO SING: and send via FAST
     const results = await this.privyWallet.signAndSendAllTransactions(
       serializedTxs.map((transaction) => ({
         chain: chainId,
@@ -150,7 +153,7 @@ const BET_ENTRY_SEED = "bet";
 /**
  * HELIUS OPTIMIZATION: Build and send optimized transaction with Privy
  * This helper wraps Privy's signAndSendAllTransactions with Helius best practices
- * 
+ *
  * @param connection - Solana connection
  * @param instructions - Array of transaction instructions
  * @param payer - Transaction fee payer
@@ -259,7 +262,7 @@ async function sendOptimizedTransactionWithPrivy(
       }
     } catch (error: any) {
       logger.solana.warn(`[sendOptimizedTx] Attempt ${attempt + 1} failed:`, error.message);
-      
+
       if (attempt === maxRetries - 1) {
         throw error;
       }
@@ -321,8 +324,8 @@ async function simulateForComputeUnits(
     }
 
     // Add 10% buffer (Helius recommendation)
-    const optimizedCU = simulation.value.unitsConsumed < 1000 
-      ? 1000 
+    const optimizedCU = simulation.value.unitsConsumed < 1000
+      ? 1000
       : Math.ceil(simulation.value.unitsConsumed * 1.1);
 
     logger.solana.debug("[simulateForComputeUnits] Optimized CU", {
@@ -373,7 +376,7 @@ async function getPriorityFeeForInstructions(
         method: "getPriorityFeeEstimate",
         params: [{
           transaction: serializedTx,
-          options: { 
+          options: {
             recommended: true  // Use Helius recommended fee
           }
         }]
@@ -381,7 +384,7 @@ async function getPriorityFeeForInstructions(
     });
 
     const data = await response.json();
-    
+
     if (data.result?.priorityFeeEstimate) {
       // Add 20% safety buffer
       const estimatedFee = Math.ceil(data.result.priorityFeeEstimate * 1.2);
@@ -423,7 +426,7 @@ async function confirmTransactionWithPolling(
           logger.solana.error('[confirmTransactionWithPolling] Transaction failed:', status.err);
           return false;
         }
-        
+
         if (status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized') {
           return true;
         }
@@ -520,7 +523,6 @@ export const useGameContract = () => {
     try {
       const wallet = new PrivyWalletAdapter(publicKey, selectedWallet, network);
       const provider = new AnchorProvider(connection, wallet, {
-        // HELIUS BEST PRACTICE: Use 'confirmed' commitment
         commitment: "confirmed",
       });
 
@@ -646,14 +648,14 @@ export const useGameContract = () => {
   /**
    * Place a bet in the current game using OPTIMIZED manual transaction building
    * This function handles both creating a new game (if needed) and placing additional bets
-   * 
+   *
    * HELIUS OPTIMIZATIONS APPLIED:
    * - Confirmed commitment for blockhash
    * - Compute unit simulation and optimization
    * - Dynamic priority fees via Helius API
    * - Custom retry logic with blockhash expiry checks
    * - Transaction confirmation polling
-   * 
+   *
    * @param amount - Bet amount in SOL
    * @param skin - Character skin ID (0-255)
    * @param displayName - Player display name for webhooks

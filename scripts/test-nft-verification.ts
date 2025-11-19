@@ -1,6 +1,6 @@
 import { Connection } from '@solana/web3.js';
 
-const HELIUS_RPC_URL = 'https://devnet.helius-rpc.com/?api-key=0df32d0b-da4f-49b3-b154-deaceac254c0';
+const HELIUS_RPC_URL = 'https://mainnet.helius-rpc.com/?api-key=0df32d0b-da4f-49b3-b154-deaceac254c0';
 
 async function testNFTVerification(walletAddress: string, collectionAddress: string) {
   console.log('🔍 Testing NFT verification...');
@@ -117,8 +117,8 @@ async function testNFTVerification(walletAddress: string, collectionAddress: str
 }
 
 // Test with your wallet and the collection you actually own
-const walletAddress = '3HBjgocwMDGiKq7x1D7XoT7Wg2ex5xgstPnCyJfbqC5A';
-const collectionAddress = '2iyDLX4ZNFN48DD9PjVXFg1Ek3RfEFKM9NGR55zKcrUY'; // Legder Collection you own
+const walletAddress = '4sFe6e8X8975TtG7zWfriK2ag5fKUK4zmHW2DkZKKKiz';
+const collectionAddress = '8d36b8028e2fedeb9f8d4599fbdb0bd10be7e95fd01d759ce0b9c691c1d46605'; // Your collection
 
 testNFTVerification(walletAddress, collectionAddress)
   .then((result) => {

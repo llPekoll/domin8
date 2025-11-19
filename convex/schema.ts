@@ -149,6 +149,35 @@ export default defineSchema({
     .index("by_revenue", ["totalRevenue"]), // For leaderboard sorting
 
   // ============================================================================
+  // NFT COLLECTION HOLDER CACHE TABLES
+  // ============================================================================
+
+  /**
+   * NFT Collection Holders - Cached list of wallet addresses that own NFTs from specific collections
+   * Updated every 12 hours via cron job + manual refresh (rate-limited)
+   */
+  nftCollectionHolders: defineTable({
+    collectionAddress: v.string(), // Collection address (base58)
+    walletAddress: v.string(), // Holder wallet address (base58)
+    nftCount: v.number(), // Number of NFTs owned from this collection
+    lastVerified: v.number(), // Unix timestamp when this holder was last verified
+    addedBy: v.string(), // "cron" | "manual" - how this entry was created
+  })
+    .index("by_collection", ["collectionAddress"]) // Query all holders of a collection
+    .index("by_collection_and_wallet", ["collectionAddress", "walletAddress"]) // Check specific holder
+    .index("by_wallet", ["walletAddress"]), // Query all collections owned by wallet
+
+  /**
+   * NFT Refresh Rate Limits - Prevent abuse of manual refresh functionality
+   * Users can refresh their NFT status once every 5 minutes
+   */
+  nftRefreshLimits: defineTable({
+    walletAddress: v.string(), // User's wallet address
+    lastRefreshAt: v.number(), // Unix timestamp of last refresh
+    refreshCount: v.number(), // Total refreshes (for analytics)
+  }).index("by_wallet", ["walletAddress"]),
+
+  // ============================================================================
   // 1V1 LOBBY TABLES
   // ============================================================================
 

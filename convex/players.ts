@@ -272,20 +272,20 @@ export const verifyAndPlaceBet = action({
       throw new Error("Character not found");
     }
 
-    // If character requires an NFT, verify ownership via internal action
+    // If character requires an NFT, verify ownership via cached data
     if (characterRequirements.requiresNFT && characterRequirements.nftCollection) {
       if (!args.externalWalletAddress) {
         throw new Error("External wallet required for NFT characters");
       }
 
-      // Run the internal verification action from an Action context
-      const hasNFT = await ctx.runAction(internal.nft.verifyNFTOwnershipInternal, {
+      // Check cached NFT ownership (instant verification!)
+      const ownership = await ctx.runQuery(api.nftHolderScanner.checkCachedOwnership, {
         walletAddress: args.externalWalletAddress,
         collectionAddress: characterRequirements.nftCollection,
       });
 
-      if (!hasNFT) {
-        throw new Error(`You don't own the required NFT for ${characterRequirements.characterName}`);
+      if (!ownership.hasNFT) {
+        throw new Error(`You don't own the required NFT for ${characterRequirements.characterName}. Try using the refresh button if you just bought this NFT.`);
       }
     }
 

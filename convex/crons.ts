@@ -66,4 +66,21 @@ crons.interval(
   internal.gameSchedulerMutations.cleanupOldJobs
 );
 
+/**
+ * NFT Collection Holder Scanning - Pre-cache ALL holders of each collection
+ * Runs every 12 hours to scan complete holder lists for instant verification
+ * 
+ * Benefits:
+ * - Instant NFT verification (no API calls during character selection)
+ * - Massive API savings (one comprehensive scan vs thousands of individual checks)
+ * - Better UX (no loading spinners for NFT-gated characters)
+ * 
+ * Backup: Manual refresh button for users (rate-limited every 5 minutes)
+ */
+crons.interval(
+  "scan-nft-collection-holders",
+  { hours: 12 },
+  internal.nftHolderScanner.scanAllCollectionHolders
+);
+
 export default crons;

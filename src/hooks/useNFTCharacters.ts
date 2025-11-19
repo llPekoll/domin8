@@ -1,87 +1,117 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "convex/react";
-import { Connection } from "@solana/web3.js";
+import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { getUserNFTCollections } from "../lib/nft-service";
-import { getSolanaRpcUrl } from "../lib/utils";
 import type { Character } from "../types/character";
+import { useState } from "react";
 
 /**
  * Hook to check NFT ownership and return unlocked exclusive characters
+ * Now uses cached holder data for instant verification!
  *
  * @param externalWalletAddress - The user's external wallet address (e.g., Phantom)
+ * @param embeddedWalletAddress - The user's embedded wallet address (Privy)
  * @returns Object containing unlocked characters, loading state, and any errors
  */
 export function useNFTCharacters(externalWalletAddress: string | null, embeddedWalletAddress?: string | null) {
-  const [unlockedCharacters, setUnlockedCharacters] = useState<Character[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Get all exclusive characters from Convex
   const allExclusiveChars = useQuery(api.characters.getExclusiveCharacters);
+  
+  // Get all holder data for all collections at once
+  const allHolders = useQuery(api.nftHolderScanner.getAllHoldersForWallets, {
+    walletAddresses: [externalWalletAddress, embeddedWalletAddress].filter(Boolean) as string[]
+  });
+  
+  // Manual refresh action
+  const manualRefresh = useAction(api.nftHolderScanner.manualRefreshWalletNFTs);
 
-  useEffect(() => {
-    // Check if we have any wallet address to work with
+  // Calculate unlocked characters based on cached data
+  const unlockedCharacters: Character[] = [];
+  const isLoading = !allExclusiveChars || !allHolders;
+  
+  if (allExclusiveChars && allHolders) {
+    console.log('[useNFTCharacters] Checking holders:', allHolders);
+    
+    for (const character of allExclusiveChars) {
+      if (!character.nftCollection) continue;
+      
+      // Check if any of the user's wallets own NFTs from this collection
+      const ownsNFT = allHolders.some(holder => 
+        holder.collectionAddress === character.nftCollection
+      );
+      
+      if (ownsNFT) {
+        console.log(`[useNFTCharacters] ✅ Unlocked ${character.name}`);
+        unlockedCharacters.push(character as Character);
+      }
+    }
+  }
+
+  /**
+   * Manual refresh function for users who just bought NFTs
+   * Rate-limited to once every 5 minutes per wallet
+   */
+  const refreshNFTStatus = async () => {
     const walletsToCheck = [
       externalWalletAddress,
       embeddedWalletAddress
     ].filter((addr): addr is string => Boolean(addr));
     
-    console.log('[useNFTCharacters] Checking wallets:', walletsToCheck);
-    
     if (walletsToCheck.length === 0 || !allExclusiveChars) {
-      console.log('[useNFTCharacters] No wallets to check or no exclusive chars');
-      setUnlockedCharacters([]);
       return;
     }
 
-    const checkNFTs = async () => {
-      setIsLoading(true);
-      setError(null);
+    setRefreshing(true);
+    setError(null);
 
-      try {
-        const connection = new Connection(getSolanaRpcUrl(), "confirmed");
-        
-        // Check all available wallets for NFTs
-        let allCollections: string[] = [];
-        
-        for (const walletAddr of walletsToCheck) {
-          console.log(`[useNFTCharacters] Checking wallet: ${walletAddr}`);
+    try {
+      let refreshSuccess = false;
+      
+      // Refresh each wallet for each collection
+      for (const walletAddr of walletsToCheck) {
+        for (const character of allExclusiveChars) {
+          if (!character.nftCollection) continue;
+          
           try {
-            const collections = await getUserNFTCollections(walletAddr, connection);
-            console.log(`[useNFTCharacters] Collections in ${walletAddr.slice(0,8)}...:`, collections);
-            allCollections = [...allCollections, ...collections];
+            console.log(`[useNFTCharacters] Manual refresh: ${walletAddr.slice(0,8)}... for ${character.name}`);
+            
+            const result = await manualRefresh({
+              walletAddress: walletAddr,
+              collectionAddress: character.nftCollection
+            });
+            
+            if (result.success) {
+              refreshSuccess = true;
+              console.log(`[useNFTCharacters] Refresh result: ${result.hasNFT ? 'HAS NFT' : 'NO NFT'}`);
+            } else if (result.rateLimited) {
+              console.log(`[useNFTCharacters] Rate limited: ${result.error}`);
+              setError(result.error);
+              break;
+            }
           } catch (err) {
-            console.log(`[useNFTCharacters] Error checking ${walletAddr}:`, err);
+            console.log(`[useNFTCharacters] Manual refresh error:`, err);
           }
         }
-        
-        // Remove duplicates
-        const uniqueCollections = [...new Set(allCollections)];
-        console.log('[useNFTCharacters] All unique collections found:', uniqueCollections);
-        console.log('[useNFTCharacters] Exclusive chars needed:', allExclusiveChars.map(c => ({ 
-          name: c.name, 
-          collection: c.nftCollection 
-        })));
-
-        // Match owned collections with exclusive characters
-        const unlocked = allExclusiveChars.filter(char =>
-          char.nftCollection && uniqueCollections.includes(char.nftCollection)
-        );
-
-        console.log('[useNFTCharacters] Unlocked characters:', unlocked.map(c => c.name));
-        setUnlockedCharacters(unlocked as Character[]);
-      } catch (err) {
-        console.error("Failed to check NFT ownership:", err);
-        setError("Failed to load exclusive characters");
-        setUnlockedCharacters([]);
-      } finally {
-        setIsLoading(false);
       }
-    };
+      
+      if (refreshSuccess) {
+        console.log('[useNFTCharacters] Manual refresh completed, cache will update automatically');
+      }
+      
+    } catch (err) {
+      console.error("Manual refresh failed:", err);
+      setError("Failed to refresh NFT status");
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
-    void checkNFTs();
-  }, [externalWalletAddress, embeddedWalletAddress, allExclusiveChars]);
-
-  return { unlockedCharacters, isLoading, error };
+  return { 
+    unlockedCharacters, 
+    isLoading, 
+    error,
+    refreshNFTStatus,
+    refreshing
+  };
 }
