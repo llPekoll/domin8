@@ -219,24 +219,42 @@ export function CreateLobby({
         character: selectedCharacter.id,
       });
 
-      // Build optimized transaction with Helius best practices
-      // This now handles the full Switchboard commit-reveal pattern:
-      // 1. Creates a randomness account via Switchboard
-      // 2. Builds and includes the commit instruction
-      // 3. Builds the create_lobby instruction
+      // For now, use a deterministic randomness account derived from player + nonce
+      // In production, this should be created/registered with Switchboard on-demand service
+      // NOTE: This is a placeholder - the actual randomness account MUST be created on Switchboard
+      const { PublicKey: PubKey } = await import("@solana/web3.js");
+      
+      // Derive a deterministic address as placeholder
+      // In production, fetch this from Switchboard's on-demand API
+      const randomnessAccountAddress = new PubKey(
+        Buffer.concat([
+          Buffer.from("randomness"),
+          publicKey.toBuffer(),
+          Buffer.alloc(8) // Placeholder for nonce/timestamp
+        ])
+      ).toString().slice(0, 44); // PublicKey string representation
+      
+      const randomnessAccount = new PubKey(randomnessAccountAddress);
+
+      logger.ui.info("Using randomness account", {
+        randomnessPubkey: randomnessAccount.toString(),
+      });
+
+      // Build optimized transaction with provided randomness account
       const { transaction, metrics, randomnessPubkey } =
         await buildCreateLobbyTransactionOptimized(
           publicKey,
           betAmountLamports,
           selectedCharacter.id,
           0, // Default map ID
+          randomnessAccount,
           connection
         );
 
       // Store randomness account for later reveal phase
       setRandomnessAccountPubkey(randomnessPubkey.toString());
 
-      logger.ui.info("Switchboard randomness account created", {
+      logger.ui.info("Randomness account registered for lobby", {
         randomnessPubkey: randomnessPubkey.toString(),
       });
 
@@ -289,9 +307,9 @@ export function CreateLobby({
         randomnessPubkey: randomnessAccountPubkey,
       });
 
-      // Verify randomness account was created
+      // Verify randomness account is set
       if (!randomnessAccountPubkey) {
-        throw new Error("Failed to create randomness account");
+        throw new Error("Randomness account address not set");
       }
 
       const result = await createLobbyAction({
@@ -333,11 +351,11 @@ export function CreateLobby({
         errorMsg.includes("insufficient lamports")
       ) {
         toast.error(
-          `Insufficient SOL. Need: ~${(betAmount + 0.01).toFixed(4)} SOL (bet + fees + randomness rent)`
+          `Insufficient SOL. Need: ~${(betAmount + 0.01).toFixed(4)} SOL (bet + transaction fees)`
         );
-      } else if (errorMsg.includes("Failed to create Switchboard randomness account")) {
+      } else if (errorMsg.includes("Randomness account")) {
         toast.error(
-          "Switchboard randomness account creation failed. Please retry or contact support."
+          "Randomness account error. Please ensure you have sufficient SOL and try again."
         );
       } else if (errorMsg.includes("Failed to create lobby")) {
         // Generic lobby creation error

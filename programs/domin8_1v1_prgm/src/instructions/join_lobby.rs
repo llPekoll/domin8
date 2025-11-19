@@ -2,18 +2,21 @@ use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 use crate::error::Domin81v1Error;
 use crate::state::*;
+use crate::Utils;
 use switchboard_on_demand::accounts::RandomnessAccountData;
+use switchboard_on_demand::PROGRAM_ID as SWITCHBOARD_PROGRAM_ID;
 
 /// Join an existing 1v1 lobby (called by Player B)
 /// 
 /// This instruction follows the Switchboard Randomness pattern:
-/// 1. Validates the randomness_account has been revealed (seed_slot is not the current slot)
-/// 2. Accepts Player B's bet
-/// 3. Calls Switchboard's get_value() to retrieve the revealed random value
-/// 4. Determines winner based on randomness (randomness % 2 == 0 → Player A wins, else Player B wins)
-/// 5. Deducts house fee and distributes prize to winner
-/// 6. Closes the lobby PDA and refunds rent to the payer
-/// 7. Sets lobby status to RESOLVED
+/// 1. Validates the randomness_account belongs to Switchboard program
+/// 2. Validates the randomness has been revealed (seed_slot is not the current slot)
+/// 3. Accepts Player B's bet
+/// 4. Calls Switchboard's get_value() to retrieve the revealed random value as Decimal
+/// 5. Determines winner based on randomness using utility function
+/// 6. Deducts house fee and distributes prize to winner
+/// 7. Closes the lobby PDA and refunds rent to the payer
+/// 8. Sets lobby status to RESOLVED
 pub fn handler(
     ctx: Context<JoinLobby>,
     amount: u64,
@@ -49,10 +52,18 @@ pub fn handler(
         Domin81v1Error::InsufficientFunds
     );
 
+    // ---- Switchboard Account Validation ----
+    // Verify the randomness account belongs to Switchboard program
+    require_eq!(
+        ctx.accounts.randomness_account_data.owner,
+        SWITCHBOARD_PROGRAM_ID,
+        Domin81v1Error::InvalidRandomnessAccountOwner
+    );
+
     // Parse the Switchboard randomness account data
     let randomness_data = RandomnessAccountData::parse(
         ctx.accounts.randomness_account_data.data.borrow()
-    ).map_err(|_| Domin81v1Error::RandomnessNotResolved)?;
+    ).map_err(|_| Domin81v1Error::RandomnessAccountParseError)?;
 
     // IMPORTANT: Switchboard Randomness pattern requires checking that the seed_slot
     // is NOT the current slot - this ensures the randomness has been revealed
@@ -62,14 +73,20 @@ pub fn handler(
     }
 
     // Get the revealed random value using Switchboard's get_value() function
-    // Pass a reference to the clock, not the slot number
-    let revealed_random_value = randomness_data.get_value(&clock)
+    // Parameters:
+    // - clock: clock sysvar to check staleness
+    // - max_stale_slots: 100 = randomness can be up to 100 slots old
+    // - min_samples: 1 = minimum samples required
+    // - require_result: false = don't require perfect result, allow reasonable values
+    let revealed_random_value = randomness_data.get_value(&clock, 100, 1, false)
         .map_err(|_| Domin81v1Error::RandomnessNotResolved)?;
 
-    // Determine winner based on randomness
-    // Use the first byte of randomness for winner determination
-    let randomness_u8 = revealed_random_value[0];
-    let winner = if randomness_u8 % 2 == 0 {
+    // Determine winner based on randomness using utility function
+    // This converts the Decimal randomness to a bool (true = Player A wins, false = Player B wins)
+    let player_a_wins = Utils::determine_winner_from_randomness(revealed_random_value)
+        .map_err(|_| Domin81v1Error::RandomnessConversionError)?;
+
+    let winner = if player_a_wins {
         lobby.player_a
     } else {
         player_b.key()
@@ -110,7 +127,8 @@ pub fn handler(
         prize
     );
     msg!("Player B Skin: {}, Position B: [{}, {}]", skin_b, position_b[0], position_b[1]);
-    msg!("Randomness value (first byte): {}", revealed_random_value[0]);
+    msg!("Randomness value: {}", revealed_random_value);
+    msg!("Player A wins: {}", player_a_wins);
 
     // Re-borrow lobby mutably now that the transfer and randomness read are done
     let lobby = &mut ctx.accounts.lobby;
@@ -174,7 +192,8 @@ pub struct JoinLobby<'info> {
     pub payer: Signer<'info>,
 
     // ---- Switchboard Randomness Accounts ----
-    /// CHECK: Switchboard randomness account - must match the one stored in the lobby
+    /// CHECK: Switchboard randomness account - must be owned by Switchboard program
+    /// The account data is validated to be from Switchboard and parsed for randomness value
     pub randomness_account_data: AccountInfo<'info>,
 
     /// CHECK: Treasury account

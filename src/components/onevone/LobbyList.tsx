@@ -37,7 +37,6 @@ export function LobbyList({
   const { connected, wallet } = usePrivyWallet();
   const joinLobbyAction = useAction(api.lobbies.joinLobby);
   const [joiningLobbies, setJoiningLobbies] = useState<Set<number>>(new Set());
-  const [retryingLobbies, setRetryingLobbies] = useState<Set<number>>(new Set());
   logger.solana.debug("Rendering LobbyList with lobbies:", lobbies);
 
   const handleJoinLobby = useCallback(
@@ -60,7 +59,6 @@ export function LobbyList({
         const {
           buildJoinLobbyTransactionOptimized,
           buildRevealInstruction,
-          waitForRandomnessRevealed,
           sendOptimizedTransaction,
           waitForConfirmationOptimized,
         } = await import("../../lib/solana-1v1-transactions-helius");
@@ -76,45 +74,23 @@ export function LobbyList({
         });
 
         // ============================================================================
-        // Phase 1: Reveal Preparation (Commit-Reveal Pattern)
+        // Build Join Transaction with Reveal Instruction
         // ============================================================================
+        // The Switchboard commit-reveal pattern works as follows:
+        // 1. Player A's create_lobby committed the randomness to a slot
+        // 2. Player B builds a transaction with: [reveal instruction, join_lobby instruction]
+        // 3. Both instructions execute atomically - reveal first, then join reads revealed randomness
         
-        logger.ui.debug("Switchboard reveal phase starting", {
+        logger.ui.debug("Building Switchboard reveal instruction", {
           randomnessAccount: lobby.randomnessAccountPubkey,
         });
 
         const randomnessAccountPubkey = new PublicKey(lobby.randomnessAccountPubkey);
 
-        // Build the reveal instruction that will commit to revealing the randomness
-        logger.ui.debug("Building Switchboard reveal instruction");
+        // Build the reveal instruction that will reveal the committed randomness
         const revealIx = await buildRevealInstruction(connection, randomnessAccountPubkey);
 
-        // Poll until the randomness is actually revealed
-        // This waits for the committed slot to pass and the randomness to be available
-        logger.ui.debug("Waiting for randomness to be revealed", {
-          timeout: "60s",
-          pollInterval: "2s",
-        });
-
-        const isRevealed = await waitForRandomnessRevealed(
-          connection,
-          randomnessAccountPubkey,
-          60000 // 60 second timeout
-        );
-
-        if (!isRevealed) {
-          throw new Error(
-            "Randomness did not reveal in time. This may happen if the randomness account seed slot has already passed."
-          );
-        }
-
-        logger.ui.info("Randomness revealed successfully", {
-          randomnessAccount: randomnessAccountPubkey.toString(),
-        });
-
-        // ============================================================================
-        // Phase 2: Build Join Transaction with Reveal Instruction
-        // ============================================================================
+        logger.ui.debug("Reveal instruction built, proceeding to build join transaction");
 
         // Build optimized join transaction with reveal instruction prepended
         const lobbyPda = new PublicKey(lobby.lobbyPda);
@@ -216,25 +192,12 @@ export function LobbyList({
               lobby.amount / 1e9 + 0.01
             ).toFixed(4)} SOL (bet + transaction fees)`
           );
-        } else if (errorMsg.includes("Randomness did not reveal in time")) {
-          toast.error(
-            "Randomness reveal timeout. The commit slot may have already passed. Try again."
-          );
-          // Offer automatic retry after a short delay
-          setRetryingLobbies((prev) => new Set(prev).add(lobby.lobbyId));
-          setTimeout(() => {
-            setRetryingLobbies((prev) => {
-              const next = new Set(prev);
-              next.delete(lobby.lobbyId);
-              return next;
-            });
-          }, 3000);
         } else if (errorMsg.includes("Failed to build reveal instruction")) {
           toast.error(
             "Failed to build reveal instruction. This may be a network issue. Please retry."
           );
-        } else if (errorMsg.includes("Failed while waiting for randomness")) {
-          toast.error("Error waiting for randomness. Please retry or try a different lobby.");
+        } else if (errorMsg.includes("Randomness account not found")) {
+          toast.error("Randomness account error. The lobby may be expired. Try a different one.");
         } else if (
           errorMsg.includes("Lobby has not been resolved yet") ||
           errorMsg.includes("InvalidLobbyStatus")
@@ -299,18 +262,13 @@ export function LobbyList({
                 onClick={() => handleJoinLobby(lobby)}
                 disabled={
                   joiningLobbies.has(lobby.lobbyId) ||
-                  retryingLobbies.has(lobby.lobbyId) ||
                   !connected ||
                   !selectedCharacter ||
                   lobby.playerA === currentPlayerWallet
                 }
                 className="ml-4 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-bold rounded transition-colors whitespace-nowrap"
               >
-                {joiningLobbies.has(lobby.lobbyId)
-                  ? "Joining..."
-                  : retryingLobbies.has(lobby.lobbyId)
-                    ? "Retrying..."
-                    : "Join"}
+                {joiningLobbies.has(lobby.lobbyId) ? "Joining..." : "Join"}
               </button>
             </div>
 

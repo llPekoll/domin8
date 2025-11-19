@@ -38,4 +38,13 @@ pub enum Domin81v1Error {
 
     #[msg("Fund distribution failed")]
     DistributionError,
+
+    #[msg("Randomness account is not owned by Switchboard program")]
+    InvalidRandomnessAccountOwner,
+
+    #[msg("Failed to parse Switchboard randomness account data")]
+    RandomnessAccountParseError,
+
+    #[msg("Randomness value conversion to winner failed")]
+    RandomnessConversionError,
 }

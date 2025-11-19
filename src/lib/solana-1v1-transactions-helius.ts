@@ -20,7 +20,6 @@ import {
   TransactionInstruction,
   ComputeBudgetProgram,
   SystemProgram,
-  Keypair,
 } from "@solana/web3.js";
 import { BN, Program, AnchorProvider } from "@coral-xyz/anchor";
 import { Buffer } from "buffer";
@@ -52,11 +51,6 @@ const SWITCHBOARD_PROGRAM_IDS = {
   devnet: new PublicKey("Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2"),
 } as const;
 
-const SWITCHBOARD_QUEUE_IDS = {
-  mainnet: new PublicKey("A43DyUGA7s8eXPxqEjJY6EBu1KKbNgfxF8h17VAHn13w"),
-  devnet: new PublicKey("EYiAmGSdsQTuCw413V5BzaruWuCCSDgTPtBGvLkXHbe7"),
-} as const;
-
 const SWITCHBOARD_RANDOMNESS_TIMEOUT_MS = 60_000; // 60 seconds for randomness to be revealed
 const SWITCHBOARD_RANDOMNESS_POLL_INTERVAL_MS = 2_000; // Poll every 2 seconds
 
@@ -85,43 +79,6 @@ function getLobbyPDA(lobbyId: number): [PublicKey, number] {
   );
 }
 
-/**
- * Helper to derive a randomness account address for Switchboard
- * This creates a deterministic address based on the lobby ID and program
- * The frontend must ensure this account is created/funded on Switchboard before game creation
- * 
- * @param lobbyId - Lobby ID (or use a timestamp/random value if not available yet)
- * @returns PublicKey - Derived randomness account address
- */
-export async function deriveRandomnessAccountAddress(lobbyId: number | string): Promise<PublicKey> {
-  // Use findProgramAddressSync with a short seed to avoid "Max seed length exceeded" error
-  // Convert the ID to a buffer (max 32 bytes)
-  const seed = typeof lobbyId === "string" 
-    ? Buffer.from(lobbyId.substring(0, 31), "utf-8")  // Limit to 31 bytes for safety
-    : Buffer.alloc(8);
-  
-  if (typeof lobbyId === "number") {
-    seed.writeBigInt64LE(BigInt(lobbyId), 0);
-  }
-
-  try {
-    const [address] = PublicKey.findProgramAddressSync(
-      [Buffer.from("randomness"), seed],
-      PROGRAM_ID
-    );
-    return address;
-  } catch (error) {
-    logger.solana.warn("[Randomness] Failed to derive address, using fallback:", error);
-    // Fallback: return a deterministic PublicKey based on the input
-    const hash = Buffer.alloc(32);
-    const seedStr = String(lobbyId);
-    for (let i = 0; i < seedStr.length && i < 32; i++) {
-      hash[i] = seedStr.charCodeAt(i);
-    }
-    return new PublicKey(hash);
-  }
-}
-
 // ============================================================================
 // SWITCHBOARD RANDOMNESS FUNCTIONS
 // ============================================================================
@@ -131,19 +88,6 @@ export async function deriveRandomnessAccountAddress(lobbyId: number | string): 
  * @param connection - Solana connection
  * @returns PublicKey of the appropriate Switchboard queue
  */
-function getSwitchboardQueueId(connection: Connection): PublicKey {
-  const endpoint = connection.rpcEndpoint;
-  if (endpoint.includes("devnet")) {
-    return SWITCHBOARD_QUEUE_IDS.devnet;
-  }
-  if (endpoint.includes("localhost") || endpoint.includes("127.0.0.1")) {
-    // For local testing, use devnet queue
-    return SWITCHBOARD_QUEUE_IDS.devnet;
-  }
-  // Default to mainnet
-  return SWITCHBOARD_QUEUE_IDS.mainnet;
-}
-
 /**
  * Helper to get the correct Switchboard Program ID based on network
  * @param connection - Solana connection
@@ -160,118 +104,6 @@ function getSwitchboardProgramId(connection: Connection): PublicKey {
   }
   // Default to mainnet
   return SWITCHBOARD_PROGRAM_IDS.mainnet;
-}
-
-/**
- * Create and commit a Switchboard randomness account
- * 
- * This function:
- * 1. Generates a new Keypair for the randomness account
- * 2. Creates the randomness account via Switchboard
- * 3. Builds a commit instruction that locks it to the current slot
- * 
- * @param connection - Solana connection
- * @param payer - Fee payer's public key
- * @returns Object containing randomness keypair, pubkey, and commit instruction
- */
-export async function createAndCommitRandomnessAccount(
-  connection: Connection,
-  payer: PublicKey
-): Promise<{
-  randomnessKeypair: Keypair;
-  randomnessPubkey: PublicKey;
-  commitIx: TransactionInstruction;
-}> {
-  try {
-    logger.solana.debug("[Switchboard] Creating and committing randomness account", {
-      payer: payer.toString(),
-    });
-
-    // Verify payer has sufficient balance for randomness account creation
-    // Randomness accounts typically cost ~0.002 SOL in rent
-    const payerBalance = await connection.getBalance(payer);
-    const RANDOMNESS_ACCOUNT_RENT = 2_000_000; // 0.002 SOL in lamports
-    
-    if (payerBalance < RANDOMNESS_ACCOUNT_RENT) {
-      throw new Error(
-        `insufficient lamports: got ${payerBalance}, need at least ${RANDOMNESS_ACCOUNT_RENT} for randomness account creation`
-      );
-    }
-
-    // Get network-appropriate Switchboard program ID
-    const sbProgramId = getSwitchboardProgramId(connection);
-    
-    // Dynamic import of Switchboard SDK
-    const { Randomness } = await import("@switchboard-xyz/on-demand");
-    
-    // Create a minimal provider for Anchor compatibility
-    const provider = new AnchorProvider(
-      connection,
-      {
-        publicKey: payer,
-        signAllTransactions: async (txs: any) => txs,
-        signTransaction: async (tx: any) => tx,
-      } as any,
-      { commitment: "confirmed" }
-    );
-
-    // Load the Switchboard program
-    const sbProgram = await Program.at(sbProgramId, provider);
-
-    // Get the queue for this network
-    const queueId = getSwitchboardQueueId(connection);
-
-    // Create a new randomness account keypair
-    const randomnessKeypair = Keypair.generate();
-    logger.solana.debug("[Switchboard] Generated randomness keypair", {
-      pubkey: randomnessKeypair.publicKey.toString(),
-    });
-
-    // Create randomness account using Switchboard SDK
-    // Note: This returns a Randomness wrapper and an instruction to create the account
-    const [randomness] = await Randomness.create(sbProgram, randomnessKeypair, queueId);
-
-    logger.solana.debug("[Switchboard] Created Randomness wrapper", {
-      pubkey: randomness.pubkey.toString(),
-    });
-
-    // Build the commit instruction
-    // This commits the randomness account to the current slot
-    const commitIx = await randomness.commitIx(queueId);
-
-    logger.solana.info("[Switchboard] Successfully created randomness account and built commit instruction", {
-      randomnessPubkey: randomness.pubkey.toString(),
-    });
-
-    return {
-      randomnessKeypair,
-      randomnessPubkey: randomness.pubkey,
-      commitIx,
-    };
-  } catch (error) {
-    logger.solana.error("[Switchboard] Failed to create and commit randomness account:", error);
-    
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    
-    // Provide specific error messages for common failure cases
-    if (errorMsg.includes("insufficient lamports")) {
-      throw new Error(
-        `Failed to create Switchboard randomness account: Insufficient SOL (need ~0.002 SOL for account creation)`
-      );
-    } else if (errorMsg.includes("InvalidQueueId") || errorMsg.includes("queue")) {
-      throw new Error(
-        `Failed to create Switchboard randomness account: Invalid or unavailable queue for this network`
-      );
-    } else if (errorMsg.includes("network") || errorMsg.includes("request failed")) {
-      throw new Error(
-        `Failed to create Switchboard randomness account: Network error. Please check your connection and retry.`
-      );
-    } else {
-      throw new Error(
-        `Failed to create Switchboard randomness account: ${errorMsg}`
-      );
-    }
-  }
 }
 
 /**
@@ -869,59 +701,43 @@ async function sendTransactionWithHeliusRetry(
 /**
  * Build a create_lobby transaction with Helius optimization
  * 
- * @param playerA - Player A's public key
- * @param amount - Bet amount in lamports
- * @param characterA - Character ID (0-255)
- * @param mapId - Map ID (0-255)
- * @param randomnessAccount - Switchboard randomness account for this game
- * @param connection - Solana connection
- * @returns Promise<{ transaction: VersionedTransaction; metrics: OptimizationMetrics }>
- */
-/**
- * Build a create_lobby transaction with Helius optimization and Switchboard randomness commitment
+ * IMPORTANT: This function now follows the CORRECT Switchboard commit-reveal pattern:
+ * 1. Accepts a pre-created randomness account address (caller's responsibility)
+ * 2. Stores the randomness account address in the lobby
+ * 3. Randomness will be revealed later during Player B's join transaction
  * 
- * IMPORTANT: This function now handles the full Switchboard commit-reveal pattern:
- * 1. Creates a randomness account via Switchboard
- * 2. Builds and includes the commit instruction
- * 3. Builds the create_lobby instruction
- * 4. Combines them into an optimized transaction
+ * NOTE: The randomness account MUST be created and committed separately before this transaction
  * 
  * @param playerA - Player A's public key
  * @param amount - Bet amount in lamports
  * @param characterA - Character ID (0-255)
  * @param mapId - Map ID (0-255)
+ * @param randomnessAccount - Pre-created Switchboard randomness account address
  * @param connection - Solana connection
- * @returns Promise with transaction, metrics, and randomness pubkey for later reveal
+ * @returns Promise with transaction, metrics, and randomness account address
  */
 export async function buildCreateLobbyTransactionOptimized(
   playerA: PublicKey,
   amount: number,
   characterA: number,
   mapId: number,
+  randomnessAccount: PublicKey,
   connection: Connection
 ): Promise<{
   transaction: VersionedTransaction;
   metrics: OptimizationMetrics;
   randomnessPubkey: PublicKey;
-  randomnessKeypair: Keypair;
 }> {
   try {
-    logger.solana.info("[CreateLobby] Building optimized transaction with Switchboard randomness", {
+    logger.solana.info("[CreateLobby] Building optimized transaction", {
       playerA: playerA.toString(),
       amount,
       characterA,
       mapId,
+      randomnessPubkey: randomnessAccount.toString(),
     });
 
-    // Step 1: Create and commit randomness account with Switchboard
-    const { randomnessKeypair, randomnessPubkey, commitIx } =
-      await createAndCommitRandomnessAccount(connection, playerA);
-
-    logger.solana.debug("[CreateLobby] Switchboard randomness account created and committed", {
-      randomnessPubkey: randomnessPubkey.toString(),
-    });
-
-    // Step 2: Build create_lobby instruction
+    // Build create_lobby instruction
     const [configPda] = getConfigPDA();
 
     // Create a read-only provider for instruction building
@@ -939,7 +755,7 @@ export async function buildCreateLobbyTransactionOptimized(
     const positionA = [0, 0] as [number, number];
 
     logger.solana.debug("[CreateLobby] Building create_lobby instruction", {
-      randomnessPubkey: randomnessPubkey.toString(),
+      randomnessPubkey: randomnessAccount.toString(),
     });
 
     // Build the create_lobby instruction
@@ -948,26 +764,25 @@ export async function buildCreateLobbyTransactionOptimized(
       .accounts({
         config: configPda,
         playerA,
-        randomnessAccount: randomnessPubkey,
+        randomnessAccount,
         systemProgram: SystemProgram.programId,
       } as any)
       .instruction();
 
-    // Step 3: Build optimized transaction with BOTH commit and create_lobby instructions
-    // Order is important: commit MUST come before create_lobby
+    // Build optimized transaction with just the create_lobby instruction
     const { transaction, metrics } = await buildOptimizedTransaction(
       connection,
-      [commitIx, createLobbyIx], // commitIx FIRST, then createLobbyIx
+      [createLobbyIx],
       playerA,
-      true // skipSimulation - randomness account is external dependency
+      false
     );
 
-    logger.solana.info("[CreateLobby] Optimized transaction created with Switchboard commit", {
-      randomnessPubkey: randomnessPubkey.toString(),
+    logger.solana.info("[CreateLobby] Optimized transaction created", {
+      randomnessPubkey: randomnessAccount.toString(),
       metrics,
     });
 
-    return { transaction, metrics, randomnessPubkey, randomnessKeypair };
+    return { transaction, metrics, randomnessPubkey: randomnessAccount };
   } catch (error) {
     logger.solana.error("[CreateLobby] Failed to build optimized transaction:", error);
     throw error;
@@ -1121,6 +936,20 @@ export async function buildJoinLobbyTransactionOptimized(
       playerA: playerA.toString(),
       randomnessAccount: randomnessAccount.toString(),
       amount: lobbyAccount.amount.toString(),
+    });
+
+    // ---- Validate Randomness Account ----
+    // Verify that the randomness account matches what's stored in the lobby
+    logger.solana.debug("[JoinLobby] Validating randomness account");
+    const randomnessAccountInfo = await connection.getAccountInfo(randomnessAccount);
+    if (!randomnessAccountInfo) {
+      throw new Error(`Randomness account not found at ${randomnessAccount.toString()}`);
+    }
+
+    logger.solana.debug("[JoinLobby] Randomness account retrieved", {
+      owner: randomnessAccountInfo.owner.toString(),
+      lamports: randomnessAccountInfo.lamports,
+      dataLength: randomnessAccountInfo.data.length,
     });
 
     // Default position for simplicity: [0, 0]
