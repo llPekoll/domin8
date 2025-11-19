@@ -15,6 +15,21 @@ export function usePrivyWallet() {
   const walletAddress = solanaWallet?.address;
   const connected = ready && authenticated && !!walletAddress;
 
+  // Debug: Log user and linked accounts
+  useEffect(() => {
+    if (user) {
+      console.log('[DEBUG] Privy user object:', {
+        id: user.id,
+        linkedAccounts: user.linkedAccounts?.map(acc => ({
+          type: acc.type,
+          chainType: 'chainType' in acc ? acc.chainType : 'N/A',
+          walletClientType: 'walletClientType' in acc ? acc.walletClientType : 'N/A',
+          address: 'address' in acc ? acc.address : 'N/A'
+        }))
+      });
+    }
+  }, [user]);
+
   // Get external wallet address (non-Privy wallet, e.g., Phantom)
   const externalWalletAccount = user?.linkedAccounts?.find(
     (account) =>
@@ -87,7 +102,17 @@ export function usePrivyWallet() {
     }
    
   };
-   return {
+  // Debug: Log what we're returning
+  console.log('[DEBUG] usePrivyWallet returning:', {
+    connected,
+    walletAddress,
+    externalWalletAddress,
+    externalWalletAccountType,
+    ready,
+    linkedAccountsCount: user?.linkedAccounts?.length || 0
+  });
+
+  return {
       connected,
       publicKey: walletAddress ? new PublicKey(walletAddress) : null,
       walletAddress,

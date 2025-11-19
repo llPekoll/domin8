@@ -4,10 +4,10 @@ import { v } from "convex/values";
 /**
  * Server-side NFT verification (SECURITY CRITICAL)
  * Cannot be bypassed by client-side manipulation
- * 
+ *
  * This action verifies that a wallet owns an NFT from a specific collection.
  * It runs on the Convex server, preventing client-side manipulation.
- * 
+ *
  * Exported as both public action (for frontend) and internal action (for mutations)
  */
 export const verifyNFTOwnership = action({
@@ -38,16 +38,82 @@ export const verifyNFTOwnershipInternal = internalAction({
 async function verifyOwnership(
   args: { walletAddress: string; collectionAddress: string }
 ): Promise<boolean> {
-  // const rpcUrl = "https://api.mainnet-beta.solana.com";
-  const rpcUrl = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
+  console.log(`[NFT Verification] Checking wallet ${args.walletAddress} for collection ${args.collectionAddress}`);
 
-  // FIXME: for dev test, return true here 
-  return true;
   try {
-    // Get all token accounts owned by the wallet
-    // SPL Token Program ID on Solana: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
-    // That give us all SPL tokens (including NFTs, supply of 1) owned by the wallet
-    const response = await fetch(rpcUrl, {
+    // Use the Helius RPC URL from environment (same as client uses)
+    // This supports the Digital Asset Standard (DAS) API for NFT metadata
+    const heliusRpcUrl = process.env.SOLANA_RPC_URL || process.env.VITE_SOLANA_RPC_URL;
+    
+    if (heliusRpcUrl && heliusRpcUrl.includes('helius')) {
+      console.log('[NFT Verification] Using Helius enhanced RPC');
+      
+      try {
+        // Use Helius's getAssetsByOwner method for proper NFT collection detection
+        const response = await fetch(heliusRpcUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 'nft-check',
+            method: 'getAssetsByOwner',
+            params: {
+              ownerAddress: args.walletAddress,
+              page: 1,
+              limit: 1000,
+              displayOptions: {
+                showCollectionMetadata: true
+              }
+            }
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+          console.log('[NFT Verification] Helius API error:', data.error);
+        }
+        
+        if (data.result?.items) {
+          console.log(`[NFT Verification] Found ${data.result.items.length} assets via Helius`);
+          
+          for (const asset of data.result.items) {
+            // Check multiple possible collection fields
+            // 1. Check grouping field (standard Metaplex)
+            const collectionGrouping = asset.grouping?.find((g: any) => g.group_key === 'collection');
+            if (collectionGrouping?.group_value === args.collectionAddress) {
+              console.log(`[NFT Verification] ✅ Found NFT from collection (via grouping)!`);
+              return true;
+            }
+            
+            // 2. Check collection field directly
+            if (asset.collection?.address === args.collectionAddress ||
+                asset.collection?.key === args.collectionAddress) {
+              console.log(`[NFT Verification] ✅ Found NFT from collection (via collection field)!`);
+              return true;
+            }
+            
+            // 3. Check if the asset ID itself matches (for single-NFT collections)
+            if (asset.id === args.collectionAddress) {
+              console.log(`[NFT Verification] ✅ Found NFT matching collection address directly!`);
+              return true;
+            }
+          }
+          
+          console.log(`[NFT Verification] No NFTs found from collection ${args.collectionAddress}`);
+        } else {
+          console.log('[NFT Verification] No assets found for wallet');
+        }
+      } catch (error) {
+        console.log('[NFT Verification] Helius API request failed:', error);
+      }
+    }
+
+    // Fallback: Use standard RPC to get token accounts
+    const fallbackRpcUrl = heliusRpcUrl || "https://api.devnet.solana.com";
+    console.log('[NFT Verification] Using standard RPC fallback method');
+    
+    const tokenAccountsResponse = await fetch(fallbackRpcUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -61,53 +127,67 @@ async function verifyOwnership(
         ]
       })
     });
-    
-    const data = await response.json();
-    
-    if (!data.result?.value) {
-      console.error('No token accounts found for wallet:', args.walletAddress);
+
+    const tokenData = await tokenAccountsResponse.json();
+
+    if (!tokenData.result?.value || tokenData.result.value.length === 0) {
+      console.log('[NFT Verification] No token accounts found');
       return false;
     }
-    
-    const accounts = data.result.value;
-    
-    // Check each token account to see if it matches our collection
-    for (const account of accounts) {
+
+    // Filter for NFTs (amount = 1, decimals = 0)
+    const nftMints: string[] = [];
+    for (const account of tokenData.result.value) {
       try {
-        const tokenAmount = account.account.data.parsed.info.tokenAmount;
-        
-        // Skip if balance is 0 (no tokens)
-        if (tokenAmount.uiAmount === 0) {
-          continue;
+        const info = account.account.data.parsed.info;
+        const tokenAmount = info.tokenAmount;
+
+        if (
+          tokenAmount.uiAmount === 1 &&
+          tokenAmount.decimals === 0 &&
+          tokenAmount.amount === '1'
+        ) {
+          nftMints.push(info.mint);
         }
-        
-        const mintAddress = account.account.data.parsed.info.mint;
-        
-        // For now, we do a simple mint address comparison
-        // In production, you should use Metaplex metadata parser to verify
-        // the collection field in the token's metadata
-        if (mintAddress === args.collectionAddress) {
-          return true;
-        }
-        
-        // TODO: Fetch and parse Metaplex metadata to check collection field
-        // This would involve:
-        // 1. Derive metadata PDA from mint address
-        // 2. Fetch metadata account
-        // 3. Parse metadata to check collection.key field
-        // For now, we're using direct mint comparison as a simplified approach
-        
-      } catch (parseError) {
-        console.error('Error parsing token account:', parseError);
+      } catch (err) {
         continue;
       }
     }
-    
-    return false; // No matching NFT found
-    
+
+    console.log(`[NFT Verification] Found ${nftMints.length} NFTs`);
+
+    // Without proper metadata parsing, we can only do basic checks:
+    // 1. Check if the collection address itself is owned as an NFT
+    if (nftMints.includes(args.collectionAddress)) {
+      console.log('[NFT Verification] ✅ Found exact mint match');
+      return true;
+    }
+
+    // 2. For development/testing: Check against known collection NFTs
+    // You would need to populate this with actual NFT mint addresses from the collection
+    const knownCollectionNFTs: { [key: string]: string[] } = {
+      // Example for the Pepe collection address from your seed data:
+      '6v8wpUjNMkdSf5q1xK4Yjjhjy1cy6FPfCXi9qMduuSG1': [
+        // Add known NFT mint addresses from this collection here
+        // e.g., 'ABC123...', 'DEF456...'
+      ]
+    };
+
+    if (knownCollectionNFTs[args.collectionAddress]) {
+      for (const mint of nftMints) {
+        if (knownCollectionNFTs[args.collectionAddress].includes(mint)) {
+          console.log('[NFT Verification] ✅ Found NFT from known collection mapping');
+          return true;
+        }
+      }
+    }
+
+    console.log('[NFT Verification] ❌ No NFT found from collection');
+    return false;
+
   } catch (error) {
-    console.error('NFT verification error:', error);
-    // Fail closed - deny access on error
+    console.error('[NFT Verification] Error:', error);
+    // Fail closed - deny access on error for security
     return false;
   }
 }

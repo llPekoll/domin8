@@ -17,7 +17,7 @@ interface CharacterSelectionProps {
 const CharacterSelection2 = memo(function CharacterSelection({
   onCharacterSelected,
 }: CharacterSelectionProps) {
-  const { connected, externalWalletAddress } = usePrivyWallet();
+  const { connected, externalWalletAddress, walletAddress } = usePrivyWallet();
   const { characters: allCharacters } = useAssets();
 
   // Carousel state
@@ -34,7 +34,7 @@ const CharacterSelection2 = memo(function CharacterSelection({
     unlockedCharacters,
     isLoading: isLoadingNFTs,
     error: nftError,
-  } = useNFTCharacters(externalWalletAddress);
+  } = useNFTCharacters(externalWalletAddress, walletAddress);
 
   // Surface NFT hook errors as user-friendly toasts
   useEffect(() => {
