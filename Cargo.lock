@@ -697,6 +697,7 @@ name = "domin8_1v1_prgm"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "rust_decimal",
  "switchboard-on-demand",
 ]
 

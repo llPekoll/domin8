@@ -116,7 +116,7 @@ export function LobbyList({
         logger.ui.debug("Signing and sending optimized join transaction with Privy wallet");
 
         // Send with Helius optimizations (retry logic, blockhash checking)
-        const network = import.meta.env.VITE_SOLANA_NETWORK || "mainnet-beta";
+        const network = import.meta.env.VITE_SOLANA_NETWORK || "devnet";
         const signature = await sendOptimizedTransaction(
           connection,
           transaction,

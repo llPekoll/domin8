@@ -102,7 +102,7 @@ export function CreateLobby({
         logger.ui.debug("Signing and sending optimized cancel transaction with Privy wallet");
 
         // Send with Helius optimizations
-        const network = import.meta.env.VITE_SOLANA_NETWORK || "mainnet-beta";
+        const network = import.meta.env.VITE_SOLANA_NETWORK || "devnet";
         const signature = await sendOptimizedTransaction(
           connection,
           transaction,
@@ -205,6 +205,7 @@ export function CreateLobby({
       // Import utilities
       const { getSharedConnection } = await import("../../lib/sharedConnection");
       const {
+        createSwitchboardRandomnessAccount,
         buildCreateLobbyTransactionOptimized,
         sendOptimizedTransaction,
         waitForConfirmationOptimized,
@@ -213,65 +214,52 @@ export function CreateLobby({
       const connection = getSharedConnection();
       const betAmountLamports = Math.floor(betAmount * 1e9); // Convert SOL to lamports
 
-      logger.ui.info("Building optimized create_lobby transaction", {
+      logger.ui.info("Starting lobby creation process", {
         playerA: publicKey.toString(),
         amount: betAmountLamports,
         character: selectedCharacter.id,
       });
 
-      // For now, use a deterministic randomness account derived from player + nonce
-      // In production, this should be created/registered with Switchboard on-demand service
-      // NOTE: This is a placeholder - the actual randomness account MUST be created on Switchboard
-      const { PublicKey: PubKey } = await import("@solana/web3.js");
+      // Step 1: Create a production-ready Switchboard randomness account
+      logger.ui.debug("Step 1: Creating Switchboard randomness account...");
       
-      // Derive a deterministic address as placeholder
-      // In production, fetch this from Switchboard's on-demand API
-      const randomnessAccountAddress = new PubKey(
-        Buffer.concat([
-          Buffer.from("randomness"),
-          publicKey.toBuffer(),
-          Buffer.alloc(8) // Placeholder for nonce/timestamp
-        ])
-      ).toString().slice(0, 44); // PublicKey string representation
-      
-      const randomnessAccount = new PubKey(randomnessAccountAddress);
+      const { randomnessKeypair: _, randomnessPubkey, creationIx: __ } =
+        await createSwitchboardRandomnessAccount(connection, publicKey);
 
-      logger.ui.info("Using randomness account", {
-        randomnessPubkey: randomnessAccount.toString(),
+      logger.ui.info("Switchboard randomness account created", {
+        randomnessPubkey: randomnessPubkey.toString(),
       });
 
-      // Build optimized transaction with provided randomness account
-      const { transaction, metrics, randomnessPubkey } =
+      // Store randomness account for later use (in Convex action)
+      setRandomnessAccountPubkey(randomnessPubkey.toString());
+
+      // Step 2: Build create_lobby transaction with the randomness account
+      logger.ui.debug("Step 2: Building create_lobby transaction...");
+
+      const { transaction, metrics } =
         await buildCreateLobbyTransactionOptimized(
           publicKey,
           betAmountLamports,
           selectedCharacter.id,
           0, // Default map ID
-          randomnessAccount,
+          randomnessPubkey,
           connection
         );
 
-      // Store randomness account for later reveal phase
-      setRandomnessAccountPubkey(randomnessPubkey.toString());
-
-      logger.ui.info("Randomness account registered for lobby", {
-        randomnessPubkey: randomnessPubkey.toString(),
-      });
-
-      // Store the block height for later validation
-      const { blockhash: _, lastValidBlockHeight } =
-        await connection.getLatestBlockhash("confirmed");
-
-      logger.ui.info("Transaction optimization metrics", {
+      logger.ui.info("Transaction built successfully", {
         computeUnits: metrics.optimizedCU,
         priorityFee: metrics.priorityFee,
         estimatedCost: (metrics.estimatedCost / 1e9).toFixed(6) + " SOL",
       });
 
-      logger.ui.debug("Signing and sending optimized transaction with Privy wallet");
+      // Step 3: Get blockhash and send transaction
+      logger.ui.debug("Step 3: Getting blockhash and sending transaction...");
+
+      const { blockhash: _blockhash, lastValidBlockHeight } =
+        await connection.getLatestBlockhash("confirmed");
 
       // Send with Helius optimizations (retry logic, blockhash checking)
-      const network = import.meta.env.VITE_SOLANA_NETWORK || "mainnet-beta";
+      const network = import.meta.env.VITE_SOLANA_NETWORK || "devnet";
       const signature = await sendOptimizedTransaction(
         connection,
         transaction,
@@ -281,12 +269,15 @@ export function CreateLobby({
         network
       );
 
-      logger.ui.info("Optimized transaction sent", {
+      logger.ui.info("Transaction sent to blockchain", {
         signature: signature.slice(0, 8) + "...",
       });
+
       toast.loading("Waiting for transaction confirmation...", { id: "tx-confirm" });
 
-      // Wait for confirmation with Helius polling
+      // Step 4: Wait for confirmation
+      logger.ui.debug("Step 4: Waiting for transaction confirmation...");
+
       const isConfirmed = await waitForConfirmationOptimized(
         connection,
         signature,
@@ -302,15 +293,10 @@ export function CreateLobby({
       toast.success("Transaction confirmed!", { id: "tx-confirm" });
       logger.ui.info("Transaction confirmed on blockchain", { signature });
 
-      // Call Convex action to create lobby in database
-      logger.ui.debug("Calling Convex action to create lobby in database", {
-        randomnessPubkey: randomnessAccountPubkey,
+      // Step 5: Call Convex action to create lobby in database
+      logger.ui.debug("Step 5: Creating lobby record in database...", {
+        randomnessPubkey: randomnessPubkey.toString(),
       });
-
-      // Verify randomness account is set
-      if (!randomnessAccountPubkey) {
-        throw new Error("Randomness account address not set");
-      }
 
       const result = await createLobbyAction({
         playerAWallet: publicKey.toString(),
@@ -318,7 +304,7 @@ export function CreateLobby({
         characterA: selectedCharacter.id,
         mapId: 0,
         transactionHash: signature,
-        randomnessAccountPubkey: randomnessAccountPubkey,
+        randomnessAccountPubkey: randomnessPubkey.toString(),
       });
 
       if (result.success) {
@@ -346,16 +332,17 @@ export function CreateLobby({
         toast.error("Transaction rejected by user");
       } else if (errorMsg.includes("confirmation timeout")) {
         toast.error("Transaction confirmation timed out. Please check your wallet.");
-      } else if (
-        errorMsg.includes("insufficient funds") ||
-        errorMsg.includes("insufficient lamports")
-      ) {
+      } else if (errorMsg.includes("Insufficient SOL")) {
         toast.error(
-          `Insufficient SOL. Need: ~${(betAmount + 0.01).toFixed(4)} SOL (bet + transaction fees)`
+          `Insufficient SOL. Need: ~${(betAmount + 0.003).toFixed(4)} SOL (bet + account creation + fees)`
         );
-      } else if (errorMsg.includes("Randomness account")) {
+      } else if (errorMsg.includes("Switchboard")) {
         toast.error(
-          "Randomness account error. Please ensure you have sufficient SOL and try again."
+          "Switchboard randomness account creation failed. Please ensure you have sufficient SOL (~0.003) and try again."
+        );
+      } else if (errorMsg.includes("Randomness")) {
+        toast.error(
+          "Randomness setup error. Please check your connection and try again."
         );
       } else if (errorMsg.includes("Failed to create lobby")) {
         // Generic lobby creation error

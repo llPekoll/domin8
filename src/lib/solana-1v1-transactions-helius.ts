@@ -20,6 +20,7 @@ import {
   TransactionInstruction,
   ComputeBudgetProgram,
   SystemProgram,
+  Keypair,
 } from "@solana/web3.js";
 import { BN, Program, AnchorProvider } from "@coral-xyz/anchor";
 import { Buffer } from "buffer";
@@ -104,6 +105,131 @@ function getSwitchboardProgramId(connection: Connection): PublicKey {
   }
   // Default to mainnet
   return SWITCHBOARD_PROGRAM_IDS.mainnet;
+}
+
+/**
+ * Create a production-ready Switchboard randomness account
+ * 
+ * This function:
+ * 1. Dynamically imports Switchboard SDK
+ * 2. Creates a randomness account keypair
+ * 3. Builds account creation instruction
+ * 4. Returns keypair, pubkey, and instruction for transaction
+ * 
+ * IMPORTANT: The returned instruction MUST be included in a transaction
+ * and signed by both the payer and the randomness account keypair
+ * 
+ * @param connection - Solana connection
+ * @param payer - Payer's public key (fee payer)
+ * @returns Object with randomnessKeypair, pubkey, and creationIx
+ * @throws Error if account creation fails
+ */
+export async function createSwitchboardRandomnessAccount(
+  connection: Connection,
+  payer: PublicKey
+): Promise<{
+  randomnessKeypair: any; // Switchboard randomness keypair
+  randomnessPubkey: PublicKey;
+  creationIx: TransactionInstruction;
+}> {
+  try {
+    logger.solana.info("[Switchboard] Creating production-ready randomness account", {
+      payer: payer.toString(),
+    });
+
+    // Verify payer has sufficient balance for account creation + rent
+    const payerBalance = await connection.getBalance(payer);
+    const RANDOMNESS_ACCOUNT_RENT = 2_000_000; // ~0.002 SOL for rent-exempt minimum
+    const BUFFER_FOR_FEES = 1_000_000; // ~0.001 SOL for transaction fees
+    const TOTAL_NEEDED = RANDOMNESS_ACCOUNT_RENT + BUFFER_FOR_FEES;
+
+    if (payerBalance < TOTAL_NEEDED) {
+      const needed = TOTAL_NEEDED / 1e9;
+      const available = payerBalance / 1e9;
+      throw new Error(
+        `Insufficient SOL: need ${needed.toFixed(4)} SOL, have ${available.toFixed(4)} SOL`
+      );
+    }
+
+    // Get Switchboard program ID for this network
+    const sbProgramId = getSwitchboardProgramId(connection);
+
+    // Dynamic import of Switchboard SDK
+    const { Randomness } = await import("@switchboard-xyz/on-demand");
+
+    logger.solana.debug("[Switchboard] Imported Switchboard SDK", {
+      programId: sbProgramId.toString(),
+    });
+
+    // Create keypair for the randomness account
+    // Use Solana's Keypair for the Switchboard randomness account
+    const randomnessKeypair = Keypair.generate();
+    logger.solana.debug("[Switchboard] Generated randomness keypair", {
+      pubkey: randomnessKeypair.publicKey.toString(),
+    });
+
+    // Create a minimal provider for Anchor compatibility (used by Switchboard SDK)
+    const provider = new AnchorProvider(
+      connection,
+      {
+        publicKey: payer,
+        signAllTransactions: async (txs: any) => txs,
+        signTransaction: async (tx: any) => tx,
+      } as any,
+      { commitment: "confirmed" }
+    );
+
+    // Load the Switchboard program
+    const sbProgram = await Program.at(sbProgramId, provider);
+
+    // Get the default queue for this network
+    // For devnet: EYiAmGSdsQTuCw413V5BzaruWuCCSDgTPtBGvLkXHbe7
+    // For mainnet: A43DyUGA7s8eXPxqEjJY6EBu1KKbNgfxF8h17VAHn13w
+    const queueId = new PublicKey(
+      connection.rpcEndpoint.includes("devnet")
+        ? "EYiAmGSdsQTuCw413V5BzaruWuCCSDgTPtBGvLkXHbe7"
+        : "A43DyUGA7s8eXPxqEjJY6EBu1KKbNgfxF8h17VAHn13w"
+    );
+
+    logger.solana.debug("[Switchboard] Using queue", {
+      queueId: queueId.toString(),
+    });
+
+    // Create randomness account using Switchboard SDK
+    // This returns a Randomness wrapper object and creates the account
+    const [randomness, createIx] = await Randomness.create(sbProgram, randomnessKeypair, queueId);
+
+    logger.solana.info("[Switchboard] Successfully created Switchboard randomness account", {
+      randomnessPubkey: randomness.pubkey.toString(),
+    });
+
+    return {
+      randomnessKeypair,
+      randomnessPubkey: randomness.pubkey,
+      creationIx: createIx,
+    };
+  } catch (error) {
+    logger.solana.error("[Switchboard] Failed to create randomness account:", error);
+
+    const errorMsg = error instanceof Error ? error.message : String(error);
+
+    // Provide specific error messages for common failure cases
+    if (errorMsg.includes("insufficient")) {
+      throw new Error(
+        `Switchboard account creation failed: Insufficient SOL (need ~0.003 SOL)`
+      );
+    } else if (errorMsg.includes("queue") || errorMsg.includes("Queue")) {
+      throw new Error(
+        `Switchboard account creation failed: Queue not found or invalid for this network`
+      );
+    } else if (errorMsg.includes("network") || errorMsg.includes("request failed")) {
+      throw new Error(
+        `Switchboard account creation failed: Network error - please check your connection`
+      );
+    } else {
+      throw new Error(`Switchboard account creation failed: ${errorMsg}`);
+    }
+  }
 }
 
 /**
@@ -1118,7 +1244,7 @@ export async function sendOptimizedTransaction(
   payer: PublicKey,
   privyWallet: any,
   lastValidBlockHeight: number,
-  network: string = "mainnet-beta"
+  network: string = "devnet"
 ): Promise<string> {
   return sendTransactionWithHeliusRetry(
     connection,
