@@ -123,7 +123,8 @@ export class Solana1v1QueryClient {
           const amount = Number(data.readBigUInt64LE(offset));
           offset += 8;
 
-          const randomnessAccount = new PublicKey(data.slice(offset, offset + 32));
+          const forceBuffer = data.slice(offset, offset + 32);
+          const force = forceBuffer.toString('hex');
           offset += 32;
 
           const status = data[offset];
@@ -178,7 +179,7 @@ export class Solana1v1QueryClient {
             playerA,
             playerB,
             amount: { toNumber: () => amount },
-            randomnessAccount,
+            force,
             status,
             winner,
             createdAt: { toNumber: () => createdAt },

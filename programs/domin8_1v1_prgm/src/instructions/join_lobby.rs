@@ -1,26 +1,18 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
-use anchor_lang::solana_program::pubkey::Pubkey;
 use crate::error::Domin81v1Error;
 use crate::state::*;
-use crate::Utils;
-use switchboard_on_demand::accounts::RandomnessAccountData;
-
-/// Switchboard Program IDs
-const SWITCHBOARD_PROGRAM_ID_DEVNET: &str = "Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2";
-const SWITCHBOARD_PROGRAM_ID_MAINNET: &str = "SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv";
+use orao_solana_vrf::program::OraoVrf;
+use orao_solana_vrf::cpi::accounts::RequestV2;
+use orao_solana_vrf::state::NetworkState;
 
 /// Join an existing 1v1 lobby (called by Player B)
 /// 
-/// This instruction follows the Switchboard Randomness pattern:
-/// 1. Validates the randomness_account belongs to Switchboard program
-/// 2. Validates the randomness has been revealed (seed_slot is not the current slot)
-/// 3. Accepts Player B's bet
-/// 4. Calls Switchboard's get_value() to retrieve the revealed random value as Decimal
-/// 5. Determines winner based on randomness using utility function
-/// 6. Deducts house fee and distributes prize to winner
-/// 7. Closes the lobby PDA and refunds rent to the payer
-/// 8. Sets lobby status to RESOLVED
+/// This instruction follows the ORAO VRF pattern:
+/// 1. Validates lobby status
+/// 2. Accepts Player B's bet
+/// 3. Requests randomness from ORAO VRF using the pre-generated force seed
+/// 4. Sets lobby status to AWAITING_VRF
 pub fn handler(
     ctx: Context<JoinLobby>,
     amount: u64,
@@ -29,10 +21,8 @@ pub fn handler(
 ) -> Result<()> {
     require!(amount > 0, Domin81v1Error::InvalidBetAmount);
 
-    let config = &ctx.accounts.config;
+    let lobby = &mut ctx.accounts.lobby;
     let player_b = &ctx.accounts.player_b;
-    let lobby = &ctx.accounts.lobby;
-    let clock = Clock::get()?;
 
     // Verify lobby is in CREATED status (waiting for second player)
     require_eq!(
@@ -56,43 +46,23 @@ pub fn handler(
         Domin81v1Error::InsufficientFunds
     );
 
-    // ---- Switchboard Account Validation ----
-    // Verify the randomness account belongs to Switchboard program (using devnet program ID for now)
-    let switchboard_program_id = Pubkey::try_from(SWITCHBOARD_PROGRAM_ID_DEVNET).unwrap();
-    require_eq!(
-        *ctx.accounts.randomness_account_data.owner,
-        switchboard_program_id,
-        Domin81v1Error::InvalidRandomnessAccountOwner
-    );
-
-    // Parse the Switchboard randomness account data
-    let randomness_data = RandomnessAccountData::parse(
-        ctx.accounts.randomness_account_data.data.borrow()
-    ).map_err(|_| Domin81v1Error::RandomnessAccountParseError)?;
-
-    // IMPORTANT: Switchboard Randomness pattern requires checking that the seed_slot
-    // is NOT the current slot - this ensures the randomness has been revealed
-    // The randomness must be from the previous slot (seed_slot should be clock.slot - 1)
-    if randomness_data.seed_slot == clock.slot {
-        return Err(Domin81v1Error::RandomnessAlreadyRevealed.into());
-    }
-
-    // Get the revealed random value using Switchboard's get_value() function
-    // Returns a [u8; 32] array of random bytes
-    // Parameter: max_stale_slots - randomness can be up to 100 slots old
-    let revealed_random_value = randomness_data.get_value(100)
-        .map_err(|_| Domin81v1Error::RandomnessNotResolved)?;
-
-    // Determine winner based on randomness using utility function
-    // This converts the raw randomness bytes to a bool (true = Player A wins, false = Player B wins)
-    let player_a_wins = Utils::determine_winner_from_randomness(&revealed_random_value)
-        .map_err(|_| Domin81v1Error::RandomnessConversionError)?;
-
-    let winner = if player_a_wins {
-        lobby.player_a
-    } else {
-        player_b.key()
+    // Request Randomness from ORAO
+    let cpi_program = ctx.accounts.vrf.to_account_info();
+    let cpi_accounts = RequestV2 {
+        payer: ctx.accounts.player_b.to_account_info(),
+        network_state: ctx.accounts.config_account.to_account_info(),
+        treasury: ctx.accounts.treasury.to_account_info(),
+        request: ctx.accounts.randomness_account.to_account_info(),
+        system_program: ctx.accounts.system_program.to_account_info(),
     };
+    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+    orao_solana_vrf::cpi::request_v2(cpi_ctx, lobby.force)?;
+
+    // Update Lobby State
+    lobby.player_b = Some(player_b.key());
+    lobby.skin_b = Some(skin_b);
+    lobby.position_b = Some(position_b);
+    lobby.status = LOBBY_STATUS_AWAITING_VRF;
 
     // Transfer SOL from Player B to the lobby PDA
     let transfer_instruction = system_program::Transfer {
@@ -105,68 +75,19 @@ pub fn handler(
     );
     system_program::transfer(cpi_context, amount)?;
 
-    // Calculate total pot
-    let total_pot = amount.checked_add(lobby.amount)
-        .ok_or(Domin81v1Error::DistributionError)?;
-
-    // Calculate house fee
-    let house_fee = (total_pot as u128)
-        .checked_mul(config.house_fee_bps as u128)
-        .ok_or(Domin81v1Error::DistributionError)?
-        .checked_div(10000)
-        .ok_or(Domin81v1Error::DistributionError)? as u64;
-
-    let prize = total_pot.checked_sub(house_fee)
-        .ok_or(Domin81v1Error::DistributionError)?;
-
     msg!(
-        "Lobby {} resolution: Player B={}, Winner={}, Total Pot={}, House Fee={}, Prize={}",
+        "Lobby {} joined by Player B: {}",
         lobby.lobby_id,
-        player_b.key(),
-        winner,
-        total_pot,
-        house_fee,
-        prize
+        player_b.key()
     );
-    msg!("Player B Skin: {}, Position B: [{}, {}]", skin_b, position_b[0], position_b[1]);
-    msg!("Randomness value: {}", Utils::bytes_to_hex(&revealed_random_value));
-    msg!("Player A wins: {}", player_a_wins);
-
-    // Re-borrow lobby mutably now that the transfer and randomness read are done
-    let lobby = &mut ctx.accounts.lobby;
-
-    // Update lobby before closing
-    lobby.player_b = Some(player_b.key());
-    lobby.winner = Some(winner);
-    lobby.status = LOBBY_STATUS_RESOLVED;
-    lobby.skin_b = Some(skin_b);
-    lobby.position_b = Some(position_b);
-    if house_fee > 0 {
-        let treasury_info = &ctx.accounts.treasury;
-        **lobby.to_account_info().lamports.borrow_mut() -= house_fee;
-        **treasury_info.lamports.borrow_mut() += house_fee;
-        msg!("Transferred {} lamports to treasury", house_fee);
-    }
-
-    // Transfer prize to winner
-    if prize > 0 {
-        let winner_info = if winner == lobby.player_a {
-            ctx.accounts.player_a.to_account_info()
-        } else {
-            player_b.to_account_info()
-        };
-
-        **lobby.to_account_info().lamports.borrow_mut() -= prize;
-        **winner_info.lamports.borrow_mut() += prize;
-        msg!("Transferred {} lamports to winner {}", prize, winner);
-    }
-
-    msg!("Lobby {} closed, account will be closed by Anchor", lobby.lobby_id);
+    msg!("Status updated to AWAITING_VRF (2)");
+    msg!("Randomness requested with force seed: {:?}", lobby.force);
 
     Ok(())
 }
 
 #[derive(Accounts)]
+#[instruction(amount: u64, skin_b: u8, position_b: [u16; 2])]
 pub struct JoinLobby<'info> {
     #[account(
         mut,
@@ -177,30 +98,31 @@ pub struct JoinLobby<'info> {
 
     #[account(
         mut,
-        close = payer,
-        owner = crate::ID,
+        seeds = [
+            b"domin8_1v1_lobby",
+            lobby.lobby_id.to_le_bytes().as_ref(),
+        ],
+        bump,
     )]
     pub lobby: Account<'info, Domin81v1Lobby>,
-
-    /// CHECK: Player A account, used only for receiving winnings
-    #[account(mut)]
-    pub player_a: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub player_b: Signer<'info>,
 
-    // Payer for refunds/rent
-    #[account(mut)]
-    pub payer: Signer<'info>,
+    /// CHECK: ORAO VRF Program
+    pub vrf: Program<'info, OraoVrf>,
 
-    // ---- Switchboard Randomness Accounts ----
-    /// CHECK: Switchboard randomness account - must be owned by Switchboard program
-    /// The account data is validated to be from Switchboard and parsed for randomness value
-    pub randomness_account_data: AccountInfo<'info>,
-
-    /// CHECK: Treasury account
+    /// CHECK: ORAO Network State
     #[account(mut)]
-    pub treasury: UncheckedAccount<'info>,
+    pub config_account: Account<'info, NetworkState>,
+
+    /// CHECK: ORAO Treasury
+    #[account(mut)]
+    pub treasury: AccountInfo<'info>,
+
+    /// CHECK: Randomness account to be created (PDA derived from seed)
+    #[account(mut)]
+    pub randomness_account: AccountInfo<'info>,
 
     pub system_program: Program<'info, System>,
 }

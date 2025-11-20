@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { logger } from "../../lib/logger";
 import type { Character } from "../../types/character";
+import { LobbyDetailsDialog } from "./LobbyDetailsDialog";
 
 interface LobbyData {
   _id: string;
@@ -13,12 +14,12 @@ interface LobbyData {
   playerA: string;
   playerB?: string;
   amount: number;
-  status: 0 | 1;
+  status: 0 | 1 | 2;
   winner?: string;
   characterA: number;
   characterB?: number;
   mapId: number;
-  randomnessAccountPubkey: string; // Switchboard randomness account for reveal
+  forceSeed?: string; // ORAO force seed
 }
 
 interface LobbyListProps {
@@ -37,6 +38,8 @@ export function LobbyList({
   const { connected, wallet } = usePrivyWallet();
   const joinLobbyAction = useAction(api.lobbies.joinLobby);
   const [joiningLobbies, setJoiningLobbies] = useState<Set<number>>(new Set());
+  const [selectedLobby, setSelectedLobby] = useState<LobbyData | null>(null);
+  
   logger.solana.debug("Rendering LobbyList with lobbies:", lobbies);
 
   const handleJoinLobby = useCallback(
@@ -56,12 +59,7 @@ export function LobbyList({
       try {
         // Import utilities
         const { getSharedConnection } = await import("../../lib/sharedConnection");
-        const {
-          buildJoinLobbyTransactionOptimized,
-          buildRevealInstruction,
-          sendOptimizedTransaction,
-          waitForConfirmationOptimized,
-        } = await import("../../lib/solana-1v1-transactions-helius");
+        const { buildJoinLobbyTransaction } = await import("../../lib/solana-1v1-transactions");
         const { PublicKey } = await import("@solana/web3.js");
 
         const connection = getSharedConnection();
@@ -70,79 +68,34 @@ export function LobbyList({
           lobbyId: lobby.lobbyId,
           playerB: currentPlayerWallet,
           character: selectedCharacter.id,
-          randomnessAccount: lobby.randomnessAccountPubkey,
+          forceSeed: lobby.forceSeed,
         });
 
-        // ============================================================================
-        // Build Join Transaction with Reveal Instruction
-        // ============================================================================
-        // The Switchboard commit-reveal pattern works as follows:
-        // 1. Player A's create_lobby committed the randomness to a slot
-        // 2. Player B builds a transaction with: [reveal instruction, join_lobby instruction]
-        // 3. Both instructions execute atomically - reveal first, then join reads revealed randomness
-        
-        logger.ui.debug("Building Switchboard reveal instruction", {
-          randomnessAccount: lobby.randomnessAccountPubkey,
-        });
+        if (!lobby.forceSeed) {
+            throw new Error("Lobby missing force seed");
+        }
 
-        const randomnessAccountPubkey = new PublicKey(lobby.randomnessAccountPubkey);
-
-        // Build the reveal instruction that will reveal the committed randomness
-        const revealIx = await buildRevealInstruction(connection, randomnessAccountPubkey);
-
-        logger.ui.debug("Reveal instruction built, proceeding to build join transaction");
-
-        // Build optimized join transaction with reveal instruction prepended
         const lobbyPda = new PublicKey(lobby.lobbyPda);
-        const { transaction, metrics } = await buildJoinLobbyTransactionOptimized(
+        const transaction = await buildJoinLobbyTransaction(
           new PublicKey(currentPlayerWallet),
           lobby.lobbyId,
           selectedCharacter.id,
           lobbyPda,
-          connection,
-          revealIx // Pass the reveal instruction to be prepended
+          lobby.forceSeed,
+          connection
         );
 
-        // Store the block height for later validation
-        const { blockhash: _, lastValidBlockHeight } =
-          await connection.getLatestBlockhash("confirmed");
-
-        logger.ui.info("Transaction optimization metrics", {
-          computeUnits: metrics.optimizedCU,
-          priorityFee: metrics.priorityFee,
-          estimatedCost: (metrics.estimatedCost / 1e9).toFixed(6) + " SOL",
-        });
-
-        logger.ui.debug("Signing and sending optimized join transaction with Privy wallet");
-
-        // Send with Helius optimizations (retry logic, blockhash checking)
-        const network = import.meta.env.VITE_SOLANA_NETWORK || "devnet";
-        const signature = await sendOptimizedTransaction(
-          connection,
-          transaction,
-          new PublicKey(currentPlayerWallet),
-          wallet,
-          lastValidBlockHeight,
-          network
-        );
-
-        logger.ui.info("Optimized join transaction sent", {
-          signature: signature.slice(0, 8) + "...",
-          lobbyId: lobby.lobbyId,
-        });
+        // Sign and send
+        const signedTx = await wallet.signTransaction(transaction);
+        const signature = await connection.sendRawTransaction(signedTx.serialize());
+        
+        logger.ui.info("Join transaction sent", { signature });
         toast.loading("Waiting for transaction confirmation...", { id: "join-tx-confirm" });
-
-        // Wait for confirmation with Helius polling
-        const isConfirmed = await waitForConfirmationOptimized(
-          connection,
-          signature,
-          lastValidBlockHeight
-        );
-
-        if (!isConfirmed) {
-          toast.error("Transaction confirmation timeout", { id: "join-tx-confirm" });
-          logger.ui.error("Join transaction confirmation timed out", { signature });
-          return;
+        
+        const confirmation = await connection.confirmTransaction(signature, "confirmed");
+        
+        if (confirmation.value.err) {
+            throw new Error("Transaction failed: " + confirmation.value.err.toString());
         }
 
         toast.success("Transaction confirmed!", { id: "join-tx-confirm" });
@@ -161,7 +114,6 @@ export function LobbyList({
         if (result.success) {
           logger.ui.info("Lobby joined successfully", {
             lobbyId: result.lobbyId,
-            winner: result.winner,
           });
 
           toast.success("You joined the lobby! Starting fight...", {
@@ -177,39 +129,7 @@ export function LobbyList({
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         logger.ui.error("Failed to join lobby:", error);
-
-        // Enhanced error messages with recovery guidance
-        if (errorMsg.includes("User rejected")) {
-          toast.error("Transaction rejected by user");
-        } else if (errorMsg.includes("confirmation timeout")) {
-          toast.error("Transaction confirmation timed out. Please retry.");
-        } else if (
-          errorMsg.includes("insufficient funds") ||
-          errorMsg.includes("insufficient lamports")
-        ) {
-          toast.error(
-            `Insufficient SOL. Need: ~${(
-              lobby.amount / 1e9 + 0.01
-            ).toFixed(4)} SOL (bet + transaction fees)`
-          );
-        } else if (errorMsg.includes("Failed to build reveal instruction")) {
-          toast.error(
-            "Failed to build reveal instruction. This may be a network issue. Please retry."
-          );
-        } else if (errorMsg.includes("Randomness account not found")) {
-          toast.error("Randomness account error. The lobby may be expired. Try a different one.");
-        } else if (
-          errorMsg.includes("Lobby has not been resolved yet") ||
-          errorMsg.includes("InvalidLobbyStatus")
-        ) {
-          toast.error("Lobby state error. Please try again or choose a different lobby.");
-        } else {
-          // For unknown errors, show truncated message
-          toast.error(
-            "Failed to join lobby: " +
-              (errorMsg.length > 80 ? errorMsg.substring(0, 80) + "..." : errorMsg)
-          );
-        }
+        toast.error("Failed to join lobby: " + errorMsg);
       } finally {
         setJoiningLobbies((prev) => {
           const next = new Set(prev);
@@ -221,7 +141,6 @@ export function LobbyList({
     [connected, wallet, selectedCharacter, currentPlayerWallet, onLobbyJoined, joinLobbyAction]
   );
 
-  // Convert SOL from lamports for display
   const formatAmount = (lamports: number) => {
     return (lamports / 1e9).toFixed(4);
   };
@@ -239,12 +158,17 @@ export function LobbyList({
   }
 
   return (
+    <>
     <div className="bg-gray-900 border-2 border-indigo-500 rounded-lg p-6">
       <h2 className="text-xl font-bold text-indigo-200 mb-4">Open Lobbies ({lobbies.length})</h2>
 
       <div className="space-y-3">
         {lobbies.map((lobby) => (
-          <div key={lobby._id} className="bg-gray-800 border border-indigo-400/50 rounded-lg p-4">
+          <div 
+            key={lobby._id} 
+            className="bg-gray-800 border border-indigo-400/50 rounded-lg p-4 cursor-pointer hover:bg-gray-700 transition-colors"
+            onClick={() => setSelectedLobby(lobby)}
+          >
             <div className="flex items-center justify-between mb-3">
               <div className="flex-1">
                 <p className="text-sm text-indigo-400">Lobby #{lobby.lobbyId}</p>
@@ -259,7 +183,10 @@ export function LobbyList({
               </div>
 
               <button
-                onClick={() => handleJoinLobby(lobby)}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    handleJoinLobby(lobby);
+                }}
                 disabled={
                   joiningLobbies.has(lobby.lobbyId) ||
                   !connected ||
@@ -275,12 +202,24 @@ export function LobbyList({
             {/* Status Info */}
             <div className="flex gap-2 text-xs text-gray-400">
               <span className="px-2 py-1 bg-gray-700 rounded">
-                Status: {lobby.status === 0 ? "Waiting" : "Resolved"}
+                Status: {lobby.status === 0 ? "Waiting" : lobby.status === 2 ? "Awaiting VRF" : "Resolved"}
               </span>
             </div>
           </div>
         ))}
       </div>
     </div>
+    
+    <LobbyDetailsDialog 
+        isOpen={!!selectedLobby}
+        onClose={() => setSelectedLobby(null)}
+        lobby={selectedLobby}
+        onJoin={(id) => {
+            const lobby = lobbies.find(l => l.lobbyId === id);
+            if (lobby) handleJoinLobby(lobby);
+            setSelectedLobby(null);
+        }}
+    />
+    </>
   );
 }

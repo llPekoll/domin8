@@ -129,7 +129,7 @@ export default defineSchema({
 
     // Game state
     amount: v.number(), // Bet amount per player (in lamports)
-    status: v.number(), // 0 = created (waiting), 1 = resolved
+    status: v.number(), // 0 = created (waiting), 1 = resolved, 2 = awaiting vrf
     winner: v.optional(v.string()), // Winner's wallet address (base58, None until resolved)
 
     // Character & Map selection
@@ -137,10 +137,8 @@ export default defineSchema({
     characterB: v.optional(v.number()), // Player B's character/skin ID (0-255, None until joined)
     mapId: v.number(), // Map/background ID (0-255)
 
-    // Switchboard Randomness (for commit-reveal pattern)
-    randomnessAccountPubkey: v.string(), // Public key of the Switchboard randomness account (base58)
-                                         // Created by Player A during lobby creation
-                                         // Used by Player B during join_lobby to reveal randomness
+    // ORAO VRF
+    forceSeed: v.optional(v.string()), // Hex string of the force seed used for ORAO request
 
     // Positioning (optional, for future expansion)
     positionA: v.optional(v.array(v.number())), // [x, y] spawn position for Player A

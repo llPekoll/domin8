@@ -134,7 +134,7 @@ export const createLobbyInDb = mutation({
     amount: v.number(),
     characterA: v.number(),
     mapId: v.number(),
-    randomnessAccountPubkey: v.string(),
+    forceSeed: v.string(),
   },
   handler: async (ctx, args) => {
     const docId = await ctx.db.insert("oneVOneLobbies", {
@@ -148,7 +148,7 @@ export const createLobbyInDb = mutation({
       characterA: args.characterA,
       characterB: undefined,
       mapId: args.mapId,
-      randomnessAccountPubkey: args.randomnessAccountPubkey,
+      forceSeed: args.forceSeed,
       createdAt: Date.now(),
       resolvedAt: undefined,
     });
@@ -165,7 +165,6 @@ export const joinLobbyInDb = mutation({
     lobbyId: v.number(),
     playerB: v.string(),
     characterB: v.number(),
-    winner: v.string(),
   },
   handler: async (ctx, args) => {
     const lobby = await ctx.db
@@ -180,6 +179,33 @@ export const joinLobbyInDb = mutation({
     await ctx.db.patch(lobby._id, {
       playerB: args.playerB,
       characterB: args.characterB,
+      status: 2, // Awaiting VRF
+    });
+
+    return lobby._id;
+  },
+});
+
+/**
+ * Public mutation wrapper for settling lobbies
+ * Used by the settleLobby action
+ */
+export const settleLobbyInDb = mutation({
+  args: {
+    lobbyId: v.number(),
+    winner: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const lobby = await ctx.db
+      .query("oneVOneLobbies")
+      .filter((q) => q.eq(q.field("lobbyId"), args.lobbyId))
+      .first();
+
+    if (!lobby) {
+      throw new Error(`Lobby ${args.lobbyId} not found`);
+    }
+
+    await ctx.db.patch(lobby._id, {
       winner: args.winner,
       status: 1, // Resolved
       resolvedAt: Date.now(),
@@ -224,7 +250,7 @@ export const _internalCreateLobby = internalMutation({
     amount: v.number(),
     characterA: v.number(),
     mapId: v.number(),
-    randomnessAccountPubkey: v.string(),
+    forceSeed: v.string(),
   },
   handler: async (ctx, args) => {
     const docId = await ctx.db.insert("oneVOneLobbies", {
@@ -238,7 +264,7 @@ export const _internalCreateLobby = internalMutation({
       characterA: args.characterA,
       characterB: undefined,
       mapId: args.mapId,
-      randomnessAccountPubkey: args.randomnessAccountPubkey,
+      forceSeed: args.forceSeed,
       createdAt: Date.now(),
       resolvedAt: undefined,
     });
@@ -256,7 +282,6 @@ export const _internalJoinLobby = internalMutation({
     lobbyId: v.number(),
     playerB: v.string(),
     characterB: v.number(),
-    winner: v.string(), // Winner's wallet
   },
   handler: async (ctx, args) => {
     // Find the lobby by lobbyId
@@ -269,10 +294,37 @@ export const _internalJoinLobby = internalMutation({
       throw new Error(`Lobby ${args.lobbyId} not found`);
     }
 
-    // Update the lobby with Player B's info and resolved state
+    // Update the lobby with Player B's info and awaiting VRF state
     await ctx.db.patch(lobby._id, {
       playerB: args.playerB,
       characterB: args.characterB,
+      status: 2, // Awaiting VRF
+    });
+
+    return lobby._id;
+  },
+});
+
+/**
+ * Internal mutation to settle a lobby
+ * Called by settleLobby action or sync
+ */
+export const _internalSettleLobby = internalMutation({
+  args: {
+    lobbyId: v.number(),
+    winner: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const lobby = await ctx.db
+      .query("oneVOneLobbies")
+      .filter((q) => q.eq(q.field("lobbyId"), args.lobbyId))
+      .first();
+
+    if (!lobby) {
+      throw new Error(`Lobby ${args.lobbyId} not found`);
+    }
+
+    await ctx.db.patch(lobby._id, {
       winner: args.winner,
       status: 1, // Resolved
       resolvedAt: Date.now(),
@@ -354,7 +406,7 @@ export const createLobby = action({
     amount: v.number(), // Bet amount in lamports
     characterA: v.number(), // Character/skin ID (0-255)
     mapId: v.number(), // Map ID (0-255)
-    randomnessAccountPubkey: v.string(), // Switchboard randomness account pubkey (base58)
+    forceSeed: v.string(), // ORAO force seed (hex string)
     transactionHash: v.string(), // Solana transaction hash (for verification)
   },
   handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; lobbyPda: string; action: string }> => {
@@ -393,7 +445,7 @@ export const createLobby = action({
         amount: args.amount,
         characterA: args.characterA,
         mapId: args.mapId,
-        randomnessAccountPubkey: args.randomnessAccountPubkey,
+        forceSeed: args.forceSeed,
       });
 
       return {
@@ -425,6 +477,58 @@ export const joinLobby = action({
     characterB: v.number(), // Character/skin ID (0-255)
     transactionHash: v.string(), // Solana transaction hash (for verification)
   },
+  handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; action: string }> => {
+    try {
+      const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
+
+      // Verify transaction
+      const connection = queryClient.getConnection();
+      const tx = await connection.getTransaction(args.transactionHash, {
+        maxSupportedTransactionVersion: 0,
+      });
+
+      if (!tx) {
+        throw new Error("Transaction not found on blockchain");
+      }
+
+      // Get the lobby
+      const lobbyPda = queryClient.getLobbyPdaForId(args.lobbyId);
+      const lobbyAccount = await queryClient.getLobbyAccount(lobbyPda);
+
+      if (!lobbyAccount) {
+        throw new Error("Lobby not found");
+      }
+
+      // Status should be 2 (Awaiting VRF) or 1 (Resolved)
+      if (lobbyAccount.status === 0) {
+        throw new Error("Lobby status is still 0 (Created) after join");
+      }
+
+      return {
+        success: true,
+        lobbyId: args.lobbyId,
+        action: "join",
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to join lobby: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  },
+});
+
+/**
+ * Settle a lobby (Resolve winner)
+ * Frontend flow:
+ * 1. User signs transaction to settle (or crank does it)
+ * 2. Frontend calls this action
+ * 3. Action confirms and updates Convex
+ */
+export const settleLobby = action({
+  args: {
+    lobbyId: v.number(),
+    transactionHash: v.string(),
+  },
   handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; winner: string; action: string }> => {
     try {
       const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
@@ -454,15 +558,21 @@ export const joinLobby = action({
       // Determine winner from on-chain account
       const winner = lobbyAccount.winner.toString();
 
+      // Update Convex
+      await ctx.runMutation(internal.lobbies._internalSettleLobby, {
+        lobbyId: args.lobbyId,
+        winner,
+      });
+
       return {
         success: true,
         lobbyId: args.lobbyId,
         winner,
-        action: "join",
+        action: "settle",
       };
     } catch (error) {
       throw new Error(
-        `Failed to join lobby: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to settle lobby: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   },

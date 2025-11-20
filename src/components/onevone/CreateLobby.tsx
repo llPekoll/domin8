@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { logger } from "../../lib/logger";
 import type { Character } from "../../types/character";
+import * as anchor from "@coral-xyz/anchor";
 
 interface CreateLobbyProps {
   selectedCharacter: Character | null;
@@ -204,12 +205,8 @@ export function CreateLobby({
     try {
       // Import utilities
       const { getSharedConnection } = await import("../../lib/sharedConnection");
-      const {
-        createSwitchboardRandomnessAccount,
-        buildCreateLobbyTransactionOptimized,
-        sendOptimizedTransaction,
-        waitForConfirmationOptimized,
-      } = await import("../../lib/solana-1v1-transactions-helius");
+      const { buildCreateLobbyTransaction } = await import("../../lib/solana-1v1-transactions");
+      const { Keypair } = await import("@solana/web3.js");
 
       const connection = getSharedConnection();
       const betAmountLamports = Math.floor(betAmount * 1e9); // Convert SOL to lamports
@@ -220,64 +217,25 @@ export function CreateLobby({
         character: selectedCharacter.id,
       });
 
-      // Step 1: Create a production-ready Switchboard randomness account
-      logger.solana.debug("Step 1: Creating Switchboard randomness account...");
-      
-      const { randomnessKeypair, randomnessPubkey, creationIx } =
-        await createSwitchboardRandomnessAccount(connection, publicKey);
+      // Generate a random 32-byte seed for ORAO VRF
+      const forceKeypair = Keypair.generate();
+      const forceSeed = forceKeypair.publicKey.toBase58(); // Use public key as a convenient 32-byte seed source
 
-      logger.solana.info("Switchboard randomness account created", {
-        randomnessPubkey: randomnessPubkey.toString(),
-      });
+      logger.solana.debug("Generated force seed for ORAO VRF", { forceSeed });
 
-      // Store randomness account for later use (in Convex action)
-      setRandomnessAccountPubkey(randomnessPubkey.toString());
-
-      // Step 2: Build create_lobby transaction with the randomness account
-      logger.solana.debug("Step 2: Building create_lobby transaction...");
-
-      // IMPORTANT: We must sign with the randomness keypair as well!
-      // The buildCreateLobbyTransactionOptimized function will include the creationIx
-      // but we need to handle the signing part.
-      // Wait, sendOptimizedTransaction uses Privy which only signs with the user's wallet.
-      // We need to add the randomness keypair signature to the transaction.
-
-      const { transaction, metrics } =
-        await buildCreateLobbyTransactionOptimized(
-          publicKey,
-          betAmountLamports,
-          selectedCharacter.id,
-          0, // Default map ID
-          randomnessPubkey,
-          connection,
-          creationIx // Pass the creation instruction!
-        );
-
-      // Sign with the randomness keypair (required for account creation)
-      transaction.sign([randomnessKeypair]);
-
-      logger.solana.info("Transaction built successfully", {
-        computeUnits: metrics.optimizedCU,
-        priorityFee: metrics.priorityFee,
-        estimatedCost: (metrics.estimatedCost / 1e9).toFixed(6) + " SOL",
-      });
-
-      // Step 3: Get blockhash and send transaction
-      logger.solana.debug("Step 3: Getting blockhash and sending transaction...");
-
-      const { blockhash: _blockhash, lastValidBlockHeight } =
-        await connection.getLatestBlockhash("confirmed");
-
-      // Send with Helius optimizations (retry logic, blockhash checking)
-      const network = import.meta.env.VITE_SOLANA_NETWORK || "devnet";
-      const signature = await sendOptimizedTransaction(
-        connection,
-        transaction,
+      // Build create_lobby transaction
+      const transaction = await buildCreateLobbyTransaction(
         publicKey,
-        wallet,
-        lastValidBlockHeight,
-        network
+        betAmountLamports,
+        selectedCharacter.id,
+        0, // Default map ID
+        forceSeed,
+        connection
       );
+
+      // Sign and send
+      const signedTx = await wallet.signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signedTx.serialize());
 
       logger.solana.info("Transaction sent to blockchain", {
         signature: signature.slice(0, 8) + "...",
@@ -285,36 +243,23 @@ export function CreateLobby({
 
       toast.loading("Waiting for transaction confirmation...", { id: "tx-confirm" });
 
-      // Step 4: Wait for confirmation
-      logger.solana.debug("Step 4: Waiting for transaction confirmation...");
-
-      const isConfirmed = await waitForConfirmationOptimized(
-        connection,
-        signature,
-        lastValidBlockHeight
-      );
-
-      if (!isConfirmed) {
-        toast.error("Transaction confirmation timeout", { id: "tx-confirm" });
-        logger.solana.error("Transaction confirmation timed out", { signature });
-        return;
+      const confirmation = await connection.confirmTransaction(signature, "confirmed");
+      
+      if (confirmation.value.err) {
+          throw new Error("Transaction failed: " + confirmation.value.err.toString());
       }
 
       toast.success("Transaction confirmed!", { id: "tx-confirm" });
       logger.solana.info("Transaction confirmed on blockchain", { signature });
 
-      // Step 5: Call Convex action to create lobby in database
-      logger.solana.debug("Step 5: Creating lobby record in database...", {
-        randomnessPubkey: randomnessPubkey.toString(),
-      });
-
+      // Call Convex action to create lobby in database
       const result = await createLobbyAction({
         playerAWallet: publicKey.toString(),
         amount: betAmountLamports,
         characterA: selectedCharacter.id,
         mapId: 0,
         transactionHash: signature,
-        randomnessAccountPubkey: randomnessPubkey.toString(),
+        forceSeed: forceSeed,
       });
 
       if (result.success) {
@@ -343,27 +288,23 @@ export function CreateLobby({
         toast.error("Transaction confirmation timed out. Please check your wallet.");
       } else if (errorMsg.includes("Insufficient SOL")) {
         toast.error(
-          `Insufficient SOL. Need: ~${(betAmount + 0.003).toFixed(4)} SOL (bet + account creation + fees)`
+          `Insufficient SOL. Need: ~${(betAmount + 0.003).toFixed(4)} SOL (bet + fees)`
         );
-      } else if (errorMsg.includes("Switchboard")) {
-        toast.error(
-          "Switchboard randomness account creation failed. Please ensure you have sufficient SOL (~0.003) and try again."
-        );
-      } else if (errorMsg.includes("Randomness")) {
-        toast.error(
-          "Randomness setup error. Please check your connection and try again."
-        );
-      } else if (errorMsg.includes("Failed to create lobby")) {
-        // Generic lobby creation error
-        toast.error("Failed to create lobby. Please try again.");
       } else {
-        // For unknown errors, show a generic message but log the full error
-        toast.error("Failed to create lobby: " + (errorMsg.length > 100 ? errorMsg.substring(0, 100) + "..." : errorMsg));
+        toast.error("Failed to create lobby: " + errorMsg);
       }
     } finally {
       setIsLoading(false);
     }
-  }, [connected, publicKey, wallet, selectedCharacter, betAmount, createLobbyAction, onLobbyCreated]);
+  }, [
+    connected,
+    publicKey,
+    selectedCharacter,
+    wallet,
+    betAmount,
+    createLobbyAction,
+    onLobbyCreated,
+  ]);
 
   if (!connected || !publicKey) {
     return (

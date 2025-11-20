@@ -47,4 +47,7 @@ pub enum Domin81v1Error {
 
     #[msg("Randomness value conversion to winner failed")]
     RandomnessConversionError,
+
+    #[msg("Randomness seed does not match lobby force seed")]
+    InvalidRandomnessSeed,
 }

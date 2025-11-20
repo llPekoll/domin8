@@ -51,4 +51,11 @@ pub mod domin8_1v1_prgm {
     ) -> Result<()> {
         instructions::cancel_lobby::handler(ctx)
     }
+
+    /// Settle a 1v1 lobby (Resolve winner after VRF fulfillment)
+    pub fn settle_lobby(
+        ctx: Context<SettleLobby>,
+    ) -> Result<()> {
+        instructions::settle_lobby::handler(ctx)
+    }
 }
