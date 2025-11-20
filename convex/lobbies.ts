@@ -583,20 +583,24 @@ export const settleLobby = action({
         throw new Error("Transaction not found on blockchain");
       }
 
-      // Get the lobby
-      const lobbyPda = queryClient.getLobbyPdaForId(args.lobbyId);
-      const lobbyAccount = await queryClient.getLobbyAccount(lobbyPda);
-
-      if (!lobbyAccount) {
-        throw new Error("Lobby not found");
+      // Extract winner from program logs
+      // The Rust instruction logs: "Lobby {id} settled. Winner: {pubkey}"
+      let winner: string | null = null;
+      
+      if (tx.meta?.logMessages) {
+        for (const log of tx.meta.logMessages) {
+          // Match log format: "Program log: Lobby 16 settled. Winner: 5X5wJL7HhNzY2KP1eUhEBmVqAvi4Mk16o713Kb4HQ33Q"
+          const match = log.match(/Lobby \d+ settled\. Winner: ([1-9A-HJ-NP-Z]{43,44})/);
+          if (match) {
+            winner = match[1];
+            break;
+          }
+        }
       }
 
-      if (lobbyAccount.status !== 2) {
-        throw new Error("Lobby has not been resolved yet");
+      if (!winner) {
+        throw new Error("Could not extract winner from transaction logs");
       }
-
-      // Determine winner from on-chain account
-      const winner = lobbyAccount.winner.toString();
 
       // Update Convex
       await ctx.runMutation(internal.lobbies._internalSettleLobby, {
