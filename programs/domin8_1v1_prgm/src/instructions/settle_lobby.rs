@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
 use crate::error::Domin81v1Error;
 use crate::state::*;
-use orao_solana_vrf::state::Randomness;
+use orao_solana_vrf::state::RandomnessAccountData;
+use orao_solana_vrf::RANDOMNESS_ACCOUNT_SEED;
+use orao_solana_vrf::ID as ORAO_VRF_ID;
 
 /// Settle a 1v1 lobby (called by anyone after VRF fulfillment)
 /// 
@@ -13,19 +15,7 @@ use orao_solana_vrf::state::Randomness;
 pub fn handler(ctx: Context<SettleLobby>) -> Result<()> {
     let lobby = &mut ctx.accounts.lobby;
     let config = &ctx.accounts.config;
-    
-    // Manually deserialize randomness account to avoid discriminator mismatch
     let randomness_account_info = &ctx.accounts.randomness_account;
-    let data = randomness_account_info.try_borrow_data()?;
-    
-    if data.len() < 8 {
-        return Err(Domin81v1Error::RandomnessAccountParseError.into());
-    }
-
-    // Skip 8-byte discriminator and deserialize
-    let mut randomness_data = &data[8..];
-    let randomness: Randomness = AnchorDeserialize::deserialize(&mut randomness_data)
-        .map_err(|_| Domin81v1Error::RandomnessAccountParseError)?;
 
     // Verify lobby is in AWAITING_VRF status
     require_eq!(
@@ -34,15 +24,25 @@ pub fn handler(ctx: Context<SettleLobby>) -> Result<()> {
         Domin81v1Error::InvalidLobbyStatus
     );
 
-    // Verify randomness seed matches lobby force
-    require!(
-        randomness.seed == lobby.force,
+    // Verify randomness account PDA matches what we expect for this lobby's force seed
+    let (expected_pda, _) = Pubkey::find_program_address(
+        &[RANDOMNESS_ACCOUNT_SEED, &lobby.force],
+        &ORAO_VRF_ID
+    );
+    
+    require_eq!(
+        randomness_account_info.key(),
+        expected_pda,
         Domin81v1Error::InvalidRandomnessSeed
     );
 
+    // Deserialize randomness account using ORAO's helper
+    let mut data = &randomness_account_info.try_borrow_data()?[..];
+    let randomness_data = RandomnessAccountData::try_deserialize(&mut data)
+        .map_err(|_| Domin81v1Error::RandomnessAccountParseError)?;
+
     // Check randomness fulfillment
-    // fulfilled() returns Option<[u8; 64]>
-    let randomness_value = randomness.fulfilled().ok_or(Domin81v1Error::RandomnessNotResolved)?;
+    let randomness_value = randomness_data.fulfilled_randomness().ok_or(Domin81v1Error::RandomnessNotResolved)?;
 
     // Determine winner
     // We use the first byte of the randomness. Even = Player A, Odd = Player B
