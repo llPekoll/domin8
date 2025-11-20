@@ -18,8 +18,7 @@
     "name": "sam",
     "assetPath": "/characters/sam.png",
     "description": "A quick and agile fighter",
-    "isActive": true,
-    "nftCollection": "6v8wpUjNMkdSf5q1xK4Yjjhjy1cy6FPfCXi9qMduuSG1"
+    "isActive": true
   },
   {
     "id": 5,
@@ -44,7 +43,7 @@
   },
   {
     "id": 8,
-    "name": "huggywuggy",
+    "name": "huggy_wuggy",
     "assetPath": "/characters/huggywuggy.png",
     "description": "Creepy but cuddly creature from the shadows",
     "isActive": true
@@ -54,6 +53,26 @@
     "name": "yasuo",
     "assetPath": "/characters/yasuo.png",
     "description": "Swift wandering swordsman seeking redemption",
+    "nftCollection": "8Rt3Ayqth4DAiPnW9MDFi63TiQJHmohfTWLMQFHi4KZH",
+    "nftCollectionName": "Monkey",
+    "isActive": true
+  },
+  {
+    "id": 10,
+    "name": "nomu",
+    "assetPath": "/characters/fish.png",
+    "description": "Nomu's native utility token, bought back on every product sale.",
+    "nftCollection": "B2ZojDkpLwCgM2nUYpR8NzFPwjf8enMLNyJpqeyPnfvy",
+    "nftCollectionName": "Nomu OG Collection",
+    "isActive": true
+  },
+  {
+    "id": 11,
+    "name": "Siren",
+    "assetPath": "/characters/mermaid.png",
+    "description": "Super solana is in the house",
+    "nftCollection": "AMdMcYA1fFpjPQ3jwB5gAjKTMSJPVH651RtYZn74eQoy",
+    "nftCollectionName": "HMS",
     "isActive": true
   }
 ]

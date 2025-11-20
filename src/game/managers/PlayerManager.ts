@@ -216,7 +216,9 @@ export class PlayerManager {
       pepe: 13, // Transparent space at bottom in original sprite
       yasuo: 13, // Transparent space at bottom in original sprite
       darthvader: 13, // Transparent space at bottom in original sprite
-      huggywuggy: 13, // Transparent space at bottom in original sprite
+      huggy_wuggy: 13, // Transparent space at bottom in original sprite
+      nomu: 12, // Transparent space at bottom in original sprite
+      siren: 12, // Transparent space at bottom in original sprite
       // Add other characters here if needed
     };
     const offsetPixels = spriteOffsetsInPixels[textureKey] || 0;
