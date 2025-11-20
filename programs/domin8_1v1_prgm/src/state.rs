@@ -2,8 +2,9 @@ use anchor_lang::prelude::*;
 
 /// Lobby status constants
 pub const LOBBY_STATUS_CREATED: u8 = 0;    // Waiting for second player
-pub const LOBBY_STATUS_RESOLVED: u8 = 1;   // Both players joined, winner determined, funds distributed
-pub const LOBBY_STATUS_AWAITING_VRF: u8 = 2; // Waiting for ORAO VRF fulfillment
+pub const LOBBY_STATUS_AWAITING_VRF: u8 = 1; // Waiting for ORAO VRF fulfillment
+pub const LOBBY_STATUS_RESOLVED: u8 = 2;   // Both players joined, winner determined, funds distributed
+
 
 /// Global configuration account for the 1v1 program
 #[account]

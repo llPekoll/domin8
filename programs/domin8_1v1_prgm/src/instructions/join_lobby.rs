@@ -80,7 +80,7 @@ pub fn handler(
         lobby.lobby_id,
         player_b.key()
     );
-    msg!("Status updated to AWAITING_VRF (2)");
+    msg!("Status updated to AWAITING_VRF (1)");
     msg!("Randomness requested with force seed: {:?}", lobby.force);
 
     Ok(())

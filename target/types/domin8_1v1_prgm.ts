@@ -131,13 +131,6 @@ export type Domin81v1Prgm = {
           "signer": true
         },
         {
-          "name": "randomnessAccount",
-          "docs": [
-            "The caller (frontend) is responsible for creating this account",
-            "and passing the correct randomness account here"
-          ]
-        },
-        {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
@@ -280,11 +273,37 @@ export type Domin81v1Prgm = {
         },
         {
           "name": "lobby",
-          "writable": true
-        },
-        {
-          "name": "playerA",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  49,
+                  118,
+                  49,
+                  95,
+                  108,
+                  111,
+                  98,
+                  98,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lobby.lobby_id",
+                "account": "domin81v1Lobby"
+              }
+            ]
+          }
         },
         {
           "name": "playerB",
@@ -292,18 +311,19 @@ export type Domin81v1Prgm = {
           "signer": true
         },
         {
-          "name": "payer",
-          "writable": true,
-          "signer": true
+          "name": "vrf",
+          "address": "VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y"
         },
         {
-          "name": "randomnessAccountData",
-          "docs": [
-            "The account data is validated to be from Switchboard and parsed for randomness value"
-          ]
+          "name": "configAccount",
+          "writable": true
         },
         {
           "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "randomnessAccount",
           "writable": true
         },
         {
@@ -330,6 +350,112 @@ export type Domin81v1Prgm = {
           }
         }
       ]
+    },
+    {
+      "name": "settleLobby",
+      "docs": [
+        "Settle a 1v1 lobby (Resolve winner after VRF fulfillment)"
+      ],
+      "discriminator": [
+        207,
+        75,
+        50,
+        251,
+        99,
+        177,
+        195,
+        225
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  49,
+                  118,
+                  49,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "lobby",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  49,
+                  118,
+                  49,
+                  95,
+                  108,
+                  111,
+                  98,
+                  98,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lobby.lobby_id",
+                "account": "domin81v1Lobby"
+              }
+            ]
+          }
+        },
+        {
+          "name": "randomnessAccount",
+          "docs": [
+            "We verify the seed matches the lobby's force seed"
+          ]
+        },
+        {
+          "name": "playerA",
+          "writable": true
+        },
+        {
+          "name": "playerB",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [
@@ -357,6 +483,32 @@ export type Domin81v1Prgm = {
         94,
         51,
         199
+      ]
+    },
+    {
+      "name": "networkState",
+      "discriminator": [
+        212,
+        237,
+        148,
+        56,
+        97,
+        245,
+        51,
+        169
+      ]
+    },
+    {
+      "name": "randomness",
+      "discriminator": [
+        188,
+        96,
+        216,
+        248,
+        93,
+        94,
+        49,
+        112
       ]
     }
   ],
@@ -435,6 +587,11 @@ export type Domin81v1Prgm = {
       "code": 6014,
       "name": "randomnessConversionError",
       "msg": "Randomness value conversion to winner failed"
+    },
+    {
+      "code": 6015,
+      "name": "invalidRandomnessSeed",
+      "msg": "Randomness seed does not match lobby force seed"
     }
   ],
   "types": [
@@ -492,8 +649,13 @@ export type Domin81v1Prgm = {
             "type": "u64"
           },
           {
-            "name": "randomnessAccount",
-            "type": "pubkey"
+            "name": "force",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
             "name": "status",
@@ -542,6 +704,154 @@ export type Domin81v1Prgm = {
           {
             "name": "map",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "networkConfiguration",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "requestFee",
+            "type": "u64"
+          },
+          {
+            "name": "fulfillmentAuthorities",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "tokenFeeConfig",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "oraoTokenFeeConfig"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "networkState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "networkConfiguration"
+              }
+            }
+          },
+          {
+            "name": "numReceived",
+            "docs": [
+              "Total number of received requests."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "oraoTokenFeeConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "docs": [
+              "ORAO token mint address."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "docs": [
+              "ORAO token treasury account."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "fee",
+            "docs": [
+              "Fee in ORAO SPL token smallest units."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "randomness",
+      "docs": [
+        "This account is now obsolete and exists as a legacy to observe the old requests."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "seed",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "randomness",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "responses",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "randomnessResponse"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "randomnessResponse",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "pubkey"
+          },
+          {
+            "name": "randomness",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           }
         ]
       }

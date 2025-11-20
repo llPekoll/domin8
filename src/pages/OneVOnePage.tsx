@@ -115,9 +115,13 @@ export function OneVOnePage() {
         connection
       );
 
-      // Sign and send
-      const signedTx = await wallet.signTransaction(transaction);
-      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      // Sign and send via Privy
+      const txResult = await wallet.signAndSendTransaction({
+        transaction: transaction as any,
+        chain: "solana:mainnet",
+      });
+
+      const signature = txResult.signature.toString();
 
       logger.solana.info("Double Down transaction sent", { signature });
       toast.loading("Confirming Double Down transaction...", { id: toastId });

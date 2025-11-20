@@ -5,7 +5,6 @@ import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { logger } from "../../lib/logger";
 import type { Character } from "../../types/character";
-import * as anchor from "@coral-xyz/anchor";
 
 interface CreateLobbyProps {
   selectedCharacter: Character | null;
@@ -35,7 +34,6 @@ export function CreateLobby({
   const [betAmount, setBetAmount] = useState<number>(DEFAULT_BET_AMOUNT_SOL);
   const [isLoading, setIsLoading] = useState(false);
   const [cancellingLobbies, setCancellingLobbies] = useState<Set<number>>(new Set());
-  const [randomnessAccountPubkey, setRandomnessAccountPubkey] = useState<string | null>(null);
 
   const handleAmountChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -233,9 +231,13 @@ export function CreateLobby({
         connection
       );
 
-      // Sign and send
-      const signedTx = await wallet.signTransaction(transaction);
-      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      // Sign and send via Privy
+      const txResult = await wallet.signAndSendTransaction({
+        transaction: transaction as any,
+        chain: "solana:mainnet",
+      });
+
+      const signature = txResult.signature.toString();
 
       logger.solana.info("Transaction sent to blockchain", {
         signature: signature.slice(0, 8) + "...",

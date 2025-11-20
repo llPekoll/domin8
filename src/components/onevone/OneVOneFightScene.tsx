@@ -45,7 +45,7 @@ export function OneVOneFightScene({
   } | null>(null);
 
   const handleSettle = useCallback(async () => {
-    if (!connected || !wallet || !lobby.forceSeed) return;
+    if (!connected || !wallet || !lobby.forceSeed || !publicKey) return;
     
     setIsSettling(true);
     const toastId = toast.loading("Settling lobby...");
@@ -67,9 +67,13 @@ export function OneVOneFightScene({
             connection
         );
 
-        // Sign and send
-        const signedTx = await wallet.signTransaction(transaction);
-        const signature = await connection.sendRawTransaction(signedTx.serialize());
+        // Sign and send via Privy
+        const txResult = await wallet.signAndSendTransaction({
+          transaction: transaction as any,
+          chain: "solana:mainnet",
+        });
+
+        const signature = txResult.signature.toString();
 
         logger.ui.info("Settle transaction sent", { signature });
         toast.loading("Confirming settlement...", { id: toastId });

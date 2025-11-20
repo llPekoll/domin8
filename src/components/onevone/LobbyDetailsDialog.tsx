@@ -1,5 +1,4 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
-import type { Character } from "../../types/character";
 
 interface LobbyData {
   _id: string;
