@@ -350,8 +350,9 @@ export class PlayerManager {
     const maxBet = 10;
 
     // Base scale values for native resolution (396x180)
-    const baseMinScale = 0.5;
-    const baseMaxScale = 2.0;
+    // Increased minimum scale from 0.5 to 0.8 to make small bets bigger
+    const baseMinScale = 0.9;
+    const baseMaxScale = 2.5;
 
     // Apply resolution scale to character sizes
     const minScale = baseMinScale * RESOLUTION_SCALE;
