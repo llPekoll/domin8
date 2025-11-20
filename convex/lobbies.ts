@@ -860,6 +860,7 @@ const _syncMissingLobby = async (
     const characterA = onChainLobby.skinA;
     const mapId = onChainLobby.map;
     const lobbyPda = onChainLobby.publicKey?.toString() || `lobby_${lobbyId}`;
+    const forceSeed = onChainLobby.forceSeed || "";
 
     // Validate required fields
     if (!playerA) {
@@ -882,6 +883,7 @@ const _syncMissingLobby = async (
       amount,
       characterA,
       mapId,
+      forceSeed,
     });
 
     console.log(`[1v1 Sync] Successfully created missing lobby ${lobbyId}`);
