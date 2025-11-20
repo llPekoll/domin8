@@ -65,8 +65,8 @@ export function LobbyHistory({ lobbies, characters }: LobbyHistoryProps) {
 
   if (lobbies.length === 0) {
     return (
-      <div className="bg-gray-900 border-2 border-purple-500 rounded-lg p-6">
-        <h2 className="text-xl font-bold text-purple-200 mb-4">Lobby History</h2>
+      <div className="bg-gray-900 border-2 border-indigo-500 rounded-lg p-6">
+        <h2 className="text-xl font-bold text-indigo-200 mb-4">Lobby History</h2>
         <div className="text-center py-8">
           <p className="text-gray-400">No completed lobbies yet</p>
         </div>
@@ -75,8 +75,8 @@ export function LobbyHistory({ lobbies, characters }: LobbyHistoryProps) {
   }
 
   return (
-    <div className="bg-gray-900 border-2 border-purple-500 rounded-lg p-6">
-      <h2 className="text-xl font-bold text-purple-200 mb-4">
+    <div className="bg-gray-900 border-2 border-indigo-500 rounded-lg p-6">
+      <h2 className="text-xl font-bold text-indigo-200 mb-4">
         Lobby History ({lobbies.length})
       </h2>
 
@@ -90,19 +90,19 @@ export function LobbyHistory({ lobbies, characters }: LobbyHistoryProps) {
           return (
             <div
               key={lobby._id}
-              className="bg-gray-800/60 border border-purple-400/40 rounded-lg p-3 hover:bg-gray-800 hover:border-purple-400/60 transition-all"
+              className="bg-gray-800/60 border border-indigo-400/40 rounded-lg p-3 hover:bg-gray-800 hover:border-indigo-400/60 transition-all"
             >
               {/* Header: Lobby ID, Status, and Amount */}
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <p className="text-xs font-bold text-purple-300">#{lobby.lobbyId}</p>
+                  <p className="text-xs font-bold text-indigo-300">#{lobby.lobbyId}</p>
                   <span
                     className={`px-2 py-0.5 rounded border text-xs font-semibold whitespace-nowrap ${statusBadge.color}`}
                   >
                     {statusBadge.text}
                   </span>
                 </div>
-                <p className="text-xs font-bold text-purple-300 whitespace-nowrap">
+                <p className="text-xs font-bold text-indigo-300 whitespace-nowrap">
                   {formatAmount(lobby.amount)} SOL
                 </p>
               </div>
@@ -114,7 +114,7 @@ export function LobbyHistory({ lobbies, characters }: LobbyHistoryProps) {
                   <p className="text-xs text-gray-400 mb-0.5">Player A</p>
                   <div className="flex items-center justify-between gap-1">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-purple-300 font-mono truncate">
+                      <p className="text-xs text-indigo-300 font-mono truncate">
                         {formatWallet(lobby.playerA)}
                       </p>
                       <p className="text-xs text-gray-500 truncate">
@@ -137,7 +137,7 @@ export function LobbyHistory({ lobbies, characters }: LobbyHistoryProps) {
                   {lobby.playerB ? (
                     <div className="flex items-center justify-between gap-1">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs text-purple-300 font-mono truncate">
+                        <p className="text-xs text-indigo-300 font-mono truncate">
                           {formatWallet(lobby.playerB)}
                         </p>
                         <p className="text-xs text-gray-500 truncate">
@@ -158,8 +158,8 @@ export function LobbyHistory({ lobbies, characters }: LobbyHistoryProps) {
 
               {/* Winner Info */}
               {isResolved && (
-                <div className="bg-purple-900/30 border border-purple-400/40 rounded p-2 mb-2">
-                  <p className="text-xs text-purple-300 mb-1 font-semibold">🏆 Winner</p>
+                <div className="bg-indigo-900/30 border border-indigo-400/40 rounded p-2 mb-2">
+                  <p className="text-xs text-indigo-300 mb-1 font-semibold">🏆 Winner</p>
                   {lobby.winner ? (
                     <p className="text-xs text-yellow-300 font-mono font-bold">
                       {formatWallet(lobby.winner)}
@@ -171,7 +171,7 @@ export function LobbyHistory({ lobbies, characters }: LobbyHistoryProps) {
               )}
 
               {/* Footer: Timestamps - Compact */}
-              <div className="text-xs text-gray-500 space-y-0.5 border-t border-purple-400/20 pt-2">
+              <div className="text-xs text-gray-500 space-y-0.5 border-t border-indigo-400/20 pt-2">
                 <p className="truncate">Created: {formatDate(lobby.createdAt)}</p>
                 {isResolved && (
                   <p className="truncate">Resolved: {formatDate(lobby.resolvedAt)}</p>
