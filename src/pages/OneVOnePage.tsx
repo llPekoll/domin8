@@ -3,6 +3,7 @@ import { Header } from "../components/Header";
 import { CharacterSelection2 } from "../components/CharacterSelection2";
 import { CreateLobby } from "../components/onevone/CreateLobby";
 import { LobbyList } from "../components/onevone/LobbyList";
+import { LobbyHistory } from "../components/onevone/LobbyHistory";
 import { OneVOneFightScene } from "../components/onevone/OneVOneFightScene";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useQuery, useAction } from "convex/react";
@@ -38,6 +39,9 @@ export function OneVOnePage() {
   
   // Get open lobbies from Convex (real-time updates)
   const openLobbies = useQuery(api.lobbies.getOpenLobbies) || [];
+  
+  // Get completed lobbies for history
+  const completedLobbies = useQuery(api.lobbies.getCompletedLobbies, { limit: 20 }) || [];
   
   // Get user's personal lobbies (for cancel functionality)
   // Must always pass a value to useQuery - pass empty string as default
@@ -214,8 +218,8 @@ export function OneVOnePage() {
           <>
             {/* Lobby list + create view (Show if not fighting OR if fighting but minimized) */}
             {(currentView !== "fighting" || isArenaMinimized) && (
-              <div className="max-w-4xl mx-auto">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="max-w-6xl mx-auto">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                   {/* Create Lobby Section */}
                   <div>
                     <CreateLobby
@@ -234,6 +238,11 @@ export function OneVOnePage() {
                       selectedCharacter={selectedCharacter}
                       onLobbyJoined={handleLobbyJoined}
                     />
+                  </div>
+
+                  {/* Lobby History */}
+                  <div>
+                    <LobbyHistory lobbies={completedLobbies as LobbyData[]} />
                   </div>
                 </div>
               </div>

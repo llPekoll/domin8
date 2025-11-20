@@ -85,6 +85,38 @@ export const getPlayerLobbies = query({
   },
 });
 
+/**
+ * Get completed lobbies (status 1 or 2)
+ * Used to display lobby history in the UI
+ * Ordered by most recent first
+ */
+export const getCompletedLobbies = query({
+  args: {
+    limit: v.optional(v.number()), // Default: 50
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 50;
+    
+    // Get all completed lobbies (status 1 = resolved, status 2 = awaiting VRF)
+    const completedLobbies = await ctx.db
+      .query("oneVOneLobbies")
+      .withIndex("by_status_and_created", (q) => q.eq("status", 1))
+      .collect();
+
+    const awaitingVrfLobbies = await ctx.db
+      .query("oneVOneLobbies")
+      .withIndex("by_status", (q) => q.eq("status", 2))
+      .collect();
+
+    // Combine and sort by creation date (most recent first)
+    const allCompleted = [...completedLobbies, ...awaitingVrfLobbies]
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      .slice(0, limit);
+
+    return allCompleted;
+  },
+});
+
 // ============================================================================
 // INTERNAL QUERIES (Used by Cron)
 // ============================================================================
