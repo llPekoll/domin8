@@ -40,7 +40,7 @@ function getConfigPDA(): [PublicKey, number] {
  */
 function getLobbyPDA(lobbyId: number): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [PDA_SEEDS_1V1.LOBBY, new BN(lobbyId).toBuffer("le", 8)],
+    [PDA_SEEDS_1V1.LOBBY, new BN(lobbyId).toArrayLike(Buffer, "le", 8)],
     PROGRAM_ID
   );
 }
@@ -75,9 +75,59 @@ export async function buildCreateLobbyTransaction(
     // Get Config PDA
     const [configPda] = getConfigPDA();
 
-    // Derive lobby PDA using force seed
-    const lobbyId = Math.floor(Math.random() * 1000000);
-    const [lobbyPda] = getLobbyPDA(lobbyId);
+    // Fetch the config account to get the current lobby count
+    const configAccount = await connection.getAccountInfo(configPda);
+    if (!configAccount) {
+      throw new Error("Config account not found. Make sure initialize_config has been called.");
+    }
+
+    // Decode the config account manually
+    // The Domin81v1Config structure (from Rust):
+    // 8-byte discriminator
+    // 32 bytes: admin (Pubkey)
+    // 32 bytes: treasury (Pubkey)
+    // 2 bytes: house_fee_bps (u16)
+    // 8 bytes: lobby_count (u64) <- this is what we need
+    const discriminatorLength = 8;
+    const adminOffset = discriminatorLength; // 8
+    const treasuryOffset = adminOffset + 32; // 40
+    const houseFeeOffset = treasuryOffset + 32; // 72
+    const lobbyCountOffset = houseFeeOffset + 2; // 74
+    
+    // Validate buffer has enough data
+    if (configAccount.data.length < lobbyCountOffset + 8) {
+      throw new Error(
+        `Config account data too small. Expected at least ${lobbyCountOffset + 8} bytes, got ${configAccount.data.length}`
+      );
+    }
+    
+    // Read u64 (8 bytes) for lobby_count at the correct offset using little-endian
+    const lobbyCountBuffer = configAccount.data.slice(lobbyCountOffset, lobbyCountOffset + 8);
+    let currentLobbyCount: number;
+    
+    try {
+      const bigintValue = lobbyCountBuffer.readBigUInt64LE(0);
+      currentLobbyCount = Number(bigintValue);
+      
+      // Validate the count is a safe integer
+      if (!Number.isSafeInteger(currentLobbyCount)) {
+        throw new Error(`Lobby count ${bigintValue} is not a safe integer`);
+      }
+    } catch (parseError) {
+      logger.ui.error("Failed to parse lobby count from config", {
+        error: parseError,
+        bufferLength: lobbyCountBuffer.length,
+        bufferHex: lobbyCountBuffer.toString("hex"),
+        configDataLength: configAccount.data.length,
+        offset: lobbyCountOffset,
+      });
+      throw new Error(`Failed to parse lobby count: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+    }
+
+    logger.ui.debug("Fetched lobby count from config", { currentLobbyCount, offset: lobbyCountOffset });
+
+    // Derive lobby PDA using the current lobby count from config
+    const [lobbyPda] = getLobbyPDA(currentLobbyCount);
 
     // Create a read-only provider for instruction building
     const provider = new AnchorProvider(
@@ -87,7 +137,6 @@ export async function buildCreateLobbyTransaction(
       } as any,
       { commitment: "confirmed" }
     );
-
     const program = new Program<Domin81v1Prgm>(IDL as any, provider);
 
     // Default position for simplicity: [0, 0]

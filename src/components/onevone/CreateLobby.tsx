@@ -231,13 +231,26 @@ export function CreateLobby({
         connection
       );
 
+      // Serialize transaction for Privy (must be Uint8Array, not VersionedTransaction object)
+      const serializedTx = transaction.serialize();
+
       // Sign and send via Privy
       const txResult = await wallet.signAndSendTransaction({
-        transaction: transaction as any,
+        transaction: serializedTx,
         chain: "solana:mainnet",
       });
 
-      const signature = txResult.signature.toString();
+      // Handle signature - could be string or Uint8Array
+      let signature: string;
+      if (typeof txResult.signature === "string") {
+        signature = txResult.signature;
+      } else if (txResult.signature instanceof Uint8Array) {
+        // Convert Uint8Array to base58
+        const bs58 = await import("bs58");
+        signature = bs58.default.encode(txResult.signature);
+      } else {
+        throw new Error("Invalid signature format from wallet");
+      }
 
       logger.solana.info("Transaction sent to blockchain", {
         signature: signature.slice(0, 8) + "...",
