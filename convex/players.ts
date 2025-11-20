@@ -1,5 +1,5 @@
 import { mutation, query, action, internalQuery, internalMutation } from "./_generated/server";
-import { internal, api } from "./_generated/api";
+import { api } from "./_generated/api";
 import { v } from "convex/values";
 
 export const getPlayer = query({
@@ -47,7 +47,7 @@ export const getPlayersByWallets = query({
           .query("players")
           .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
           .first();
-        
+
         return {
           walletAddress,
           displayName: player?.displayName || null,
@@ -77,23 +77,21 @@ export const getPlayerWithCharacter = query({
       .withIndex("by_active", (q) => q.eq("isActive", true))
       .collect();
 
-    const character = characters.length > 0
-      ? characters[Math.floor(Math.random() * characters.length)]
-      : null;
+    const character =
+      characters.length > 0 ? characters[Math.floor(Math.random() * characters.length)] : null;
 
     return {
       ...player,
-      character
+      character,
     };
   },
 });
-
 
 export const createPlayer = mutation({
   args: {
     walletAddress: v.string(),
     displayName: v.optional(v.string()),
-    externalWalletAddress: v.optional(v.string())
+    externalWalletAddress: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existingPlayer = await ctx.db
@@ -143,7 +141,7 @@ export const updateLastActive = mutation({
 export const updateDisplayName = mutation({
   args: {
     walletAddress: v.string(),
-    displayName: v.string()
+    displayName: v.string(),
   },
   handler: async (ctx, args) => {
     const player = await ctx.db
@@ -172,7 +170,6 @@ export const updateDisplayName = mutation({
     return trimmedName;
   },
 });
-
 
 // Update player statistics after game
 export const updatePlayerStats = mutation({
@@ -223,7 +220,7 @@ export const addAchievement = mutation({
 
 /**
  * Get Character Requirements
- * 
+ *
  * Returns information about a character's requirements (e.g., NFT ownership).
  * Used by frontend to determine if character needs special verification.
  */
@@ -233,11 +230,11 @@ export const getCharacterRequirements = query({
   },
   handler: async (ctx, args) => {
     const character = await ctx.db.get(args.characterId);
-    
+
     if (!character) {
       return null;
     }
-    
+
     return {
       characterId: character._id,
       characterName: character.name,
@@ -285,7 +282,9 @@ export const verifyAndPlaceBet = action({
       });
 
       if (!ownership.hasNFT) {
-        throw new Error(`You don't own the required NFT for ${characterRequirements.characterName}. Try using the refresh button if you just bought this NFT.`);
+        throw new Error(
+          `You don't own the required NFT for ${characterRequirements.characterName}. Try using the refresh button if you just bought this NFT.`
+        );
       }
     }
 
@@ -306,14 +305,17 @@ export const verifyAndPlaceBet = action({
  * @param walletAddress - Player's wallet address
  * @param amountLamports - Amount in lamports to convert to points
  */
-const awardPointsHandler = async (ctx: any, args: { walletAddress: string; amountLamports: number }) => {
+const awardPointsHandler = async (
+  ctx: any,
+  args: { walletAddress: string; amountLamports: number }
+) => {
   // Calculate points: 1 point per 0.001 SOL
   // 0.001 SOL = 1_000_000 lamports
 
   // Ensure amountLamports is a valid number
   const amount = Number(args.amountLamports);
   if (isNaN(amount)) {
-    console.error('[awardPoints] Invalid amountLamports:', args.amountLamports);
+    console.error("[awardPoints] Invalid amountLamports:", args.amountLamports);
     return;
   }
 
@@ -388,13 +390,11 @@ export const getLeaderboard = query({
     const limit = args.limit ?? 100;
 
     // Get all players with points
-    const allPlayers = await ctx.db
-      .query("players")
-      .collect();
+    const allPlayers = await ctx.db.query("players").collect();
 
     // Filter and sort by totalPoints (descending)
     const topPlayers = allPlayers
-      .filter(player => (player.totalPoints ?? 0) > 0)
+      .filter((player) => (player.totalPoints ?? 0) > 0)
       .sort((a, b) => (b.totalPoints ?? 0) - (a.totalPoints ?? 0))
       .slice(0, limit);
 

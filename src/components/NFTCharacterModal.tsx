@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Star } from "lucide-react";
+import { Star, RefreshCw } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,8 @@ interface NFTCharacterModalProps {
   error?: string | null;
   allExclusiveCharacters: Character[];
   onNFTCharacterSelected?: (characters: Character[]) => void;
+  onRefreshNFTs?: () => Promise<void>;
+  isRefreshing?: boolean;
 }
 
 export function NFTCharacterModal({
@@ -34,6 +36,8 @@ export function NFTCharacterModal({
   error,
   allExclusiveCharacters,
   onNFTCharacterSelected,
+  onRefreshNFTs,
+  isRefreshing,
 }: NFTCharacterModalProps) {
   const [tempSelected, setTempSelected] = useState<Character[]>(selectedCharacters);
 
@@ -84,13 +88,32 @@ export function NFTCharacterModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lvw max-h-[85vh] overflow-y-auto bg-gradient-to-b from-amber-950/98 to-amber-900/98 border-1 border-purple-500/50 backdrop-blur-sm [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-amber-950/30 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gradient-to-b [&::-webkit-scrollbar-thumb]:from-purple-600 [&::-webkit-scrollbar-thumb]:to-purple-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border [&::-webkit-scrollbar-thumb]:border-purple-500/30 hover:[&::-webkit-scrollbar-thumb]:from-purple-500 hover:[&::-webkit-scrollbar-thumb]:to-purple-600 [&::-webkit-scrollbar-corner]:bg-amber-950/30">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-amber-100 flex items-center gap-2">
-            <Star className="w-6 h-6 text-purple-400 fill-current" />
-            Your Exclusive Characters
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-2xl font-bold text-amber-100 flex items-center gap-2">
+              <Star className="w-6 h-6 text-purple-400 fill-current" />
+              Your Exclusive Characters
+            </DialogTitle>
+            {onRefreshNFTs && (
+              <Button
+                onClick={onRefreshNFTs}
+                disabled={isRefreshing || isLoading}
+                variant="outline"
+                size="sm"
+                className="border-purple-500 text-purple-300 hover:bg-purple-900/30 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Refreshing...' : 'Refresh NFTs'}
+              </Button>
+            )}
+          </div>
           <DialogDescription className="text-amber-300">
             Select characters for your exclusive pool. One character will be displayed and used for
             bets, or select none to use regular characters.
+            {onRefreshNFTs && (
+              <span className="block mt-2 text-sm text-amber-400">
+                Just bought an NFT? Click "Refresh NFTs" to update your collection.
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
 

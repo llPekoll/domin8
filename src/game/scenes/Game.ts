@@ -409,6 +409,10 @@ export class Game extends Scene {
 
   private getSkinName(skinId: number): string {
     const character = this.characters.find((char) => char.id === skinId);
+    if (!character) {
+      logger.game.warn(`[Game] Character not found for skin ID ${skinId}, using default`);
+      return `Character ${skinId}`;
+    }
     return character.name;
   }
 

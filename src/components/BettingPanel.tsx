@@ -15,7 +15,7 @@ import styles from "./ButtonShine.module.css";
 import { Plus, Wallet } from "lucide-react";
 
 // Betting limits
-const MIN_BET_AMOUNT = 0.001;
+const MIN_BET_AMOUNT = 0.002;
 const MAX_BET_AMOUNT = 10;
 const DEFAULT_BET_AMOUNT = MIN_BET_AMOUNT;
 
@@ -35,7 +35,6 @@ const BettingPanel = memo(function BettingPanel({
 
   const [betAmount, setBetAmount] = useState<string>(DEFAULT_BET_AMOUNT.toString());
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isVerifyingNFT, setIsVerifyingNFT] = useState(false);
 
   // Memoize wallet address to prevent unnecessary re-queries
   const walletAddress = useMemo(
@@ -46,8 +45,8 @@ const BettingPanel = memo(function BettingPanel({
   // NFT character checking
   const { unlockedCharacters } = useNFTCharacters(externalWalletAddress, walletAddress);
 
-  // NFT verification action
-  const verifyNFTOwnership = useAction(api.nft.verifyNFTOwnership);
+  // NFT verification action (checks cached database, no blockchain scan)
+  const verifyCachedNFT = useAction(api.nftHolderScanner.verifyCachedNFTOwnership);
 
   // Get player data
   const playerData = useQuery(api.players.getPlayer, walletAddress ? { walletAddress } : "skip");
@@ -206,42 +205,36 @@ const BettingPanel = memo(function BettingPanel({
           return;
         }
 
-        setIsVerifyingNFT(true);
-        logger.ui.debug(
-          "[BettingPanel] Verifying NFT ownership for character:",
-          selectedCharacter.name
-        );
-
+        // Check cached NFT ownership (no blockchain scan, instant)
         try {
-          const hasNFT = await verifyNFTOwnership({
+          const cachedResult = await verifyCachedNFT({
             walletAddress: externalWalletAddress,
             collectionAddress: requiresNFT as string,
           });
 
-          if (!hasNFT) {
-            toast.error("NFT Verification Failed", {
-              description: `You don't own the required NFT for ${selectedCharacter.name}. Please select a different character.`,
+          if (!cachedResult?.hasNFT) {
+            toast.error("NFT Not Found", {
+              description: `You don't own the required NFT for ${selectedCharacter.name}. Please refresh your NFTs in the character selection or choose a different character.`,
               duration: 5000,
             });
             logger.ui.error(
-              "[BettingPanel] NFT verification failed for character:",
+              "[BettingPanel] NFT not found in cache for character:",
               selectedCharacter.name
             );
             return;
           }
 
           logger.ui.debug(
-            "[BettingPanel] NFT verification successful for character:",
-            selectedCharacter.name
+            "[BettingPanel] NFT verified from cache for character:",
+            selectedCharacter.name,
+            cachedResult
           );
         } catch (error) {
-          logger.ui.error("[BettingPanel] NFT verification error:", error);
-          toast.error("Failed to verify NFT ownership", {
-            description: "Please try again or select a different character.",
+          logger.ui.error("[BettingPanel] Error checking cached NFT ownership:", error);
+          toast.error("NFT Verification Error", {
+            description: "Failed to verify NFT ownership. Please try again.",
           });
           return;
-        } finally {
-          setIsVerifyingNFT(false);
         }
       }
 
@@ -299,7 +292,6 @@ const BettingPanel = memo(function BettingPanel({
       EventBus.emit("player-bet-placed", eventData);
       logger.ui.debug("[BettingPanel] ✅ Event emitted successfully");
 
-      setBetAmount(DEFAULT_BET_AMOUNT.toString());
       onBetPlaced?.();
     } catch (error) {
       logger.ui.error("Failed to place bet:", error);
@@ -319,7 +311,6 @@ const BettingPanel = memo(function BettingPanel({
       }
     } finally {
       setIsSubmitting(false);
-      setIsVerifyingNFT(false);
     }
   }, [
     connected,
@@ -333,7 +324,7 @@ const BettingPanel = memo(function BettingPanel({
     validateBet,
     onBetPlaced,
     allCharacters,
-    verifyNFTOwnership,
+    verifyCachedNFT,
     externalWalletAddress,
     allMaps,
   ]);
@@ -598,7 +589,7 @@ const BettingPanel = memo(function BettingPanel({
         {/* Place bet button with arcade press effect */}
         <button
           onClick={() => void handlePlaceBet()}
-          disabled={isSubmitting || !canPlaceBet || isVerifyingNFT || !selectedCharacter}
+          disabled={isSubmitting || !canPlaceBet || !selectedCharacter}
           className={`
             text-2xl cursor-pointer flex justify-center items-center w-1/3 py-2
             bg-gradient-to-b from-amber-500 to-amber-700
@@ -617,13 +608,11 @@ const BettingPanel = memo(function BettingPanel({
           <img src="/assets/insert-coin.png" alt="Coin" className="h-6 mr-2" />
           {!selectedCharacter
             ? "Select"
-            : isVerifyingNFT
-              ? "Verifying..."
-              : isSubmitting
-                ? "Inserting..."
-                : !canPlaceBet
-                  ? "Closed"
-                  : "Insert coin"}
+            : isSubmitting
+              ? "Inserting..."
+              : !canPlaceBet
+                ? "Closed"
+                : "Insert coin"}
         </button>
       </div>
     </div>

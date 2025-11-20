@@ -33,6 +33,8 @@ const CharacterSelection2 = memo(function CharacterSelection({
     unlockedCharacters,
     isLoading: isLoadingNFTs,
     error: nftError,
+    refreshNFTStatus,
+    refreshing,
   } = useNFTCharacters(externalWalletAddress, walletAddress);
 
   // Surface NFT hook errors as user-friendly toasts
@@ -277,6 +279,8 @@ const CharacterSelection2 = memo(function CharacterSelection({
         isLoading={isLoadingNFTs}
         error={nftError}
         allExclusiveCharacters={(allExclusiveChars || []) as Character[]}
+        onRefreshNFTs={refreshNFTStatus}
+        isRefreshing={refreshing}
       />
     </>
   );

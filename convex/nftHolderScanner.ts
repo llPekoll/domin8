@@ -268,6 +268,57 @@ export const checkCachedOwnership = query({
 });
 
 /**
+ * Action wrapper for checkCachedOwnership (for use in BettingPanel)
+ * Instantly checks cache without scanning blockchain
+ */
+export const verifyCachedNFTOwnership = action({
+  args: {
+    walletAddress: v.string(),
+    collectionAddress: v.string()
+  },
+  handler: async (_ctx, args) => {
+    // Direct blockchain verification - simple and reliable
+    console.log('[verifyCachedNFTOwnership] Checking blockchain for:', args.walletAddress.slice(0, 8), '...');
+    const hasNFT = await verifyNFTOwnershipRealtime(args.walletAddress, args.collectionAddress);
+
+    console.log('[verifyCachedNFTOwnership] Result:', hasNFT ? '✅ HAS NFT' : '❌ NO NFT');
+
+    return {
+      hasNFT,
+      nftCount: hasNFT ? 1 : 0,
+      lastVerified: Date.now(),
+      addedBy: 'realtime-check'
+    };
+  }
+});
+
+/**
+ * Internal query for checkCachedOwnership (called by action)
+ */
+export const checkCachedOwnershipInternal = internalQuery({
+  args: {
+    walletAddress: v.string(),
+    collectionAddress: v.string()
+  },
+  handler: async (ctx, args) => {
+    const holder = await ctx.db
+      .query("nftCollectionHolders")
+      .withIndex("by_collection_and_wallet", (q) =>
+        q.eq("collectionAddress", args.collectionAddress)
+          .eq("walletAddress", args.walletAddress)
+      )
+      .first();
+
+    return {
+      hasNFT: !!holder,
+      nftCount: holder?.nftCount || 0,
+      lastVerified: holder?.lastVerified,
+      addedBy: holder?.addedBy
+    };
+  }
+});
+
+/**
  * Get all holder records for specific wallet addresses
  * Used by frontend to efficiently check all collections at once
  */

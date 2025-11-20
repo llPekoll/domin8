@@ -143,7 +143,6 @@ export class Preloader extends Scene {
     logger.game.debug("[Preloader] 🎨 Background configs queued for loading");
 
     // Load VFX assets
-    this.load.atlas("explosion", "vfx/Explosion.png", "vfx/Explosion.json");
     this.load.atlas("explosion-fullscreen", "vfx/fight-effect.png", "vfx/fight-effect.json");
     this.load.atlas("blood", "vfx/blood_spritesheet.png", "vfx/blood_spritesheet.json");
     this.load.atlas("dust", "dust_char.png", "dust_char.json");
@@ -327,19 +326,6 @@ export class Preloader extends Scene {
           createAnimation(animType, idleFrameTag, true);
         }
       });
-    });
-
-    // Create explosion animation
-    this.anims.create({
-      key: "explosion",
-      frames: this.anims.generateFrameNames("explosion", {
-        prefix: "Explosion 2 SpriteSheet ",
-        suffix: ".png",
-        start: 0,
-        end: 17,
-      }),
-      frameRate: 18,
-      repeat: 0,
     });
 
     // Create fullscreen explosion animation
