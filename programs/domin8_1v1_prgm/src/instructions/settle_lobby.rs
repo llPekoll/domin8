@@ -13,7 +13,19 @@ use orao_solana_vrf::state::Randomness;
 pub fn handler(ctx: Context<SettleLobby>) -> Result<()> {
     let lobby = &mut ctx.accounts.lobby;
     let config = &ctx.accounts.config;
-    let randomness_account = &ctx.accounts.randomness_account;
+    
+    // Manually deserialize randomness account to avoid discriminator mismatch
+    let randomness_account_info = &ctx.accounts.randomness_account;
+    let data = randomness_account_info.try_borrow_data()?;
+    
+    if data.len() < 8 {
+        return Err(Domin81v1Error::RandomnessAccountParseError.into());
+    }
+
+    // Skip 8-byte discriminator and deserialize
+    let mut randomness_data = &data[8..];
+    let randomness: Randomness = AnchorDeserialize::deserialize(&mut randomness_data)
+        .map_err(|_| Domin81v1Error::RandomnessAccountParseError)?;
 
     // Verify lobby is in AWAITING_VRF status
     require_eq!(
@@ -22,9 +34,15 @@ pub fn handler(ctx: Context<SettleLobby>) -> Result<()> {
         Domin81v1Error::InvalidLobbyStatus
     );
 
+    // Verify randomness seed matches lobby force
+    require!(
+        randomness.seed == lobby.force,
+        Domin81v1Error::InvalidRandomnessSeed
+    );
+
     // Check randomness fulfillment
     // fulfilled() returns Option<[u8; 64]>
-    let randomness_value = randomness_account.fulfilled().ok_or(Domin81v1Error::RandomnessNotResolved)?;
+    let randomness_value = randomness.fulfilled().ok_or(Domin81v1Error::RandomnessNotResolved)?;
 
     // Determine winner
     // We use the first byte of the randomness. Even = Player A, Odd = Player B
@@ -98,11 +116,8 @@ pub struct SettleLobby<'info> {
     pub lobby: Account<'info, Domin81v1Lobby>,
 
     /// CHECK: ORAO Randomness account
-    /// We verify the seed matches the lobby's force seed
-    #[account(
-        constraint = randomness_account.seed == lobby.force @ Domin81v1Error::InvalidRandomnessSeed,
-    )]
-    pub randomness_account: Account<'info, Randomness>,
+    /// We verify the seed matches the lobby's force seed manually in handler
+    pub randomness_account: UncheckedAccount<'info>,
 
     /// CHECK: Player A (Winner or Loser)
     #[account(mut, address = lobby.player_a)]

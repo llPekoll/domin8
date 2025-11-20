@@ -12,12 +12,14 @@ import { mutation, query, action, internalMutation, internalQuery, internalActio
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Solana1v1QueryClient } from "./lib/solana_1v1";
+import { Solana1v1Client } from "./lib/solana_1v1";
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
 const RPC_ENDPOINT = process.env.RPC_URL || process.env.VITE_SOLANA_RPC_URL || "https://devnet.helius-rpc.com/?api-key=0df32d0b-da4f-49b3-b154-deaceac254c0";
+const CRANK_AUTHORITY_PRIVATE_KEY = process.env.CRANK_AUTHORITY_PRIVATE_KEY || "";
 
 // ============================================================================
 // QUERIES
@@ -1066,12 +1068,34 @@ export const _checkAndSettleLobby = internalAction({
         };
       }
 
-      // Still pending on-chain - schedule another check after delay
+      // Still pending on-chain (status 1) - call settle_lobby instruction directly
       if (onChainLobby.status === 1) {
-        console.log(`[1v1 Scheduler] Lobby ${args.lobbyId} still pending (status 1), scheduling retry in 5 seconds`);
-        await ctx.scheduler.runAfter(5000, internal.lobbies._checkAndSettleLobby, {
-          lobbyId: args.lobbyId,
-        });
+        console.log(`[1v1 Scheduler] Lobby ${args.lobbyId} at status 1 (AWAITING_VRF). Calling settle_lobby...`);
+        
+        try {
+          // Use signing client to call settle_lobby instruction
+          const crankClient = new Solana1v1Client(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
+          
+          const txSignature = await crankClient.settleLobby(args.lobbyId, onChainLobby.force);
+          console.log(`[1v1 Scheduler] settle_lobby tx: ${txSignature}`);
+          
+          // Wait for confirmation
+          const confirmed = await crankClient.confirmTransaction(txSignature);
+          if (confirmed) {
+            console.log(`[1v1 Scheduler] ✅ settle_lobby confirmed for lobby ${args.lobbyId}`);
+            
+            // Schedule a follow-up check to sync the winner
+            await ctx.scheduler.runAfter(2000, internal.lobbies._checkAndSettleLobby, {
+              lobbyId: args.lobbyId,
+            });
+          } else {
+            console.warn(`[1v1 Scheduler] ⚠️ settle_lobby confirmation failed for lobby ${args.lobbyId}`);
+          }
+        } catch (crankError) {
+          console.error(
+            `[1v1 Scheduler] Error calling settle_lobby: ${crankError instanceof Error ? crankError.message : String(crankError)}`
+          );
+        }
       }
 
       return {

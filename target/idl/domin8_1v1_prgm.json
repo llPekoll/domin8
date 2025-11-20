@@ -428,7 +428,7 @@
         {
           "name": "randomness_account",
           "docs": [
-            "We verify the seed matches the lobby's force seed"
+            "We verify the seed matches the lobby's force seed manually in handler"
           ]
         },
         {
@@ -491,19 +491,6 @@
         51,
         169
       ]
-    },
-    {
-      "name": "Randomness",
-      "discriminator": [
-        188,
-        96,
-        216,
-        248,
-        93,
-        94,
-        49,
-        112
-      ]
     }
   ],
   "errors": [
@@ -540,12 +527,12 @@
     {
       "code": 6006,
       "name": "RandomnessNotResolved",
-      "msg": "Switchboard randomness not yet resolved"
+      "msg": "VRF randomness not yet resolved"
     },
     {
       "code": 6007,
       "name": "RandomnessAlreadyRevealed",
-      "msg": "Switchboard randomness already revealed for this slot"
+      "msg": "VRF randomness already revealed for this slot"
     },
     {
       "code": 6008,
@@ -570,12 +557,12 @@
     {
       "code": 6012,
       "name": "InvalidRandomnessAccountOwner",
-      "msg": "Randomness account is not owned by Switchboard program"
+      "msg": "Randomness account is not owned by VRF program"
     },
     {
       "code": 6013,
       "name": "RandomnessAccountParseError",
-      "msg": "Failed to parse Switchboard randomness account data"
+      "msg": "Failed to parse VRF randomness account data"
     },
     {
       "code": 6014,
@@ -786,66 +773,6 @@
               "Fee in ORAO SPL token smallest units."
             ],
             "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Randomness",
-      "docs": [
-        "This account is now obsolete and exists as a legacy to observe the old requests."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "seed",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "randomness",
-            "type": {
-              "array": [
-                "u8",
-                64
-              ]
-            }
-          },
-          {
-            "name": "responses",
-            "type": {
-              "vec": {
-                "defined": {
-                  "name": "RandomnessResponse"
-                }
-              }
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "RandomnessResponse",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "pubkey",
-            "type": "pubkey"
-          },
-          {
-            "name": "randomness",
-            "type": {
-              "array": [
-                "u8",
-                64
-              ]
-            }
           }
         ]
       }
