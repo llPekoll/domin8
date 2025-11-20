@@ -85,11 +85,54 @@ export function LobbyList({
           connection
         );
 
-        // Sign and send
-        const signedTx = await wallet.signTransaction(transaction);
-        const signature = await connection.sendRawTransaction(signedTx.serialize());
+        logger.solana.debug("Transaction ready for signing", {
+          type: transaction.constructor.name,
+          messageType: transaction.message.constructor.name,
+          messageLength: transaction.message.serialize().length,
+          keysCount: transaction.message.staticAccountKeys?.length,
+          instructionCount: transaction.message.compiledInstructions?.length,
+        });
+
+        // Sign and send using Privy's signAndSendAllTransactions
+        logger.solana.info("Attempting to sign transaction with Privy wallet...");
         
-        logger.ui.info("Join transaction sent", { signature });
+        const chainId = `solana:devnet` as `${string}:${string}`;
+        
+        // For VersionedTransaction, serialize the full transaction (not just the message)
+        // This includes the message and placeholder signatures
+        const serialized = Buffer.from(transaction.serialize());
+        
+        logger.solana.debug("Serialized transaction", {
+          serializedLength: serialized.length,
+          serializedHex: serialized.slice(0, 32).toString("hex"),
+        });
+        
+        const signAndSendResult = await wallet.signAndSendAllTransactions([
+          {
+            chain: chainId,
+            transaction: serialized,
+          },
+        ]);
+        
+        logger.solana.debug("Sign and send result", {
+          resultCount: signAndSendResult?.length,
+          firstResult: signAndSendResult?.[0],
+        });
+        
+        if (!signAndSendResult || signAndSendResult.length === 0) {
+          throw new Error("Failed to get signature from Privy wallet");
+        }
+        
+        const signatureBytes = signAndSendResult[0].signature;
+        if (!signatureBytes) {
+          throw new Error("No signature in Privy response");
+        }
+        
+        // Import bs58 for signature encoding
+        const { default: bs58 } = await import("bs58");
+        const signature = bs58.encode(signatureBytes);
+        
+        logger.solana.info("Join transaction signed and sent", { signature });
         toast.loading("Waiting for transaction confirmation...", { id: "join-tx-confirm" });
         
         const confirmation = await connection.confirmTransaction(signature, "confirmed");

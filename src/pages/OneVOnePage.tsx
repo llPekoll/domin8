@@ -53,9 +53,14 @@ export function OneVOnePage() {
   }, [publicKey, userLobbies]);
   
   // Get specific lobby state when fighting (for real-time updates during fight)
-  const lobbyState = fightingLobbyId !== null 
-    ? useQuery(api.lobbies.getLobbyState, { lobbyId: fightingLobbyId })
-    : null;
+  // Must always call useQuery unconditionally - use fightingLobbyId || 0 as fallback
+  const lobbyStateQuery = useQuery(
+    api.lobbies.getLobbyState, 
+    fightingLobbyId !== null ? { lobbyId: fightingLobbyId } : "skip"
+  );
+  
+  // Only use the lobby state if we're actually fighting
+  const lobbyState = fightingLobbyId !== null ? lobbyStateQuery : null;
 
   const handleCharacterSelected = useCallback((character: Character | null) => {
     setSelectedCharacter(character);

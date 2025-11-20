@@ -64,7 +64,7 @@ export async function buildCreateLobbyTransaction(
   connection: Connection
 ): Promise<VersionedTransaction> {
   try {
-    logger.ui.debug("Building create_lobby transaction", {
+    logger.solana.debug("Building create_lobby transaction", {
       playerA: playerA.toString(),
       amount,
       characterA,
@@ -114,7 +114,7 @@ export async function buildCreateLobbyTransaction(
         throw new Error(`Lobby count ${bigintValue} is not a safe integer`);
       }
     } catch (parseError) {
-      logger.ui.error("Failed to parse lobby count from config", {
+      logger.solana.error("Failed to parse lobby count from config", {
         error: parseError,
         bufferLength: lobbyCountBuffer.length,
         bufferHex: lobbyCountBuffer.toString("hex"),
@@ -124,7 +124,7 @@ export async function buildCreateLobbyTransaction(
       throw new Error(`Failed to parse lobby count: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
     }
 
-    logger.ui.debug("Fetched lobby count from config", { currentLobbyCount, offset: lobbyCountOffset });
+    logger.solana.debug("Fetched lobby count from config", { currentLobbyCount, offset: lobbyCountOffset });
 
     // Derive lobby PDA using the current lobby count from config
     const [lobbyPda] = getLobbyPDA(currentLobbyCount);
@@ -167,10 +167,10 @@ export async function buildCreateLobbyTransaction(
     }).compileToV0Message();
 
     const transaction = new VersionedTransaction(messageV0);
-    logger.ui.debug("Created create_lobby transaction");
+    logger.solana.debug("Created create_lobby transaction");
     return transaction;
   } catch (error) {
-    logger.ui.error("Failed to build create_lobby transaction:", error);
+    logger.solana.error("Failed to build create_lobby transaction:", error);
     throw error;
   }
 }
@@ -195,7 +195,7 @@ export async function buildJoinLobbyTransaction(
   connection: Connection
 ): Promise<VersionedTransaction> {
   try {
-    logger.ui.debug("Building join_lobby transaction", {
+    logger.solana.debug("Building join_lobby transaction", {
       playerB: playerB.toString(),
       lobbyId,
       characterB,
@@ -216,45 +216,322 @@ export async function buildJoinLobbyTransaction(
 
     const program = new Program<Domin81v1Prgm>(IDL as any, provider);
 
-    // Fetch lobby to get amount
-    const lobbyAccount = await program.account.domin81v1Lobby.fetch(lobbyPda);
+    // Fetch lobby account once (used for both amount and force seed)
+    let lobbyAmount: number = 0;
+    let forceSeed: Buffer;
+    
+    const lobbyAccountInfo = await connection.getAccountInfo(lobbyPda);
+    if (!lobbyAccountInfo) {
+      throw new Error(`Lobby account not found at ${lobbyPda.toString()}`);
+    }
+
+    logger.solana.debug("Lobby account info", {
+      owner: lobbyAccountInfo.owner.toString(),
+      dataLength: lobbyAccountInfo.data.length,
+    });
+
+    try {
+      const data = lobbyAccountInfo.data;
+      
+      logger.solana.debug("Lobby account data info", {
+        totalLength: data.length,
+        first64Hex: data.slice(0, 64).toString("hex"),
+      });
+
+      // Domin81v1Lobby structure (Borsh encoded):
+      // 0-7: discriminator (8 bytes)
+      // 8-15: lobby_id (u64)
+      // 16-47: player_a (Pubkey, 32 bytes)
+      // 48: player_b discriminant (1 byte, 0=None, 1=Some)
+      // 49-80: player_b value (32 bytes if Some, skip if None)
+      // After player_b: amount (u64, 8 bytes)
+      
+      // Check if player_b is Some (discriminant at offset 48)
+      const playerBDiscriminant = data[48];
+      let amountOffset: number;
+      
+      if (playerBDiscriminant === 0) {
+        // player_b is None, so amount is right after the discriminant
+        amountOffset = 49;
+      } else if (playerBDiscriminant === 1) {
+        // player_b is Some, skip 32 bytes for the pubkey
+        amountOffset = 49 + 32; // = 81
+      } else {
+        throw new Error(`Invalid player_b discriminant: ${playerBDiscriminant}`);
+      }
+
+      logger.solana.debug("Lobby structure analysis", {
+        playerBDiscriminant,
+        expectedAmountOffset: amountOffset,
+      });
+
+      // Read the amount at the calculated offset
+      if (data.length < amountOffset + 8) {
+        throw new Error(`Data too short for amount: ${data.length} bytes, need at least ${amountOffset + 8}`);
+      }
+
+      const amountBuffer = data.slice(amountOffset, amountOffset + 8);
+      const amountBigInt = amountBuffer.readBigUInt64LE(0);
+      lobbyAmount = Number(amountBigInt);
+
+      // Validate it's a reasonable amount
+      const MIN_AMOUNT = 10_000_000; // 0.01 SOL
+      const MAX_AMOUNT = 100_000_000_000; // 100 SOL
+      
+      if (lobbyAmount < MIN_AMOUNT || lobbyAmount > MAX_AMOUNT) {
+        logger.solana.error("Amount out of valid range", {
+          amount: lobbyAmount,
+          min: MIN_AMOUNT,
+          max: MAX_AMOUNT,
+          offset: amountOffset,
+          hex: amountBuffer.toString("hex"),
+        });
+        throw new Error(`Amount ${lobbyAmount} is outside valid range [${MIN_AMOUNT}, ${MAX_AMOUNT}]`);
+      }
+
+      logger.solana.debug("Found lobby amount", { lobbyAmount, offset: amountOffset });
+
+      // Parse force field - should be 32 bytes after the amount
+      const forceStartOffset = amountOffset + 8;
+      if (data.length < forceStartOffset + 32) {
+        throw new Error(`Data too short for force field: ${data.length} bytes, need at least ${forceStartOffset + 32}`);
+      }
+
+      forceSeed = Buffer.from(data.slice(forceStartOffset, forceStartOffset + 32));
+      logger.solana.debug("Parsed force seed", { 
+        forceHex: forceSeed.toString("hex"),
+        forceOffset: forceStartOffset
+      });
+    } catch (parseError) {
+      logger.solana.error("Failed to parse lobby account", {
+        error: parseError,
+        lobbyPda: lobbyPda.toString(),
+      });
+      throw new Error(`Failed to parse lobby account: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+    }
 
     // Default position for simplicity: [0, 0]
     const positionB = [0, 0] as [number, number];
 
-    // ORAO Setup - simplified for now (placeholder values)
-    // In production, these would come from ORAO's on-chain state
-    // For now, we just generate the randomness account PDA
+    // Import ORAO SDK for VRF account derivation
+    const OraoModule = await import("@orao-network/solana-vrf");
+    const { Orao, networkStateAccountAddress, randomnessAccountAddress } = OraoModule;
+    const ORAO_VRF_ID = new PublicKey("VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y");
+    
+    // Initialize ORAO SDK
+    const orao = new Orao(provider as any);
+    
+    // Derive VRF accounts using ORAO SDK
+    const networkState = networkStateAccountAddress();
+    const randomnessAccount = randomnessAccountAddress(forceSeed);
+    
+    // Get treasury from ORAO network state
+    logger.solana.debug("Fetching ORAO network state...");
+    const networkStateData = await orao.getNetworkState();
+    logger.solana.debug("ORAO network state fetched", {
+      treasuryRaw: String(networkStateData.config.treasury),
+      treasuryType: typeof networkStateData.config.treasury,
+    });
+    
+    let treasuryPubkey: PublicKey;
+    const treasuryRaw = networkStateData.config.treasury;
+    
+    if (treasuryRaw instanceof PublicKey) {
+      treasuryPubkey = treasuryRaw;
+    } else if (typeof treasuryRaw === "string") {
+      treasuryPubkey = new PublicKey(treasuryRaw);
+    } else if (treasuryRaw && typeof treasuryRaw === "object") {
+      // Try to convert buffer or other representations
+      treasuryPubkey = new PublicKey(treasuryRaw as any);
+    } else {
+      throw new Error(`Invalid treasury type from ORAO: ${typeof treasuryRaw}, value: ${treasuryRaw}`);
+    }
 
-    // Build the join_lobby instruction
-    const joinLobbyIx = await program.methods
-      .joinLobby(new BN(lobbyAccount.amount), characterB, positionB)
-      .accounts({
-        config: configPda,
-        lobby: lobbyPda,
-        playerB,
-        systemProgram: SystemProgram.programId,
-      } as any)
-      .instruction();
+    logger.solana.debug("ORAO VRF accounts derived", {
+      networkState: networkState.toString(),
+      randomnessAccount: randomnessAccount.toString(),
+      treasury: treasuryPubkey.toString(),
+      oraoVrfId: ORAO_VRF_ID.toString(),
+    });
+
+    // Validate all accounts are valid PublicKeys
+    const accountsToValidate: Record<string, unknown> = {
+      config: configPda,
+      lobby: lobbyPda,
+      playerB: playerB,
+      vrf: ORAO_VRF_ID,
+      configAccount: networkState,
+      treasury: treasuryPubkey,
+      randomnessAccount: randomnessAccount,
+      systemProgram: SystemProgram.programId,
+    };
+
+    for (const [name, addr] of Object.entries(accountsToValidate)) {
+      if (!addr || !(addr instanceof PublicKey)) {
+        logger.solana.error(`Invalid account address for ${name}`, { 
+          value: String(addr),
+          type: typeof addr,
+        });
+        throw new Error(`Invalid account address for ${name}: ${addr} (type: ${typeof addr})`);
+      }
+    }
+
+    logger.solana.debug("All accounts validated");
+
+    // Log all accounts before building instruction for debugging
+    logger.solana.info("📋 Join Lobby Instruction Accounts", {
+      config: configPda.toString(),
+      lobby: lobbyPda.toString(), 
+      playerB: playerB.toString(),
+      vrf: ORAO_VRF_ID.toString(),
+      configAccount: networkState.toString(),
+      treasury: treasuryPubkey.toString(),
+      randomnessAccount: randomnessAccount.toString(),
+      systemProgram: SystemProgram.programId.toString(),
+    });
+
+    logger.solana.info("📋 Instruction Parameters", {
+      amount: lobbyAmount.toString(),
+      characterB,
+      positionB: positionB.toString(),
+    });
+
+    // Build the join_lobby instruction with proper ORAO accounts
+    // Use .instruction() to get the raw instruction
+    logger.solana.debug("Building join_lobby instruction with Anchor...");
+    let joinLobbyIx;
+    
+    try {
+      joinLobbyIx = await program.methods
+        .joinLobby(new BN(lobbyAmount), characterB, positionB)
+        .accounts({
+          config: configPda,
+          lobby: lobbyPda,
+          playerB,
+          vrf: ORAO_VRF_ID,
+          configAccount: networkState,
+          treasury: treasuryPubkey,
+          randomnessAccount: randomnessAccount,
+          systemProgram: SystemProgram.programId,
+        } as any)
+        .instruction();
+      
+      logger.solana.info("✅ Instruction built successfully");
+    } catch (buildError) {
+      logger.solana.error("❌ Failed to build instruction", {
+        error: buildError instanceof Error ? buildError.message : String(buildError),
+        stack: buildError instanceof Error ? buildError.stack : undefined,
+      });
+      
+      // Check which account might be problematic - log their string values
+      logger.solana.error("Account debug info:", {
+        config: String(configPda),
+        lobby: String(lobbyPda),
+        playerB: String(playerB),
+        vrf: String(ORAO_VRF_ID),
+        configAccount: String(networkState),
+        treasury: String(treasuryPubkey),
+        randomnessAccount: String(randomnessAccount),
+        systemProgram: String(SystemProgram.programId),
+      });
+      
+      throw buildError;
+    }
+
+    logger.solana.debug("Built join_lobby instruction", {
+      programId: joinLobbyIx.programId.toString(),
+      keysCount: joinLobbyIx.keys.length,
+      dataLength: joinLobbyIx.data.length,
+    });
 
     // Get the latest blockhash
     const { blockhash } = await connection.getLatestBlockhash("confirmed");
 
-    // Compile message
-    const messageV0 = new TransactionMessage({
+    // HELIUS SIMULATION: Test transaction before signing
+    logger.solana.info("🔍 Simulating transaction with Helius...");
+    
+    const simulationInstructions = [joinLobbyIx];
+    const testMessage = new TransactionMessage({
       payerKey: playerB,
       recentBlockhash: blockhash,
       instructions: [
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
-        joinLobbyIx,
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
+        ...simulationInstructions,
       ],
     }).compileToV0Message();
 
-    const transaction = new VersionedTransaction(messageV0);
-    logger.ui.debug("Built join_lobby transaction");
-    return transaction;
+    const testTx = new VersionedTransaction(testMessage);
+    
+    try {
+      const simulation = await connection.simulateTransaction(testTx, {
+        replaceRecentBlockhash: true,
+        sigVerify: false,
+      });
+
+      if (simulation.value.err) {
+        logger.solana.error("❌ Transaction simulation failed", {
+          error: simulation.value.err,
+          logs: simulation.value.logs,
+        });
+        throw new Error(`Simulation error: ${JSON.stringify(simulation.value.err)}`);
+      }
+
+      logger.solana.info("✅ Simulation successful", {
+        unitsConsumed: simulation.value.unitsConsumed,
+        logs: simulation.value.logs?.slice(-5), // Last 5 logs for context
+      });
+
+      // Apply buffer to simulated CU (Helius recommendation: 10% buffer)
+      const simulatedCU = simulation.value.unitsConsumed || 100_000;
+      const optimizedCU = Math.ceil(simulatedCU * 1.1);
+
+      logger.solana.debug("Compute unit optimization", {
+        simulated: simulatedCU,
+        optimized: optimizedCU,
+        buffer: "10%",
+      });
+
+      // Rebuild with optimized compute units
+      const finalInstructions = [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: optimizedCU }),
+        joinLobbyIx,
+      ];
+
+      const finalMessage = new TransactionMessage({
+        payerKey: playerB,
+        recentBlockhash: blockhash,
+        instructions: finalInstructions,
+      }).compileToV0Message();
+
+      const transaction = new VersionedTransaction(finalMessage);
+      logger.solana.debug("Built optimized join_lobby transaction", {
+        computeUnitLimit: optimizedCU,
+      });
+      return transaction;
+
+    } catch (simError) {
+      logger.solana.warn("⚠️ Simulation error, proceeding with conservative CU estimate", {
+        error: simError instanceof Error ? simError.message : String(simError),
+      });
+
+      // Fallback: Use conservative compute units
+      const conservativeInstructions = [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 500_000 }),
+        joinLobbyIx,
+      ];
+
+      const messageV0 = new TransactionMessage({
+        payerKey: playerB,
+        recentBlockhash: blockhash,
+        instructions: conservativeInstructions,
+      }).compileToV0Message();
+
+      const transaction = new VersionedTransaction(messageV0);
+      logger.solana.debug("Built join_lobby transaction with fallback CU");
+      return transaction;
+    }
   } catch (error) {
-    logger.ui.error("Failed to build join_lobby transaction:", error);
+    logger.solana.error("Failed to build join_lobby transaction:", error);
     throw error;
   }
 }
@@ -277,7 +554,7 @@ export async function buildSettleLobbyTransaction(
   _connection: Connection
 ): Promise<VersionedTransaction> {
   try {
-    logger.ui.debug("Building settle_lobby transaction", {
+    logger.solana.debug("Building settle_lobby transaction", {
       signer: signer.toString(),
       lobbyId,
       lobbyPda: lobbyPda.toString(),
@@ -306,7 +583,7 @@ export async function buildSettleLobbyTransaction(
     // eslint-disable-next-line @typescript-eslint/no-unreachable
     return undefined as any;
   } catch (error) {
-    logger.ui.error("Failed to build settle_lobby transaction:", error);
+    logger.solana.error("Failed to build settle_lobby transaction:", error);
     throw error;
   }
 }
@@ -325,7 +602,7 @@ export async function buildCancelLobbyTransaction(
   connection: Connection
 ): Promise<VersionedTransaction> {
   try {
-    logger.ui.debug("Building cancel_lobby transaction", {
+    logger.solana.debug("Building cancel_lobby transaction", {
       playerA: playerA.toString(),
       lobbyPda: lobbyPda.toString(),
     });
@@ -364,10 +641,10 @@ export async function buildCancelLobbyTransaction(
     }).compileToV0Message();
 
     const transaction = new VersionedTransaction(messageV0);
-    logger.ui.debug("Created cancel_lobby transaction");
+    logger.solana.debug("Created cancel_lobby transaction");
     return transaction;
   } catch (error) {
-    logger.ui.error("Failed to build cancel_lobby transaction:", error);
+    logger.solana.error("Failed to build cancel_lobby transaction:", error);
     throw error;
   }
 }
@@ -386,7 +663,7 @@ export async function waitForTransactionConfirmation(
   timeout: number = 30_000
 ): Promise<boolean> {
   try {
-    logger.ui.debug("Waiting for transaction confirmation", { signature, timeout });
+    logger.solana.debug("Waiting for transaction confirmation", { signature, timeout });
 
     const startTime = Date.now();
     const pollInterval = 1_000; // 1 second
@@ -395,12 +672,12 @@ export async function waitForTransactionConfirmation(
       const status = await connection.getSignatureStatus(signature);
 
       if (status.value?.confirmationStatus === "confirmed" || status.value?.confirmationStatus === "finalized") {
-        logger.ui.debug("Transaction confirmed", { signature });
+        logger.solana.debug("Transaction confirmed", { signature });
         return true;
       }
 
       if (status.value?.err) {
-        logger.ui.error("Transaction failed", { signature, error: status.value.err });
+        logger.solana.error("Transaction failed", { signature, error: status.value.err });
         return false;
       }
 
@@ -408,10 +685,10 @@ export async function waitForTransactionConfirmation(
       await new Promise((resolve) => setTimeout(resolve, pollInterval));
     }
 
-    logger.ui.warn("Transaction confirmation timeout", { signature });
+    logger.solana.warn("Transaction confirmation timeout", { signature });
     return false;
   } catch (error) {
-    logger.ui.error("Error waiting for confirmation:", error);
+    logger.solana.error("Error waiting for confirmation:", error);
     throw error;
   }
 }
