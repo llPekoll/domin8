@@ -131,7 +131,6 @@ export class Game extends Scene {
       logger.game.debug("[Game] 🎮 Player bet placed event received:", data);
       // Play challenger sound when a new player joins
       // (Note: insert-coin plays for the player who placed the bet)
-      SoundManager.playChallenger(this);
     });
 
     // Characters now spawn automatically via blockchain subscription (useActiveGame)
@@ -392,6 +391,9 @@ export class Game extends Scene {
 
         logger.game.debug("[Game] ✅ Spawning participant from blockchain:", participant);
         this.playerManager.addParticipant(participant);
+
+        // Play challenger sound to notify all players of new participant
+        SoundManager.playChallenger(this);
 
         // Apply arena mask to the newly spawned participant
         if (this.arenaMask) {
