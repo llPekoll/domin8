@@ -3,12 +3,11 @@
  * Shows last winner info and current game state for debugging during development
  */
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useActiveGame } from "../hooks/useActiveGame";
 import { X, Trophy, TrendingUp, Users, Clock, Coins, Share2 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { usePrivyWallet } from "../hooks/usePrivyWallet";
 
 export function BlockchainDebugDialog() {
   const [isOpen, setIsOpen] = useState(false);

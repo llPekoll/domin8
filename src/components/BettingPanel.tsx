@@ -12,10 +12,10 @@ import { logger } from "../lib/logger";
 import { useAssets } from "../contexts/AssetsContext";
 import type { Character } from "../types/character";
 import styles from "./ButtonShine.module.css";
-import { Plus, Wallet } from "lucide-react";
+import { Plus, Wallet, Eraser } from "lucide-react";
 
 // Betting limits
-const MIN_BET_AMOUNT = 0.002;
+const MIN_BET_AMOUNT = 0.001;
 const MAX_BET_AMOUNT = 10;
 const DEFAULT_BET_AMOUNT = MIN_BET_AMOUNT;
 
@@ -120,6 +120,10 @@ const BettingPanel = memo(function BettingPanel({
     // Cap at max bet
     const cappedAmount = Math.min(newAmount, MAX_BET_AMOUNT);
     setBetAmount(cappedAmount.toFixed(2));
+  };
+
+  const handleClearBet = () => {
+    setBetAmount(DEFAULT_BET_AMOUNT.toString());
   };
 
   const handlePlaceBet = useCallback(async () => {
@@ -537,6 +541,13 @@ const BettingPanel = memo(function BettingPanel({
       </div>
       <div className="flex items-center justify-between bg-gradient-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-xl shadow-2xl shadow-amber-900/50 min-w-[560px] px-2 py-2 space-x-1">
         <div className="relative w-1/5">
+          <button
+            onClick={handleClearBet}
+            className="absolute -top-3 -left-4 p-1.5 bg-red-800 hover:bg-red-700 border border-red-600 rounded-lg text-red-300 transition-colors z-10"
+            title="Clear amount"
+          >
+            <Eraser className="w-4 h-4 " />
+          </button>
           <img
             src="/sol-logo.svg"
             alt="SOL"
@@ -615,6 +626,9 @@ const BettingPanel = memo(function BettingPanel({
                 : "Insert coin"}
         </button>
       </div>
+      <p className="text-center text-white text-sm mt-2 bg-red-700">
+        You need at least 0.004 SOL to create a game
+      </p>
     </div>
   );
 });
