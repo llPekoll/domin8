@@ -14,6 +14,7 @@ export class UIManager {
 
   private gameState: any = null;
   private timerContainer!: Phaser.GameObjects.Container;
+  private playerNamesMap: Map<string, string> = new Map();
 
   // Demo-style countdown (large, bottom center)
   private demoCountdownText!: Phaser.GameObjects.Text;
@@ -149,6 +150,20 @@ export class UIManager {
         isCurrentUser: isCurrentUserWinner,
         prize: winnerPrize,
       });
+    } else if (winnerWallet) {
+      // Show winner name for non-winners
+      const mappedName = this.playerNamesMap.get(winnerWallet);
+      console.log(`[UIManager] Looking up winner: ${winnerWallet}, found: ${mappedName}, map size: ${this.playerNamesMap.size}`);
+
+      const winnerDisplayName = mappedName ||
+        `${winnerWallet.slice(0, 4)}...${winnerWallet.slice(-4)}`;
+
+      this.winnerContainer.setVisible(true);
+      this.winnerContainer.setAlpha(1);
+      this.phaseText.setVisible(true);
+      this.phaseText.setText(`🏆 ${winnerDisplayName} WON!`);
+      this.subText.setVisible(true);
+      this.subText.setText(`Prize: ${winnerPrize} SOL`);
     }
   }
 
@@ -337,6 +352,17 @@ export class UIManager {
 
   updateGameState(gameState: any) {
     this.gameState = gameState;
+  }
+
+  setPlayerNames(playerNames: Array<{ walletAddress: string; displayName: string | null }>) {
+    this.playerNamesMap.clear();
+    playerNames.forEach(({ walletAddress, displayName }) => {
+      if (displayName) {
+        this.playerNamesMap.set(walletAddress, displayName);
+      }
+    });
+    console.log(`[UIManager] Player names updated: ${this.playerNamesMap.size} with names, ${playerNames.length} total`);
+    console.log(`[UIManager] Names map:`, Object.fromEntries(this.playerNamesMap));
   }
 
   updateTimer() {

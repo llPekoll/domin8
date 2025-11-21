@@ -51,6 +51,11 @@ export class Game extends Scene {
       this.animationManager.setPlayerNames(this.playerNames);
     }
 
+    // Pass updated player names to UIManager
+    if (this.uiManager) {
+      this.uiManager.setPlayerNames(playerNames);
+    }
+
     // Update existing participants with new display names
     if (this.playerManager) {
       this.updateParticipantDisplayNames();
@@ -178,6 +183,15 @@ export class Game extends Scene {
       logger.game.debug("[Game] 🧹 Cleanup triggered");
       this.handleGameCleanup();
     });
+
+    // Listen for player names updates from PlayerNamesContext
+    EventBus.on(
+      "player-names-update",
+      (playerNames: Array<{ walletAddress: string; displayName: string | null }>) => {
+        logger.game.debug("[Game] 📛 Player names update received:", playerNames.length);
+        this.setPlayerNames(playerNames);
+      }
+    );
   }
 
   /**
