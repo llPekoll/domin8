@@ -14,6 +14,8 @@ export class UIManager {
 
   private gameState: any = null;
   private timerContainer!: Phaser.GameObjects.Container;
+  private playerNamesMap: Map<string, string> = new Map();
+  private cachedBetAmounts: number[] = []; // Cache bet amounts before game ends
 
   // Demo-style countdown (large, bottom center)
   private demoCountdownText!: Phaser.GameObjects.Text;
@@ -28,6 +30,7 @@ export class UIManager {
   private phaseText!: Phaser.GameObjects.Text;
   private subText!: Phaser.GameObjects.Text;
   private winnerContainer!: Phaser.GameObjects.Container;
+  private multiplierText!: Phaser.GameObjects.Text;
 
   constructor(scene: Scene, centerX: number) {
     this.scene = scene;
@@ -99,7 +102,8 @@ export class UIManager {
       this.timerContainer &&
       this.timerBackground &&
       this.demoCountdownText &&
-      this.winnerContainer
+      this.winnerContainer &&
+      this.multiplierText
     );
   }
 
@@ -113,6 +117,9 @@ export class UIManager {
     this.vrfOverlay.setVisible(false);
     this.vrfContainer.setVisible(false);
     this.winnerContainer.setVisible(false);
+
+    // Clear cached data for next game
+    this.cachedBetAmounts = [];
   }
 
   private showWinnerUI() {
@@ -128,9 +135,33 @@ export class UIManager {
 
     // Get winner info from game state
     const winnerWallet = this.gameState?.winner?.toBase58?.() || this.gameState?.winner;
-    const winnerPrize = this.gameState?.winnerPrize
-      ? (Number(this.gameState.winnerPrize) / 1e9).toFixed(3)
-      : "0";
+    const winnerPrizeNum = this.gameState?.winnerPrize
+      ? Number(this.gameState.winnerPrize) / 1e9
+      : 0;
+    const winnerPrize = winnerPrizeNum.toFixed(3);
+
+    // Calculate multiplier from winner's bet (use cached amounts since live data gets cleared)
+    let multiplier = 0;
+    const winningBetIndex = this.gameState?.winningBetIndex;
+    console.log(`[UIManager] Multiplier calc: winningBetIndex=${winningBetIndex}, cached bets=${this.cachedBetAmounts.length}, prize=${winnerPrizeNum}`);
+
+    if (winningBetIndex !== null && winningBetIndex !== undefined && this.cachedBetAmounts.length > 0) {
+      // winningBetIndex might be a BN object
+      const betIdx = typeof winningBetIndex === 'object' && winningBetIndex.toNumber
+        ? winningBetIndex.toNumber()
+        : Number(winningBetIndex);
+
+      console.log(`[UIManager] Bet index: ${betIdx}, cachedBetAmount:`, this.cachedBetAmounts[betIdx]);
+
+      if (this.cachedBetAmounts[betIdx]) {
+        const winnerBetAmount = this.cachedBetAmounts[betIdx] / 1e9;
+        console.log(`[UIManager] Winner bet amount: ${winnerBetAmount} SOL`);
+        if (winnerBetAmount > 0) {
+          multiplier = winnerPrizeNum / winnerBetAmount;
+          console.log(`[UIManager] Calculated multiplier: x${multiplier.toFixed(1)}`);
+        }
+      }
+    }
 
     // Check if current user is the winner
     const isCurrentUserWinner = currentUserWallet && winnerWallet === currentUserWallet;
@@ -144,12 +175,69 @@ export class UIManager {
       this.subText.setVisible(true);
       this.subText.setText("Restarting in 4s...");
 
+      // Show multiplier with punchy animation
+      this.showMultiplier(multiplier);
+
       // Emit event for React to show Twitter share button
       EventBus.emit("show-winner-share", {
         isCurrentUser: isCurrentUserWinner,
         prize: winnerPrize,
       });
+    } else if (winnerWallet) {
+      // Show winner name for non-winners
+      const mappedName = this.playerNamesMap.get(winnerWallet);
+      console.log(`[UIManager] Looking up winner: ${winnerWallet}, found: ${mappedName}, map size: ${this.playerNamesMap.size}`);
+
+      const winnerDisplayName = mappedName ||
+        `${winnerWallet.slice(0, 4)}...${winnerWallet.slice(-4)}`;
+
+      this.winnerContainer.setVisible(true);
+      this.winnerContainer.setAlpha(1);
+      this.phaseText.setVisible(true);
+      this.phaseText.setText(`🏆 ${winnerDisplayName} WON!`);
+      this.subText.setVisible(true);
+      this.subText.setText(`Prize: ${winnerPrize} SOL`);
+
+      // Show multiplier with punchy animation
+      this.showMultiplier(multiplier);
     }
+  }
+
+  /**
+   * Show multiplier with punchy scale animation
+   */
+  private showMultiplier(multiplier: number) {
+    if (multiplier <= 1) {
+      this.multiplierText.setVisible(false);
+      return;
+    }
+
+    // Format multiplier (e.g., x2.5 or x10)
+    const multiplierStr = multiplier >= 10
+      ? `x${Math.round(multiplier)}`
+      : `x${multiplier.toFixed(1)}`;
+
+    this.multiplierText.setText(multiplierStr);
+    this.multiplierText.setVisible(true);
+    this.multiplierText.setScale(0);
+    this.multiplierText.setAlpha(1);
+
+    // Punchy scale-in animation
+    this.scene.tweens.add({
+      targets: this.multiplierText,
+      scale: { from: 0, to: 1.3 },
+      duration: 300,
+      ease: "Back.easeOut",
+      onComplete: () => {
+        // Settle to normal size
+        this.scene.tweens.add({
+          targets: this.multiplierText,
+          scale: 1,
+          duration: 150,
+          ease: "Sine.easeOut",
+        });
+      },
+    });
   }
 
   /**
@@ -331,12 +419,43 @@ export class UIManager {
     });
     this.subText.setOrigin(0.5);
 
+    // Multiplier text (e.g., "x10") - punchy style
+    this.multiplierText = this.scene.add.text(0, 42, "", {
+      fontFamily: "metal-slug",
+      fontSize: "20px",
+      color: "#00FF00", // Bright green
+      stroke: "#000000",
+      strokeThickness: 3,
+      resolution: 4,
+    });
+    this.multiplierText.setOrigin(0.5);
+    this.multiplierText.setVisible(false);
+
     // Add to container
-    this.winnerContainer.add([this.phaseText, this.subText]);
+    this.winnerContainer.add([this.phaseText, this.subText, this.multiplierText]);
   }
 
   updateGameState(gameState: any) {
     this.gameState = gameState;
+
+    // Cache bet amounts while they're available (before game ends and clears them)
+    if (gameState?.betAmounts && gameState.betAmounts.length > 0) {
+      this.cachedBetAmounts = gameState.betAmounts.map((amt: any) =>
+        typeof amt === 'object' && amt.toNumber ? amt.toNumber() : Number(amt)
+      );
+      console.log(`[UIManager] Cached ${this.cachedBetAmounts.length} bet amounts`);
+    }
+  }
+
+  setPlayerNames(playerNames: Array<{ walletAddress: string; displayName: string | null }>) {
+    this.playerNamesMap.clear();
+    playerNames.forEach(({ walletAddress, displayName }) => {
+      if (displayName) {
+        this.playerNamesMap.set(walletAddress, displayName);
+      }
+    });
+    console.log(`[UIManager] Player names updated: ${this.playerNamesMap.size} with names, ${playerNames.length} total`);
+    console.log(`[UIManager] Names map:`, Object.fromEntries(this.playerNamesMap));
   }
 
   updateTimer() {
