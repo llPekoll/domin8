@@ -705,6 +705,7 @@ export class AnimationManager {
     if (this.scene.anims.exists("explosion-fullscreen")) {
       this.scene.time.delayedCall(200, () => {
         fullscreenExplosion.play("explosion-fullscreen");
+        SoundManager.playExplosion(this.scene, 0.8);
       });
     }
 
