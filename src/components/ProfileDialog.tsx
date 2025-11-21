@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Button } from "./ui/button";
 import {
@@ -13,7 +13,7 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { toast } from "sonner";
-import { User, Copy, Check, Share2 } from "lucide-react";
+import { User, Copy, Check, Share2, Trophy, Coins } from "lucide-react";
 import { logger } from "../lib/logger";
 
 interface ProfileDialogProps {
@@ -34,6 +34,12 @@ export function ProfileDialog({
   const [isCopied, setIsCopied] = useState(false);
 
   const updateDisplayName = useMutation(api.players.updateDisplayName);
+
+  // Fetch player stats from game history
+  const playerStats = useQuery(
+    api.players.getPlayerStatsFromHistory,
+    { walletAddress }
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,6 +151,49 @@ export function ProfileDialog({
                   <Copy className="w-4 h-4" />
                 )}
               </Button>
+            </div>
+          </div>
+
+          {/* Player Stats Section */}
+          <div className="space-y-2">
+            <Label className="text-amber-300">Game Statistics</Label>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Total Wins */}
+              <div className="px-3 py-3 bg-black/30 rounded-md border border-amber-700/50">
+                <div className="flex items-center gap-2 mb-1">
+                  <Trophy className="w-4 h-4 text-yellow-400" />
+                  <span className="text-xs text-amber-400/80">Total Wins</span>
+                </div>
+                <div className="text-xl font-bold text-amber-100">
+                  {playerStats ? playerStats.totalWins : "..."}
+                </div>
+              </div>
+
+              {/* Total Winnings */}
+              <div className="px-3 py-3 bg-black/30 rounded-md border border-amber-700/50">
+                <div className="flex items-center gap-2 mb-1">
+                  <Coins className="w-4 h-4 text-yellow-400" />
+                  <span className="text-xs text-amber-400/80">Total Winnings</span>
+                </div>
+                <div className="text-xl font-bold text-amber-100 flex items-center gap-1">
+                  {playerStats ? (
+                    <>
+                      <img
+                        src="/sol-logo.svg"
+                        alt="SOL"
+                        className="w-4 h-4"
+                        style={{
+                          filter:
+                            "brightness(0) saturate(100%) invert(81%) sepia(13%) saturate(891%) hue-rotate(196deg) brightness(95%) contrast(92%)",
+                        }}
+                      />
+                      {playerStats.totalWinningsSOL.toFixed(4)}
+                    </>
+                  ) : (
+                    "..."
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 

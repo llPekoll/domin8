@@ -377,6 +377,51 @@ export const awardPointsInternal = internalMutation({
 });
 
 /**
+ * Get player statistics from game history
+ * Calculates total wins and total winnings by querying finished games
+ *
+ * @param walletAddress - Player's wallet address
+ * @returns Player stats including total wins, total winnings in SOL, and games played
+ */
+export const getPlayerStatsFromHistory = query({
+  args: {
+    walletAddress: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Get all finished games where this player was the winner
+    const finishedGames = await ctx.db
+      .query("gameRoundStates")
+      .withIndex("by_status", (q) => q.eq("status", "finished"))
+      .collect();
+
+    // Filter games where this player won and calculate total winnings
+    let totalWins = 0;
+    let totalWinningsLamports = 0;
+
+    for (const game of finishedGames) {
+      if (game.winner === args.walletAddress) {
+        totalWins++;
+        // Prize is 95% of total pot
+        if (game.totalPot) {
+          const prizeAmount = game.totalPot * 0.95;
+          totalWinningsLamports += prizeAmount;
+        }
+      }
+    }
+
+    // Convert to SOL (1 SOL = 1,000,000,000 lamports)
+    const totalWinningsSOL = totalWinningsLamports / 1_000_000_000;
+
+    return {
+      walletAddress: args.walletAddress,
+      totalWins,
+      totalWinningsSOL,
+      totalWinningsLamports,
+    };
+  },
+});
+
+/**
  * Get leaderboard (top players by points)
  *
  * @param limit - Number of top players to return (default: 100)
