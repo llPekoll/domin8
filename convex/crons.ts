@@ -50,9 +50,19 @@ crons.interval(
 // TODO LATER: priority low
 
 /**
- * Game cleanup - removes old completed games
+ * Game cleanup - removes old game accounts (2+ days old)
+ * Runs every 2 days to delete old PDAs and recover rent
+ *
+ * Benefits:
+ * - Recovers rent from closed game accounts (~0.01-0.05 SOL per game)
+ * - Keeps blockchain storage clean
+ * - Net profit: Rent recovered > transaction fees
  */
-// TODO LATER: priority low
+crons.interval(
+  "cleanup-old-games",
+  { hours: 48 }, // Every 2 days
+  internal.cleanupService.cleanupOldGames
+);
 
 /**
  * Scheduled jobs cleanup - removes old completed/failed jobs (safety net)
