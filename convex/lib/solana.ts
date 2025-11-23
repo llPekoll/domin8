@@ -420,6 +420,34 @@ export class SolanaClient {
     return signature;
   }
 
+  // Delete old game account and recover rent (admin only)
+  // HELIUS OPTIMIZED: Uses confirmed commitment, CU optimization, priority fees, and retry logic
+  async deleteGame(roundId: number): Promise<string> {
+    const { config, gameRound } = this.getPDAs(roundId);
+
+    if (!gameRound) {
+      throw new Error("Failed to derive game round PDA");
+    }
+
+    console.log(`Deleting game account for round ${roundId} with Helius optimizations`);
+
+    // Build the instruction (instead of using .rpc() directly)
+    const instruction = await this.program.methods
+      .deleteGame(new anchor.BN(roundId))
+      .accounts({
+        config,
+        game: gameRound,
+        admin: this.authority.publicKey,
+      } as any)
+      .instruction();
+
+    // Send using Helius-optimized transaction flow
+    const signature = await this.sendOptimizedTransaction(instruction);
+
+    console.log(`Game ${roundId} deleted successfully (rent refunded): ${signature}`);
+    return signature;
+  }
+
   // Note: VRF functionality removed - risk architecture uses simpler randomness
 
   // Fetch all bets for a specific round (risk-based architecture - bets stored inline)
