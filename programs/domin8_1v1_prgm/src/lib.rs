@@ -55,7 +55,8 @@ pub mod domin8_1v1_prgm {
     /// Settle a 1v1 lobby (Resolve winner after VRF fulfillment)
     pub fn settle_lobby(
         ctx: Context<SettleLobby>,
+        randomness: [u8; 32],
     ) -> Result<()> {
-        instructions::settle_lobby::handler(ctx)
+        instructions::settle_lobby::handler(ctx, randomness)
     }
 }
