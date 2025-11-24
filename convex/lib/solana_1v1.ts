@@ -562,8 +562,12 @@ export class Solana1v1Client {
 
   /**
    * Call settle_lobby instruction on-chain
+   * 
+   * Note: With MagicBlock Ephemeral VRF, this is called automatically by the VRF program
+   * as a callback after randomness is generated. This method is kept for manual settlement
+   * if needed, but typically won't be used.
    */
-  async settleLobby(lobbyId: number, randomnessSeedHex: string): Promise<string> {
+  async settleLobby(lobbyId: number, randomness: [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number]): Promise<string> {
     try {
       console.log(`[1v1 Crank] Calling settle_lobby for lobby ${lobbyId}...`);
 
@@ -585,52 +589,35 @@ export class Solana1v1Client {
       const config = await this.getConfigAccount();
       const treasury = new PublicKey(config.treasury?.toString() || "0");
 
-      // Derive the ORAO randomness account PDA from the force seed
-      // The force is stored as hex string, convert to buffer
-      const forceBuffer = Buffer.from(randomnessSeedHex, 'hex');
-      
-      const ORAO_VRF_PROGRAM_ID = new PublicKey("VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y");
-      const RANDOMNESS_ACCOUNT_SEED = Buffer.from("orao-vrf-randomness-request");
-
-      const [randomnessAccountPda] = PublicKey.findProgramAddressSync(
-        [RANDOMNESS_ACCOUNT_SEED, forceBuffer],
-        ORAO_VRF_PROGRAM_ID
+      // Derive the VRF program identity (MagicBlock callback signer)
+      const VRF_PROGRAM = new PublicKey("Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz");
+      const [vrfProgramIdentity] = PublicKey.findProgramAddressSync(
+        [Buffer.from("identity")],
+        VRF_PROGRAM
       );
 
-      console.log(`[1v1 Crank] Derived randomness account: ${randomnessAccountPda.toBase58()}`);
+      console.log(`[1v1 Crank] VRF Program Identity: ${vrfProgramIdentity.toBase58()}`);
 
-      // Verify the randomness account exists and is initialized
-      const randomnessAccountInfo = await this.connection.getAccountInfo(randomnessAccountPda);
-      if (!randomnessAccountInfo) {
-        throw new Error(`Randomness account ${randomnessAccountPda.toBase58()} not found on-chain. VRF may not have been requested yet.`);
-      }
-
-      if (!randomnessAccountInfo.owner.equals(ORAO_VRF_PROGRAM_ID)) {
-        throw new Error(
-          `Randomness account ${randomnessAccountPda.toBase58()} is owned by ${randomnessAccountInfo.owner.toBase58()}, ` +
-          `not ORAO VRF program ${ORAO_VRF_PROGRAM_ID.toBase58()}`
-        );
-      }
-
-      console.log(`[1v1 Crank] Randomness account exists. Owner: ${randomnessAccountInfo.owner.toBase58()}, Data length: ${randomnessAccountInfo.data.length}`);
-
-      // Build the instruction accounts array manually to avoid Anchor's discriminator check
-      // The randomness_account is from ORAO VRF and has a different discriminator
+      // Build the instruction accounts array
+      // The settle_lobby is called by the MagicBlock VRF program, so vrf_program_identity is a signer
       const accounts = [
+        { pubkey: vrfProgramIdentity, isSigner: true, isWritable: false },  // vrf_program_identity (signer from VRF)
         { pubkey: configPda, isSigner: false, isWritable: true },           // config
         { pubkey: lobbyPda, isSigner: false, isWritable: true },            // lobby
-        { pubkey: randomnessAccountPda, isSigner: false, isWritable: false }, // randomness_account (from ORAO)
         { pubkey: playerA, isSigner: false, isWritable: true },             // player_a
         { pubkey: playerB, isSigner: false, isWritable: true },             // player_b
         { pubkey: treasury, isSigner: false, isWritable: true },            // treasury
-        { pubkey: this.authority.publicKey, isSigner: true, isWritable: true }, // signer
+        { pubkey: PublicKey.default, isSigner: false, isWritable: false },  // system_program
       ];
 
-      // Get the settle_lobby instruction discriminator from the program
+      // Get the settle_lobby instruction discriminator
       const instruction = new anchor.web3.TransactionInstruction({
         programId: this.programId,
         keys: accounts,
-        data: Buffer.from([207, 75, 50, 251, 99, 177, 195, 225]), // settle_lobby discriminator
+        data: Buffer.concat([
+          Buffer.from([207, 75, 50, 251, 99, 177, 195, 225]), // settle_lobby discriminator
+          Buffer.from(randomness), // randomness: [u8; 32]
+        ]),
       });
 
       // Send the transaction

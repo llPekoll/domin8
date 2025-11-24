@@ -43,6 +43,10 @@ pub struct JoinLobby<'info> {
     pub oracle_queue: AccountInfo<'info>,
 
     pub system_program: Program<'info, System>,
+    
+    /// CHECK: The VRF request account derived from the force seed
+    /// This account will be created by the MagicBlock VRF program
+    pub vrf: AccountInfo<'info>,
 }
 
 pub fn handler(

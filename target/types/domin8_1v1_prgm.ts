@@ -327,6 +327,12 @@ export type Domin81v1Prgm = {
           "address": "11111111111111111111111111111111"
         },
         {
+          "name": "vrf",
+          "docs": [
+            "This account will be created by the MagicBlock VRF program"
+          ]
+        },
+        {
           "name": "programIdentity",
           "pda": {
             "seeds": [

@@ -12,6 +12,7 @@ import {
   VersionedTransaction,
   ComputeBudgetProgram,
   SystemProgram,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import { BN, Program, AnchorProvider } from "@coral-xyz/anchor";
 import { Buffer } from "buffer";
@@ -272,27 +273,114 @@ export async function buildJoinLobbyTransaction(
       throw new Error(`Failed to parse lobby account: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
     }
 
+    // Now parse the force field for VRF account derivation
+    // Domin81v1Lobby structure offsets:
+    // 0-7: discriminator (8 bytes)
+    // 8-15: lobby_id (u64, 8 bytes)
+    // 16-47: player_a (Pubkey, 32 bytes)
+    // 48-80: player_b (Option<Pubkey>, 1 discriminant + 32 pubkey = 33 bytes)
+    // 81-88: amount (u64, 8 bytes)
+    // 89-120: force ([u8; 32], 32 bytes) ← We need this for VRF
+    let lobbyForce: Buffer;
+    
+    try {
+      const data = lobbyAccountInfo.data;
+      const forceOffset = 89;
+      
+      if (data.length < forceOffset + 32) {
+        throw new Error(`Data too short for force: ${data.length} bytes, need at least ${forceOffset + 32}`);
+      }
+      
+      lobbyForce = data.slice(forceOffset, forceOffset + 32);
+      logger.solana.debug("Parsed lobby force field", { force: lobbyForce.toString('hex') });
+    } catch (parseError) {
+      logger.solana.error("Failed to parse force field", {
+        error: parseError,
+        lobbyPda: lobbyPda.toString(),
+      });
+      throw new Error(`Failed to parse force field: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+    }
+
     // Default position for simplicity: [0, 0]
     const positionB = [0, 0] as [number, number];
 
-    // MagicBlock Oracle Queue (Devnet)
-    // TODO: Make this configurable based on cluster
-    const ORACLE_QUEUE = new PublicKey("uPeRMDfPmrPqgRWSrjAnAkH78ZG3ktNQ8M6yDUhpACp");
+    // MagicBlock Oracle Queue (from IDL - this is the actual queue address on devnet)
+    const ORACLE_QUEUE = new PublicKey("Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh");
+    
+    // MagicBlock VRF program and related accounts (added by #[vrf] macro)
+    const VRF_PROGRAM = new PublicKey("Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz");
+    const SLOT_HASHES = new PublicKey("SysvarS1otHashes111111111111111111111111111");
+    
+    // Derive program_identity PDA - this should be derived from OUR program, not the VRF program
+    const [programIdentity] = PublicKey.findProgramAddressSync(
+      [Buffer.from("identity")],
+      PROGRAM_ID  // Our program, not VRF_PROGRAM
+    );
+
+    // Derive the VRF request account using the force seed from the lobby
+    // The #[vrf] macro uses this account for the randomness request
+    const [vrfAccount] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vrf"), lobbyForce],
+      VRF_PROGRAM
+    );
+
+    logger.solana.debug("Derived VRF accounts", {
+      programIdentity: programIdentity.toString(),
+      vrfAccount: vrfAccount.toString(),
+      forceSeed: lobbyForce.toString('hex'),
+    });
 
     // Build the join_lobby instruction
     logger.solana.debug("Building join_lobby instruction...");
     
-    const joinLobbyIx = await program.methods
-      .joinLobby(new BN(lobbyAmount), characterB, positionB)
-      .accounts({
-        config: configPda,
-        lobby: lobbyPda,
-        playerB,
-        playerA, // Needed for callback metas
-        oracleQueue: ORACLE_QUEUE,
-        systemProgram: SystemProgram.programId,
-      } as any)
-      .instruction();
+    let joinLobbyIx: TransactionInstruction;
+    try {
+      // Log all accounts before building instruction
+      logger.solana.debug("Instruction accounts:", {
+        config: configPda.toString(),
+        lobby: lobbyPda.toString(),
+        playerB: playerB.toString(),
+        playerA: playerA.toString(),
+        oracleQueue: ORACLE_QUEUE.toString(),
+        systemProgram: SystemProgram.programId.toString(),
+        programIdentity: programIdentity.toString(),
+        vrfProgram: VRF_PROGRAM.toString(),
+        slotHashes: SLOT_HASHES.toString(),
+      });
+      
+      // Use camelCase account names (Anchor TypeScript types use camelCase)
+      // Add the vrf account derived from the force seed
+      joinLobbyIx = await program.methods
+        .joinLobby(new BN(lobbyAmount), characterB, positionB)
+        .accounts({
+          config: configPda,
+          lobby: lobbyPda,
+          playerB: playerB,
+          playerA: playerA,
+          oracleQueue: ORACLE_QUEUE,
+          systemProgram: SystemProgram.programId,
+          programIdentity: programIdentity,
+          vrfProgram: VRF_PROGRAM,
+          slotHashes: SLOT_HASHES,
+          vrf: vrfAccount,
+        } as any)
+        .instruction();
+        
+      const keyDetails = joinLobbyIx.keys.map((k: any, idx: number) => 
+        `[${idx}] ${k.pubkey.toString()} (signer: ${k.isSigner}, writable: ${k.isWritable})`
+      ).join('\n');
+      logger.solana.info(`Join lobby instruction keys:\n${keyDetails}`);
+      
+      // Verify the VRF account is in the instruction
+      const hasVrfAccount = joinLobbyIx.keys.some(k => k.pubkey.equals(vrfAccount));
+      logger.solana.debug("VRF account check", {
+        vrfAccountDerived: vrfAccount.toString(),
+        hasVrfAccountInInstruction: hasVrfAccount,
+      });
+    } catch (ixError) {
+      logger.solana.error("Failed to build instruction:", ixError);
+      throw new Error(`Instruction building failed: ${ixError instanceof Error ? ixError.message : String(ixError)}`);
+    }
 
     // Get the latest blockhash
     const { blockhash } = await connection.getLatestBlockhash("confirmed");
@@ -308,7 +396,41 @@ export async function buildJoinLobbyTransaction(
     }).compileToV0Message();
 
     const transaction = new VersionedTransaction(messageV0);
-    logger.solana.debug("Built join_lobby transaction");
+    
+    logger.solana.debug("Built join_lobby transaction", {
+      messageLength: messageV0.serialize().length,
+      accountKeys: messageV0.staticAccountKeys.length,
+      instructions: messageV0.compiledInstructions.length,
+    });
+    
+    // Try to simulate the transaction to get detailed error information
+    try {
+      logger.solana.debug("Simulating transaction to detect issues...");
+      const simulation = await connection.simulateTransaction(transaction, {
+        replaceRecentBlockhash: true,
+        sigVerify: false,
+      });
+      
+      if (simulation.value.err) {
+        const logsText = simulation.value.logs?.join('\n') || 'No logs';
+        logger.solana.warn("Simulation failed with logs (may still work when signed):", logsText);
+        logger.solana.debug("Simulation error details:", {
+          error: simulation.value.err,
+          logsArray: simulation.value.logs,
+        });
+        // Don't throw - VRF CPIs may not simulate properly
+        logger.solana.info("Proceeding despite simulation error - VRF CPIs may not work in simulation mode");
+      } else {
+        logger.solana.info("Simulation successful", {
+          unitsConsumed: simulation.value.unitsConsumed,
+          logsCount: simulation.value.logs?.length,
+        });
+      }
+    } catch (simError) {
+      logger.solana.debug("Simulation check failed (expected for VRF transactions):", simError);
+      // Continue - VRF transactions may not simulate properly
+    }
+    
     return transaction;
 
   } catch (error) {

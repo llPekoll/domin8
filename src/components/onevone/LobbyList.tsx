@@ -100,12 +100,22 @@ export function LobbyList({
           serializedHex: serialized.slice(0, 32).toString("hex"),
         });
         
-        const signAndSendResult = await wallet.signAndSendAllTransactions([
-          {
-            chain: chainId,
-            transaction: serialized,
-          },
-        ]);
+        let signAndSendResult;
+        try {
+          signAndSendResult = await wallet.signAndSendAllTransactions([
+            {
+              chain: chainId,
+              transaction: serialized,
+            },
+          ]);
+        } catch (privyError: any) {
+          logger.solana.error("Privy wallet error (likely simulation failure):", {
+            message: privyError?.message,
+            code: privyError?.code,
+            fullError: privyError,
+          });
+          throw new Error(`Privy wallet error: ${privyError?.message || String(privyError)}`);
+        }
         
         logger.solana.debug("Sign and send result", {
           resultCount: signAndSendResult?.length,
