@@ -51,25 +51,36 @@ pub fn handler(
     skin_b: u8,
     position_b: [u16; 2],
 ) -> Result<()> {
-    let lobby = &mut ctx.accounts.lobby;
-    
     require!(amount > 0, Domin81v1Error::InvalidBetAmount);
+
+    // Collect all necessary data before taking mutable borrow
+    let lobby_status = ctx.accounts.lobby.status;
+    let lobby_amount = ctx.accounts.lobby.amount;
+    let lobby_player_b = ctx.accounts.lobby.player_b;
+    let lobby_force = ctx.accounts.lobby.force;
+    let lobby_id = ctx.accounts.lobby.lobby_id;
+    let player_b_key = ctx.accounts.player_b.key();
+    let player_a_key = ctx.accounts.player_a.key();
+    let config_key = ctx.accounts.config.key();
+    let treasury_key = ctx.accounts.config.treasury;
+    let system_program_key = ctx.accounts.system_program.key();
+    let oracle_queue_key = ctx.accounts.oracle_queue.key();
 
     // Verify lobby is in CREATED status (waiting for second player)
     require_eq!(
-        lobby.status,
+        lobby_status,
         LOBBY_STATUS_CREATED,
         Domin81v1Error::InvalidLobbyStatus
     );
 
     // Verify amounts match
     require_eq!(
-        amount, lobby.amount,
+        amount, lobby_amount,
         Domin81v1Error::InvalidBetAmount
     );
 
     // Verify Player B hasn't already joined
-    require!(lobby.player_b.is_none(), Domin81v1Error::AlreadyJoined);
+    require!(lobby_player_b.is_none(), Domin81v1Error::AlreadyJoined);
 
     // Check Player B has sufficient balance
     require!(
@@ -80,7 +91,7 @@ pub fn handler(
     // Transfer SOL from Player B to the lobby PDA
     let transfer_instruction = system_program::Transfer {
         from: ctx.accounts.player_b.to_account_info(),
-        to: lobby.to_account_info(),
+        to: ctx.accounts.lobby.to_account_info(),
     };
     let cpi_context = CpiContext::new(
         ctx.accounts.system_program.to_account_info(),
@@ -92,22 +103,22 @@ pub fn handler(
     // The settle_lobby instruction will need these accounts to execute.
     // Order is important! It must match the accounts expected by SettleLobby (excluding the VRF signer).
     let accounts_metas = vec![
-        SerializableAccountMeta { pubkey: ctx.accounts.config.key(), is_signer: false, is_writable: true },
+        SerializableAccountMeta { pubkey: config_key, is_signer: false, is_writable: true },
         SerializableAccountMeta { pubkey: ctx.accounts.lobby.key(), is_signer: false, is_writable: true },
-        SerializableAccountMeta { pubkey: ctx.accounts.player_a.key(), is_signer: false, is_writable: true }, // Player A
-        SerializableAccountMeta { pubkey: ctx.accounts.player_b.key(), is_signer: false, is_writable: true }, // Player B
-        SerializableAccountMeta { pubkey: ctx.accounts.config.treasury, is_signer: false, is_writable: true }, // Treasury (read from config)
-        SerializableAccountMeta { pubkey: ctx.accounts.system_program.key(), is_signer: false, is_writable: false },
+        SerializableAccountMeta { pubkey: player_a_key, is_signer: false, is_writable: true }, // Player A
+        SerializableAccountMeta { pubkey: player_b_key, is_signer: false, is_writable: true }, // Player B
+        SerializableAccountMeta { pubkey: treasury_key, is_signer: false, is_writable: true }, // Treasury (read from config)
+        SerializableAccountMeta { pubkey: system_program_key, is_signer: false, is_writable: false },
     ];
 
     // 4. Request Randomness
     let ix = create_request_randomness_ix(RequestRandomnessParams {
-        payer: ctx.accounts.player_b.key(),
-        oracle_queue: ctx.accounts.oracle_queue.key(),
+        payer: player_b_key,
+        oracle_queue: oracle_queue_key,
         callback_program_id: crate::ID,
         // This discriminator must match the settle_lobby instruction
         callback_discriminator: crate::instruction::SettleLobby::DISCRIMINATOR.to_vec(), 
-        caller_seed: lobby.force, // Reuse the existing unique seed mechanism
+        caller_seed: lobby_force, // Reuse the existing unique seed mechanism
         accounts_metas: Some(accounts_metas),
         ..Default::default()
     });
@@ -116,12 +127,13 @@ pub fn handler(
     ctx.accounts.invoke_signed_vrf(&ctx.accounts.player_b.to_account_info(), &ix)?;
 
     // Update State
-    lobby.player_b = Some(ctx.accounts.player_b.key());
+    let lobby = &mut ctx.accounts.lobby;
+    lobby.player_b = Some(player_b_key);
     lobby.skin_b = Some(skin_b);
     lobby.position_b = Some(position_b);
     lobby.status = LOBBY_STATUS_AWAITING_VRF;
 
-    msg!("Randomness requested for Lobby {}. Waiting for callback...", lobby.lobby_id);
+    msg!("Randomness requested for Lobby {}. Waiting for callback...", lobby_id);
 
     Ok(())
 }
