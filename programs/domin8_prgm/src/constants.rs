@@ -6,6 +6,7 @@ pub const SEED: &str = "anchor";
 // Game status constants
 pub const GAME_STATUS_OPEN: u8 = 0;
 pub const GAME_STATUS_CLOSED: u8 = 1;
+pub const GAME_STATUS_WAITING: u8 = 2;
 
 // Fee constants (basis points)
 pub const MAX_HOUSE_FEE: u64 = 1000; // 10%

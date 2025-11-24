@@ -1,12 +1,8 @@
 use crate::*;
 use anchor_lang::prelude::*;
 use orao_solana_vrf::{
-    cpi::accounts::RequestV2,
-    program::OraoVrf,
-    state::NetworkState,
-    CONFIG_ACCOUNT_SEED,
-    RANDOMNESS_ACCOUNT_SEED,
-    ID as ORAO_VRF_ID,
+    cpi::accounts::RequestV2, program::OraoVrf, state::NetworkState, CONFIG_ACCOUNT_SEED,
+    ID as ORAO_VRF_ID, RANDOMNESS_ACCOUNT_SEED,
 };
 
 #[derive(Accounts)]
@@ -47,7 +43,6 @@ pub struct CreateGameRound<'info> {
     pub user: Signer<'info>,
 
     // ---- VRF accounts ----
-
     /// CHECK: Orao randomness account
     #[account(
         mut,
@@ -92,7 +87,7 @@ pub struct CreateGameRound<'info> {
 pub fn handler(
     ctx: Context<CreateGameRound>,
     round_id: u64,
-    bet_amount: u64,
+    _bet_amount: u64,
     skin: u8,
     position: [u16; 2],
     map: u8,
@@ -101,17 +96,25 @@ pub fn handler(
     let game = &mut ctx.accounts.game;
     let active_game = &mut ctx.accounts.active_game;
     let user = &ctx.accounts.user;
-    let clock = Clock::get()?;
 
     // Check if system is locked
     require!(!config.lock, Domin8Error::GameLocked);
 
     // Validate round_id matches the expected next round
-    require!(round_id == config.game_round, Domin8Error::GameAlreadyExists);
+    require!(
+        round_id == config.game_round,
+        Domin8Error::GameAlreadyExists
+    );
 
     // Validate bet amount meets minimum and maximum requirements
-    require!(bet_amount >= config.min_deposit_amount, Domin8Error::InsufficientBet);
-    require!(bet_amount <= config.max_deposit_amount, Domin8Error::ExcessiveBet);
+    // require!(
+    //     bet_amount >= config.min_deposit_amount,
+    //     Domin8Error::InsufficientBet
+    // );
+    // require!(
+    //     bet_amount <= config.max_deposit_amount,
+    //     Domin8Error::ExcessiveBet
+    // );
 
     // Get force from config for VRF request
     let force = config.force;
@@ -129,8 +132,11 @@ pub fn handler(
     );
     orao_solana_vrf::cpi::request_v2(vrf_cpi, force)?;
 
-    // Check if user has sufficient funds
-    require!(user.lamports() >= bet_amount, Domin8Error::InsufficientFunds);
+    // // Check if user has sufficient funds
+    // require!(
+    //     user.lamports() >= bet_amount,
+    //     Domin8Error::InsufficientFunds
+    // );
 
     // Check if game is already initialized (prevent double initialization)
     if game.game_round != 0 {
@@ -139,97 +145,85 @@ pub fn handler(
 
     // Initialize the game
     game.game_round = round_id;
-    game.start_date = clock.unix_timestamp;
-    game.end_date = clock.unix_timestamp + config.round_time as i64;
-    game.total_deposit = bet_amount;
+    game.start_date = 0;
+    game.end_date = 0;
+    game.total_deposit = 0;
     game.rand = 0; // Will be filled when VRF is ready
     game.map = map; // Set the map/background ID
     game.winner = None;
     game.winner_prize = 0; // Will be set when game ends
     game.winning_bet_index = None; // Will be set when game ends
-    game.user_count = 1;
+    game.user_count = 0;
     game.force = force; // Store as [u8; 32]
-    game.status = GAME_STATUS_OPEN;
+    game.status = GAME_STATUS_WAITING;
     game.wallets = Vec::new();
     game.bets = Vec::new();
 
-    // Reset the active game (this will be called for each new game round)
-    active_game.game_round = round_id;
-    active_game.start_date = clock.unix_timestamp;
-    active_game.end_date = clock.unix_timestamp + config.round_time as i64;
-    active_game.total_deposit = bet_amount;
-    active_game.rand = 0; // Will be filled when VRF is ready
-    active_game.map = map; // Set the map/background ID
-    active_game.winner = None;
-    active_game.winner_prize = 0; // Will be set when game ends
-    active_game.winning_bet_index = None; // Will be set when game ends
-    active_game.user_count = 1;
-    active_game.force = force; // Store as [u8; 32]
-    active_game.status = GAME_STATUS_OPEN;
-    active_game.wallets = Vec::new(); // Initialize empty wallets vector
-    active_game.bets = Vec::new();
-
     // Calculate new space needed for the first bet
-    let current_space = game.to_account_info().data_len();
-    let new_space = current_space + BET_INFO_SIZE + WALLET_SIZE;
+    // let current_space = game.to_account_info().data_len();
+    // let new_space = current_space + BET_INFO_SIZE + WALLET_SIZE;
 
     // Reallocate account to accommodate the first bet
-    game.to_account_info().realloc(new_space, false)?;
+    // game.to_account_info().realloc(new_space, false)?;
 
     // Reallocate active_game to match game size
-    let active_game_current_size = active_game.to_account_info().data_len();
-    if active_game_current_size != new_space {
-        // Calculate rent-exempt minimum for the new size
-        let rent = Rent::get()?;
-        let active_game_rent_exempt = rent.minimum_balance(new_space);
-        let active_game_current_balance = active_game.to_account_info().lamports();
+    // let active_game_current_size = active_game.to_account_info().data_len();
+    // if active_game_current_size != new_space {
+    //     // Calculate rent-exempt minimum for the new size
+    //     let rent = Rent::get()?;
+    //     let active_game_rent_exempt = rent.minimum_balance(new_space);
+    //     let active_game_current_balance = active_game.to_account_info().lamports();
 
-        // Transfer SOL if needed
-        if active_game_current_balance < active_game_rent_exempt {
-            let needed = active_game_rent_exempt - active_game_current_balance;
-            let active_game_transfer = anchor_lang::system_program::Transfer {
-                from: user.to_account_info(),
-                to: active_game.to_account_info(),
-            };
+    //     // Transfer SOL if needed
+    //     if active_game_current_balance < active_game_rent_exempt {
+    //         let needed = active_game_rent_exempt - active_game_current_balance;
+    //         let active_game_transfer = anchor_lang::system_program::Transfer {
+    //             from: user.to_account_info(),
+    //             to: active_game.to_account_info(),
+    //         };
 
-            let active_game_cpi_context = CpiContext::new(
-                ctx.accounts.system_program.to_account_info(),
-                active_game_transfer,
-            );
+    //         let active_game_cpi_context = CpiContext::new(
+    //             ctx.accounts.system_program.to_account_info(),
+    //             active_game_transfer,
+    //         );
 
-            anchor_lang::system_program::transfer(active_game_cpi_context, needed)?;
-            msg!("✓ Transferred {} lamports to active_game for rent", needed);
-        }
+    //         anchor_lang::system_program::transfer(active_game_cpi_context, needed)?;
+    //         msg!("✓ Transferred {} lamports to active_game for rent", needed);
+    //     }
 
-        // Reallocate active_game to match game size
-        active_game.to_account_info().realloc(new_space, false)?;
-        msg!("✓ Reallocated active_game from {} to {} bytes", active_game_current_size, new_space);
-    }
+    //     // Reallocate active_game to match game size
+    //     active_game.to_account_info().realloc(new_space, false)?;
+    //     msg!(
+    //         "✓ Reallocated active_game from {} to {} bytes",
+    //         active_game_current_size,
+    //         new_space
+    //     );
+    // }
 
     // Add the first bet to active_game only (game will be synced in end_game)
     // First, add the user to wallets
-    active_game.wallets.push(user.key());
+    // active_game.wallets.push(user.key());
 
     // Add the first bet with wallet_index 0 (first wallet) INCLUDING skin and position
-    active_game.bets.push(BetInfo {
-        wallet_index: 0,
-        amount: bet_amount,
-        skin,
-        position,
-    });
+    // active_game.bets.push(BetInfo {
+    //     wallet_index: 0,
+    //     amount: bet_amount,
+    //     skin,
+    //     position,
+    // });
 
     // Transfer SOL from user to game PDA
-    let transfer_instruction = anchor_lang::system_program::Transfer {
-        from: user.to_account_info(),
-        to: game.to_account_info(),
-    };
+    // let transfer_instruction = anchor_lang::system_program::Transfer {
+    //     from: user.to_account_info(),
+    //     to: game.to_account_info(),
+    // };
 
-    let cpi_context = CpiContext::new(
-        ctx.accounts.system_program.to_account_info(),
-        transfer_instruction,
-    );
+    // let cpi_context = CpiContext::new(
+    //     ctx.accounts.system_program.to_account_info(),
+    //     transfer_instruction,
+    // );
 
-    anchor_lang::system_program::transfer(cpi_context, bet_amount)?;
+    // anchor_lang::system_program::transfer(cpi_context, bet_amount)?;
 
     // Increment the game round counter for next game
     config.game_round += 1;
@@ -238,14 +232,32 @@ pub fn handler(
     config.lock = true;
 
     msg!("Game round {} created by user: {}", round_id, user.key());
-    msg!("Initial bet: {} lamports", bet_amount);
+    // msg!("Initial bet: {} lamports", bet_amount);
     msg!("Character skin: {}", skin);
     msg!("Map ID: {}", map);
     msg!("Spawn position: [{}, {}]", position[0], position[1]);
-    msg!("Game ends at: {}", game.end_date);
+    // msg!("Game ends at: {}", game.end_date);
     msg!("VRF force (hex): {}", Utils::bytes_to_hex(&force));
     msg!("Total bets: {}", game.bets.len());
-    msg!("Account space: {} bytes", new_space);
-
+    // msg!("Account space: {} bytes", new_space);
+    emit!(GameCreated {
+        round_id,
+        creator: user.key(),
+        initial_bet: 0, // No initial bet
+        start_time: game.start_date,
+        end_time: game.end_date,
+        vrf_force: Utils::bytes_to_hex(&force), // Convert to hex string for readability
+        vrf_force_bytes: force,
+    });
     Ok(())
+}
+#[event]
+pub struct GameCreated {
+    pub round_id: u64,
+    pub creator: Pubkey,
+    pub initial_bet: u64,
+    pub start_time: i64,
+    pub end_time: i64,
+    pub vrf_force: String,         // Hex string for readability
+    pub vrf_force_bytes: [u8; 32], // Actual bytes used
 }
