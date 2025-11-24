@@ -311,24 +311,48 @@ export type Domin81v1Prgm = {
           "signer": true
         },
         {
-          "name": "vrf",
-          "address": "VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y"
-        },
-        {
-          "name": "configAccount",
+          "name": "playerA",
+          "docs": [
+            "because the callback (settle_lobby) needs to pay them if they win."
+          ],
           "writable": true
         },
         {
-          "name": "treasury",
-          "writable": true
-        },
-        {
-          "name": "randomnessAccount",
-          "writable": true
+          "name": "oracleQueue",
+          "writable": true,
+          "address": "Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh"
         },
         {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "programIdentity",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vrfProgram",
+          "address": "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz"
+        },
+        {
+          "name": "slotHashes",
+          "address": "SysvarS1otHashes111111111111111111111111111"
         }
       ],
       "args": [
@@ -368,34 +392,13 @@ export type Domin81v1Prgm = {
       ],
       "accounts": [
         {
+          "name": "vrfProgramIdentity",
+          "signer": true,
+          "address": "9irBy75QS2BN81FUgXuHcjqceJJRuc9oDkAe8TKVvvAw"
+        },
+        {
           "name": "config",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  100,
-                  111,
-                  109,
-                  105,
-                  110,
-                  56,
-                  95,
-                  49,
-                  118,
-                  49,
-                  95,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "lobby",
@@ -432,12 +435,6 @@ export type Domin81v1Prgm = {
           }
         },
         {
-          "name": "randomnessAccount",
-          "docs": [
-            "We verify the seed matches the lobby's force seed manually in handler"
-          ]
-        },
-        {
           "name": "playerA",
           "writable": true
         },
@@ -450,12 +447,21 @@ export type Domin81v1Prgm = {
           "writable": true
         },
         {
-          "name": "signer",
-          "writable": true,
-          "signer": true
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "randomness",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -483,19 +489,6 @@ export type Domin81v1Prgm = {
         94,
         51,
         199
-      ]
-    },
-    {
-      "name": "networkState",
-      "discriminator": [
-        212,
-        237,
-        148,
-        56,
-        97,
-        245,
-        51,
-        169
       ]
     }
   ],
@@ -532,53 +525,28 @@ export type Domin81v1Prgm = {
     },
     {
       "code": 6006,
-      "name": "randomnessNotResolved",
-      "msg": "VRF randomness not yet resolved"
-    },
-    {
-      "code": 6007,
-      "name": "randomnessAlreadyRevealed",
-      "msg": "VRF randomness already revealed for this slot"
-    },
-    {
-      "code": 6008,
       "name": "invalidBetAmount",
       "msg": "Invalid bet amount"
     },
     {
-      "code": 6009,
+      "code": 6007,
       "name": "invalidHouseFee",
       "msg": "House fee configuration error"
     },
     {
-      "code": 6010,
+      "code": 6008,
       "name": "winnerDeterminationError",
       "msg": "Unable to determine winner from randomness"
     },
     {
-      "code": 6011,
+      "code": 6009,
       "name": "distributionError",
       "msg": "Fund distribution failed"
     },
     {
-      "code": 6012,
-      "name": "invalidRandomnessAccountOwner",
-      "msg": "Randomness account is not owned by VRF program"
-    },
-    {
-      "code": 6013,
-      "name": "randomnessAccountParseError",
-      "msg": "Failed to parse VRF randomness account data"
-    },
-    {
-      "code": 6014,
+      "code": 6010,
       "name": "randomnessConversionError",
       "msg": "Randomness value conversion to winner failed"
-    },
-    {
-      "code": 6015,
-      "name": "invalidRandomnessSeed",
-      "msg": "Randomness seed does not match lobby force seed"
     }
   ],
   "types": [
@@ -691,94 +659,6 @@ export type Domin81v1Prgm = {
           {
             "name": "map",
             "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "networkConfiguration",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authority",
-            "type": "pubkey"
-          },
-          {
-            "name": "treasury",
-            "type": "pubkey"
-          },
-          {
-            "name": "requestFee",
-            "type": "u64"
-          },
-          {
-            "name": "fulfillmentAuthorities",
-            "type": {
-              "vec": "pubkey"
-            }
-          },
-          {
-            "name": "tokenFeeConfig",
-            "type": {
-              "option": {
-                "defined": {
-                  "name": "oraoTokenFeeConfig"
-                }
-              }
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "networkState",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "config",
-            "type": {
-              "defined": {
-                "name": "networkConfiguration"
-              }
-            }
-          },
-          {
-            "name": "numReceived",
-            "docs": [
-              "Total number of received requests."
-            ],
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "oraoTokenFeeConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "mint",
-            "docs": [
-              "ORAO token mint address."
-            ],
-            "type": "pubkey"
-          },
-          {
-            "name": "treasury",
-            "docs": [
-              "ORAO token treasury account."
-            ],
-            "type": "pubkey"
-          },
-          {
-            "name": "fee",
-            "docs": [
-              "Fee in ORAO SPL token smallest units."
-            ],
-            "type": "u64"
           }
         ]
       }
