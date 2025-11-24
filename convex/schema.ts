@@ -129,16 +129,13 @@ export default defineSchema({
 
     // Game state
     amount: v.number(), // Bet amount per player (in lamports)
-    status: v.number(), // 0 = created (waiting), 1 = resolved, 2 = awaiting vrf
+    status: v.number(), // 0 = created (waiting), 1 = awaiting vrf, 2 = resolved
     winner: v.optional(v.string()), // Winner's wallet address (base58, None until resolved)
 
     // Character & Map selection
     characterA: v.number(), // Player A's character/skin ID (0-255)
     characterB: v.optional(v.number()), // Player B's character/skin ID (0-255, None until joined)
     mapId: v.number(), // Map/background ID (0-255)
-
-    // ORAO VRF
-    forceSeed: v.optional(v.string()), // Hex string of the force seed used for ORAO request
 
     // Positioning (optional, for future expansion)
     positionA: v.optional(v.array(v.number())), // [x, y] spawn position for Player A

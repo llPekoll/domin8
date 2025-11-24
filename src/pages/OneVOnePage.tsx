@@ -108,19 +108,12 @@ export function OneVOnePage() {
 
       const connection = getSharedConnection();
       
-      // Generate a random 32-byte seed for ORAO VRF
-      const forceKeypair = Keypair.generate();
-      const forceSeed = forceKeypair.publicKey.toBase58();
-
-      logger.solana.debug("Generated force seed for Double Down", { forceSeed });
-
       // Build create_lobby transaction
       const transaction = await buildCreateLobbyTransaction(
         publicKey,
         amount, // Amount is already in lamports
         selectedCharacter.id,
         0, // Default map ID
-        forceSeed,
         connection
       );
 
@@ -163,7 +156,6 @@ export function OneVOnePage() {
         characterA: selectedCharacter.id,
         mapId: 0,
         transactionHash: signature,
-        forceSeed: forceSeed,
       });
 
       if (result.success) {

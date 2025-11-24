@@ -168,7 +168,6 @@ export const createLobbyInDb = mutation({
     amount: v.number(),
     characterA: v.number(),
     mapId: v.number(),
-    forceSeed: v.string(),
   },
   handler: async (ctx, args) => {
     const docId = await ctx.db.insert("oneVOneLobbies", {
@@ -182,7 +181,6 @@ export const createLobbyInDb = mutation({
       characterA: args.characterA,
       characterB: undefined,
       mapId: args.mapId,
-      forceSeed: args.forceSeed,
       createdAt: Date.now(),
       resolvedAt: undefined,
     });
@@ -220,34 +218,7 @@ export const joinLobbyInDb = mutation({
   },
 });
 
-/**
- * Public mutation wrapper for settling lobbies
- * Used by the settleLobby action
- */
-export const settleLobbyInDb = mutation({
-  args: {
-    lobbyId: v.number(),
-    winner: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const lobby = await ctx.db
-      .query("oneVOneLobbies")
-      .filter((q) => q.eq(q.field("lobbyId"), args.lobbyId))
-      .first();
 
-    if (!lobby) {
-      throw new Error(`Lobby ${args.lobbyId} not found`);
-    }
-
-    await ctx.db.patch(lobby._id, {
-      winner: args.winner,
-      status: 2, // Status 2 = Resolved
-      resolvedAt: Date.now(),
-    });
-
-    return lobby._id;
-  },
-});
 
 /**
  * Public mutation wrapper for canceling lobbies
@@ -284,7 +255,6 @@ export const _internalCreateLobby = internalMutation({
     amount: v.number(),
     characterA: v.number(),
     mapId: v.number(),
-    forceSeed: v.string(),
   },
   handler: async (ctx, args) => {
     const docId = await ctx.db.insert("oneVOneLobbies", {
@@ -298,7 +268,6 @@ export const _internalCreateLobby = internalMutation({
       characterA: args.characterA,
       characterB: undefined,
       mapId: args.mapId,
-      forceSeed: args.forceSeed,
       createdAt: Date.now(),
       resolvedAt: undefined,
     });
@@ -366,7 +335,7 @@ export const _internalSettleLobby = internalMutation({
 
     await ctx.db.patch(lobby._id, {
       winner: args.winner,
-      status: 1, // Resolved
+      status: 2, // Resolved
       resolvedAt: Date.now(),
     });
 
@@ -446,7 +415,6 @@ export const createLobby = action({
     amount: v.number(), // Bet amount in lamports
     characterA: v.number(), // Character/skin ID (0-255)
     mapId: v.number(), // Map ID (0-255)
-    forceSeed: v.string(), // ORAO force seed (hex string)
     transactionHash: v.string(), // Solana transaction hash (for verification)
   },
   handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; lobbyPda: string; action: string }> => {
@@ -485,7 +453,6 @@ export const createLobby = action({
         amount: args.amount,
         characterA: args.characterA,
         mapId: args.mapId,
-        forceSeed: args.forceSeed,
       });
 
       return {
@@ -557,70 +524,7 @@ export const joinLobby = action({
   },
 });
 
-/**
- * Settle a lobby (Resolve winner)
- * Frontend flow:
- * 1. User signs transaction to settle (or crank does it)
- * 2. Frontend calls this action
- * 3. Action confirms and updates Convex
- */
-export const settleLobby = action({
-  args: {
-    lobbyId: v.number(),
-    transactionHash: v.string(),
-  },
-  handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; winner: string; action: string }> => {
-    try {
-      const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
 
-      // Verify transaction
-      const connection = queryClient.getConnection();
-      const tx = await connection.getTransaction(args.transactionHash, {
-        maxSupportedTransactionVersion: 0,
-      });
-
-      if (!tx) {
-        throw new Error("Transaction not found on blockchain");
-      }
-
-      // Extract winner from program logs
-      // The Rust instruction logs: "Lobby {id} settled. Winner: {pubkey}"
-      let winner: string | null = null;
-      
-      if (tx.meta?.logMessages) {
-        for (const log of tx.meta.logMessages) {
-          // Match log format: "Program log: Lobby 16 settled. Winner: 5X5wJL7HhNzY2KP1eUhEBmVqAvi4Mk16o713Kb4HQ33Q"
-          const match = log.match(/Lobby \d+ settled\. Winner: ([1-9A-HJ-NP-Z]{43,44})/);
-          if (match) {
-            winner = match[1];
-            break;
-          }
-        }
-      }
-
-      if (!winner) {
-        throw new Error("Could not extract winner from transaction logs");
-      }
-
-      // Update Convex
-      await ctx.runMutation(internal.lobbies._internalSettleLobby, {
-        lobbyId: args.lobbyId,
-        winner,
-      });
-
-      return {
-        success: true,
-        lobbyId: args.lobbyId,
-        winner,
-        action: "settle",
-      };
-    } catch (error) {
-      throw new Error(
-        `Failed to settle lobby: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  },
-});
 
 /**
  * Cancel a lobby (Player A refunds)
@@ -860,7 +764,6 @@ const _syncMissingLobby = async (
     const characterA = onChainLobby.skinA;
     const mapId = onChainLobby.map;
     const lobbyPda = onChainLobby.publicKey?.toString() || `lobby_${lobbyId}`;
-    const forceSeed = onChainLobby.forceSeed || "";
 
     // Validate required fields
     if (!playerA) {
@@ -883,7 +786,6 @@ const _syncMissingLobby = async (
       amount,
       characterA,
       mapId,
-      forceSeed,
     });
 
     console.log(`[1v1 Sync] Successfully created missing lobby ${lobbyId}`);
@@ -1106,34 +1008,14 @@ export const _checkAndSettleLobby = internalAction({
         };
       }
 
-      // Still pending on-chain (status 1) - call settle_lobby instruction directly
+      // Still pending on-chain (status 1) - wait for MagicBlock callback
       if (onChainLobby.status === 1) {
-        console.log(`[1v1 Scheduler] Lobby ${args.lobbyId} at status 1 (AWAITING_VRF). Calling settle_lobby...`);
+        console.log(`[1v1 Scheduler] Lobby ${args.lobbyId} at status 1 (AWAITING_VRF). Waiting for MagicBlock callback...`);
         
-        try {
-          // Use signing client to call settle_lobby instruction
-          const crankClient = new Solana1v1Client(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
-          
-          const txSignature = await crankClient.settleLobby(args.lobbyId, onChainLobby.force);
-          console.log(`[1v1 Scheduler] settle_lobby tx: ${txSignature}`);
-          
-          // Wait for confirmation
-          const confirmed = await crankClient.confirmTransaction(txSignature);
-          if (confirmed) {
-            console.log(`[1v1 Scheduler] ✅ settle_lobby confirmed for lobby ${args.lobbyId}`);
-            
-            // Schedule a follow-up check to sync the winner
-            await ctx.scheduler.runAfter(2000, internal.lobbies._checkAndSettleLobby, {
-              lobbyId: args.lobbyId,
-            });
-          } else {
-            console.warn(`[1v1 Scheduler] ⚠️ settle_lobby confirmation failed for lobby ${args.lobbyId}`);
-          }
-        } catch (crankError) {
-          console.error(
-            `[1v1 Scheduler] Error calling settle_lobby: ${crankError instanceof Error ? crankError.message : String(crankError)}`
-          );
-        }
+        // Schedule a follow-up check
+        await ctx.scheduler.runAfter(5000, internal.lobbies._checkAndSettleLobby, {
+          lobbyId: args.lobbyId,
+        });
       }
 
       return {
@@ -1218,8 +1100,8 @@ export const settlePendingLobbies = internalAction({
             }
           }
 
-          // If still at status 1, we need an external service to call settle_lobby instruction
-          console.log(`[1v1 Crank] ALERT: Lobby ${lobby.lobbyId} is still at status 1 on-chain. External crank needed to call settle_lobby instruction.`);
+          // If still at status 1, we wait for MagicBlock callback
+          console.log(`[1v1 Crank] Lobby ${lobby.lobbyId} is still at status 1 on-chain. Waiting for MagicBlock callback.`);
           
         } catch (error) {
           errors++;

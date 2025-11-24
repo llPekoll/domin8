@@ -19,7 +19,6 @@ interface LobbyData {
   characterA: number;
   characterB?: number;
   mapId: number;
-  forceSeed?: string; // ORAO force seed
 }
 
 interface LobbyListProps {
@@ -68,12 +67,7 @@ export function LobbyList({
           lobbyId: lobby.lobbyId,
           playerB: currentPlayerWallet,
           character: selectedCharacter.id,
-          forceSeed: lobby.forceSeed,
         });
-
-        if (!lobby.forceSeed) {
-            throw new Error("Lobby missing force seed");
-        }
 
         const lobbyPda = new PublicKey(lobby.lobbyPda);
         const transaction = await buildJoinLobbyTransaction(
@@ -81,7 +75,6 @@ export function LobbyList({
           lobby.lobbyId,
           selectedCharacter.id,
           lobbyPda,
-          lobby.forceSeed,
           connection
         );
 
@@ -245,7 +238,7 @@ export function LobbyList({
             {/* Status Info */}
             <div className="flex gap-2 text-xs text-gray-400">
               <span className="px-2 py-1 bg-gray-700 rounded">
-                Status: {lobby.status === 0 ? "Waiting" : lobby.status === 2 ? "Awaiting VRF" : "Resolved"}
+                Status: {lobby.status === 0 ? "Waiting" : lobby.status === 1 ? "Awaiting VRF" : "Resolved"}
               </span>
             </div>
           </div>

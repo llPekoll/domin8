@@ -215,19 +215,12 @@ export function CreateLobby({
         character: selectedCharacter.id,
       });
 
-      // Generate a random 32-byte seed for ORAO VRF
-      const forceKeypair = Keypair.generate();
-      const forceSeed = forceKeypair.publicKey.toBase58(); // Use public key as a convenient 32-byte seed source
-
-      logger.solana.debug("Generated force seed for ORAO VRF", { forceSeed });
-
       // Build create_lobby transaction
       const transaction = await buildCreateLobbyTransaction(
         publicKey,
         betAmountLamports,
         selectedCharacter.id,
         0, // Default map ID
-        forceSeed,
         connection
       );
 
@@ -274,7 +267,6 @@ export function CreateLobby({
         characterA: selectedCharacter.id,
         mapId: 0,
         transactionHash: signature,
-        forceSeed: forceSeed,
       });
 
       if (result.success) {
