@@ -29,6 +29,7 @@ export default defineSchema({
     betAmounts: v.optional(v.array(v.number())), // Array of bet amounts
     betSkin: v.optional(v.array(v.number())), // Array of skin IDs (u8) - character customization
     betPosition: v.optional(v.array(v.array(v.number()))), // Array of [x, y] positions (u16)
+    wallets: v.optional(v.array(v.string())), // Array of unique wallet addresses (base58)
     totalPot: v.optional(v.number()), // Total accumulated pot in lamports
     winner: v.optional(v.union(v.string(), v.null())), // Winner wallet (base58), null if not determined
     winningBetIndex: v.optional(v.number()), // Index of winning bet
@@ -38,6 +39,7 @@ export default defineSchema({
     .index("by_round_and_status", ["roundId", "status"]) // Prevent duplicate states (PRIMARY)
     .index("by_round_id", ["roundId"]) // Query all states for a round
     .index("by_status", ["status"]) // Query rounds by status
+    .index("by_status_and_round", ["status", "roundId"]) // Query by status, ordered by roundId
     .index("by_captured_at", ["capturedAt"]), // Chronological ordering
 
   // ============================================================================
@@ -107,7 +109,73 @@ export default defineSchema({
     lastActive: v.number(),
     totalGamesPlayed: v.number(),
     totalWins: v.number(),
+    totalPoints: v.optional(v.number()), // Points earned from bets and prizes (1 point per 0.001 SOL)
     achievements: v.array(v.string()),
+  }).index("by_wallet", ["walletAddress"]),
+
+  // ============================================================================
+  // REFERRAL SYSTEM TABLES
+  // ============================================================================
+
+  /**
+   * Referrals - Individual referral relationships
+   * Tracks which users were referred by whom
+   */
+  referrals: defineTable({
+    referrerId: v.string(), // Wallet address of the person who referred
+    referredUserId: v.string(), // Wallet address of the person who signed up
+    referralCode: v.string(), // The referral code used
+    signupDate: v.number(), // Unix timestamp when they signed up
+    totalBetVolume: v.number(), // Total SOL (in lamports) bet by this referred user
+    status: v.string(), // "active" | "inactive"
+  })
+    .index("by_referrer", ["referrerId"]) // Query all users referred by someone
+    .index("by_referred_user", ["referredUserId"]) // Check if user was referred
+    .index("by_referral_code", ["referralCode"]), // Look up by code during signup
+
+  /**
+   * Referral Stats - Aggregated statistics per referrer
+   * Used for leaderboards and personal dashboards
+   * Rank is calculated on-demand, not stored
+   */
+  referralStats: defineTable({
+    walletAddress: v.string(), // Referrer's wallet address
+    referralCode: v.string(), // Their unique referral code
+    totalReferred: v.number(), // Count of users they've referred
+    totalRevenue: v.number(), // Sum of all referred users' bet volume (in lamports)
+    accumulatedRewards: v.number(), // 1.5% of totalRevenue - rewards earned (in lamports)
+    createdAt: v.number(), // When they created their referral link
+  }).index("by_wallet", ["walletAddress"])
+    .index("by_code", ["referralCode"])
+    .index("by_revenue", ["totalRevenue"]), // For leaderboard sorting
+
+  // ============================================================================
+  // NFT COLLECTION HOLDER CACHE TABLES
+  // ============================================================================
+
+  /**
+   * NFT Collection Holders - Cached list of wallet addresses that own NFTs from specific collections
+   * Updated every 12 hours via cron job + manual refresh (rate-limited)
+   */
+  nftCollectionHolders: defineTable({
+    collectionAddress: v.string(), // Collection address (base58)
+    walletAddress: v.string(), // Holder wallet address (base58)
+    nftCount: v.number(), // Number of NFTs owned from this collection
+    lastVerified: v.number(), // Unix timestamp when this holder was last verified
+    addedBy: v.string(), // "cron" | "manual" - how this entry was created
+  })
+    .index("by_collection", ["collectionAddress"]) // Query all holders of a collection
+    .index("by_collection_and_wallet", ["collectionAddress", "walletAddress"]) // Check specific holder
+    .index("by_wallet", ["walletAddress"]), // Query all collections owned by wallet
+
+  /**
+   * NFT Refresh Rate Limits - Prevent abuse of manual refresh functionality
+   * Users can refresh their NFT status once every 5 minutes
+   */
+  nftRefreshLimits: defineTable({
+    walletAddress: v.string(), // User's wallet address
+    lastRefreshAt: v.number(), // Unix timestamp of last refresh
+    refreshCount: v.number(), // Total refreshes (for analytics)
   }).index("by_wallet", ["walletAddress"]),
 
   // ============================================================================

@@ -1,25 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { EventBus } from "../../game/EventBus";
 import type { Character } from "../../types/character";
-import { usePrivyWallet } from "../../hooks/usePrivyWallet";
-import { useAction } from "convex/react";
-import { api } from "../../../convex/_generated/api";
-import { toast } from "sonner";
-import { logger } from "../../lib/logger";
-
-interface LobbyData {
-  _id: string;
-  lobbyId: number;
-  lobbyPda: string;
-  playerA: string;
-  playerB?: string;
-  amount: number;
-  status: 0 | 1 | 2;
-  winner?: string;
-  characterA: number;
-  characterB?: number;
-  mapId: number;
-}
+import type { LobbyData } from "../../types/lobby";
 
 interface OneVOneFightSceneProps {
   lobby: LobbyData;

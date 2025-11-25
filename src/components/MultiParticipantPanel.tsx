@@ -17,23 +17,38 @@ export function MultiParticipantPanel() {
     return activeGame.totalDeposit.toNumber();
   }, [activeGame]);
 
-  // Transform blockchain bet data into participant format
+  // Transform blockchain bet data into participant format, aggregated per user
   const participants = useMemo(() => {
     if (!activeGame?.bets || !activeGame?.wallets) return [];
-    
+
     // Get host wallet (first wallet in the array)
     const hostWallet = activeGame.wallets[0]?.toString();
 
-    return activeGame.bets.map((bet, index) => {
+    // Aggregate bets by wallet address
+    const aggregatedBets = new Map<string, { totalAmount: number; betCount: number }>();
+
+    activeGame.bets.forEach((bet) => {
       const wallet = activeGame.wallets[bet.walletIndex];
       const walletStr = wallet?.toString() || "";
       const amount = bet.amount.toNumber();
-      const winChance = totalPot > 0 ? (amount / totalPot) * 100 : 0;
+
+      const existing = aggregatedBets.get(walletStr);
+      if (existing) {
+        existing.totalAmount += amount;
+        existing.betCount += 1;
+      } else {
+        aggregatedBets.set(walletStr, { totalAmount: amount, betCount: 1 });
+      }
+    });
+
+    // Convert to array and calculate win chances
+    return Array.from(aggregatedBets.entries()).map(([walletStr, data], index) => {
+      const winChance = totalPot > 0 ? (data.totalAmount / totalPot) * 100 : 0;
 
       // Find player name from playerNames context
       const playerData = playerNames?.find((p: any) => p.walletAddress === walletStr);
       const displayName = playerData?.displayName || `${walletStr.slice(0, 4)}...${walletStr.slice(-4)}`;
-      
+
       // Check if this participant is the host
       const isHost = walletStr === hostWallet;
 
@@ -41,12 +56,13 @@ export function MultiParticipantPanel() {
         id: index,
         walletAddress: walletStr,
         displayName,
-        amount,
+        amount: data.totalAmount,
+        betCount: data.betCount,
         winChance,
         isOwn: walletStr === walletAddress,
-        isHost, // Add host flag
+        isHost,
       };
-    });
+    }).sort((a, b) => b.amount - a.amount); // Sort by total bet amount descending
   }, [activeGame, totalPot, playerNames, walletAddress]);
 
   // Don't show panel if no game or loading
@@ -120,6 +136,11 @@ export function MultiParticipantPanel() {
                 </div>
                 <div className="text-amber-400 text-xs">
                   {(participant.amount / LAMPORTS_PER_SOL).toFixed(3)} SOL
+                  {participant.betCount > 1 && (
+                    <span className="text-amber-500/70 ml-1">
+                      ({participant.betCount} bets)
+                    </span>
+                  )}
                 </div>
               </div>
 

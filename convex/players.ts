@@ -1,5 +1,5 @@
-import { mutation, query, action, internalQuery } from "./_generated/server";
-import { internal, api } from "./_generated/api";
+import { mutation, query, action, internalQuery, internalMutation } from "./_generated/server";
+import { api } from "./_generated/api";
 import { v } from "convex/values";
 
 export const getPlayer = query({
@@ -47,7 +47,7 @@ export const getPlayersByWallets = query({
           .query("players")
           .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
           .first();
-        
+
         return {
           walletAddress,
           displayName: player?.displayName || null,
@@ -77,23 +77,21 @@ export const getPlayerWithCharacter = query({
       .withIndex("by_active", (q) => q.eq("isActive", true))
       .collect();
 
-    const character = characters.length > 0
-      ? characters[Math.floor(Math.random() * characters.length)]
-      : null;
+    const character =
+      characters.length > 0 ? characters[Math.floor(Math.random() * characters.length)] : null;
 
     return {
       ...player,
-      character
+      character,
     };
   },
 });
-
 
 export const createPlayer = mutation({
   args: {
     walletAddress: v.string(),
     displayName: v.optional(v.string()),
-    externalWalletAddress: v.optional(v.string())
+    externalWalletAddress: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existingPlayer = await ctx.db
@@ -112,6 +110,7 @@ export const createPlayer = mutation({
       lastActive: Date.now(),
       totalGamesPlayed: 0,
       totalWins: 0,
+      totalPoints: 0,
       achievements: [],
     });
 
@@ -142,7 +141,7 @@ export const updateLastActive = mutation({
 export const updateDisplayName = mutation({
   args: {
     walletAddress: v.string(),
-    displayName: v.string()
+    displayName: v.string(),
   },
   handler: async (ctx, args) => {
     const player = await ctx.db
@@ -171,7 +170,6 @@ export const updateDisplayName = mutation({
     return trimmedName;
   },
 });
-
 
 // Update player statistics after game
 export const updatePlayerStats = mutation({
@@ -222,7 +220,7 @@ export const addAchievement = mutation({
 
 /**
  * Get Character Requirements
- * 
+ *
  * Returns information about a character's requirements (e.g., NFT ownership).
  * Used by frontend to determine if character needs special verification.
  */
@@ -232,11 +230,11 @@ export const getCharacterRequirements = query({
   },
   handler: async (ctx, args) => {
     const character = await ctx.db.get(args.characterId);
-    
+
     if (!character) {
       return null;
     }
-    
+
     return {
       characterId: character._id,
       characterName: character.name,
@@ -271,20 +269,22 @@ export const verifyAndPlaceBet = action({
       throw new Error("Character not found");
     }
 
-    // If character requires an NFT, verify ownership via internal action
+    // If character requires an NFT, verify ownership via cached data
     if (characterRequirements.requiresNFT && characterRequirements.nftCollection) {
       if (!args.externalWalletAddress) {
         throw new Error("External wallet required for NFT characters");
       }
 
-      // Run the internal verification action from an Action context
-      const hasNFT = await ctx.runAction(internal.nft.verifyNFTOwnershipInternal, {
+      // Check cached NFT ownership (instant verification!)
+      const ownership = await ctx.runQuery(api.nftHolderScanner.checkCachedOwnership, {
         walletAddress: args.externalWalletAddress,
         collectionAddress: characterRequirements.nftCollection,
       });
 
-      if (!hasNFT) {
-        throw new Error(`You don't own the required NFT for ${characterRequirements.characterName}`);
+      if (!ownership.hasNFT) {
+        throw new Error(
+          `You don't own the required NFT for ${characterRequirements.characterName}. Try using the refresh button if you just bought this NFT.`
+        );
       }
     }
 
@@ -292,5 +292,165 @@ export const verifyAndPlaceBet = action({
     // work here (e.g., logging, running mutations) if desired. We return
     // success so the client can proceed to submit the on-chain transaction.
     return { ok: true };
+  },
+});
+
+/**
+ * Award points to a player (internal - called from backend)
+ *
+ * Awards points based on SOL amount (1 point per 0.001 SOL).
+ * Used for prize distribution from gameScheduler.
+ * Creates player record if it doesn't exist.
+ *
+ * @param walletAddress - Player's wallet address
+ * @param amountLamports - Amount in lamports to convert to points
+ */
+const awardPointsHandler = async (
+  ctx: any,
+  args: { walletAddress: string; amountLamports: number }
+) => {
+  // Calculate points: 1 point per 0.001 SOL
+  // 0.001 SOL = 1_000_000 lamports
+
+  // Ensure amountLamports is a valid number
+  const amount = Number(args.amountLamports);
+  if (isNaN(amount)) {
+    console.error("[awardPoints] Invalid amountLamports:", args.amountLamports);
+    return;
+  }
+
+  const points = Math.floor(amount / 1_000_000);
+
+  if (points <= 0) {
+    // No points to award
+    return;
+  }
+
+  // Find player
+  const player = await ctx.db
+    .query("players")
+    .withIndex("by_wallet", (q: any) => q.eq("walletAddress", args.walletAddress))
+    .first();
+
+  if (player) {
+    // Update existing player (handle case where totalPoints might be undefined for old players)
+    const currentPoints = Number(player.totalPoints) || 0;
+    await ctx.db.patch(player._id, {
+      totalPoints: currentPoints + points,
+      lastActive: Date.now(),
+    });
+  } else {
+    // Create new player with points
+    await ctx.db.insert("players", {
+      walletAddress: args.walletAddress,
+      displayName: undefined,
+      externalWalletAddress: undefined,
+      lastActive: Date.now(),
+      totalGamesPlayed: 0,
+      totalWins: 0,
+      totalPoints: points,
+      achievements: [],
+    });
+  }
+};
+
+/**
+ * Award points to a player (public mutation - called from frontend)
+ */
+export const awardPoints = mutation({
+  args: {
+    walletAddress: v.string(),
+    amountLamports: v.number(),
+  },
+  handler: awardPointsHandler,
+});
+
+/**
+ * Award points to a player (internal mutation - called from backend actions)
+ */
+export const awardPointsInternal = internalMutation({
+  args: {
+    walletAddress: v.string(),
+    amountLamports: v.number(),
+  },
+  handler: awardPointsHandler,
+});
+
+/**
+ * Get player statistics from game history
+ * Calculates total wins and total winnings by querying finished games
+ *
+ * @param walletAddress - Player's wallet address
+ * @returns Player stats including total wins, total winnings in SOL, and games played
+ */
+export const getPlayerStatsFromHistory = query({
+  args: {
+    walletAddress: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Get all finished games where this player was the winner
+    const finishedGames = await ctx.db
+      .query("gameRoundStates")
+      .withIndex("by_status", (q) => q.eq("status", "finished"))
+      .collect();
+
+    // Filter games where this player won and calculate total winnings
+    let totalWins = 0;
+    let totalWinningsLamports = 0;
+
+    for (const game of finishedGames) {
+      if (game.winner === args.walletAddress) {
+        totalWins++;
+        // Prize is 95% of total pot
+        if (game.totalPot) {
+          const prizeAmount = game.totalPot * 0.95;
+          totalWinningsLamports += prizeAmount;
+        }
+      }
+    }
+
+    // Convert to SOL (1 SOL = 1,000,000,000 lamports)
+    const totalWinningsSOL = totalWinningsLamports / 1_000_000_000;
+
+    return {
+      walletAddress: args.walletAddress,
+      totalWins,
+      totalWinningsSOL,
+      totalWinningsLamports,
+    };
+  },
+});
+
+/**
+ * Get leaderboard (top players by points)
+ *
+ * @param limit - Number of top players to return (default: 100)
+ * @returns Array of players sorted by totalPoints (descending)
+ */
+export const getLeaderboard = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 100;
+
+    // Get all players with points
+    const allPlayers = await ctx.db.query("players").collect();
+
+    // Filter and sort by totalPoints (descending)
+    const topPlayers = allPlayers
+      .filter((player) => (player.totalPoints ?? 0) > 0)
+      .sort((a, b) => (b.totalPoints ?? 0) - (a.totalPoints ?? 0))
+      .slice(0, limit);
+
+    // Return with rank
+    return topPlayers.map((player, index) => ({
+      rank: index + 1,
+      walletAddress: player.walletAddress,
+      displayName: player.displayName || `Player ${player.walletAddress.slice(0, 6)}`,
+      totalPoints: player.totalPoints ?? 0,
+      totalWins: player.totalWins,
+      totalGamesPlayed: player.totalGamesPlayed,
+    }));
   },
 });

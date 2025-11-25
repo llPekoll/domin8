@@ -50,9 +50,19 @@ crons.interval(
 // TODO LATER: priority low
 
 /**
- * Game cleanup - removes old completed games
+ * Game cleanup - removes old game accounts (2+ days old)
+ * Runs every 2 days to delete old PDAs and recover rent
+ *
+ * Benefits:
+ * - Recovers rent from closed game accounts (~0.01-0.05 SOL per game)
+ * - Keeps blockchain storage clean
+ * - Net profit: Rent recovered > transaction fees
  */
-// TODO LATER: priority low
+crons.interval(
+  "cleanup-old-games",
+  { hours: 48 }, // Every 2 days
+  internal.cleanupService.cleanupOldGames
+);
 
 /**
  * Scheduled jobs cleanup - removes old completed/failed jobs (safety net)
@@ -64,6 +74,23 @@ crons.interval(
   "cleanup-old-scheduled-jobs",
   { hours: 6 },
   internal.gameSchedulerMutations.cleanupOldJobs
+);
+
+/**
+ * NFT Collection Holder Scanning - Pre-cache ALL holders of each collection
+ * Runs every 12 hours to scan complete holder lists for instant verification
+ * 
+ * Benefits:
+ * - Instant NFT verification (no API calls during character selection)
+ * - Massive API savings (one comprehensive scan vs thousands of individual checks)
+ * - Better UX (no loading spinners for NFT-gated characters)
+ * 
+ * Backup: Manual refresh button for users (rate-limited every 5 minutes)
+ */
+crons.interval(
+  "scan-nft-collection-holders",
+  { hours: 12 },
+  internal.nftHolderScanner.scanAllCollectionHolders
 );
 
 export default crons;

@@ -51,6 +51,11 @@ export class Game extends Scene {
       this.animationManager.setPlayerNames(this.playerNames);
     }
 
+    // Pass updated player names to UIManager
+    if (this.uiManager) {
+      this.uiManager.setPlayerNames(playerNames);
+    }
+
     // Update existing participants with new display names
     if (this.playerManager) {
       this.updateParticipantDisplayNames();
@@ -126,7 +131,6 @@ export class Game extends Scene {
       logger.game.debug("[Game] 🎮 Player bet placed event received:", data);
       // Play challenger sound when a new player joins
       // (Note: insert-coin plays for the player who placed the bet)
-      SoundManager.playChallenger(this);
     });
 
     // Characters now spawn automatically via blockchain subscription (useActiveGame)
@@ -178,6 +182,15 @@ export class Game extends Scene {
       logger.game.debug("[Game] 🧹 Cleanup triggered");
       this.handleGameCleanup();
     });
+
+    // Listen for player names updates from PlayerNamesContext
+    EventBus.on(
+      "player-names-update",
+      (playerNames: Array<{ walletAddress: string; displayName: string | null }>) => {
+        logger.game.debug("[Game] 📛 Player names update received:", playerNames.length);
+        this.setPlayerNames(playerNames);
+      }
+    );
   }
 
   /**
@@ -379,6 +392,9 @@ export class Game extends Scene {
         logger.game.debug("[Game] ✅ Spawning participant from blockchain:", participant);
         this.playerManager.addParticipant(participant);
 
+        // Play challenger sound to notify all players of new participant
+        SoundManager.playChallenger(this);
+
         // Apply arena mask to the newly spawned participant
         if (this.arenaMask) {
           const gameParticipant = this.playerManager.getParticipant(participantId);
@@ -409,6 +425,10 @@ export class Game extends Scene {
 
   private getSkinName(skinId: number): string {
     const character = this.characters.find((char) => char.id === skinId);
+    if (!character) {
+      logger.game.warn(`[Game] Character not found for skin ID ${skinId}, using default`);
+      return `Character ${skinId}`;
+    }
     return character.name;
   }
 

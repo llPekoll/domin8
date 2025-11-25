@@ -48,4 +48,6 @@ pub enum Domin8Error {
     InvalidSkin,
     #[msg("Invalid position coordinates")]
     InvalidPosition,
+    #[msg("Invalid game account provided")]
+    InvalidGameAccount,
 }

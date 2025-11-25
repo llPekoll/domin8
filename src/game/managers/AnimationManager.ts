@@ -91,49 +91,6 @@ export class AnimationManager {
     this.celebrationObjects = [];
   }
 
-  createExplosionsSequence() {
-    const createExplosion = (delay: number = 0) => {
-      this.scene.time.delayedCall(delay, () => {
-        // Random position around center
-        const offsetX = (Math.random() - 0.5) * 150;
-        const offsetY = (Math.random() - 0.5) * 150;
-
-        const explosion = this.scene.add.sprite(
-          this.centerX + offsetX,
-          this.centerY + offsetY,
-          "explosion"
-        );
-
-        // Scale up the explosion for dramatic effect
-        explosion.setScale(2 + Math.random());
-        explosion.setDepth(500); // On top of everything
-        // Keep pixel art crisp when scaling
-        explosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
-
-        // Play explosion animation
-        if (this.scene.anims.exists("explosion")) {
-          explosion.play("explosion");
-        }
-
-        // Remove sprite after animation completes
-        explosion.once("animationcomplete", () => {
-          explosion.destroy();
-        });
-
-        // Screen shake for impact
-        if (delay === 0) {
-          this.scene.cameras.main.shake(200, 0.01);
-        }
-      });
-    };
-
-    // Create multiple explosions over time
-    createExplosion(0);
-    createExplosion(300);
-    createExplosion(600);
-    createExplosion(900);
-    createExplosion(1200);
-  }
 
   addWinnerCelebration() {
     // Play victory sound when winner celebration starts
@@ -214,18 +171,8 @@ export class AnimationManager {
     //   .setOrigin(0.5)
     //   .setDepth(200);
 
-    // // Track all celebration objects for cleanup
-    // this.celebrationObjects.push(backgroundOverlay, throne, nameText);
-
-    // // Animate name and bet text
-    // nameText.setAlpha(1);
-
-    // this.scene.tweens.add({
-    //   targets: nameText,
-    //   alpha: 1,
-    //   duration: 500,
-    //   delay: 300,
-    // });
+    // Track celebration objects for cleanup (throne and overlay)
+    this.celebrationObjects.push(backgroundOverlay, throne);
 
     // Bounce animation is now handled in PlayerManager.showResults()
 
@@ -270,22 +217,6 @@ export class AnimationManager {
   }
 
   createCenterExplosion() {
-    // Create a single large explosion at center
-    const explosion = this.scene.add.sprite(this.centerX, this.centerY, "explosion");
-
-    explosion.setScale(15); // 5x bigger (was 3, now 15)
-    explosion.setDepth(500); // On top of everything
-    // Keep pixel art crisp when scaling
-    explosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
-
-    if (this.scene.anims.exists("explosion")) {
-      explosion.play("explosion");
-    }
-
-    explosion.once("animationcomplete", () => {
-      explosion.destroy();
-    });
-
     // Add directional blood effects from center
     this.createDirectionalBloodEffects();
 
@@ -527,42 +458,6 @@ export class AnimationManager {
       this.checkScreenEdgeCollision(participant);
     });
 
-    // Add extra particle effects
-    this.createExplosionParticles();
-  }
-
-  private createExplosionParticles() {
-    // Create debris particles that fly out
-    const particleCount = 20;
-    const colors = [0xff0000, 0xffff00, 0xff8800, 0xffffff];
-
-    for (let i = 0; i < particleCount; i++) {
-      const particle = this.scene.add.rectangle(
-        this.centerX,
-        this.centerY,
-        4 + Math.random() * 8,
-        4 + Math.random() * 8,
-        colors[Math.floor(Math.random() * colors.length)]
-      );
-      particle.setDepth(140);
-
-      const angle = ((Math.PI * 2) / particleCount) * i + Math.random() * 0.5;
-      const speed = 200 + Math.random() * 400;
-      const lifetime = 1000 + Math.random() * 1000;
-
-      this.scene.tweens.add({
-        targets: particle,
-        x: this.centerX + Math.cos(angle) * speed,
-        y: this.centerY + Math.sin(angle) * speed + Math.random() * 200,
-        alpha: 0,
-        angle: Math.random() * 720,
-        duration: lifetime,
-        ease: "Power2",
-        onComplete: () => {
-          particle.destroy();
-        },
-      });
-    }
   }
 
   showBettingPrompt() {
@@ -596,40 +491,6 @@ export class AnimationManager {
     });
   }
 
-  createBattleEffects() {
-    // Create multiple small explosions during battle
-    const createBattleExplosion = (delay: number) => {
-      this.scene.time.delayedCall(delay, () => {
-        const x = this.centerX + (Math.random() - 0.5) * 200;
-        const y = this.centerY + (Math.random() - 0.5) * 200;
-
-        const explosion = this.scene.add.sprite(x, y, "explosion");
-        explosion.setScale(1.5);
-        explosion.setDepth(1500); // In front of all characters (characters are ~100-900)
-        // Keep pixel art crisp when scaling
-        explosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
-
-        if (this.scene.anims.exists("explosion")) {
-          explosion.play("explosion");
-        }
-
-        explosion.once("animationcomplete", () => {
-          explosion.destroy();
-        });
-
-        // Add blood splatter at fight location
-        this.createBloodSplatter(x, y, false);
-      });
-    };
-
-    // Create battle explosions over time
-    for (let i = 0; i < 8; i++) {
-      createBattleExplosion(i * 500);
-    }
-
-    // Screen shake throughout battle
-    this.scene.cameras.main.shake(3000, 0.005);
-  }
 
   checkScreenEdgeCollision(participant: any) {
     // Get screen dimensions
@@ -816,72 +677,7 @@ export class AnimationManager {
     }
   }
 
-  createFinalExplosion() {
-    // Create the biggest explosion for battle finale
-    const explosion = this.scene.add.sprite(this.centerX, this.centerY, "explosion");
 
-    explosion.setScale(1);
-    explosion.setDepth(500); // On top of everything
-    // Keep pixel art crisp when scaling
-    explosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
-
-    if (this.scene.anims.exists("explosion")) {
-      explosion.play("explosion");
-    }
-
-    explosion.once("animationcomplete", () => {
-      explosion.destroy();
-    });
-
-    // Biggest screen shake
-    this.scene.cameras.main.shake(500, 0.03);
-  }
-
-  createContinuousExplosions() {
-    // Create multiple explosions continuously on top of everything
-    const explosionCount = 5; // Total number of explosions
-    const delayBetweenExplosions = 200; // Time between each explosion in ms
-
-    for (let i = 0; i < explosionCount; i++) {
-      this.scene.time.delayedCall(i * delayBetweenExplosions, () => {
-        // Play explosion sound with the first explosion
-        if (i === 0) {
-          SoundManager.playExplosion(this.scene, 0.7);
-        }
-
-        // Random position across the entire screen
-        const gameWidth = this.scene.scale.width;
-        const gameHeight = this.scene.scale.height;
-
-        const explosion = this.scene.add.sprite(gameWidth / 2, gameHeight / 2 - 100, "explosion");
-
-        // Random scale for variety (1.5x to 4x)
-        explosion.setScale(1 + Math.random() * 2.5);
-        explosion.setDepth(1600); // On top of everything else
-        // Keep pixel art crisp when scaling
-        explosion.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
-
-        if (this.scene.anims.exists("explosion")) {
-          explosion.play("explosion");
-        }
-
-        explosion.once("animationcomplete", () => {
-          explosion.destroy();
-        });
-
-        // Occasional screen shake for some explosions
-        if (i % 3 === 0) {
-          this.scene.cameras.main.shake(150, 0.008);
-        }
-      });
-    }
-
-    logger.game.debug(
-      "[AnimationManager] 💥 Started continuous explosion sequence with",
-      explosionCount,
-      "explosions"
-    );
-  }
 
   /**
    * Shared battle phase animation sequence
@@ -909,6 +705,7 @@ export class AnimationManager {
     if (this.scene.anims.exists("explosion-fullscreen")) {
       this.scene.time.delayedCall(200, () => {
         fullscreenExplosion.play("explosion-fullscreen");
+        SoundManager.playExplosion(this.scene, 0.8);
       });
     }
 
@@ -921,11 +718,6 @@ export class AnimationManager {
 
     // Move participants to center
     playerManager.moveParticipantsToCenter();
-
-    // After 500ms of running, start continuous explosions
-    this.scene.time.delayedCall(200, () => {
-      this.createContinuousExplosions();
-    });
 
     // Call onComplete callback if provided
     if (onComplete) {

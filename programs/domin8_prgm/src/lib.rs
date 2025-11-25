@@ -16,7 +16,7 @@ pub use error::*;
 pub use state::*;
 pub use utils::*;
 
-declare_id!("4CGrFCWbyrZFxz1PqbaoAFzJrtmxskSbjsBziXctxCZv");
+declare_id!("JBZ9jKkL5M8vRpLmhNwYT648e8WhCQKhQpRxt4QAb6zt");
 
 #[program]
 pub mod domin8_prgm {
@@ -48,23 +48,13 @@ pub mod domin8_prgm {
         )
     }
 
-    /// Create new game round with first bet
+    /// Create new game round (admin only, no bets yet)
     ///
     /// Parameters:
     /// - round_id: u64 - Round ID for the game
-    /// - bet_amount: u64 - Initial bet amount in lamports
-    /// - skin: u8 - Character skin ID (0-255)
-    /// - position: [u16; 2] - Spawn position [x, y]
     /// - map: u8 - Map/background ID (0-255)
-    pub fn create_game_round(
-        ctx: Context<CreateGameRound>,
-        round_id: u64,
-        bet_amount: u64,
-        skin: u8,
-        position: [u16; 2],
-        map: u8,
-    ) -> Result<()> {
-        create_game_round::handler(ctx, round_id, bet_amount, skin, position, map)
+    pub fn create_game_round(ctx: Context<CreateGameRound>, round_id: u64, map: u8) -> Result<()> {
+        create_game_round::handler(ctx, round_id, map)
     }
 
     /// Place a bet in the current game round
@@ -74,8 +64,8 @@ pub mod domin8_prgm {
     /// - bet_amount: u64 - Bet amount in lamports
     /// - skin: u8 - Character skin ID (0-255)
     /// - position: [u16; 2] - Spawn position [x, y]
-    pub fn bet(
-        ctx: Context<Bet>,
+    pub fn bet<'info>(
+        ctx: Context<'_, '_, '_, 'info, Bet<'info>>,
         round_id: u64,
         bet_amount: u64,
         skin: u8,
@@ -106,5 +96,13 @@ pub mod domin8_prgm {
     /// - round_id: u64 - Round ID for the game to delete
     pub fn delete_game(ctx: Context<DeleteGame>, round_id: u64) -> Result<()> {
         delete_game::handler(ctx, round_id)
+    }
+
+    /// VRF callback - called automatically by Magic Block VRF
+    ///
+    /// Parameters:
+    /// - randomness: [u8; 32] - 32 bytes of verifiable randomness
+    pub fn vrf_callback(ctx: Context<VrfCallback>, randomness: [u8; 32]) -> Result<()> {
+        vrf_callback::handler(ctx, randomness)
     }
 }

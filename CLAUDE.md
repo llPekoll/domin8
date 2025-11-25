@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A fast-paced battle royale betting game on Solana where players bet on themselves in real-time battles. Built with Convex, React, Phaser.js, and Solana blockchain integration using Orao VRF for verifiable randomness.
+A fast-paced battle royale betting game on Solana where players bet on themselves in real-time battles. Built with Convex, React, Phaser.js, and Solana blockchain integration using Magic Block VRF for verifiable randomness.
 
 ## Tech Stack
 
@@ -11,10 +11,11 @@ A fast-paced battle royale betting game on Solana where players bet on themselve
 - **Frontend**: React + TypeScript + Vite
 - **Game Engine**: Phaser.js (WebGL/Canvas)
 - **Blockchain**: Solana (Anchor framework)
-- **VRF Provider**: Orao VRF (production-grade verifiable randomness)
+- **VRF Provider**: Magic Block VRF (ephemeral rollup, cost-optimized)
 - **Wallet**: Privy (embedded wallets, seamless auth)
 - **Styling**: Tailwind CSS
 - **State**: Convex React hooks
+- **Events**: Helius webhooks for blockchain updates
 
 ## Commands
 
@@ -52,34 +53,32 @@ anchor deploy
 ```
 /
 ├── convex/                    # Backend functions and schema
-│   ├── syncService.ts         # Blockchain sync (every 45s)
 │   ├── gameScheduler.ts       # Execute smart contract calls
 │   ├── gameSchedulerMutations.ts  # Job tracking
-│   ├── syncServiceMutations.ts    # DB writes for sync
 │   ├── players.ts             # Player CRUD operations
 │   ├── characters.ts          # Character management
 │   ├── maps.ts                # Map management
 │   ├── schema.ts              # Database schema
 │   └── crons.ts               # Scheduled functions
 ├── programs/
-│   ├── domin8_prgm/           # Main game smart contract
-│   │   ├── src/
-│   │   │   ├── lib.rs         # Program entry (6 instructions)
-│   │   │   ├── state/
-│   │   │   │   ├── domin8_game.rs    # Game account structure
-│   │   │   │   └── domin8_config.rs  # Global config
-│   │   │   ├── instructions/  # 6 instruction handlers
-│   │   │   │   ├── initialize_config.rs
-│   │   │   │   ├── create_game_round.rs (first bet + VRF request)
-│   │   │   │   ├── bet.rs (additional bets)
-│   │   │   │   ├── end_game.rs (winner selection via Orao VRF)
-│   │   │   │   ├── send_prize_winner.rs (payout)
-│   │   │   │   └── delete_game.rs (admin cleanup)
-│   │   │   ├── constants.rs   # Bet limits, fees
-│   │   │   ├── error.rs       # 26+ error codes
-│   │   │   └── utils.rs       # Helper functions
-│   │   └── Cargo.toml
-│   └── domin8_prgm.backup/    # Old version (10 instructions, mock VRF)
+│   └── domin8_prgm/           # Main game smart contract
+│       ├── src/
+│       │   ├── lib.rs         # Program entry (7 instructions)
+│       │   ├── state/
+│       │   │   ├── domin8_game.rs    # Game account structure
+│       │   │   └── domin8_config.rs  # Global config
+│       │   ├── instructions/  # 7 instruction handlers
+│       │   │   ├── initialize_config.rs
+│       │   │   ├── create_game_round.rs (no bets, no VRF)
+│       │   │   ├── bet.rs (VRF on 2nd player)
+│       │   │   ├── vrf_callback.rs (Magic Block callback)
+│       │   │   ├── end_game.rs (winner selection)
+│       │   │   ├── send_prize_winner.rs (payout)
+│       │   │   └── delete_game.rs (admin cleanup)
+│       │   ├── constants.rs   # Bet limits, fees
+│       │   ├── error.rs       # Error codes
+│       │   └── utils.rs       # Helper functions
+│       └── Cargo.toml
 ├── src/
 │   ├── game/                  # Phaser game engine
 │   │   ├── scenes/
@@ -100,7 +99,6 @@ anchor deploy
 │   └── hooks/
 │       ├── usePrivyWallet.ts            # Privy integration
 │       ├── useGameContract.ts           # Smart contract calls
-│       ├── useActiveGame.ts             # Real-time blockchain updates
 │       └── useNFTCharacters.ts          # NFT verification
 └── public/
     └── assets/                # Game assets
@@ -129,60 +127,92 @@ The platform has two distinct modes:
 
 ##### Real Game Mode
 
-Triggered when **first player places a bet**:
+**Triggered by Convex creating a game:**
 
-1. **Game Creation**: First bet calls `create_game_round` instruction
-2. **Demo Stops**: Client-side demo stops in user's browser
-3. **VRF Request**: Smart contract requests Orao VRF randomness
-4. **Waiting Phase**: 30-second countdown for other players
-5. **Additional Bets**: Other players call `bet` instruction
-6. **Game End**: Backend calls `end_game` after countdown
-7. **Winner Selection**: Orao VRF determines winner (weighted by bet amounts)
-8. **Settlement**: Backend calls `send_prize_winner` for payout
-9. **Return to Demo**: All clients return to local client-side demo
+1. **Game Creation**: Convex calls `create_game_round` instruction
+   - Game status = **WAITING** (no bets yet)
+   - **NO countdown** (start_date = 0, end_date = 0)
+   - **NO VRF requested** (cost optimization!)
+   - Lock system to prevent concurrent games
+
+2. **First Player Bets**: User calls `bet` instruction
+   - Status changes: **WAITING → OPEN**
+   - **Countdown STARTS**: end_date = now + round_time (e.g., 60s)
+   - Adds first bet (SOL transferred to game vault)
+   - **NO VRF requested yet** (saves cost!)
+
+3. **Second Player Bets**: User calls `bet` instruction
+   - **VRF REQUEST TRIGGERED** (Magic Block VRF)
+   - VRF callback automatically stores randomness
+   - Adds second bet (SOL transferred)
+
+4. **Additional Players**: More players can join
+   - No new VRF requests (already done)
+
+5. **Countdown Expires**: Convex calls `end_game`
+   - **Single player**: Full refund (0% house fee), deterministic seed
+   - **Multiple players**: Magic Block VRF randomness, 5% house fee
+
+6. **Prize Distribution**: Convex calls `send_prize_winner`
+   - 95% to winner (or 100% for single player refund)
+   - 5% to treasury (multi-player only)
+
+7. **Return to Demo**: All clients return to local demo
 
 #### Game Flow (Single Round)
 
-All real games follow the same **3-phase structure**:
+All real games follow this **optimized flow**:
 
-1. **WAITING PHASE** (30 seconds)
-   - First bet creates game via `create_game_round`
-   - Additional players join via `bet` instruction
-   - Game status = 0 (open)
+1. **GAME CREATION** (Convex creates game)
+   - Status = WAITING
+   - No bets, no countdown, no VRF
+   - Game account initialized
+
+2. **FIRST BET** (countdown starts)
+   - Status: WAITING → OPEN
+   - start_date = now, end_date = now + 60s
+   - First bet stored, NO VRF request
+
+3. **SECOND BET** (VRF triggered)
+   - Magic Block VRF requested
+   - VRF callback stores randomness
+   - Second bet stored
+
+4. **WAITING PHASE** (up to 60 seconds)
+   - More players can join
    - Each bet includes: amount, skin (character), position (spawn coords)
 
-2. **ARENA PHASE** (Variable duration)
-   - Countdown reaches zero
-   - Backend calls `end_game` instruction
-   - Orao VRF provides randomness
-   - Winner selected on-chain (weighted by bet amounts)
-   - Game status = 1 (closed)
-   - Frontend shows battle animations
+5. **GAME END** (Convex calls end_game)
+   - Uses VRF randomness (or deterministic for single player)
+   - Weighted selection: bigger bet = higher chance
+   - Game status = CLOSED
+   - Winner determined, prize calculated
 
-3. **RESULTS PHASE** (15 seconds)
-   - Winner celebration animations
-   - Eliminated participants explode
-   - Backend calls `send_prize_winner`
-   - 95% pool to winner, 5% house fee
-   - Return to demo mode
+6. **PRIZE DISTRIBUTION** (Convex calls send_prize_winner)
+   - Winner receives 95% (or 100% if solo)
+   - Treasury receives 5% (multi-player only)
+
+7. **CLEANUP** (15 seconds later)
+   - Convex can create next game
+   - System unlocked
 
 #### Core Features
 
 - **Client-Side Demo**: Each user runs their own demo locally, zero server cost
-- **Single Global Real Game**: One blockchain-synced game for all real players
-- **Demo-to-Real Transition**: Client demo stops, real game starts on first bet
+- **Convex-Managed Games**: Backend creates games, players place bets
+- **VRF Cost Optimization**: VRF only requested when 2nd player joins
+- **Single Player Refunds**: Full refund with 0% fee if only 1 player
 - **Multiple Maps**: Random selection between bg1 and bg2 backgrounds
 - **Character System**: 8 characters available (some NFT-gated)
 - **Bet-to-size**: Character size scales with bet amount
-- **Real-time Updates**: Blockchain state synced to clients in <1 second
-- **Server-side Settlement**: Convex schedules smart contract calls
-- **No Demo Backend**: Demo runs purely in browser, no database records
-- **Orao VRF**: Production-grade verifiable randomness from Solana
+- **Helius Webhooks**: Blockchain events → Convex → Frontend via WebSocket
+- **No active_game PDA**: Simplified architecture, events-based sync
+- **Magic Block VRF**: Cheap, fast verifiable randomness
 
 ### Betting System
 
 - **Self-Betting Only**: Players bet on themselves during waiting phase
-- **One Bet Per Game**: Each player can place one bet per game round
+- **Multiple Bets Per Player**: Limits based on bet size (20-30 bets max)
 - **Currency**: Native SOL (no conversion, direct betting)
 - **Betting Limits**:
   - Minimum: 0.001 SOL (hardcoded constant)
@@ -190,55 +220,69 @@ All real games follow the same **3-phase structure**:
   - Recommended: 0.01 SOL min, 10 SOL max
 - **Embedded Wallets**: Privy manages user wallets seamlessly
 - **Smart Contract Escrow**: All bets locked in on-chain program (non-custodial)
-- **Pool Distribution**: 95% to winner, 5% house fee
+- **Pool Distribution**:
+  - **Multi-player**: 95% to winner, 5% house fee
+  - **Single player**: 100% refund, 0% house fee
 - **Trustless**: Funds secured by smart contract, automatic payouts
 
 ### Technical Features
 
-- **Real-time**: Blockchain updates in <1 second via WebSocket subscriptions
+- **Events-Based Sync**: Helius webhooks → Convex → Frontend
 - **Type-safe**: End-to-end TypeScript
 - **Responsive**: Mobile and desktop support
 - **Scalable**: Serverless architecture (Convex)
 - **Non-custodial**: Smart contract holds funds, not backend
 - **Seamless Auth**: Privy embedded wallets (email/social login)
 - **Signless UX**: Privy handles transaction signing smoothly
-- **Verifiable**: Orao VRF randomness on-chain
+- **Verifiable**: Magic Block VRF randomness on-chain
 
 ## Smart Contract Architecture
 
 ### Program: domin8_prgm
 
-**Program ID**: `D8zxCM4tehr4Aux9zvonwCCYjV71WEgFnssWxgpgEEb7` (Devnet)
+**Program ID**: `7bHYHZVu7kWRU4xf7DWypCvefWvuDqW1CqVfsuwdGiR7` (Devnet)
 
-### Instructions (6 total)
+### Instructions (7 total)
 
 1. **initialize_config** - Admin-only setup
    - Sets: treasury wallet, house fee, min/max bet amounts, round time
    - Creates global config account (PDA)
+   - **NO active_game PDA created** (removed for simplification)
 
-2. **create_game_round** - First bet creates game
-   - Transfers SOL from player to game vault
-   - Requests Orao VRF randomness
+2. **create_game_round** - Convex creates game
+   - **NO bets placed** (just initializes game)
+   - **NO VRF request** (deferred to 2nd bet)
+   - **NO countdown** (starts on first bet)
+   - Game status = WAITING
    - Locks system (prevents concurrent games)
-   - Stores first bet with skin + position
 
-3. **bet** - Additional players join
+3. **bet** - Players place bets
+   - **First bet**: Starts countdown (status: WAITING → OPEN)
+   - **Second bet**: Requests Magic Block VRF
    - Transfers SOL to game vault
-   - Adds bet to game with skin + position
+   - Adds bet with skin + position
    - Checks bet limits (amount, per-user count)
 
-4. **end_game** - Winner selection
-   - Reads Orao VRF randomness
-   - Weighted selection by bet amounts
-   - Closes game (status = 1)
-   - Stores winner + prize amount
+4. **vrf_callback** - Magic Block VRF callback
+   - Called automatically by Magic Block VRF
+   - Stores randomness in `game.rand`
+   - Executed within seconds of VRF request
 
-5. **send_prize_winner** - Payout distribution
-   - Transfers 95% pool to winner
-   - Transfers 5% fee to treasury
+5. **end_game** - Winner selection
+   - **Single player**: Uses deterministic seed (no VRF needed)
+   - **Multiple players**: Uses Magic Block VRF randomness
+   - Weighted selection by bet amounts
+   - Closes game (status = CLOSED)
+   - Stores winner + prize amount
+   - **Single player**: 0% house fee (full refund)
+   - **Multiple players**: 5% house fee
+
+6. **send_prize_winner** - Payout distribution
+   - Transfers prize to winner (95% or 100%)
+   - Transfers house fee to treasury (5% or 0%)
    - Marks prize as sent
 
-6. **delete_game** - Admin cleanup
+7. **delete_game** - Admin cleanup
    - Removes old game accounts
    - Frees up storage
 
@@ -247,14 +291,15 @@ All real games follow the same **3-phase structure**:
 ```rust
 pub struct Domin8Game {
     pub game_round: u64,          // Increments each game
-    pub start_date: i64,          // Unix timestamp
-    pub end_date: i64,            // Unix timestamp
+    pub start_date: i64,          // Unix timestamp (set on first bet)
+    pub end_date: i64,            // Unix timestamp (set on first bet)
     pub total_deposit: u64,       // Total pool in lamports
-    pub rand: u64,                // VRF randomness (unused, legacy)
+    pub rand: u64,                // VRF randomness (from callback)
     pub map: u8,                  // Background ID (0-255)
     pub user_count: u64,          // Unique players
     pub force: [u8; 32],          // VRF force seed (entropy)
-    pub status: u8,               // 0 = open, 1 = closed
+    pub status: u8,               // 0 = waiting, 1 = open, 2 = closed
+    pub vrf_requested: bool,      // True if VRF requested (optimization)
     pub winner: Option<Pubkey>,   // Winner wallet
     pub winner_prize: u64,        // Prize amount
     pub winning_bet_index: Option<u64>, // Which bet won
@@ -282,6 +327,11 @@ MIN_DEPOSIT_AMOUNT = 1_000_000 lamports (0.001 SOL)
 // House fee cap
 MAX_HOUSE_FEE = 1000 basis points (10%)
 
+// Game status constants
+GAME_STATUS_WAITING = 0   // Game created, no bets yet
+GAME_STATUS_OPEN = 1      // First bet placed, countdown started
+GAME_STATUS_CLOSED = 2    // Game ended, winner selected
+
 // Anti-spam limits
 MAX_BETS_PER_GAME = 1000 total bets
 MAX_BETS_PER_USER_SMALL = 20 (for bets < 0.01 SOL)
@@ -299,7 +349,7 @@ MAX_ROUND_TIME = 86400 seconds (24 hours)
 
 **gameRoundStates** - Real game state cache
 - `roundId`: number (from blockchain)
-- `status`: "waiting" | "finished"
+- `status`: "waiting" | "open" | "closed"
 - `startTimestamp`: number
 - `endTimestamp`: number
 - `capturedAt`: number (sync timestamp)
@@ -312,6 +362,7 @@ MAX_ROUND_TIME = 86400 seconds (24 hours)
 - `winner`: string | null (wallet address)
 - `winningBetIndex`: number
 - `prizeSent`: boolean
+- `vrfRequested`: boolean
 
 **scheduledJobs** - Backend task tracking
 - `jobId`: string
@@ -368,11 +419,6 @@ From `seed/maps.json`:
 ### Scheduled Functions (Crons)
 
 ```typescript
-// Every 45 seconds - sync blockchain state to Convex
-crons.interval("sync-blockchain-state", { seconds: 45 },
-  internal.syncService.syncBlockchainState
-);
-
 // Every 6 hours - cleanup old scheduled jobs
 crons.interval("cleanup-old-scheduled-jobs", { hours: 6 },
   internal.gameSchedulerMutations.cleanupOldJobs
@@ -381,13 +427,8 @@ crons.interval("cleanup-old-scheduled-jobs", { hours: 6 },
 
 ### Key Functions
 
-**syncService.ts**
-- `syncBlockchainState()` - Main cron: reads active_game PDA, syncs to DB
-- `syncActiveGame()` - Stores game state in gameRoundStates table
-- `processEndedGames()` - Detects when countdown expires
-- `scheduleEndGameAction()` - Creates scheduled job for end_game
-
 **gameScheduler.ts**
+- `createGameRound()` - Calls smart contract create_game_round instruction
 - `executeEndGame()` - Calls smart contract end_game instruction
 - `executeSendPrize()` - Calls smart contract send_prize_winner instruction
 
@@ -398,61 +439,64 @@ crons.interval("cleanup-old-scheduled-jobs", { hours: 6 },
 
 ### Real-time Features
 
-- Blockchain updates synced every 45 seconds
-- Frontend subscribes to `active_game` PDA directly (<1s updates)
-- Automatic UI updates via Convex hooks
-- Optimistic updates with rollback
+- Helius webhook listens for program events
+- Events stored in Convex database
+- Frontend subscribes to Convex via WebSocket (<1s updates)
+- Automatic UI updates via Convex React hooks
 
-## VRF Integration (Orao)
+## VRF Integration (Magic Block)
 
-### Orao VRF Overview
+### Magic Block VRF Overview
 
-**Provider**: Orao Network (production-grade Solana VRF)
-**Program ID**: `VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y`
+**Provider**: Magic Block (ephemeral rollup VRF)
+**SDK**: `ephemeral-vrf-sdk`
+**Cost**: Much cheaper than Orao VRF (~90% savings)
 
 ### VRF Flow
 
-1. **Request** (create_game_round)
-   - Smart contract calls Orao VRF `request_v2` via CPI
-   - Force seed (32 bytes) provided for entropy
-   - Orao generates verifiable randomness (~1-3 seconds)
+1. **Deferred Request** (2nd bet only)
+   - Smart contract requests VRF only when 2nd player joins
+   - Uses `create_request_randomness_ix` from SDK
+   - Callback discriminator: `VrfCallback::DISCRIMINATOR`
+   - **Single player games**: NO VRF request (saves 100% cost)
 
-2. **Fulfillment** (automatic)
-   - Orao VRF stores randomness in on-chain account
-   - Randomness account PDA derived from force seed
+2. **Callback Execution** (automatic)
+   - Magic Block VRF calls `vrf_callback` instruction
+   - Stores randomness in `game.rand`
+   - Executed within seconds
 
 3. **Consumption** (end_game)
-   - Backend calls `end_game` instruction
-   - Smart contract reads Orao randomness account
-   - Extracts random bytes for winner selection
+   - **Single player**: Uses deterministic seed (no VRF needed)
+   - **Multiple players**: Uses `game.rand` from callback
    - Weighted selection: higher bets = higher win chance
 
 4. **Verification**
-   - Anyone can verify randomness on-chain
-   - Orao provides cryptographic proofs
-   - Reproducible: same seed + bets = same winner
+   - Magic Block provides verifiable randomness
+   - On-chain callback ensures integrity
 
-### Why Orao VRF?
+### Why Magic Block VRF?
 
-- **Production-Grade**: Battle-tested, used by major Solana dapps
-- **No Custom Audit**: Saves $10-50k in audit costs
-- **Fast**: 1-3 second randomness generation
+- **Cost-Optimized**: ~90% cheaper than Orao VRF
+- **Deferred Request**: Only triggered on 2nd player (not game creation)
+- **Fast**: Sub-second callback execution
 - **Verifiable**: Cryptographic proofs on-chain
-- **Reliable**: No custom implementation bugs
+- **Ephemeral Rollup**: Optimized for low-cost operations
 
 ### Winner Selection Algorithm
 
 ```rust
 // Pseudo-code (implemented in smart contract)
-1. Read Orao VRF randomness (32 bytes)
-2. Convert to u64 random number
-3. Calculate total pool (sum of all bet amounts)
-4. Random point = random_number % total_pool
-5. Iterate through bets, accumulate weights
-6. Winner = first bet where cumulative >= random_point
+1. Check player count
+2. If single player: use deterministic seed, full refund
+3. If multiple players: use Magic Block VRF randomness
+4. Calculate total pool (sum of all bet amounts)
+5. Random point = randomness % total_pool
+6. Iterate through bets, accumulate weights
+7. Winner = first bet where cumulative >= random_point
+8. Calculate prize (95% pool for multi-player, 100% for solo)
 ```
 
-**Example**:
+**Example (Multi-Player)**:
 - Bet 1: 1 SOL (weight: 1)
 - Bet 2: 3 SOL (weight: 3)
 - Bet 3: 1 SOL (weight: 1)
@@ -460,6 +504,13 @@ crons.interval("cleanup-old-scheduled-jobs", { hours: 6 },
 - Random point: 3.7
 - Cumulative: 0→1 (Bet 1), 1→4 (Bet 2), 4→5 (Bet 3)
 - Winner: Bet 2 (because 3.7 falls in range 1-4)
+- Prize: 4.75 SOL (95%), House: 0.25 SOL (5%)
+
+**Example (Single Player)**:
+- Bet 1: 2 SOL
+- Deterministic seed (no VRF)
+- Winner: Player 1 (only player)
+- Prize: 2 SOL (100%), House: 0 SOL (0%)
 
 ## Frontend Architecture
 
@@ -468,7 +519,7 @@ crons.interval("cleanup-old-scheduled-jobs", { hours: 6 },
 ```typescript
 enum GamePhase {
   IDLE = "idle",              // Show demo
-  WAITING = "waiting",        // Accepting bets (30s)
+  WAITING = "waiting",        // Accepting bets (countdown running)
   VRF_PENDING = "vrf_pending", // Waiting for end_game
   CELEBRATING = "celebrating", // Winner celebration (15s)
   FIGHTING = "fighting",      // Battle animations
@@ -507,17 +558,11 @@ DEMO_PARTICIPANT_COUNT: 20             // Always 20 bots
 - Returns: `connected`, `publicKey`, `solBalance`, `wallet`
 
 **useGameContract.ts**
-- `placeBet(amount, skin, position, map)` - Send bet transaction
+- `placeBet(amount, skin, position)` - Send bet transaction
 - `validateBet(amount)` - Check bet validity
 - Builds Anchor instructions manually
 - Signs via Privy's `signAndSendAllTransactions()`
-- Supports both `create_game_round` and `bet` instructions
-
-**useActiveGame.ts**
-- Subscribes to `active_game` PDA via WebSocket
-- Real-time updates (<1s latency)
-- Returns blockchain game state + map lookup
-- Transforms Solana PublicKey → base58 string
+- Supports `bet` instruction (Convex creates games)
 
 **useNFTCharacters.ts**
 - Checks NFT ownership for exclusive characters
@@ -530,35 +575,37 @@ DEMO_PARTICIPANT_COUNT: 20             // Always 20 bots
 │   Demo Mode (20 bots)│ Runs continuously in DemoScene
 │  No DB, No Blockchain│ Math.random() for all RNG
 └──────────────────────┘
-           ↓ [User clicks "Place Bet"]
+           ↓ [Convex creates game]
 ┌──────────────────────────────────────┐
-│ 1. User selects character + bet      │
-│ 2. Frontend calls placeBet()          │
-│ 3. Privy signs create_game_round     │ First bet = create game
-│ 4. Transaction includes:             │
-│    - round_id (auto-increment)       │
-│    - bet_amount (SOL)                │
-│    - skin (char ID)                  │
-│    - position (spawn coords)         │
-│    - map (background ID)             │
+│ Convex: create_game_round            │
+│ - Status = WAITING                   │
+│ - NO bets, NO countdown, NO VRF      │
+│ - Game account initialized           │
+│ - System locked                      │
 └──────────────────────────────────────┘
-           ↓
+           ↓ [First user clicks "Place Bet"]
 ┌──────────────────────────────────────┐
-│ Smart Contract: create_game_round    │
-│ 1. Validate bet amount               │
-│ 2. Create game account (PDA)         │
-│ 3. Request Orao VRF seed             │
-│ 4. Lock system (prevent new games)   │
-│ 5. Transfer SOL to game vault        │
-│ 6. Return: first bet stored          │
+│ User: bet instruction (1st bet)      │
+│ 1. Status: WAITING → OPEN            │
+│ 2. Countdown STARTS (60s)            │
+│ 3. Bet stored (SOL transferred)      │
+│ 4. NO VRF requested (saves cost!)    │
 └──────────────────────────────────────┘
-           ↓ [Demo stops, real game starts]
+           ↓ [Second user bets]
 ┌──────────────────────────────────────┐
-│ WAITING PHASE (30 seconds)           │
-│ - Other players call bet()           │
+│ User: bet instruction (2nd bet)      │
+│ 1. VRF REQUEST TRIGGERED             │
+│ 2. Magic Block VRF called            │
+│ 3. Bet stored (SOL transferred)      │
+│ 4. Callback stores randomness        │
+└──────────────────────────────────────┘
+           ↓ [More players can join]
+┌──────────────────────────────────────┐
+│ WAITING PHASE (up to 60 seconds)     │
+│ - Additional players call bet()      │
 │ - Each bet: skin + position          │
-│ - Status = 0 (open)                  │
-│ - Convex syncs every 45s             │
+│ - Status = OPEN                      │
+│ - Helius webhooks → Convex           │
 │ - Frontend shows countdown           │
 └──────────────────────────────────────┘
            ↓ [End time reached]
@@ -566,9 +613,10 @@ DEMO_PARTICIPANT_COUNT: 20             // Always 20 bots
 │ gameScheduler.executeEndGame()       │
 │ 1. Convex scheduler triggers         │
 │ 2. Calls smart contract end_game()   │
-│ 3. Orao VRF used to select winner    │
-│ 4. Status = 1 (closed)               │
-│ 5. Winner stored in blockchain       │
+│ 3. Single player: deterministic seed │
+│ 4. Multi-player: Magic Block VRF     │
+│ 5. Status = CLOSED                   │
+│ 6. Winner stored in blockchain       │
 └──────────────────────────────────────┘
            ↓ [Winner determined]
 ┌──────────────────────────────────────┐
@@ -582,8 +630,8 @@ DEMO_PARTICIPANT_COUNT: 20             // Always 20 bots
 │ gameScheduler.executeSendPrize()     │
 │ 1. Calls smart contract send_prize   │
 │ 2. Distributes SOL to winner         │
-│ 3. Calculates prize (95% pool)       │
-│ 4. House fee (5%) to treasury        │
+│ 3. Single: 100% (no house fee)       │
+│ 4. Multi: 95% winner, 5% treasury    │
 └──────────────────────────────────────┘
            ↓ [Prize sent]
 ┌──────────────────────────────────────┐
@@ -591,6 +639,7 @@ DEMO_PARTICIPANT_COUNT: 20             // Always 20 bots
 │ 1. Fade out game                     │
 │ 2. Return to demo mode               │
 │ 3. DemoScene restarts locally        │
+│ 4. Convex can create next game       │
 └──────────────────────────────────────┘
 ```
 
@@ -602,23 +651,40 @@ DEMO_PARTICIPANT_COUNT: 20             // Always 20 bots
 
 ### Real Games
 
-**Per Game Costs** (Backend pays):
+**Per Game Costs** (Backend/Convex pays):
+
+**Single Player (1 bet only)**:
 - Create game: ~0.000005 SOL
-- Lock game: ~0.000005 SOL
-- Orao VRF request: ~0.0001 SOL
 - End game: ~0.000005 SOL
 - Send prize: ~0.000005 SOL
-- **Total Backend Cost**: ~0.00012 SOL (~$0.025 at $200/SOL)
+- **VRF cost**: $0 (NO VRF requested!)
+- **Total Backend Cost**: ~0.000015 SOL (~$0.003 at $200/SOL)
+- **House Fee**: 0% (full refund)
+
+**Multi-Player (2+ bets)**:
+- Create game: ~0.000005 SOL
+- Magic Block VRF: ~0.00001 SOL (cheap!)
+- End game: ~0.000005 SOL
+- Send prize: ~0.000005 SOL
+- **Total Backend Cost**: ~0.000025 SOL (~$0.005 at $200/SOL)
+- **House Fee**: 5% of pool
 
 **Per Player Costs** (User pays):
 - Bet transaction: ~0.000005 SOL (~$0.001)
 
 **Economic Model**:
-- House edge: 5% of pool
+- House edge: 5% of pool (multi-player) or 0% (single player)
 - Example: 10 SOL pool = 0.5 SOL house fee (~$100)
-- Backend cost: ~$0.025
-- Net profit: ~$99.975 per game
+- Backend cost: ~$0.005
+- Net profit: ~$99.995 per multi-player game
 - Scalability: Costs stay flat, revenue scales with pool size
+
+### Cost Comparison (Old vs New)
+
+| Scenario | Old (Orao VRF) | New (Magic Block) | Savings |
+|----------|---------------|-------------------|---------|
+| Single player | ~$0.025 | ~$0.003 | **88%** |
+| Multi-player | ~$0.025 | ~$0.005 | **80%** |
 
 ## Environment Variables
 
@@ -629,13 +695,15 @@ CONVEX_DEPLOYMENT=
 # Solana
 SOLANA_RPC_URL=
 VITE_SOLANA_NETWORK=devnet                      # Client-side (Vite exposes VITE_*)
-GAME_PROGRAM_ID=D8zxCM4tehr4Aux9zvonwCCYjV71WEgFnssWxgpgEEb7
-ORAO_VRF_PROGRAM_ID=VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y
+GAME_PROGRAM_ID=7bHYHZVu7kWRU4xf7DWypCvefWvuDqW1CqVfsuwdGiR7
 BACKEND_WALLET_SECRET=                          # For settlements
 
 # Privy
 VITE_PRIVY_APP_ID=                              # Client-side (exposed to browser)
 PRIVY_APP_SECRET=                               # Backend-only (Convex uses this)
+
+# Helius (for webhooks)
+HELIUS_API_KEY=                                 # For blockchain event monitoring
 
 # Note: Vite only exposes variables prefixed with VITE_ to the browser
 # All other variables are only accessible server-side in Convex
@@ -648,7 +716,8 @@ PRIVY_APP_SECRET=                               # Backend-only (Convex uses this
 - Validate all user inputs on-chain
 - Smart contract enforces all game rules
 - Non-custodial: Backend cannot access player funds
-- Verifiable: Orao VRF provides cryptographic proofs
+- Verifiable: Magic Block VRF provides cryptographic proofs
+- Helius webhooks for secure event monitoring
 
 ## Resources
 
@@ -656,8 +725,9 @@ PRIVY_APP_SECRET=                               # Backend-only (Convex uses this
 - [Phaser.js Docs](https://phaser.io/docs)
 - [Solana Cookbook](https://solanacookbook.com/)
 - [Anchor Framework](https://www.anchor-lang.com/)
-- [Orao VRF Docs](https://docs.orao.network/)
+- [Magic Block VRF](https://github.com/magicblock-labs/ephemeral-vrf-sdk)
 - [Privy Docs](https://docs.privy.io/)
+- [Helius Docs](https://docs.helius.dev/)
 - [Bun Documentation](https://bun.sh/docs)
 
 ---
@@ -672,11 +742,12 @@ PRIVY_APP_SECRET=                               # Backend-only (Convex uses this
 ├─────────────────────────────────────────────────────────────┤
 │ 1. Login with email/social (Privy)                          │
 │ 2. Watch demo game (20 bots, entertaining)                  │
-│ 3. Click "Bet 0.5 SOL" → Privy signs seamlessly             │
-│ 4. Wait 30s for other players                               │
-│ 5. Watch game play (Phaser animations)                      │
-│ 6. Winner announced → SOL arrives in wallet                 │
-│ 7. Return to demo mode                                      │
+│ 3. Wait for Convex to create real game                      │
+│ 4. Click "Bet 0.5 SOL" → Privy signs seamlessly             │
+│ 5. Wait 60s for other players (or instant if solo)          │
+│ 6. Watch game play (Phaser animations)                      │
+│ 7. Winner announced → SOL arrives in wallet                 │
+│ 8. Return to demo mode                                      │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -684,17 +755,18 @@ PRIVY_APP_SECRET=                               # Backend-only (Convex uses this
 ├─────────────────────────────────────────────────────────────┤
 │ Frontend (React + Vite + Phaser)                            │
 │   - Privy for auth + embedded wallets                       │
-│   - Real-time blockchain updates (<1s via WebSocket)        │
+│   - Convex WebSocket for real-time updates (<1s)            │
 │   - 60fps animations on canvas                              │
 ├─────────────────────────────────────────────────────────────┤
 │ Backend (Convex Serverless)                                 │
-│   - Blockchain sync (45s intervals)                         │
+│   - Creates games (create_game_round)                       │
 │   - Scheduled jobs (end_game, send_prize)                   │
+│   - Helius webhook listener (event processing)              │
 │   - Player/character/map management                         │
 ├─────────────────────────────────────────────────────────────┤
 │ Blockchain (Solana)                                         │
-│   - domin8_prgm: Bet escrow (6 instructions)                │
-│   - Orao VRF: Verifiable randomness                         │
+│   - domin8_prgm: Bet escrow (7 instructions)                │
+│   - Magic Block VRF: Cost-optimized randomness              │
 │   - All bets locked in smart contracts                      │
 │   - Non-custodial, trustless, transparent                   │
 └─────────────────────────────────────────────────────────────┘
@@ -704,7 +776,8 @@ PRIVY_APP_SECRET=                               # Backend-only (Convex uses this
 
 **1. Hybrid On/Off-Chain**
 - ✅ Bets: On-chain (trustless escrow)
-- ✅ VRF: On-chain (Orao VRF, verifiable randomness)
+- ✅ VRF: On-chain (Magic Block VRF, cost-optimized)
+- ✅ Game Creation: Convex-managed (off-chain trigger)
 - ✅ Game Logic: Off-chain (fast, flexible)
 - ✅ Animations: Off-chain (smooth, no blockchain lag)
 
@@ -726,17 +799,23 @@ PRIVY_APP_SECRET=                               # Backend-only (Convex uses this
 - Users control keys (can export)
 - 1-2 second bet confirmations
 
-**5. Orao VRF (Not Custom)**
-- Production-grade randomness provider
-- No audit costs ($10-50k savings)
-- Battle-tested, reliable
-- Cryptographic verification built-in
+**5. Magic Block VRF (Cost-Optimized)**
+- Ephemeral rollup VRF (~90% cheaper than Orao)
+- Deferred request (only on 2nd player join)
+- Single player games: NO VRF (100% savings)
+- Fast callback execution (sub-second)
 
 **6. Smart Contract Escrow**
 - Non-custodial (backend can't steal)
 - Transparent (all bets on-chain)
-- Verifiable (Orao VRF proofs public)
+- Verifiable (Magic Block VRF proofs)
 - Marketing advantage (provably fair)
+
+**7. Events-Based Architecture**
+- Helius webhooks for blockchain events
+- Convex stores and broadcasts events
+- Frontend subscribes via WebSocket
+- No polling, no active_game PDA needed
 
 ---
 
@@ -744,37 +823,40 @@ PRIVY_APP_SECRET=                               # Backend-only (Convex uses this
 
 ### What's Implemented
 ✅ Demo mode with 20 bots (client-side only)
-✅ Real game mode (blockchain-synced)
-✅ Orao VRF integration (production-grade)
-✅ 6-instruction smart contract (optimized)
+✅ Real game mode (Convex-managed)
+✅ Magic Block VRF integration (cost-optimized)
+✅ 7-instruction smart contract (optimized)
 ✅ Privy wallet integration (seamless UX)
-✅ Real-time blockchain updates (<1s)
+✅ Helius webhooks + Convex events
 ✅ 8 characters (some NFT-gated)
 ✅ 2 maps (bg1, bg2)
 ✅ Bet-to-size scaling
 ✅ Smart explosion effects (winner stays)
 ✅ Non-custodial escrow
-✅ 95/5 prize distribution
+✅ Dynamic prize distribution (95/5 or 100/0)
+✅ VRF cost optimization (deferred to 2nd bet)
+✅ Single player full refund (0% house fee)
 
-### Not Implemented
-❌ Bank bot (solo player opponent)
-❌ Top-4 betting phase
-❌ Spectator betting
-❌ Multi-phase variable games
-❌ Custom VRF program
-❌ Multiple bets per player per game
+### Removed/Simplified
+❌ active_game PDA (events-based sync instead)
+❌ Orao VRF (replaced with Magic Block)
+❌ VRF on game creation (deferred to 2nd bet)
+❌ Fixed house fee (0% for solo, 5% for multi)
+❌ Blockchain polling (Helius webhooks instead)
 
-### Simplified vs Original Design
-The actual codebase is **simpler and more elegant** than originally documented:
-- Single-round games (not variable 3-7 phases)
-- One VRF call per game (not two)
-- Self-betting only (no spectator phase)
-- Orao VRF (not custom implementation)
-- Fixed 3 phases (waiting → arena → results)
+### Key Optimizations
+✅ **VRF Cost**: 80-90% reduction vs Orao VRF
+✅ **Single Player**: 100% VRF cost savings (no request)
+✅ **Architecture**: Simplified (no active_game PDA)
+✅ **Events**: Real-time via Helius webhooks
+✅ **Fairness**: Single player full refund (0% fee)
 
-This simplification makes the game:
-- Easier to understand
-- Faster to play
-- Cheaper to run
-- More reliable (fewer edge cases)
-- Still provably fair (Orao VRF)
+### Flow Confirmed
+✅ Convex creates game (no bets, no VRF, no countdown)
+✅ First bet starts countdown (60s)
+✅ Second bet triggers VRF request (Magic Block)
+✅ Countdown expires → end_game
+✅ Single player: full refund, deterministic seed
+✅ Multi-player: 95/5 split, VRF randomness
+✅ Prize sent → return to demo
+✅ 15s later, Convex creates next game

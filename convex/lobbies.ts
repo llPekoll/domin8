@@ -8,7 +8,14 @@
  * - Cron runs every 30 seconds as a backup to catch missed updates
  */
 
-import { mutation, query, action, internalMutation, internalQuery, internalAction } from "./_generated/server";
+import {
+  mutation,
+  query,
+  action,
+  internalMutation,
+  internalQuery,
+  internalAction,
+} from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Solana1v1QueryClient } from "./lib/solana_1v1";
@@ -18,8 +25,10 @@ import { Solana1v1Client } from "./lib/solana_1v1";
 // CONFIGURATION
 // ============================================================================
 
-const RPC_ENDPOINT = process.env.RPC_URL || process.env.VITE_SOLANA_RPC_URL || "https://devnet.helius-rpc.com/?api-key=0df32d0b-da4f-49b3-b154-deaceac254c0";
-const CRANK_AUTHORITY_PRIVATE_KEY = process.env.CRANK_AUTHORITY_PRIVATE_KEY || "";
+const RPC_ENDPOINT =
+  process.env.RPC_URL ||
+  process.env.VITE_SOLANA_RPC_URL ||
+  "https://devnet.helius-rpc.com/?api-key=0df32d0b-da4f-49b3-b154-deaceac254c0";
 
 // ============================================================================
 // QUERIES
@@ -242,7 +251,6 @@ export const cancelLobbyInDb = mutation({
   },
 });
 
-
 /**
  * Internal mutation to create a lobby in Convex
  * Called by createLobby action after transaction confirmation
@@ -417,7 +425,10 @@ export const createLobby = action({
     mapId: v.number(), // Map ID (0-255)
     transactionHash: v.string(), // Solana transaction hash (for verification)
   },
-  handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; lobbyPda: string; action: string }> => {
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ success: boolean; lobbyId: number; lobbyPda: string; action: string }> => {
     try {
       const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
 
@@ -484,7 +495,10 @@ export const joinLobby = action({
     characterB: v.number(), // Character/skin ID (0-255)
     transactionHash: v.string(), // Solana transaction hash (for verification)
   },
-  handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; action: string }> => {
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ success: boolean; lobbyId: number; winner: string; action: string }> => {
     try {
       const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
 
@@ -510,6 +524,17 @@ export const joinLobby = action({
       if (lobbyAccount.status === 0) {
         throw new Error("Lobby status is still 0 (Created) after join");
       }
+
+      // Determine winner from on-chain account
+      const winner = lobbyAccount.winner.toString();
+
+      // Update Convex immediately after blockchain confirmation
+      await ctx.runMutation(internal.lobbies._internalJoinLobby, {
+        lobbyId: args.lobbyId,
+        playerB: args.playerBWallet,
+        characterB: args.characterB,
+        winner,
+      });
 
       return {
         success: true,
@@ -621,7 +646,7 @@ const _getBlockchainLobbyCount = async (queryClient: any): Promise<number> => {
   try {
     console.log("[1v1 Sync] Attempting to fetch config account...");
     const config = await queryClient.getConfigAccount();
-    
+
     if (!config) {
       throw new Error("Config account is null or undefined");
     }
@@ -630,10 +655,9 @@ const _getBlockchainLobbyCount = async (queryClient: any): Promise<number> => {
       throw new Error("Config account missing lobbyCount field");
     }
 
-    const count = typeof config.lobbyCount === 'number' 
-      ? config.lobbyCount 
-      : config.lobbyCount.toNumber();
-      
+    const count =
+      typeof config.lobbyCount === "number" ? config.lobbyCount : config.lobbyCount.toNumber();
+
     console.log(`[1v1 Sync] Successfully fetched blockchain lobby count: ${count}`);
     return count;
   } catch (error) {
@@ -758,9 +782,10 @@ const _syncMissingLobby = async (
 
     // Extract fields, handling both Anchor-parsed and raw-parsed formats
     const playerA = onChainLobby.playerA;
-    const amount = typeof onChainLobby.amount === 'number' 
-      ? onChainLobby.amount 
-      : onChainLobby.amount.toNumber();
+    const amount =
+      typeof onChainLobby.amount === "number"
+        ? onChainLobby.amount
+        : onChainLobby.amount.toNumber();
     const characterA = onChainLobby.skinA;
     const mapId = onChainLobby.map;
     const lobbyPda = onChainLobby.publicKey?.toString() || `lobby_${lobbyId}`;
@@ -1152,7 +1177,9 @@ export const settlePendingLobbies = internalAction({
  */
 export const syncLobbyFromBlockchain = internalAction({
   args: {},
-  handler: async (ctx): Promise<{
+  handler: async (
+    ctx
+  ): Promise<{
     checked: number;
     synced: number;
     errors: number;

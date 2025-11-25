@@ -61,10 +61,15 @@ export class DemoScene extends Scene {
 
   // Demo UI elements
   private demoUIContainer!: Phaser.GameObjects.Container;
-  private insertCoinText!: Phaser.GameObjects.Text;
+  // private insertCoinText!: Phaser.GameObjects.Text;
+  private demoModeText!: Phaser.GameObjects.Text; // "Demo mode!" - larger text
+  private instructionText!: Phaser.GameObjects.Text; // "please insert coin..." - smaller text
   private countdownText!: Phaser.GameObjects.Text;
   private phaseText!: Phaser.GameObjects.Text;
   private subText!: Phaser.GameObjects.Text;
+  private demoBadge!: Phaser.GameObjects.Container;
+  private demoBadgeBackground!: Phaser.GameObjects.Rectangle;
+  private demoBadgeText!: Phaser.GameObjects.Text;
 
   constructor() {
     super("Demo");
@@ -215,6 +220,9 @@ export class DemoScene extends Scene {
     // Create demo UI
     this.createDemoUI();
 
+    // Create persistent demo badge
+    this.createDemoBadge();
+
     // ✅ DON'T auto-start demo - wait for initial state confirmation from GlobalGameStateManager
     // Demo will start when we receive "demo-mode-active" event OR after timeout
     logger.game.debug("[DemoScene] Waiting for initial state confirmation before starting demo...");
@@ -250,6 +258,11 @@ export class DemoScene extends Scene {
     // Update UI
     this.updateDemoUI(this.demoPhase, this.countdown, 0);
 
+    // Show demo badge
+    if (this.demoBadge) {
+      this.demoBadge.setVisible(true);
+    }
+
     // Start countdown timer
     this.startCountdownTimer();
 
@@ -264,6 +277,11 @@ export class DemoScene extends Scene {
     // Hide demo UI
     if (this.demoUIContainer) {
       this.demoUIContainer.setVisible(false);
+    }
+
+    // Hide demo badge
+    if (this.demoBadge) {
+      this.demoBadge.setVisible(false);
     }
   }
 
@@ -382,6 +400,51 @@ export class DemoScene extends Scene {
     });
   }
 
+  private createDemoBadge() {
+    // Create persistent demo badge in top-left corner (avoids LastWinnerCard)
+    const padding = 15;
+    const badgeWidth = 150; // Bigger width
+    const badgeHeight = 45; // Bigger height
+
+    // Position in top-left corner, moved down a bit
+    const badgeX = badgeWidth / 2 + padding;
+    const badgeY = badgeHeight / 2 + padding + 40; // +40px lower
+
+    // Create container
+    this.demoBadge = this.add.container(badgeX, badgeY);
+    this.demoBadge.setDepth(2000); // Above everything
+    this.demoBadge.setScrollFactor(0);
+
+    // Background rectangle with retro arcade styling
+    this.demoBadgeBackground = this.add.rectangle(0, 0, badgeWidth, badgeHeight, 0x000000, 0.9);
+    this.demoBadgeBackground.setStrokeStyle(3, 0xffd700); // Thicker border
+
+    // "DEMO MODE" text - bigger font
+    this.demoBadgeText = this.add.text(0, 0, "DEMO MODE", {
+      fontFamily: "metal-slug",
+      fontSize: "16px", // Bigger font
+      color: "#FFD700",
+      resolution: 4,
+    });
+    this.demoBadgeText.setOrigin(0.5);
+
+    // Add to container
+    this.demoBadge.add([this.demoBadgeBackground, this.demoBadgeText]);
+
+    // Blinking animation (more noticeable than pulse)
+    this.tweens.add({
+      targets: this.demoBadge,
+      alpha: 0.3, // Blink to low opacity
+      duration: 600, // Faster blink
+      yoyo: true,
+      repeat: -1,
+      ease: "Cubic.easeInOut",
+    });
+
+    // Initially hidden (will show when demo starts)
+    this.demoBadge.setVisible(false);
+  }
+
   private createDemoUI() {
     // Create container for all UI elements - bottom 1/3 of screen
     const bottomThirdY = this.camera.height * 0.75; // 75% down the screen
@@ -389,17 +452,30 @@ export class DemoScene extends Scene {
     this.demoUIContainer.setDepth(1000);
     this.demoUIContainer.setScrollFactor(0);
 
-    // "INSERT COIN!" text - scaled for native 396x180 resolution
-    this.insertCoinText = this.add.text(0, 0, "INSERT COIN!", {
+    // "Demo mode!" text - larger, top line
+    this.demoModeText = this.add.text(0, -10, "Demo mode!", {
       fontFamily: "metal-slug",
-      fontSize: "20px", // Scaled down from 64px (approximately 1/3)
+      fontSize: "20px", // Bigger font
       color: "#FFD700",
       stroke: "#000000",
-      strokeThickness: 2, // Scaled down from 6px
-      resolution: 4, // High resolution for crisp text when scaled
+      strokeThickness: 2,
+      resolution: 4,
     });
-    // this.insertCoinText.setAlpha(0);
-    this.insertCoinText.setOrigin(0.5);
+    this.demoModeText.setOrigin(0.5);
+
+    // "please insert coin to start the game" text - smaller, bottom line
+    this.instructionText = this.add.text(0, 10, "Please insert coin to start the game", {
+      fontFamily: "metal-slug",
+      fontSize: "12px", // Smaller font
+      color: "#FFD700",
+      stroke: "#000000",
+      strokeThickness: 1.5,
+      resolution: 4,
+    });
+    this.instructionText.setOrigin(0.5);
+
+    // Keep old insertCoinText for backwards compatibility (hidden)
+    // this.insertCoinText = this.demoModeText;
 
     // Countdown text - scaled for native resolution
     this.countdownText = this.add.text(0, 35, "30", {
@@ -436,20 +512,23 @@ export class DemoScene extends Scene {
 
     // Add to container
     this.demoUIContainer.add([
-      this.insertCoinText,
+      this.demoModeText,
+      this.instructionText,
       this.countdownText,
       this.phaseText,
       this.subText,
     ]);
 
-    // Add instant blink animation to INSERT COIN text (no fade)
+    // Add instant blink animation to demo mode texts (no fade)
     // Stays visible longer (1000ms), then briefly disappears (300ms)
     const blinkCycle = () => {
       // Start visible for 1000ms
-      this.insertCoinText.setAlpha(1);
+      this.demoModeText.setAlpha(1);
+      this.instructionText.setAlpha(1);
       this.time.delayedCall(1000, () => {
         // Hide for 300ms
-        this.insertCoinText.setAlpha(0);
+        this.demoModeText.setAlpha(0);
+        this.instructionText.setAlpha(0);
         this.time.delayedCall(300, () => {
           // Repeat the cycle
           blinkCycle();
@@ -470,26 +549,31 @@ export class DemoScene extends Scene {
     if (!this.demoUIContainer) return;
 
     if (phase === "spawning") {
-      // Show INSERT COIN + countdown
-      this.insertCoinText.setVisible(true);
+      // Show demo mode text + countdown
+      this.demoModeText.setVisible(true);
+      this.instructionText.setVisible(true);
       this.countdownText.setVisible(true);
       this.countdownText.setText(countdown.toString());
       this.phaseText.setVisible(false);
       this.subText.setVisible(false);
     } else if (phase === "arena") {
-      // Show Battle Royale
-      this.insertCoinText.setVisible(false);
+      // Show Battle Royale with clear demo context
+      this.demoModeText.setVisible(false);
+      this.instructionText.setVisible(false);
       this.countdownText.setVisible(false);
       this.phaseText.setVisible(true);
-      this.phaseText.setText("⚔️ BATTLE ROYALE!");
+      this.phaseText.setText("⚔️ AI BATTLE DEMO");
       this.subText.setVisible(true);
-      this.subText.setText(`${participantCount} bots fighting for victory`);
+      this.subText.setText(`Watching ${participantCount} AI bots compete`);
     } else if (phase === "results") {
-      // Hide all UI in results phase - no need to show anything in demo mode
-      this.insertCoinText.setVisible(false);
+      // Show demo reminder during results
+      this.demoModeText.setVisible(false);
+      this.instructionText.setVisible(false);
       this.countdownText.setVisible(false);
-      this.phaseText.setVisible(false);
-      this.subText.setVisible(false);
+      this.phaseText.setVisible(true);
+      this.phaseText.setText("DEMO COMPLETE");
+      this.subText.setVisible(true);
+      this.subText.setText("Place a bet to join the real game!");
     }
   }
 
@@ -635,7 +719,9 @@ export class DemoScene extends Scene {
 
     // Create bitmap mask from the image
     this.arenaMask = maskImage.createBitmapMask();
-    logger.game.debug(`[DemoScene] Arena mask created using ${maskKey} with scale ${RESOLUTION_SCALE}`);
+    logger.game.debug(
+      `[DemoScene] Arena mask created using ${maskKey} with scale ${RESOLUTION_SCALE}`
+    );
   }
 
   /**

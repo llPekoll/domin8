@@ -3,19 +3,16 @@
  * Shows last winner info and current game state for debugging during development
  */
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useActiveGame } from "../hooks/useActiveGame";
 import { X, Trophy, TrendingUp, Users, Clock, Coins, Share2 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { usePrivyWallet } from "../hooks/usePrivyWallet";
 
 export function BlockchainDebugDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [jsonCopied, setJsonCopied] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
   const { activeGame, activeGamePDA } = useActiveGame();
-  const { connected } = usePrivyWallet();
 
   // Get winner's display name if winner exists
   const winnerAddress = activeGame?.winner?.toString();
@@ -52,22 +49,6 @@ export function BlockchainDebugDialog() {
     const maxAgeMs = 60 * 1000; // 1 minute
     return timeSinceEnd < maxAgeMs;
   }, [hasWinner, activeGame?.status, activeGame?.endTimestamp]);
-
-  // Auto-show tooltip when winner appears
-  useEffect(() => {
-    if (shouldShowTooltip && !isOpen && connected) {
-      // Set a timeout to delay a bit, for better UX
-      const showTimer = setTimeout(() => setShowTooltip(true), 5000);
-
-      // Auto-hide after 15 seconds total (5s delay + 10s shown)
-      const hideTimer = setTimeout(() => setShowTooltip(false), 15000);
-
-      return () => {
-        clearTimeout(showTimer);
-        clearTimeout(hideTimer);
-      };
-    }
-  }, [shouldShowTooltip, isOpen, connected]);
 
   const shareWinnerOnX = () => {
     if (!hasWinner) return;
@@ -127,8 +108,6 @@ ${gameUrl}
               rel="noopener noreferrer"
               className="p-2 bg-gray-800 hover:bg-gray-900 text-white rounded-full shadow-lg transition-colors block"
               aria-label="X (Twitter)"
-              onMouseEnter={() => shouldShowTooltip && setShowTooltip(true)}
-              onMouseLeave={() => setShowTooltip(false)}
               onClick={(e) => {
                 if (shouldShowTooltip) {
                   e.preventDefault();
@@ -140,69 +119,6 @@ ${gameUrl}
                 <path d="M18.244 2.25h3.308l-7.227 8.26l8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
               </svg>
             </a>
-
-            {/* Pixel Art Tooltip */}
-            {shouldShowTooltip && showTooltip && (
-              <div
-                className="absolute right-full mr-3 top-1/2 -translate-y-1/2 z-[60] animate-bounce"
-                style={{
-                  imageRendering: "pixelated",
-                  filter: "contrast(1.1)",
-                }}
-              >
-                {/* Tooltip Arrow */}
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full">
-                  <div
-                    className="w-0 h-0 border-y-[6px] border-y-transparent border-l-[8px] border-l-yellow-400"
-                    style={{ imageRendering: "pixelated" }}
-                  />
-                  <div
-                    className="absolute top-1/2 -translate-y-1/2 right-[2px] w-0 h-0 border-y-[4px] border-y-transparent border-l-[6px] border-l-gray-900"
-                    style={{ imageRendering: "pixelated" }}
-                  />
-                </div>
-
-                {/* Tooltip Content */}
-                {/*<div
-                  className="bg-gray-900 border-2 border-yellow-400 rounded px-3 py-2 shadow-2xl whitespace-nowrap"
-                  style={{
-                    boxShadow:
-                      "0 0 20px rgba(250, 204, 21, 0.5), inset 0 0 10px rgba(250, 204, 21, 0.1)",
-                    imageRendering: "pixelated",
-                  }}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="text-yellow-400 text-lg">🏆</div>
-                    <div
-                      className="font-bold text-yellow-400 text-sm"
-                      style={{ fontFamily: "monospace" }}
-                    >
-                      WINNER!
-                    </div>
-                  </div>
-                  <div className="text-white text-xs mb-2" style={{ fontFamily: "monospace" }}>
-                    {winnerDisplayName}
-                  </div>
-                  <div
-                    className="flex items-center gap-2 text-green-400 text-xs font-bold mb-2"
-                    style={{ fontFamily: "monospace" }}
-                  >
-                    <span>💰</span>
-                    <span>{winnerPrizeSOL} SOL</span>
-                  </div>
-                  <button
-                    onClick={shareWinnerOnX}
-                    className="text-center text-white text-xs font-bold py-1 px-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 rounded border border-purple-400 transition-all w-full"
-                    style={{
-                      fontFamily: "monospace",
-                      textShadow: "1px 1px 0px rgba(0,0,0,0.5)",
-                    }}
-                  >
-                    👆 SHARE ON X!
-                  </button>
-                </div>*/}
-              </div>
-            )}
           </div>
         </div>
       </div>

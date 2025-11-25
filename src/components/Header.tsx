@@ -2,8 +2,9 @@ import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+// import { Link } from "react-router-dom";
 import { ProfileDialog } from "./ProfileDialog";
+import { LeaderboardDialog } from "./LeaderboardDialog";
 import { PrivyWalletButton } from "./PrivyWalletButton";
 import { SoundControl } from "./SoundControl";
 import { toast } from "sonner";
@@ -15,6 +16,7 @@ export function Header() {
   const { connected, publicKey, externalWalletAddress, solBalance, isLoadingBalance } =
     usePrivyWallet();
   const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [showLeaderboardDialog, setShowLeaderboardDialog] = useState(false);
   const [hasAttemptedCreation, setHasAttemptedCreation] = useState(false);
 
   const createPlayer = useMutation(api.players.createPlayer);
@@ -69,18 +71,24 @@ export function Header() {
 
               {/* Center - Navigation Links */}
               <div className="flex-1 flex gap-6">
-                <Link
+                {/*<Link
                   to="/"
                   className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
                 >
                   Arena
-                </Link>
-                <Link
+                </Link>*/}
+                {/*<Link
                   to="/1v1"
                   className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
                 >
                   1<span className="px-0.5">v</span>1
-                </Link>
+                </Link>*/}
+                {/*<Link
+                  to="/referrals"
+                  className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
+                >
+                  Referrals
+                </Link>*/}
               </div>
 
               {/* Right Side - User Controls */}
@@ -92,6 +100,30 @@ export function Header() {
 
                 {connected && (
                   <>
+                    {/* Divider */}
+                    <div className="h-8 w-px bg-indigo-500/30"></div>
+
+                    {/* Points */}
+                    <button
+                      onClick={() => setShowLeaderboardDialog(true)}
+                      className="flex flex-col hover:bg-indigo-800/30 px-2 py-1 rounded-lg transition-all cursor-pointer group"
+                      title="View Leaderboard"
+                    >
+                      <div className="text-xs text-indigo-400/80 leading-tight group-hover:text-indigo-300/90">
+                        Points
+                      </div>
+                      <div className="text-indigo-200 font-bold text-base flex items-center gap-1 leading-tight group-hover:text-indigo-100">
+                        {playerData ? (
+                          <>
+                            <span className="text-yellow-400">🏆</span>
+                            {(playerData.totalPoints ?? 0).toLocaleString()}
+                          </>
+                        ) : (
+                          <span className="text-sm">--</span>
+                        )}
+                      </div>
+                    </button>
+
                     {/* Divider */}
                     <div className="h-8 w-px bg-indigo-500/30"></div>
 
@@ -148,6 +180,8 @@ export function Header() {
           walletAddress={publicKey.toString()}
         />
       )}
+
+      <LeaderboardDialog open={showLeaderboardDialog} onOpenChange={setShowLeaderboardDialog} />
     </>
   );
 }

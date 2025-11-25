@@ -150,7 +150,8 @@ export const executeEndGame = internalAction({
 
       // 5. Call Solana endGame() instruction
       console.log(`Round ${roundId}: Calling end_game instruction...`);
-      const txSignature = await solanaClient.endGame(roundId);
+      const txResult = await solanaClient.endGame(roundId);
+      const txSignature = txResult.signature;
 
       // 6. Wait for confirmation
       const confirmed = await solanaClient.confirmTransaction(txSignature);
@@ -318,7 +319,8 @@ export const executeSendPrize = internalAction({
       console.log(`Round ${roundId}: Winner: ${gameRound.winner}`);
       console.log(`Round ${roundId}: Prize: ${gameRound.winnerPrize} lamports`);
 
-      const txSignature = await solanaClient.sendPrizeWinner(roundId);
+      const txResult = await solanaClient.sendPrizeWinner(roundId);
+      const txSignature = txResult.signature;
 
       // 3. Wait for confirmation
       const confirmed = await solanaClient.confirmTransaction(txSignature);
@@ -337,6 +339,19 @@ export const executeSendPrize = internalAction({
         const updatedGame = await solanaClient.getGameRound(roundId);
 
         if (updatedGame?.winnerPrize === 0) {
+          // Award points to winner for the prize amount
+          if (gameRound.winner) {
+            try {
+              await ctx.runMutation(internal.players.awardPointsInternal, {
+                walletAddress: gameRound.winner.toString(),
+                amountLamports: gameRound.winnerPrize,
+              });
+              console.log(`Round ${roundId}: Points awarded to winner for prize`);
+            } catch (pointsError) {
+              console.error(`Round ${roundId}: Failed to award points to winner:`, pointsError);
+            }
+          }
+
           await ctx.runMutation(internal.syncServiceMutations.upsertGameState, {
             gameRound: {
               roundId: updatedGame.gameRound,

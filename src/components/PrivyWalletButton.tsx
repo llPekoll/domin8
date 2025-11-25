@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { useWallets, useFundWallet } from "@privy-io/react-auth/solana";
+import { useWallets } from "@privy-io/react-auth/solana";
 import {
   LogIn,
   LogOut,
@@ -17,6 +17,7 @@ import { Button } from "./ui/button";
 import { isPhantomInstalled, openPhantomDownload } from "../lib/solana-wallet-utils";
 import { toast } from "sonner";
 import { WithdrawDialog } from "./WithdrawDialog";
+import { useFundWallet } from "../hooks/useFundWallet";
 
 interface PrivyWalletButtonProps {
   className?: string;
@@ -34,7 +35,7 @@ export function PrivyWalletButton({
 }: PrivyWalletButtonProps) {
   const { ready, authenticated, login, logout, user } = usePrivy();
   const { wallets } = useWallets();
-  const { fundWallet } = useFundWallet();
+  const { handleAddFunds } = useFundWallet();
   const [isMounted, setIsMounted] = useState(false);
   const [hasPhantom, setHasPhantom] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -100,7 +101,7 @@ export function PrivyWalletButton({
     }
   }, [authenticated, walletAddress, onWalletConnected]);
 
-  const handleAddFunds = async () => {
+  const onAddFundsClick = async () => {
     setDropdownOpen(false);
 
     if (!embeddedWallet) {
@@ -108,32 +109,7 @@ export function PrivyWalletButton({
       return;
     }
 
-    try {
-      await fundWallet({
-        address: embeddedWallet.address,
-        options: {
-          chain: `solana:${import.meta.env.VITE_SOLANA_NETWORK}`,
-          amount: "0.01",
-        },
-      });
-    } catch (error: any) {
-      if (error?.message?.includes("not enabled")) {
-        try {
-          await navigator.clipboard.writeText(embeddedWallet.address);
-          toast.info("Funding not yet enabled. In-game wallet address copied!", {
-            description: "Send SOL to this address to fund your in-game wallet",
-            duration: 5000,
-          });
-        } catch {
-          toast.error("Funding not enabled. Enable MoonPay in Privy Dashboard.", {
-            description: "Go to dashboard.privy.io → Plugins → MoonPay Fiat On-Ramp",
-            duration: 5000,
-          });
-        }
-      } else {
-        toast.error("Failed to open funding flow");
-      }
-    }
+    await handleAddFunds(embeddedWallet.address);
   };
 
   const handleWithdraw = () => {
@@ -240,7 +216,7 @@ export function PrivyWalletButton({
               </button>
               <div className="border-t border-gray-700 my-1" />
               <button
-                onClick={() => void handleAddFunds()}
+                onClick={() => void onAddFundsClick()}
                 className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
@@ -315,7 +291,7 @@ export function PrivyWalletButton({
             </button>
             <div className="border-t border-gray-700 my-1" />
             <button
-              onClick={() => void handleAddFunds()}
+              onClick={() => void onAddFundsClick()}
               className="w-full px-4 py-2.5 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-3 transition-colors"
             >
               <Plus className="w-4 h-4" />

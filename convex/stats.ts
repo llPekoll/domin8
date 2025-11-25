@@ -222,41 +222,68 @@ export const getAllTimeStats = query({
 export const getLastFinishedGame = query({
   args: {},
   handler: async (ctx) => {
-    // Query all finished games, ordered by roundId descending
+    // Query finished games, ordered by roundId descending using compound index
     const finishedGames = await ctx.db
       .query("gameRoundStates")
-      .withIndex("by_status", (q) => q.eq("status", "finished"))
+      .withIndex("by_status_and_round", (q) => q.eq("status", "finished"))
       .order("desc")
-      .collect();
+      .take(20); // Only fetch recent games for efficiency
 
     if (finishedGames.length === 0) {
       return null;
     }
 
-    // Filter to only games with valid bet data
-    const validGames = finishedGames.filter(
+    // Current time in seconds
+    const currentTime = Math.floor(Date.now() / 1000);
+    // Minimum delay before showing a finished game (15 seconds for celebration phase)
+    const MIN_DISPLAY_DELAY = 15;
+
+    // Find the first valid game with a winner that ended at least 15 seconds ago
+    // This prevents spoiling the winner during the celebration phase
+    const lastGame = finishedGames.find(
       (game) =>
         game.winner &&
         game.winningBetIndex !== undefined &&
-        game.betSkin &&
-        game.betSkin.length > 0 &&
-        game.betAmounts &&
-        game.betAmounts.length > 0
+        game.totalPot &&
+        game.totalPot > 0 &&
+        currentTime - game.endTimestamp >= MIN_DISPLAY_DELAY
     );
 
-    if (validGames.length === 0) {
+    if (!lastGame) {
       return null;
     }
 
-    // Get the most recent finished game with valid data (highest roundId)
-    const lastGame = validGames.reduce((latest, current) => {
-      return current.roundId > latest.roundId ? current : latest;
-    }, validGames[0]);
+    // Get the winning bet details - handle case where bet arrays might be empty
+    const winningBetIndex = lastGame.winningBetIndex!;
+    let hasBetData = lastGame.betSkin && lastGame.betSkin.length > winningBetIndex;
+    let winningBet = hasBetData ? lastGame.betSkin![winningBetIndex] : undefined;
+    let winningAmount =
+      lastGame.betAmounts && lastGame.betAmounts.length > winningBetIndex
+        ? lastGame.betAmounts![winningBetIndex]
+        : undefined;
 
-    // Get the winning bet details (we know these exist from the filter above)
-    const winningBetIndex = lastGame.winningBetIndex!; // Non-null assertion - we filtered for this
-    const winningBet = lastGame.betSkin![winningBetIndex];
-    const winningAmount = lastGame.betAmounts![winningBetIndex];
+    // If bet data is missing from finished state, try to get it from the waiting state
+    if (!hasBetData || winningAmount === undefined) {
+      const waitingState = await ctx.db
+        .query("gameRoundStates")
+        .withIndex("by_round_and_status", (q) => q.eq("roundId", lastGame.roundId).eq("status", "waiting"))
+        .first();
+
+      if (waitingState) {
+        if (!hasBetData && waitingState.betSkin && waitingState.betSkin.length > winningBetIndex) {
+          winningBet = waitingState.betSkin[winningBetIndex];
+          hasBetData = true;
+        }
+        if (winningAmount === undefined && waitingState.betAmounts && waitingState.betAmounts.length > winningBetIndex) {
+          winningAmount = waitingState.betAmounts[winningBetIndex];
+        }
+      }
+    }
+
+    // Final fallback for winning amount
+    if (winningAmount === undefined) {
+      winningAmount = lastGame.totalPot! / (lastGame.betCount || 1);
+    }
 
     // Calculate prize (95% of total pot)
     const prizeAmount = lastGame.totalPot ? lastGame.totalPot * 0.95 : 0;
@@ -274,7 +301,7 @@ export const getLastFinishedGame = query({
     return {
       roundId: lastGame.roundId,
       winnerAddress: lastGame.winner,
-      characterId: winningBet,
+      characterId: winningBet ?? 1, // Default to character 1 if not available
       characterName: character?.name || "Unknown",
       characterAssetPath: character?.assetPath || null,
       prizeAmount: prizeSOL,

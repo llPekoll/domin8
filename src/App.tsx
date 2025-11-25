@@ -8,12 +8,14 @@ import { MultiParticipantPanel } from "./components/MultiParticipantPanel";
 import { PotDisplayPanel } from "./components/PotDisplayPanel";
 import { WinnerShareOverlay } from "./components/WinnerShareOverlay";
 import { LastWinnerCard } from "./components/LastWinnerCard";
+import { LandscapeEnforcer } from "./components/LandscapeEnforcer";
 import { useActiveGame } from "./hooks/useActiveGame";
 import { usePrivyWallet } from "./hooks/usePrivyWallet";
 import { EventBus } from "./game/EventBus";
 import { setActiveGameData, setCurrentUserWallet } from "./game/main";
 import type { Character } from "./types/character";
 import { useAutoCreatePlayer } from "./hooks/useAutoCreatePlayer";
+import { ConnectWalletOverlay } from "./components/ConnectWalletOverlay";
 
 export default function App() {
   const phaserRef = useRef<IRefPhaserGame | null>(null);
@@ -22,14 +24,9 @@ export default function App() {
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
 
   // Get current user's wallet
-  const { connected, publicKey, externalWalletAddress } = usePrivyWallet();
-
+  const { connected, ready: walletReady, publicKey, externalWalletAddress } = usePrivyWallet();
   // Auto-create player when wallet connects
-  useAutoCreatePlayer(
-    connected,
-    publicKey?.toBase58() || null,
-    externalWalletAddress || undefined
-  );
+  useAutoCreatePlayer(connected, publicKey?.toBase58() || null, externalWalletAddress || undefined);
 
   // Get current game state directly from blockchain (no Convex, <1s updates)
   const { activeGame: currentRoundState } = useActiveGame();
@@ -100,9 +97,15 @@ export default function App() {
 
   return (
     <div className="relative min-h-screen overflow-hidden">
+      {/* Landscape Enforcer - Highest priority overlay */}
+      <LandscapeEnforcer />
+
       <div className="fixed inset-0 w-full h-full">
         <PhaserGame ref={phaserRef} />
       </div>
+
+      {/* Connect Wallet Overlay - Shows when not connected */}
+      {walletReady && !connected && <ConnectWalletOverlay />}
 
       <div className="relative z-10">
         <Header />

@@ -1,0 +1,19 @@
+{
+  "name": "Domin8 Test NFT #1",
+  "description": "A test NFT for the Domin8 battle game on Solana devnet",
+  "image": "0.png",
+  "attributes": [
+    {
+      "trait_type": "Game",
+      "value": "Domin8"
+    },
+    {
+      "trait_type": "Type",
+      "value": "Battle Character"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Common"
+    }
+  ]
+}
