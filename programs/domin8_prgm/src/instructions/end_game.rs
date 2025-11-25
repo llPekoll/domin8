@@ -1,11 +1,9 @@
 use crate::*;
 use anchor_lang::prelude::*;
-use orao_solana_vrf::{
-    state::RandomnessAccountData,
-    RANDOMNESS_ACCOUNT_SEED,
-    ID as ORAO_VRF_ID,
-};
+use ephemeral_vrf_sdk::anchor::vrf;
+use ephemeral_vrf_sdk::instructions::{create_request_randomness_ix, RequestRandomnessParams};
 
+#[vrf]
 #[derive(Accounts)]
 #[instruction(
     round_id: u64,
@@ -28,13 +26,6 @@ pub struct EndGame<'info> {
     )]
     pub game: Box<Account<'info, Domin8Game>>,
 
-    #[account(
-        mut,
-        seeds = [b"active_game"],
-        bump,
-    )]
-    pub active_game: Box<Account<'info, Domin8Game>>,
-
     #[account(mut)]
     pub admin: Signer<'info>,
 
@@ -42,27 +33,22 @@ pub struct EndGame<'info> {
     /// CHECK: Treasury wallet
     pub treasury: UncheckedAccount<'info>,
 
-    /// CHECK: Must equal PDA of (RANDOMNESS_ACCOUNT_SEED, open_request.force) for ORAO_VRF_ID
-    #[account(
-        seeds = [RANDOMNESS_ACCOUNT_SEED, &game.force],
-        bump,
-        seeds::program = ORAO_VRF_ID
-    )]
-    pub vrf_randomness: AccountInfo<'info>,
+    /// CHECK: The oracle queue for Magic Block VRF
+    #[account(mut, address = ephemeral_vrf_sdk::consts::DEFAULT_QUEUE)]
+    pub oracle_queue: AccountInfo<'info>,
 
     pub system_program: Program<'info, System>,
 }
 
 /// End game, draw winner, and distribute prizes (admin only)
+/// Uses randomness already provided by Magic Block VRF callback
 ///
 /// Accounts:
 /// 0. `[writable]` config: [Domin8Config] Configuration
 /// 1. `[writable]` game: [Domin8Game] Game round to end
-/// 2. `[writable]` active_game: [Domin8Game] Active game singleton
-/// 3. `[writable, signer]` admin: [AccountInfo] Administrator account
-/// 4. `[writable]` treasury: [AccountInfo] Treasury wallet for fees
-/// 5. `[]` vrf_randomness: [AccountInfo] Orao VRF randomness account
-/// 6. `[]` system_program: [AccountInfo] System program
+/// 2. `[writable, signer]` admin: [AccountInfo] Administrator account
+/// 3. `[writable]` treasury: [AccountInfo] Treasury wallet for fees
+/// 4. `[]` system_program: [AccountInfo] System program
 ///
 /// Data:
 /// - round_id: [u64] Round ID for the game
@@ -76,7 +62,6 @@ pub fn handler(
 
     // First, do all validations without mutable borrows
     let game_data = &ctx.accounts.game;
-    let active_game_data = &ctx.accounts.active_game;
     let config_data = &ctx.accounts.config;
 
     // Verify admin authorization
@@ -95,28 +80,69 @@ pub fn handler(
     require!(treasury.key() == config_data.treasury, Domin8Error::Unauthorized);
 
     // Ensure there are bets to process
-    require!(!active_game_data.bets.is_empty(), Domin8Error::NoBets);
+    require!(!game_data.bets.is_empty(), Domin8Error::NoBets);
 
-    // Get VRF randomness from Orao VRF
-    let mut data = &ctx.accounts.vrf_randomness.try_borrow_data()?[..];
-    let vrf_state = RandomnessAccountData::try_deserialize(&mut data)
-        .map_err(|_| Domin8Error::RandomnessNotReady)?;
+    // For multi-player games, request VRF if not done yet
+    if game_data.user_count > 1 && !game_data.vrf_requested {
+        msg!("Multi-player game detected. Requesting VRF randomness...");
 
-    // Pull the randomness (32 bytes) if fulfilled
-    let rnd32 = vrf_state
-        .fulfilled_randomness()
-        .ok_or(Domin8Error::RandomnessNotReady)?;
+        // Mark VRF as requested
+        let game = &mut ctx.accounts.game;
+        game.vrf_requested = true;
 
-    // Use first 8 bytes as u64
-    let randomness = u64::from_le_bytes(rnd32[0..8].try_into().unwrap());
-    msg!("VRF randomness (u64): {}", randomness);
+        // Encode round_id in caller_seed so callback can derive game PDA
+        let mut caller_seed = [0u8; 32];
+        caller_seed[0..8].copy_from_slice(&round_id.to_le_bytes());
+
+        // Specify accounts to pass to callback (convert to SerializableAccountMeta)
+        use ephemeral_vrf_sdk::types::SerializableAccountMeta;
+        let callback_accounts = Some(vec![
+            SerializableAccountMeta {
+                pubkey: ctx.accounts.game.key(),
+                is_signer: false,
+                is_writable: true,
+            },
+        ]);
+
+        let ix = create_request_randomness_ix(RequestRandomnessParams {
+            payer: admin.key(), // Admin (crank) pays for VRF
+            oracle_queue: ctx.accounts.oracle_queue.key(),
+            callback_program_id: crate::ID,
+            callback_discriminator: instruction::VrfCallback::DISCRIMINATOR.to_vec(),
+            caller_seed,
+            accounts_metas: callback_accounts,
+            ..Default::default()
+        });
+
+        // Admin signs the VRF request
+        ctx.accounts.invoke_signed_vrf(&admin.to_account_info(), &ix)?;
+
+        msg!("VRF request submitted. Call end_game again in 3 seconds.");
+        return Ok(()); // Return early, crank will retry after VRF callback
+    }
+
+    // Use randomness from Magic Block VRF callback (already stored in game)
+    // For single player games, randomness might not be set (no VRF request)
+    let randomness = if game_data.user_count == 1 {
+        // Single player - use deterministic value based on game data
+        let mut seed = round_id;
+        seed = seed.wrapping_mul(game_data.total_deposit);
+        seed = seed.wrapping_add(game_data.start_date as u64);
+        msg!("Single player - using deterministic seed: {}", seed);
+        seed
+    } else {
+        // Multi-player - use VRF randomness from callback
+        require!(game_data.rand != 0, Domin8Error::RandomnessNotReady);
+        msg!("Magic Block VRF randomness: {}", game_data.rand);
+        game_data.rand
+    };
 
     // Select winner using weighted random selection based on bet amounts
     let (selected_winner, winning_bet_index) = Utils::select_winner_by_weight(
         randomness,
-        &active_game_data.bets,
-        &active_game_data.wallets,
-        active_game_data.total_deposit
+        &game_data.bets,
+        &game_data.wallets,
+        game_data.total_deposit
     )?;
 
     // Calculate prize distribution from the FULL POT
@@ -127,7 +153,7 @@ pub fn handler(
     msg!("Game {} ended: winner={}, pot={}", round_id, selected_winner, total_pot);
 
     // Check if single player (refund scenario - no fees)
-    let is_single_player = active_game_data.user_count == 1;
+    let is_single_player = game_data.user_count == 1;
 
     // Calculate house fee (zero for single player)
     let house_fee_amount = if is_single_player {
@@ -166,14 +192,7 @@ pub fn handler(
 
     // Now do all mutable updates after transfers are complete
     let game = &mut ctx.accounts.game;
-    let active_game = &mut ctx.accounts.active_game;
     let config = &mut ctx.accounts.config;
-
-    // Transfer data from active_game to game without cloning (memory-efficient)
-    game.wallets = std::mem::take(&mut active_game.wallets);
-    game.bets = std::mem::take(&mut active_game.bets);
-    game.total_deposit = active_game.total_deposit;
-    game.user_count = active_game.user_count;
 
     // Store winner prize amount in game state for later claiming
     game.winner_prize = winner_prize;
@@ -183,13 +202,6 @@ pub fn handler(
 
     // Close the game
     game.status = GAME_STATUS_CLOSED;
-
-    // Update active_game to match the game state
-    active_game.winner_prize = winner_prize;
-    active_game.rand = randomness;
-    active_game.winner = Some(selected_winner);
-    active_game.winning_bet_index = Some(winning_bet_index as u64);
-    active_game.status = GAME_STATUS_CLOSED;
 
     // Generate new VRF force seed for next game (using current randomness + game data)
     let mut new_force = [0u8; 32];

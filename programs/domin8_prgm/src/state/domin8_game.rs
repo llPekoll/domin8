@@ -21,6 +21,7 @@ pub struct Domin8Game {
     pub user_count: u64,
     pub force: [u8; 32], // VRF force seed for this game
     pub status: u8,      // 0 = open, 1 = closed
+    pub vrf_requested: bool, // True if VRF has been requested (optimization: only request when 2+ players)
     pub winner: Option<Pubkey>,
     pub winner_prize: u64, // Prize amount to be claimed by winner
     pub winning_bet_index: Option<u64>,

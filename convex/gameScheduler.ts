@@ -150,7 +150,8 @@ export const executeEndGame = internalAction({
 
       // 5. Call Solana endGame() instruction
       console.log(`Round ${roundId}: Calling end_game instruction...`);
-      const txSignature = await solanaClient.endGame(roundId);
+      const txResult = await solanaClient.endGame(roundId);
+      const txSignature = txResult.signature;
 
       // 6. Wait for confirmation
       const confirmed = await solanaClient.confirmTransaction(txSignature);
@@ -318,7 +319,8 @@ export const executeSendPrize = internalAction({
       console.log(`Round ${roundId}: Winner: ${gameRound.winner}`);
       console.log(`Round ${roundId}: Prize: ${gameRound.winnerPrize} lamports`);
 
-      const txSignature = await solanaClient.sendPrizeWinner(roundId);
+      const txResult = await solanaClient.sendPrizeWinner(roundId);
+      const txSignature = txResult.signature;
 
       // 3. Wait for confirmation
       const confirmed = await solanaClient.confirmTransaction(txSignature);
