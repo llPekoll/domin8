@@ -10,7 +10,7 @@ pub use state::*;
 pub use instructions::*;
 pub use utils::*;
 
-declare_id!("7CQJV4nTsE1KLoYajzW1XPgPKz8LRojfy3kUHXFLsWZK"); // TODO: Generate actual program ID
+declare_id!("CSj9CvC2ZZscGJDHJu8fCxxkTiJifWPZWiQCugxJkAad"); // TODO: Generate actual program ID
 
 #[program]
 pub mod domin8_1v1_prgm {
@@ -52,11 +52,20 @@ pub mod domin8_1v1_prgm {
         instructions::cancel_lobby::handler(ctx)
     }
 
-    /// Settle a 1v1 lobby (Resolve winner after VRF fulfillment)
-    pub fn settle_lobby(
-        ctx: Context<SettleLobby>,
+    /// VRF callback - called automatically by MagicBlock VRF
+    /// Stores randomness in lobby, sets status to VRF_RECEIVED
+    pub fn vrf_callback(
+        ctx: Context<VrfCallback>,
         randomness: [u8; 32],
     ) -> Result<()> {
-        instructions::settle_lobby::handler(ctx, randomness)
+        instructions::vrf_callback::handler(ctx, randomness)
+    }
+
+    /// Settle a 1v1 lobby after VRF has been received
+    /// Can be called by anyone to distribute funds based on stored randomness
+    pub fn settle_lobby(
+        ctx: Context<SettleLobby>,
+    ) -> Result<()> {
+        instructions::settle_lobby::handler(ctx)
     }
 }

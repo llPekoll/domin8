@@ -1,9 +1,10 @@
 use anchor_lang::prelude::*;
 
 /// Lobby status constants
-pub const LOBBY_STATUS_CREATED: u8 = 0;    // Waiting for second player
-pub const LOBBY_STATUS_AWAITING_VRF: u8 = 1; // Waiting for ORAO VRF fulfillment
-pub const LOBBY_STATUS_RESOLVED: u8 = 2;   // Both players joined, winner determined, funds distributed
+pub const LOBBY_STATUS_CREATED: u8 = 0;       // Waiting for second player
+pub const LOBBY_STATUS_AWAITING_VRF: u8 = 1;  // Waiting for MagicBlock VRF fulfillment
+pub const LOBBY_STATUS_VRF_RECEIVED: u8 = 2;  // VRF received, ready for settlement
+pub const LOBBY_STATUS_RESOLVED: u8 = 3;      // Winner determined, funds distributed
 
 
 /// Global configuration account for the 1v1 program
@@ -35,8 +36,12 @@ pub struct Domin81v1Lobby {
     pub position_a: [u16; 2],       // Player A's [x, y] spawn position
     pub position_b: Option<[u16; 2]>, // Player B's [x, y] spawn position (None until joined)
     pub map: u8,                    // Map/background ID (0-255)
+    pub randomness: Option<[u8; 32]>, // VRF randomness (None until callback)
 }
 
 impl Domin81v1Lobby {
-    pub const SPACE: usize = 8 + 8 + 32 + 33 + 8 + 32 + 1 + 33 + 8 + 1 + 2 + 4 + 5 + 1; // discriminator + fields
+    // discriminator(8) + lobby_id(8) + player_a(32) + player_b(33) + amount(8) + force(32) 
+    // + status(1) + winner(33) + created_at(8) + skin_a(1) + skin_b(2) + position_a(4) 
+    // + position_b(5) + map(1) + randomness(33)
+    pub const SPACE: usize = 8 + 8 + 32 + 33 + 8 + 32 + 1 + 33 + 8 + 1 + 2 + 4 + 5 + 1 + 33;
 }

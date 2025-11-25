@@ -498,7 +498,7 @@ export const joinLobby = action({
   handler: async (
     ctx,
     args
-  ): Promise<{ success: boolean; lobbyId: number; winner: string; action: string }> => {
+  ): Promise<{ success: boolean; lobbyId: number; action: string }> => {
     try {
       const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
 
@@ -533,7 +533,6 @@ export const joinLobby = action({
         lobbyId: args.lobbyId,
         playerB: args.playerBWallet,
         characterB: args.characterB,
-        winner,
       });
 
       return {

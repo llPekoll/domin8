@@ -52,6 +52,7 @@ pub fn handler(
     lobby.position_a = position_a;
     lobby.position_b = None;
     lobby.map = map;
+    lobby.randomness = None;
 
     // Transfer SOL from Player A to the lobby PDA
     let transfer_instruction = anchor_lang::system_program::Transfer {

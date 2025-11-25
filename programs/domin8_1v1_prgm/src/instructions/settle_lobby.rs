@@ -2,16 +2,10 @@ use anchor_lang::prelude::*;
 use crate::error::Domin81v1Error;
 use crate::state::*;
 
-// MagicBlock ID used for security check
-use ephemeral_vrf_sdk::consts::VRF_PROGRAM_IDENTITY;
-
-// 1. Update Accounts Struct
+/// Settle a lobby after VRF randomness has been received
+/// This instruction can be called by anyone once VRF callback has executed
 #[derive(Accounts)]
 pub struct SettleLobby<'info> {
-    /// CHECK: This ensures the instruction is called by the MagicBlock VRF program
-    #[account(address = VRF_PROGRAM_IDENTITY)]
-    pub vrf_program_identity: Signer<'info>,
-
     #[account(mut)]
     pub config: Account<'info, Domin81v1Config>,
 
@@ -19,8 +13,6 @@ pub struct SettleLobby<'info> {
         mut,
         seeds = [b"domin8_1v1_lobby", lobby.lobby_id.to_le_bytes().as_ref()],
         bump,
-        // Optional: Close the account to refund rent to the creator (Player A)
-        // close = player_a 
     )]
     pub lobby: Account<'info, Domin81v1Lobby>,
 
@@ -39,33 +31,35 @@ pub struct SettleLobby<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// 2. Update Handler Signature
-pub fn handler(ctx: Context<SettleLobby>, randomness: [u8; 32]) -> Result<()> {
+/// Settle lobby handler - distributes funds based on stored randomness
+pub fn handler(ctx: Context<SettleLobby>) -> Result<()> {
     let lobby = &mut ctx.accounts.lobby;
     let config = &ctx.accounts.config;
 
-    msg!("VRF Callback triggered for Lobby {}", lobby.lobby_id);
+    msg!("Settling Lobby {}", lobby.lobby_id);
 
-    // Safety check: Ensure lobby is actually waiting for VRF
+    // Safety check: Ensure lobby has received VRF randomness
     require_eq!(
         lobby.status,
-        LOBBY_STATUS_AWAITING_VRF,
+        LOBBY_STATUS_VRF_RECEIVED,
         Domin81v1Error::InvalidLobbyStatus
     );
 
-    // 3. Use Randomness directly
-    // Example: Even number = Player A wins, Odd = Player B wins
+    // Get the stored randomness
+    let randomness = lobby.randomness.ok_or(Domin81v1Error::RandomnessNotAvailable)?;
+
+    // Determine winner using randomness
+    // Even number = Player A wins, Odd = Player B wins
     let random_val = randomness[0]; 
     let winner_is_player_a = random_val % 2 == 0;
 
     let winner = if winner_is_player_a {
         lobby.player_a
     } else {
-        // Unwrapping is safe here because we checked logic above/in accounts
         lobby.player_b.unwrap()
     };
 
-    // 4. Calculate Payouts
+    // Calculate Payouts
     let total_pot = lobby.amount.checked_mul(2).ok_or(Domin81v1Error::DistributionError)?;
     
     let house_fee = (total_pot as u128)
@@ -76,7 +70,7 @@ pub fn handler(ctx: Context<SettleLobby>, randomness: [u8; 32]) -> Result<()> {
 
     let prize = total_pot.checked_sub(house_fee).ok_or(Domin81v1Error::DistributionError)?;
 
-    // 5. Distribute Funds
+    // Distribute Funds
     // Note: The Lobby PDA is writable and owned by the program, so we can deduct lamports directly.
     
     // Pay House Fee
@@ -96,7 +90,7 @@ pub fn handler(ctx: Context<SettleLobby>, randomness: [u8; 32]) -> Result<()> {
         **winner_account.lamports.borrow_mut() += prize;
     }
 
-    // 6. Update State
+    // Update State
     lobby.winner = Some(winner);
     lobby.status = LOBBY_STATUS_RESOLVED;
 

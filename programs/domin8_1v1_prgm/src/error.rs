@@ -35,4 +35,7 @@ pub enum Domin81v1Error {
 
     #[msg("Randomness value conversion to winner failed")]
     RandomnessConversionError,
+
+    #[msg("Randomness not yet available - VRF callback has not been executed")]
+    RandomnessNotAvailable,
 }

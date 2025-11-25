@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/domin8_1v1_prgm.json`.
  */
 export type Domin81v1Prgm = {
-  "address": "7CQJV4nTsE1KLoYajzW1XPgPKz8LRojfy3kUHXFLsWZK",
+  "address": "CSj9CvC2ZZscGJDHJu8fCxxkTiJifWPZWiQCugxJkAad",
   "metadata": {
     "name": "domin81v1Prgm",
     "version": "0.1.0",
@@ -311,13 +311,6 @@ export type Domin81v1Prgm = {
           "signer": true
         },
         {
-          "name": "playerA",
-          "docs": [
-            "because the callback (settle_lobby) needs to pay them if they win."
-          ],
-          "writable": true
-        },
-        {
           "name": "oracleQueue",
           "writable": true,
           "address": "Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh"
@@ -378,7 +371,8 @@ export type Domin81v1Prgm = {
     {
       "name": "settleLobby",
       "docs": [
-        "Settle a 1v1 lobby (Resolve winner after VRF fulfillment)"
+        "Settle a 1v1 lobby after VRF has been received",
+        "Can be called by anyone to distribute funds based on stored randomness"
       ],
       "discriminator": [
         207,
@@ -391,11 +385,6 @@ export type Domin81v1Prgm = {
         225
       ],
       "accounts": [
-        {
-          "name": "vrfProgramIdentity",
-          "signer": true,
-          "address": "9irBy75QS2BN81FUgXuHcjqceJJRuc9oDkAe8TKVvvAw"
-        },
         {
           "name": "config",
           "writable": true
@@ -449,6 +438,68 @@ export type Domin81v1Prgm = {
         {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "vrfCallback",
+      "docs": [
+        "VRF callback - called automatically by MagicBlock VRF",
+        "Stores randomness in lobby, sets status to VRF_RECEIVED"
+      ],
+      "discriminator": [
+        248,
+        224,
+        55,
+        227,
+        56,
+        10,
+        108,
+        36
+      ],
+      "accounts": [
+        {
+          "name": "vrfProgramIdentity",
+          "signer": true,
+          "address": "9irBy75QS2BN81FUgXuHcjqceJJRuc9oDkAe8TKVvvAw"
+        },
+        {
+          "name": "lobby",
+          "docs": [
+            "Lobby account passed via accounts_metas in VRF request"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  49,
+                  118,
+                  49,
+                  95,
+                  108,
+                  111,
+                  98,
+                  98,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lobby.lobby_id",
+                "account": "domin81v1Lobby"
+              }
+            ]
+          }
         }
       ],
       "args": [
@@ -547,6 +598,11 @@ export type Domin81v1Prgm = {
       "code": 6010,
       "name": "randomnessConversionError",
       "msg": "Randomness value conversion to winner failed"
+    },
+    {
+      "code": 6011,
+      "name": "randomnessNotAvailable",
+      "msg": "Randomness not yet available - VRF callback has not been executed"
     }
   ],
   "types": [
@@ -659,6 +715,17 @@ export type Domin81v1Prgm = {
           {
             "name": "map",
             "type": "u8"
+          },
+          {
+            "name": "randomness",
+            "type": {
+              "option": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
           }
         ]
       }

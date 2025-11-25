@@ -3,7 +3,7 @@ import { Header } from "../components/Header";
 import { CharacterSelection2 } from "../components/CharacterSelection2";
 import { CreateLobby } from "../components/onevone/CreateLobby";
 import { LobbyList } from "../components/onevone/LobbyList";
-// import { MyLobbies } from "../components/onevone/MyLobbies";
+import { LobbyHistory } from "../components/onevone/LobbyHistory";
 import { OneVOneFightScene } from "../components/onevone/OneVOneFightScene";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useQuery, useAction } from "convex/react";
@@ -11,35 +11,60 @@ import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { logger } from "../lib/logger";
 import type { Character } from "../types/character";
-import type { LobbyData } from "../types/lobby";
+
+interface LobbyData {
+  _id: string;
+  lobbyId: number;
+  lobbyPda: string;
+  playerA: string;
+  playerB?: string;
+  amount: number;
+  status: 0 | 1 | 2;
+  winner?: string;
+  characterA: number;
+  characterB?: number;
+  mapId: number;
+}
 
 export function OneVOnePage() {
-  const { connected, publicKey } = usePrivyWallet();
-
+  const { connected, publicKey, wallet } = usePrivyWallet();
+  const createLobbyAction = useAction(api.lobbies.createLobby);
+  
   // Track selected character for 1v1 lobbies
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
-
+  
   // Track which lobby we're currently fighting in (null = list view, number = fighting)
   const [fightingLobbyId, setFightingLobbyId] = useState<number | null>(null);
-
+  const [isArenaMinimized, setIsArenaMinimized] = useState(false);
+  
   // Get open lobbies from Convex (real-time updates)
   const openLobbies = useQuery(api.lobbies.getOpenLobbies) || [];
-
+  
+  // Get completed lobbies for history
+  const completedLobbies = useQuery(api.lobbies.getCompletedLobbies, { limit: 20 }) || [];
+  
   // Get user's personal lobbies (for cancel functionality)
-  const userLobbies =
-    connected && publicKey
-      ? useQuery(api.lobbies.getPlayerLobbies, { playerWallet: publicKey.toString() })
-      : null;
-
-  const userOpenLobbies = userLobbies
-    ? [...userLobbies.asPlayerA, ...userLobbies.asPlayerB].filter((l: LobbyData) => l.status === 0)
-    : [];
-
+  // Must always pass a value to useQuery - pass empty string as default
+  const userLobbies = useQuery(
+    api.lobbies.getPlayerLobbies,
+    publicKey ? { playerWallet: publicKey.toString() } : { playerWallet: "" }
+  );
+  
+  const userOpenLobbies = useMemo(() => {
+    if (!publicKey || !userLobbies?.asPlayerA) return [];
+    // Filter to only lobbies user created (as Player A) that are still open (status = 0)
+    return userLobbies.asPlayerA.filter((l: any) => l.status === 0);
+  }, [publicKey, userLobbies]);
+  
   // Get specific lobby state when fighting (for real-time updates during fight)
-  const lobbyState =
-    fightingLobbyId !== null
-      ? useQuery(api.lobbies.getLobbyState, { lobbyId: fightingLobbyId })
-      : null;
+  // Must always call useQuery unconditionally - use fightingLobbyId || 0 as fallback
+  const lobbyStateQuery = useQuery(
+    api.lobbies.getLobbyState, 
+    fightingLobbyId !== null ? { lobbyId: fightingLobbyId } : "skip"
+  );
+  
+  // Only use the lobby state if we're actually fighting
+  const lobbyState = fightingLobbyId !== null ? lobbyStateQuery : null;
 
   const handleCharacterSelected = useCallback((character: Character | null) => {
     setSelectedCharacter(character);
@@ -154,18 +179,18 @@ export function OneVOnePage() {
     if (!connected || !publicKey) {
       return "not-connected";
     }
-
+    
     if (fightingLobbyId !== null && lobbyState) {
       return "fighting";
     }
-
+    
     return "lobby-list";
   }, [connected, publicKey, fightingLobbyId, lobbyState]);
 
   return (
     <div className="min-h-screen w-full bg-black">
       <Header />
-
+      
       {/* Character Selection (fixed, always visible) */}
       <div className="fixed bottom-0 left-0 right-0 z-10">
         <CharacterSelection2 onCharacterSelected={handleCharacterSelected} />
