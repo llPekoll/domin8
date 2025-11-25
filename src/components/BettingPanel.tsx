@@ -136,14 +136,16 @@ const BettingPanel = memo(function BettingPanel({
     EventBus.emit("play-insert-coin-sound");
 
     // Check if player can place bet based on blockchain game state
+    // Smart contract constants.rs: OPEN=0, CLOSED=1, WAITING=2
     if (!canPlaceBet && activeGame) {
       const status = activeGame.status;
       if (status === 1) {
-        toast.error("Game is determining winner, please wait...");
+        // GAME_STATUS_CLOSED = 1 - Game ended, wait for next round
+        toast.error("Game has ended, please wait for next round...");
         return;
       } else if (status === 2) {
-        // Game is finished - allow betting to create new round!
-        logger.ui.debug("Previous game finished, placing bet will create new round");
+        // GAME_STATUS_WAITING = 2 - Game waiting for first bet, allow betting!
+        logger.ui.debug("Game waiting for bets, placing first bet");
         // Continue to place bet (don't return)
       } else {
         toast.error("Cannot place bet at this time");
@@ -251,12 +253,11 @@ const BettingPanel = memo(function BettingPanel({
       }
 
       // Place bet
+      // placeBet(amount, skin, position) - displayName and mapId are not used by the smart contract
       const betResult = await placeBet(
         amount,
         selectedCharacter.id,
-        playerData.displayName,
-        position,
-        mapId
+        position
       );
       const { signature: signatureHex, roundId, betIndex } = betResult;
 

@@ -2,8 +2,16 @@ import { Boot } from "./scenes/Boot";
 import { Game as MainGame } from "./scenes/Game";
 import { DemoScene } from "./scenes/DemoScene";
 import { OneVOneScene } from "./scenes/OneVOneScene";
+import { MapCarousel } from "./scenes/MapCarousel";
 import { AUTO, Game } from "phaser";
 import { Preloader } from "./scenes/Preloader";
+
+// Game status constants (matching smart contract constants.rs)
+export const GAME_STATUS = {
+  OPEN: 0,    // First bet placed, countdown started - show Game with bets
+  CLOSED: 1,  // Game ended, winner selected - show celebration then Demo
+  WAITING: 2, // Game created by backend, no bets yet - show "Insert Coin"
+} as const;
 
 // Game stage dimensions (used for fullscreen effects and scaling)
 // Base resolution: 396x180
@@ -78,7 +86,7 @@ const config: Phaser.Types.Core.GameConfig = {
     disableWebAudio: false, // Use Web Audio API (best quality)
     noAudio: false, // Enable audio
   },
-  scene: [Boot, Preloader, DemoScene, OneVOneScene, MainGame],
+  scene: [Boot, Preloader, MapCarousel, DemoScene, OneVOneScene, MainGame],
 };
 
 const StartGame = (parent: string) => {

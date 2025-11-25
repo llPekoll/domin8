@@ -24,21 +24,29 @@ export interface BetInfo {
   position: [number, number];
 }
 
+// Game status constants (matching smart contract constants.rs)
+export const GAME_STATUS = {
+  OPEN: 0,    // First bet placed, countdown started
+  CLOSED: 1,  // Game ended, winner selected
+  WAITING: 2, // Game created, no bets yet
+} as const;
+
 // Match Domin8Game struct from smart contract (risk-based architecture)
 export interface ActiveGameState {
-  gameRound: BN; // Changed from roundId
-  startDate: BN; // Changed from startTimestamp
-  endDate: BN; // Changed from endTimestamp
-  totalDeposit: BN; // Changed from totalPot
-  rand: BN;
-  userCount: BN;
-  force: number[];
-  status: number; // 0 = open, 1 = closed (simplified from enum)
-  winner: PublicKey | null;
-  winnerPrize: BN;
-  winningBetIndex: BN | null;
-  wallets: PublicKey[]; // NEW: Unique wallet addresses
-  bets: BetInfo[]; // NEW: Array of bet info structs
+  gameRound: BN; // Round number
+  startDate: BN; // Unix timestamp (set on first bet)
+  endDate: BN; // Unix timestamp (set on first bet)
+  totalDeposit: BN; // Total pool in lamports
+  rand: BN; // VRF randomness (from callback)
+  userCount: BN; // Unique player count
+  force: number[]; // VRF force seed (32 bytes)
+  status: number; // 0=waiting, 1=open, 2=closed
+  vrfRequested: boolean; // True if VRF has been requested (on 2nd bet)
+  winner: PublicKey | null; // Winner wallet
+  winnerPrize: BN; // Prize amount
+  winningBetIndex: BN | null; // Which bet won
+  wallets: PublicKey[]; // Unique wallet addresses
+  bets: BetInfo[]; // All bets with details
   map: number; // Map/background ID (0-255)
 
   // Computed properties for backward compatibility

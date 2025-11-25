@@ -70,9 +70,9 @@ anchor deploy
 │       │   ├── instructions/  # 7 instruction handlers
 │       │   │   ├── initialize_config.rs
 │       │   │   ├── create_game_round.rs (no bets, no VRF)
-│       │   │   ├── bet.rs (VRF on 2nd player)
+│       │   │   ├── bet.rs (places bets, no VRF)
 │       │   │   ├── vrf_callback.rs (Magic Block callback)
-│       │   │   ├── end_game.rs (winner selection)
+│       │   │   ├── end_game.rs (VRF request + winner selection)
 │       │   │   ├── send_prize_winner.rs (payout)
 │       │   │   └── delete_game.rs (admin cleanup)
 │       │   ├── constants.rs   # Bet limits, fees
@@ -84,8 +84,7 @@ anchor deploy
 │   │   ├── scenes/
 │   │   │   ├── Boot.ts        # Initialization
 │   │   │   ├── Preloader.ts   # Asset loading
-│   │   │   ├── DemoScene.ts   # Client-side 20-bot demo
-│   │   │   ├── Game.ts        # Real game (blockchain-synced)
+│   │   │   ├── Game.ts        # Main game (blockchain-synced)
 │   │   │   └── CharacterPreview.ts
 │   │   ├── managers/
 │   │   │   ├── GamePhaseManager.ts      # Phase state machine
@@ -110,22 +109,15 @@ anchor deploy
 
 ### Game Mechanics
 
-#### Game Modes
+#### Waiting State (Map Carousel)
 
-The platform has two distinct modes:
+When no game is active, players see a **map carousel**:
+- **Spinning Carousel**: Maps rotate visually while waiting
+- **Map Selection**: Carousel stops on the selected map for next game
+- **Call to Action**: Players can place bets to start a game
+- **Engaging UX**: Keeps players engaged while waiting
 
-##### Demo Mode (Client-Side Only)
-
-- **Local Execution**: Runs entirely in user's browser (Phaser.js)
-- **20 Bots**: Fixed bot count for demo games
-- **Client-Generated**: Each user sees their own independent demo
-- **Randomness**: Uses Math.random() locally, no blockchain/backend calls
-- **Purpose**: Showcase gameplay, attract new players, zero cost
-- **Instant Start**: No waiting for server, loads immediately
-- **Phases**: Spawning (20s) → Arena (2-3s) → Results (15s) → Auto-restart
-- **No Database**: 100% client-side, no records stored
-
-##### Real Game Mode
+#### Game Flow
 
 **Triggered by Convex creating a game:**
 
@@ -134,79 +126,96 @@ The platform has two distinct modes:
    - **NO countdown** (start_date = 0, end_date = 0)
    - **NO VRF requested** (cost optimization!)
    - Lock system to prevent concurrent games
+   - Map selected (carousel stops)
 
 2. **First Player Bets**: User calls `bet` instruction
    - Status changes: **WAITING → OPEN**
    - **Countdown STARTS**: end_date = now + round_time (e.g., 60s)
    - Adds first bet (SOL transferred to game vault)
-   - **NO VRF requested yet** (saves cost!)
+   - **NO VRF requested** (VRF is deferred to end_game)
 
-3. **Second Player Bets**: User calls `bet` instruction
-   - **VRF REQUEST TRIGGERED** (Magic Block VRF)
-   - VRF callback automatically stores randomness
-   - Adds second bet (SOL transferred)
+3. **Additional Players Bet**: More users call `bet` instruction
+   - Adds more bets (SOL transferred)
+   - **NO VRF requested yet** (deferred to end_game)
 
-4. **Additional Players**: More players can join
-   - No new VRF requests (already done)
+4. **Countdown Expires**: Convex calls `end_game` (first call)
+   - **Single player**: Uses deterministic seed, returns winner immediately
+   - **Multiple players**: Requests Magic Block VRF, returns early
+   - Sets `vrf_requested = true`
 
-5. **Countdown Expires**: Convex calls `end_game`
-   - **Single player**: Full refund (0% house fee), deterministic seed
-   - **Multiple players**: Magic Block VRF randomness, 5% house fee
+5. **VRF Callback**: Magic Block VRF calls `vrf_callback`
+   - Stores randomness in `game.rand`
+   - Executed within seconds
 
-6. **Prize Distribution**: Convex calls `send_prize_winner`
+6. **Convex calls `end_game` again** (second call, ~3s later)
+   - Uses stored VRF randomness to select winner
+   - Game status = CLOSED
+   - **Multiple players**: 5% house fee
+
+7. **Prize Distribution**: Convex calls `send_prize_winner`
    - 95% to winner (or 100% for single player refund)
    - 5% to treasury (multi-player only)
 
-7. **Return to Demo**: All clients return to local demo
+8. **Return to Carousel**: All clients return to map carousel
 
-#### Game Flow (Single Round)
+#### Game Flow Summary
 
-All real games follow this **optimized flow**:
+All games follow this **optimized flow**:
 
-1. **GAME CREATION** (Convex creates game)
+1. **WAITING** (Map Carousel)
+   - Carousel spins, showing available maps
+   - Players can place bets anytime
+   - Convex creates game when ready
+
+2. **GAME CREATION** (Convex creates game)
    - Status = WAITING
    - No bets, no countdown, no VRF
-   - Game account initialized
+   - Carousel stops on selected map
 
-2. **FIRST BET** (countdown starts)
+3. **FIRST BET** (countdown starts)
    - Status: WAITING → OPEN
    - start_date = now, end_date = now + 60s
    - First bet stored, NO VRF request
 
-3. **SECOND BET** (VRF triggered)
-   - Magic Block VRF requested
-   - VRF callback stores randomness
-   - Second bet stored
-
-4. **WAITING PHASE** (up to 60 seconds)
-   - More players can join
+4. **BETTING PHASE** (up to 60 seconds)
+   - More players can join via `bet` instruction
    - Each bet includes: amount, skin (character), position (spawn coords)
+   - NO VRF requested during betting (deferred to end_game)
 
-5. **GAME END** (Convex calls end_game)
-   - Uses VRF randomness (or deterministic for single player)
+5. **GAME END - FIRST CALL** (Convex calls end_game)
+   - **Single player**: Deterministic seed, winner selected immediately
+   - **Multi-player**: VRF requested, returns early with "call again in 3s"
+   - Sets `vrf_requested = true` for multi-player
+
+6. **VRF CALLBACK** (Magic Block responds)
+   - `vrf_callback` instruction called automatically
+   - Stores randomness in `game.rand`
+
+7. **GAME END - SECOND CALL** (Convex calls end_game again)
+   - Uses stored VRF randomness
    - Weighted selection: bigger bet = higher chance
    - Game status = CLOSED
    - Winner determined, prize calculated
 
-6. **PRIZE DISTRIBUTION** (Convex calls send_prize_winner)
+8. **PRIZE DISTRIBUTION** (Convex calls send_prize_winner)
    - Winner receives 95% (or 100% if solo)
    - Treasury receives 5% (multi-player only)
 
-7. **CLEANUP** (15 seconds later)
-   - Convex can create next game
+9. **RETURN TO CAROUSEL**
    - System unlocked
+   - Carousel resumes spinning
+   - Ready for next game
 
 #### Core Features
 
-- **Client-Side Demo**: Each user runs their own demo locally, zero server cost
+- **Map Carousel**: Engaging spinning carousel while waiting for games
 - **Convex-Managed Games**: Backend creates games, players place bets
-- **VRF Cost Optimization**: VRF only requested when 2nd player joins
+- **VRF Cost Optimization**: VRF only requested in end_game for multi-player games
 - **Single Player Refunds**: Full refund with 0% fee if only 1 player
-- **Multiple Maps**: Random selection between bg1 and bg2 backgrounds
+- **Multiple Maps**: Carousel displays available maps (bg1, bg2)
 - **Character System**: 8 characters available (some NFT-gated)
 - **Bet-to-size**: Character size scales with bet amount
 - **Helius Webhooks**: Blockchain events → Convex → Frontend via WebSocket
-- **No active_game PDA**: Simplified architecture, events-based sync
 - **Magic Block VRF**: Cheap, fast verifiable randomness
 
 ### Betting System
@@ -251,26 +260,27 @@ All real games follow this **optimized flow**:
 
 2. **create_game_round** - Convex creates game
    - **NO bets placed** (just initializes game)
-   - **NO VRF request** (deferred to 2nd bet)
+   - **NO VRF request** (deferred to end_game)
    - **NO countdown** (starts on first bet)
    - Game status = WAITING
    - Locks system (prevents concurrent games)
 
 3. **bet** - Players place bets
    - **First bet**: Starts countdown (status: WAITING → OPEN)
-   - **Second bet**: Requests Magic Block VRF
    - Transfers SOL to game vault
    - Adds bet with skin + position
    - Checks bet limits (amount, per-user count)
+   - **NO VRF request** (VRF is deferred to end_game)
 
 4. **vrf_callback** - Magic Block VRF callback
-   - Called automatically by Magic Block VRF
+   - Called automatically by Magic Block VRF after end_game requests it
    - Stores randomness in `game.rand`
    - Executed within seconds of VRF request
 
-5. **end_game** - Winner selection
-   - **Single player**: Uses deterministic seed (no VRF needed)
-   - **Multiple players**: Uses Magic Block VRF randomness
+5. **end_game** - VRF request + Winner selection
+   - **Single player**: Uses deterministic seed, completes immediately
+   - **Multiple players (first call)**: Requests Magic Block VRF, returns early
+   - **Multiple players (second call)**: Uses stored VRF randomness
    - Weighted selection by bet amounts
    - Closes game (status = CLOSED)
    - Stores winner + prize amount
@@ -299,7 +309,7 @@ pub struct Domin8Game {
     pub user_count: u64,          // Unique players
     pub force: [u8; 32],          // VRF force seed (entropy)
     pub status: u8,               // 0 = waiting, 1 = open, 2 = closed
-    pub vrf_requested: bool,      // True if VRF requested (optimization)
+    pub vrf_requested: bool,      // True if VRF requested in end_game (for multi-player)
     pub winner: Option<Pubkey>,   // Winner wallet
     pub winner_prize: u64,        // Prize amount
     pub winning_bet_index: Option<u64>, // Which bet won
@@ -362,7 +372,7 @@ MAX_ROUND_TIME = 86400 seconds (24 hours)
 - `winner`: string | null (wallet address)
 - `winningBetIndex`: number
 - `prizeSent`: boolean
-- `vrfRequested`: boolean
+- `vrfRequested`: boolean (tracks if VRF was requested in end_game)
 
 **scheduledJobs** - Backend task tracking
 - `jobId`: string
@@ -454,30 +464,37 @@ crons.interval("cleanup-old-scheduled-jobs", { hours: 6 },
 
 ### VRF Flow
 
-1. **Deferred Request** (2nd bet only)
-   - Smart contract requests VRF only when 2nd player joins
-   - Uses `create_request_randomness_ix` from SDK
-   - Callback discriminator: `VrfCallback::DISCRIMINATOR`
-   - **Single player games**: NO VRF request (saves 100% cost)
+1. **Betting Phase** (no VRF)
+   - All bets placed via `bet` instruction
+   - NO VRF request during betting (saves cost!)
+   - **Single player games**: Will never request VRF
 
-2. **Callback Execution** (automatic)
+2. **VRF Request** (in end_game, multi-player only)
+   - When countdown expires, Convex calls `end_game`
+   - If `user_count > 1` and `!vrf_requested`:
+     - Requests VRF via `create_request_randomness_ix` from SDK
+     - Sets `vrf_requested = true`
+     - Returns early: "Call end_game again in 3 seconds"
+   - **Single player**: Uses deterministic seed, completes immediately
+
+3. **Callback Execution** (automatic)
    - Magic Block VRF calls `vrf_callback` instruction
    - Stores randomness in `game.rand`
    - Executed within seconds
 
-3. **Consumption** (end_game)
-   - **Single player**: Uses deterministic seed (no VRF needed)
-   - **Multiple players**: Uses `game.rand` from callback
+4. **Winner Selection** (end_game second call)
+   - Convex calls `end_game` again (~3s later)
+   - Uses `game.rand` from callback
    - Weighted selection: higher bets = higher win chance
 
-4. **Verification**
+5. **Verification**
    - Magic Block provides verifiable randomness
    - On-chain callback ensures integrity
 
 ### Why Magic Block VRF?
 
 - **Cost-Optimized**: ~90% cheaper than Orao VRF
-- **Deferred Request**: Only triggered on 2nd player (not game creation)
+- **Deferred Request**: Only triggered in end_game (not during betting)
 - **Fast**: Sub-second callback execution
 - **Verifiable**: Cryptographic proofs on-chain
 - **Ephemeral Rollup**: Optimized for low-cost operations
@@ -518,7 +535,7 @@ crons.interval("cleanup-old-scheduled-jobs", { hours: 6 },
 
 ```typescript
 enum GamePhase {
-  IDLE = "idle",              // Show demo
+  IDLE = "idle",              // Show map carousel
   WAITING = "waiting",        // Accepting bets (countdown running)
   VRF_PENDING = "vrf_pending", // Waiting for end_game
   CELEBRATING = "celebrating", // Winner celebration (15s)
@@ -527,29 +544,15 @@ enum GamePhase {
 }
 ```
 
-### Demo Mode Details
+### Map Carousel (Waiting State)
 
-**Configuration** (`demoTimings.ts`):
-```typescript
-SPAWNING_PHASE_DURATION: 20_000ms      // 20 seconds
-BOT_SPAWN_MIN_INTERVAL: 200ms          // Fast bursts
-BOT_SPAWN_MAX_INTERVAL: 3_000ms        // Long pauses
-ARENA_PHASE_MIN_DURATION: 2_000ms      // 2s minimum
-ARENA_PHASE_MAX_DURATION: 3_000ms      // 3s maximum
-RESULTS_PHASE_DURATION: 15_000ms       // 15s celebration
-DEMO_PARTICIPANT_COUNT: 20             // Always 20 bots
-```
+When no game is active, players see the **map carousel**:
 
-**Bot Generation**:
-- Random names (e.g., "Shadow847", "Blaze123")
-- Random characters from database
-- Random bet amounts: 0.001-10 SOL (exponential distribution)
-- Random color hues (0-360)
-- Unique spawn positions from pre-calculated grid
-
-**Winner Selection**:
-- Weighted by bet amount (same algorithm as real games)
-- Uses Math.random() (not verifiable, demo only)
+- **Spinning Animation**: Maps rotate continuously
+- **Visual Engagement**: Keeps players interested while waiting
+- **Map Preview**: Shows available arenas (bg1, bg2)
+- **Stops on Selection**: When game is created, carousel stops on selected map
+- **Bet Prompt**: UI encourages players to place bets
 
 ### Key React Hooks
 
@@ -572,14 +575,15 @@ DEMO_PARTICIPANT_COUNT: 20             // Always 20 bots
 
 ```
 ┌──────────────────────┐
-│   Demo Mode (20 bots)│ Runs continuously in DemoScene
-│  No DB, No Blockchain│ Math.random() for all RNG
+│   MAP CAROUSEL       │ Spinning maps while waiting
+│  Engaging idle state │ Players can bet anytime
 └──────────────────────┘
            ↓ [Convex creates game]
 ┌──────────────────────────────────────┐
 │ Convex: create_game_round            │
 │ - Status = WAITING                   │
 │ - NO bets, NO countdown, NO VRF      │
+│ - Carousel stops on selected map     │
 │ - Game account initialized           │
 │ - System locked                      │
 └──────────────────────────────────────┘
@@ -591,32 +595,39 @@ DEMO_PARTICIPANT_COUNT: 20             // Always 20 bots
 │ 3. Bet stored (SOL transferred)      │
 │ 4. NO VRF requested (saves cost!)    │
 └──────────────────────────────────────┘
-           ↓ [Second user bets]
-┌──────────────────────────────────────┐
-│ User: bet instruction (2nd bet)      │
-│ 1. VRF REQUEST TRIGGERED             │
-│ 2. Magic Block VRF called            │
-│ 3. Bet stored (SOL transferred)      │
-│ 4. Callback stores randomness        │
-└──────────────────────────────────────┘
            ↓ [More players can join]
 ┌──────────────────────────────────────┐
-│ WAITING PHASE (up to 60 seconds)     │
-│ - Additional players call bet()      │
+│ BETTING PHASE (up to 60 seconds)     │
+│ - Players call bet() instruction     │
 │ - Each bet: skin + position          │
 │ - Status = OPEN                      │
 │ - Helius webhooks → Convex           │
 │ - Frontend shows countdown           │
+│ - NO VRF requested yet               │
 └──────────────────────────────────────┘
            ↓ [End time reached]
 ┌──────────────────────────────────────┐
-│ gameScheduler.executeEndGame()       │
+│ gameScheduler.executeEndGame() #1    │
 │ 1. Convex scheduler triggers         │
 │ 2. Calls smart contract end_game()   │
 │ 3. Single player: deterministic seed │
-│ 4. Multi-player: Magic Block VRF     │
-│ 5. Status = CLOSED                   │
-│ 6. Winner stored in blockchain       │
+│    → Winner selected immediately     │
+│ 4. Multi-player: VRF requested       │
+│    → Returns early, call again in 3s │
+└──────────────────────────────────────┘
+           ↓ [VRF callback (multi-player)]
+┌──────────────────────────────────────┐
+│ Magic Block VRF: vrf_callback        │
+│ - Stores randomness in game.rand     │
+│ - Executes within seconds            │
+└──────────────────────────────────────┘
+           ↓ [~3 seconds later]
+┌──────────────────────────────────────┐
+│ gameScheduler.executeEndGame() #2    │
+│ 1. Convex calls end_game again       │
+│ 2. Uses stored VRF randomness        │
+│ 3. Status = CLOSED                   │
+│ 4. Winner stored in blockchain       │
 └──────────────────────────────────────┘
            ↓ [Winner determined]
 ┌──────────────────────────────────────┐
@@ -637,19 +648,15 @@ DEMO_PARTICIPANT_COUNT: 20             // Always 20 bots
 ┌──────────────────────────────────────┐
 │ CLEANUP PHASE                        │
 │ 1. Fade out game                     │
-│ 2. Return to demo mode               │
-│ 3. DemoScene restarts locally        │
+│ 2. Return to map carousel            │
+│ 3. Carousel resumes spinning         │
 │ 4. Convex can create next game       │
 └──────────────────────────────────────┘
 ```
 
 ## Cost Analysis
 
-### Demo Games
-- **Total Cost**: $0 (free)
-- **Breakdown**: No blockchain transactions, pure client-side
-
-### Real Games
+### Game Costs
 
 **Per Game Costs** (Backend/Convex pays):
 
@@ -741,13 +748,13 @@ HELIUS_API_KEY=                                 # For blockchain event monitorin
 │                     USER EXPERIENCE                          │
 ├─────────────────────────────────────────────────────────────┤
 │ 1. Login with email/social (Privy)                          │
-│ 2. Watch demo game (20 bots, entertaining)                  │
-│ 3. Wait for Convex to create real game                      │
-│ 4. Click "Bet 0.5 SOL" → Privy signs seamlessly             │
+│ 2. See map carousel spinning (engaging idle state)          │
+│ 3. Click "Bet 0.5 SOL" → Privy signs seamlessly             │
+│ 4. Carousel stops on selected map                           │
 │ 5. Wait 60s for other players (or instant if solo)          │
 │ 6. Watch game play (Phaser animations)                      │
 │ 7. Winner announced → SOL arrives in wallet                 │
-│ 8. Return to demo mode                                      │
+│ 8. Return to map carousel                                   │
 └─────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -801,7 +808,7 @@ HELIUS_API_KEY=                                 # For blockchain event monitorin
 
 **5. Magic Block VRF (Cost-Optimized)**
 - Ephemeral rollup VRF (~90% cheaper than Orao)
-- Deferred request (only on 2nd player join)
+- Deferred request (only in end_game for multi-player)
 - Single player games: NO VRF (100% savings)
 - Fast callback execution (sub-second)
 
@@ -834,13 +841,13 @@ HELIUS_API_KEY=                                 # For blockchain event monitorin
 ✅ Smart explosion effects (winner stays)
 ✅ Non-custodial escrow
 ✅ Dynamic prize distribution (95/5 or 100/0)
-✅ VRF cost optimization (deferred to 2nd bet)
+✅ VRF cost optimization (deferred to end_game)
 ✅ Single player full refund (0% house fee)
 
 ### Removed/Simplified
 ❌ active_game PDA (events-based sync instead)
 ❌ Orao VRF (replaced with Magic Block)
-❌ VRF on game creation (deferred to 2nd bet)
+❌ VRF during betting (deferred to end_game)
 ❌ Fixed house fee (0% for solo, 5% for multi)
 ❌ Blockchain polling (Helius webhooks instead)
 
@@ -854,9 +861,12 @@ HELIUS_API_KEY=                                 # For blockchain event monitorin
 ### Flow Confirmed
 ✅ Convex creates game (no bets, no VRF, no countdown)
 ✅ First bet starts countdown (60s)
-✅ Second bet triggers VRF request (Magic Block)
-✅ Countdown expires → end_game
-✅ Single player: full refund, deterministic seed
+✅ Betting phase: players place bets (no VRF)
+✅ Countdown expires → end_game (1st call)
+✅ Single player: full refund, deterministic seed (immediate)
+✅ Multi-player: VRF requested in end_game, returns early
+✅ VRF callback stores randomness
+✅ Convex calls end_game again (2nd call, ~3s later)
 ✅ Multi-player: 95/5 split, VRF randomness
 ✅ Prize sent → return to demo
 ✅ 15s later, Convex creates next game

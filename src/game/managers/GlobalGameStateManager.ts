@@ -23,7 +23,8 @@ import { logger } from "../../lib/logger";
 
 export enum GamePhase {
   IDLE = "idle", // No game, show demo
-  WAITING = "waiting", // Accepting bets (blockchain status = 0)
+  INSERT_COIN = "insert_coin", // Game created, waiting for first bet (status=2)
+  WAITING = "waiting", // Accepting bets, countdown active (status=0)
   VRF_PENDING = "vrf_pending", // Countdown ended, waiting for winner
   FIGHTING = "fighting", // Battle animations (3s)
   CELEBRATING = "celebrating", // Winner celebration (15s)
@@ -246,12 +247,15 @@ export class GlobalGameStateManager {
     }
 
     const status = gameState.status;
-    const isWaiting = status === "Waiting" || status === 0 || status === "waiting";
+    // Smart contract constants.rs: OPEN=0, CLOSED=1, WAITING=2
+    const isInsertCoin = status === 2 || status === "waiting" || status === "Waiting"; // No bets yet
+    const isOpen = status === 0 || status === "open" || status === "Open"; // Bets placed, countdown active
     const hasWinner = this.checkHasWinner(gameState);
 
     logger.game.debug("[GlobalGameStateManager] 🔍 Phase detection:", {
       status,
-      isWaiting,
+      isInsertCoin,
+      isOpen,
       hasWinner,
       hasBets: !!gameState.bets,
       betCount: gameState.bets?.length || 0,
@@ -288,13 +292,19 @@ export class GlobalGameStateManager {
       return GamePhase.VRF_PENDING;
     }
 
-    // 3. If waiting and game hasn't ended → WAITING
-    if (isWaiting && !gameHasEnded) {
+    // 3. If status=2 (WAITING, no bets yet) → INSERT_COIN
+    if (isInsertCoin) {
+      logger.game.debug("[GlobalGameStateManager] 🪙 Phase: INSERT_COIN");
+      return GamePhase.INSERT_COIN;
+    }
+
+    // 4. If status=0 (OPEN, has bets) and game hasn't ended → WAITING
+    if (isOpen && !gameHasEnded) {
       logger.game.debug("[GlobalGameStateManager] ⏰ Phase: WAITING");
       return GamePhase.WAITING;
     }
 
-    // 4. Default → IDLE (show demo)
+    // 5. Default → IDLE (show demo)
     logger.game.debug("[GlobalGameStateManager] 😴 Phase: IDLE (default)");
     return GamePhase.IDLE;
   }

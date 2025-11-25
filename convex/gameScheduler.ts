@@ -17,6 +17,13 @@ import { SolanaClient } from "./lib/solana";
 const RPC_ENDPOINT = process.env.SOLANA_RPC_ENDPOINT || "http://127.0.0.1:8899";
 const CRANK_AUTHORITY_PRIVATE_KEY = process.env.CRANK_AUTHORITY_PRIVATE_KEY || "";
 
+// Game status constants (matching smart contract constants.rs)
+const GAME_STATUS = {
+  OPEN: 0,    // First bet placed, countdown started
+  CLOSED: 1,  // Game ended, winner selected
+  WAITING: 2, // Game created by backend, no bets yet
+} as const;
+
 // ============================================================================
 // CREATE GAME ROUND SCHEDULER
 // ============================================================================
@@ -210,16 +217,22 @@ export const executeEndGame = internalAction({
         return;
       }
 
-      // Check if already closed
-      if (activeGame.status !== 0) {
-        console.log(`Round ${roundId}: Already closed (status: ${activeGame.status})`);
+      // Check game status
+      // GAME_STATUS: OPEN=0 (can end), CLOSED=1 (already ended), WAITING=2 (no bets yet)
+      if (activeGame.status === GAME_STATUS.WAITING) {
+        console.log(`Round ${roundId}: Game is WAITING for first bet (status: ${activeGame.status}), cannot end yet`);
+        return;
+      }
+
+      if (activeGame.status === GAME_STATUS.CLOSED) {
+        console.log(`Round ${roundId}: Already CLOSED (status: ${activeGame.status})`);
         console.log("winner and winner prize info:", {
           winner: activeGame.winner,
           winnerPrize: activeGame.winnerPrize,
         });
 
         // Recovery: If game is closed but prize not sent, schedule sendPrizeWinner
-        if (activeGame.status === 1 && activeGame.winner && activeGame.winnerPrize > 0) {
+        if (activeGame.winner && activeGame.winnerPrize > 0) {
           console.log(`Round ${roundId}: Game closed but prize not sent yet, scheduling...`);
 
           // Check if already scheduled

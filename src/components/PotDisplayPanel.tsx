@@ -50,12 +50,15 @@ export function PotDisplayPanel() {
   }
 
   // Determine game status text
+  // Smart contract constants.rs: OPEN=0, CLOSED=1, WAITING=2
   const getStatusText = () => {
     if (!activeGame.winner && activeGame.status === 0) {
-      return "Waiting for Players to Join";
-    }
-    if (!activeGame.winner && activeGame.status === 1) {
+      // GAME_STATUS_OPEN = 0 - Betting active
       return "Place Your Bet Now!";
+    }
+    if (!activeGame.winner && activeGame.status === 2) {
+      // GAME_STATUS_WAITING = 2 - Waiting for first bet
+      return "Waiting for Players to Join";
     }
     return null;
   };
