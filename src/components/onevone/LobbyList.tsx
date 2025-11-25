@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { logger } from "../../lib/logger";
 import type { Character } from "../../types/character";
 import type { LobbyData } from "../../types/lobby";
+import { LobbyDetailsDialog } from "./LobbyDetailsDialog";
 
 interface LobbyListProps {
   lobbies: LobbyData[];

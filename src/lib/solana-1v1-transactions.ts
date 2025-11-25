@@ -278,18 +278,10 @@ export async function buildJoinLobbyTransaction(
 
     // MagicBlock Oracle Queue (from IDL - this is the actual queue address on devnet)
     const ORACLE_QUEUE = new PublicKey("Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh");
-    
-    // VRF Program and related accounts - these are injected by the #[vrf] macro
-    const VRF_PROGRAM = new PublicKey("Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz");
-    const SLOT_HASHES = new PublicKey("SysvarS1otHashes111111111111111111111111111");
-    
-    // Derive program_identity PDA from OUR program (not the VRF program)
-    const [programIdentity] = PublicKey.findProgramAddressSync(
-      [Buffer.from("identity")],
-      PROGRAM_ID
-    );
 
     // Build the join_lobby instruction
+    // NOTE: The #[vrf] macro injects program_identity, vrf_program, slot_hashes automatically
+    // Anchor resolves these from the IDL - we should NOT pass them manually
     logger.solana.debug("Building join_lobby instruction...");
     
     let joinLobbyIx: TransactionInstruction;
@@ -302,25 +294,10 @@ export async function buildJoinLobbyTransaction(
         playerA: playerA.toString(),
         oracleQueue: ORACLE_QUEUE.toString(),
         systemProgram: SystemProgram.programId.toString(),
-        programIdentity: programIdentity.toString(),
-        vrfProgram: VRF_PROGRAM.toString(),
-        slotHashes: SLOT_HASHES.toString(),
-      });
-      
-      // Use camelCase account names (Anchor TypeScript types use camelCase)
-      // The #[vrf] macro injects: program_identity, vrf_program, slot_hashes
-      logger.solana.debug("Before building instruction, accounts summary:", {
-        configPda: configPda.toString(),
-        lobbyPda: lobbyPda.toString(),
-        playerB: playerB.toString(),
-        playerA: playerA.toString(),
-        oracleQueue: ORACLE_QUEUE.toString(),
-        systemProgram: SystemProgram.programId.toString(),
-        programIdentity: programIdentity.toString(),
-        vrfProgram: VRF_PROGRAM.toString(),
-        slotHashes: SLOT_HASHES.toString(),
       });
 
+      // Let Anchor resolve VRF accounts automatically from IDL
+      // (same pattern as endGame in domin8_prgm)
       joinLobbyIx = await program.methods
         .joinLobby(new BN(lobbyAmount), characterB, positionB)
         .accounts({
@@ -330,9 +307,6 @@ export async function buildJoinLobbyTransaction(
           playerA: playerA,
           oracleQueue: ORACLE_QUEUE,
           systemProgram: SystemProgram.programId,
-          programIdentity: programIdentity,
-          vrfProgram: VRF_PROGRAM,
-          slotHashes: SLOT_HASHES,
         } as any)
         .instruction();
         
