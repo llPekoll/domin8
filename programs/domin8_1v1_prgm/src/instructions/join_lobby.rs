@@ -43,10 +43,6 @@ pub struct JoinLobby<'info> {
     pub oracle_queue: AccountInfo<'info>,
 
     pub system_program: Program<'info, System>,
-    
-    /// CHECK: The VRF request account derived from the force seed
-    /// This account will be created by the MagicBlock VRF program
-    pub vrf: AccountInfo<'info>,
 }
 
 pub fn handler(
@@ -123,12 +119,19 @@ pub fn handler(
         // This discriminator must match the settle_lobby instruction
         callback_discriminator: crate::instruction::SettleLobby::DISCRIMINATOR.to_vec(), 
         caller_seed: lobby_force, // Reuse the existing unique seed mechanism
-        accounts_metas: Some(accounts_metas),
+        accounts_metas: Some(accounts_metas.clone()),
         ..Default::default()
     });
 
+    msg!("VRF Request Parameters: payer={}, oracle_queue={}, callback_program={}, caller_seed={:?}", 
+         player_b_key, oracle_queue_key, crate::ID, lobby_force);
+    msg!("Callback discriminator: {:?}", crate::instruction::SettleLobby::DISCRIMINATOR);
+    msg!("Accounts metas count: {}", accounts_metas.len());
+    
     // Send the CPI
+    msg!("Invoking VRF program...");
     ctx.accounts.invoke_signed_vrf(&ctx.accounts.player_b.to_account_info(), &ix)?;
+    msg!("VRF invocation successful!");
 
     // Update State
     let lobby = &mut ctx.accounts.lobby;

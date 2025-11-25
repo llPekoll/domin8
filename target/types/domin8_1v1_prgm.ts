@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/domin8_1v1_prgm.json`.
  */
 export type Domin81v1Prgm = {
-  "address": "BfxF6nhu5hgerSHmyedJegPqexK2M7VVykiSGgoT2T7v",
+  "address": "CSj9CvC2ZZscGJDHJu8fCxxkTiJifWPZWiQCugxJkAad",
   "metadata": {
     "name": "domin81v1Prgm",
     "version": "0.1.0",
@@ -325,12 +325,6 @@ export type Domin81v1Prgm = {
         {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
-        },
-        {
-          "name": "vrf",
-          "docs": [
-            "This account will be created by the MagicBlock VRF program"
-          ]
         },
         {
           "name": "programIdentity",
