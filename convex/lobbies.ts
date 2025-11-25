@@ -95,9 +95,16 @@ export const getPlayerLobbies = query({
 });
 
 /**
- * Get completed lobbies (status 1 or 2)
+ * Get completed lobbies (status 3 = resolved)
+ * Also includes lobbies awaiting settlement (status 1, 2)
  * Used to display lobby history in the UI
  * Ordered by most recent first
+ * 
+ * Status flow:
+ * 0 = Created (waiting for Player B)
+ * 1 = Awaiting VRF (Player B joined)
+ * 2 = VRF Received (ready for settlement)
+ * 3 = Resolved (winner determined)
  */
 export const getCompletedLobbies = query({
   args: {
@@ -106,19 +113,25 @@ export const getCompletedLobbies = query({
   handler: async (ctx, args) => {
     const limit = args.limit || 50;
     
-    // Get all completed lobbies (status 1 = resolved, status 2 = awaiting VRF)
+    // Get all resolved lobbies (status 3)
     const completedLobbies = await ctx.db
       .query("oneVOneLobbies")
-      .withIndex("by_status_and_created", (q) => q.eq("status", 1))
+      .withIndex("by_status_and_created", (q) => q.eq("status", 3))
       .collect();
 
+    // Also get lobbies in progress (status 1 = awaiting VRF, status 2 = VRF received)
     const awaitingVrfLobbies = await ctx.db
+      .query("oneVOneLobbies")
+      .withIndex("by_status", (q) => q.eq("status", 1))
+      .collect();
+    
+    const vrfReceivedLobbies = await ctx.db
       .query("oneVOneLobbies")
       .withIndex("by_status", (q) => q.eq("status", 2))
       .collect();
 
     // Combine and sort by creation date (most recent first)
-    const allCompleted = [...completedLobbies, ...awaitingVrfLobbies]
+    const allCompleted = [...completedLobbies, ...awaitingVrfLobbies, ...vrfReceivedLobbies]
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
       .slice(0, limit);
 
@@ -343,7 +356,7 @@ export const _internalSettleLobby = internalMutation({
 
     await ctx.db.patch(lobby._id, {
       winner: args.winner,
-      status: 2, // Resolved
+      status: 3, // Resolved (new status flow: 0=created, 1=awaiting VRF, 2=VRF received, 3=resolved)
       resolvedAt: Date.now(),
     });
 
@@ -393,7 +406,8 @@ export const _internalUpdateLobbyStatus = internalMutation({
     }
 
     const updateData: any = { status: args.status };
-    if (args.status === 1 && !lobby.resolvedAt) {
+    // Set resolvedAt when status becomes 3 (resolved)
+    if (args.status === 3 && !lobby.resolvedAt) {
       updateData.resolvedAt = Date.now();
     }
     if (args.winner) {
@@ -520,15 +534,20 @@ export const joinLobby = action({
         throw new Error("Lobby not found");
       }
 
-      // Status should be 2 (Awaiting VRF) or 1 (Resolved)
+      // With new VRF flow:
+      // Status 0 = Created (waiting for Player B)
+      // Status 1 = Awaiting VRF (Player B joined, VRF requested)
+      // Status 2 = VRF Received (randomness stored, ready for settlement)
+      // Status 3 = Resolved (winner determined, funds distributed)
+      
+      // After join_lobby, status should be 1 (Awaiting VRF)
+      // VRF callback will set it to 2, then settle_lobby sets it to 3
       if (lobbyAccount.status === 0) {
         throw new Error("Lobby status is still 0 (Created) after join");
       }
 
-      // Determine winner from on-chain account
-      const winner = lobbyAccount.winner.toString();
-
       // Update Convex immediately after blockchain confirmation
+      // Winner is NOT determined yet - that happens after VRF callback + settle
       await ctx.runMutation(internal.lobbies._internalJoinLobby, {
         lobbyId: args.lobbyId,
         playerB: args.playerBWallet,
@@ -602,11 +621,17 @@ export const cancelLobby = action({
 /**
  * Internal query helper to get all open lobbies for sync
  * Used by syncLobbyFromBlockchain to fetch lobbies that may need syncing
+ * 
+ * Status flow:
+ * 0 = Created (waiting for Player B)
+ * 1 = Awaiting VRF (Player B joined)
+ * 2 = VRF Received (ready for settlement)
+ * 3 = Resolved (winner determined)
  */
 export const _getOpenLobbiesForSync = internalQuery({
   args: {},
   handler: async (ctx) => {
-    // Get both status 0 (waiting for Player B) and status 1 (awaiting VRF) lobbies
+    // Get status 0 (waiting for Player B), 1 (awaiting VRF), and 2 (VRF received) lobbies
     const status0 = await ctx.db
       .query("oneVOneLobbies")
       .withIndex("by_status", (q) => q.eq("status", 0))
@@ -617,7 +642,12 @@ export const _getOpenLobbiesForSync = internalQuery({
       .withIndex("by_status", (q) => q.eq("status", 1))
       .collect();
 
-    return [...status0, ...status1];
+    const status2 = await ctx.db
+      .query("oneVOneLobbies")
+      .withIndex("by_status", (q) => q.eq("status", 2))
+      .collect();
+
+    return [...status0, ...status1, ...status2];
   },
 });
 
@@ -691,7 +721,12 @@ const _findMissingLobbies = (blockchainCount: number, convexLobbies: any[]): num
 /**
  * Sync a single resolved lobby from blockchain to Convex
  * Updates Convex if lobby status has progressed on-chain
- * Handles: status 0→1 (joined) and status 1→2 (resolved)
+ * 
+ * New status flow:
+ * 0 = Created (waiting for Player B)
+ * 1 = Awaiting VRF (Player B joined, VRF requested)
+ * 2 = VRF Received (randomness stored, ready for settlement)
+ * 3 = Resolved (winner determined, funds distributed)
  */
 const _syncResolvedLobby = async (
   ctx: any,
@@ -722,27 +757,54 @@ const _syncResolvedLobby = async (
     }
   }
 
-  // Case 2: Lobby is AWAITING_VRF (status 1) - trigger settlement check via scheduler
-  if (onChainLobby.status === 1 && lobbyInConvex.status === 1) {
-    console.log(
-      `[1v1 Sync] Lobby ${lobbyInConvex.lobbyId} is at status 1 (AWAITING_VRF), scheduling settlement check`
-    );
-    // Schedule the scheduler action to check and settle this lobby
-    await ctx.scheduler.runAfter(0, internal.lobbies._checkAndSettleLobby, {
-      lobbyId: lobbyInConvex.lobbyId,
-    });
-    return true;
+  // Case 2: VRF callback received (status 2) - lobby has randomness, ready for settlement
+  if (onChainLobby.status === 2) {
+    // Check if winner exists - if not, we need to call settle_lobby on-chain
+    if (!onChainLobby.winner || onChainLobby.winner.toString() === "11111111111111111111111111111111") {
+      console.log(
+        `[1v1 Sync] Lobby ${lobbyInConvex.lobbyId} at status 2 with no winner - needs settle_lobby call`
+      );
+      // Schedule the crank action to call settle_lobby on-chain
+      await ctx.scheduler.runAfter(0, internal.lobbies._crankSettleLobby, {
+        lobbyId: lobbyInConvex.lobbyId,
+      });
+      
+      // Update Convex status to 2 if not already
+      if (lobbyInConvex.status < 2) {
+        await ctx.runMutation(internal.lobbies._internalUpdateLobbyStatus, {
+          lobbyId: lobbyInConvex.lobbyId,
+          status: 2,
+        });
+      }
+      return true;
+    }
+    
+    // If status 2 but Convex not updated yet
+    if (lobbyInConvex.status < 2) {
+      console.log(
+        `[1v1 Sync] Lobby ${lobbyInConvex.lobbyId} has VRF (status 2), updating Convex`
+      );
+      await ctx.runMutation(internal.lobbies._internalUpdateLobbyStatus, {
+        lobbyId: lobbyInConvex.lobbyId,
+        status: 2,
+      });
+      // Schedule the settlement check
+      await ctx.scheduler.runAfter(0, internal.lobbies._checkAndSettleLobby, {
+        lobbyId: lobbyInConvex.lobbyId,
+      });
+      return true;
+    }
   }
 
-  // Case 3: Lobby has been resolved (status 1→2 or 0→2) on-chain but still open in Convex
-  if (onChainLobby.status === 2 && (lobbyInConvex.status === 0 || lobbyInConvex.status === 1)) {
+  // Case 3: Lobby has been fully resolved (status 3) on-chain but not in Convex
+  if (onChainLobby.status === 3 && lobbyInConvex.status < 3) {
     // Lobby has been resolved on-chain but we still have it as open
-    console.log(`[1v1 Sync] Syncing resolved lobby ${lobbyInConvex.lobbyId} to Convex (on-chain status: 2, Convex status: ${lobbyInConvex.status})`);
+    console.log(`[1v1 Sync] Syncing resolved lobby ${lobbyInConvex.lobbyId} to Convex (on-chain status: 3, Convex status: ${lobbyInConvex.status})`);
 
     // Safety check: Ensure winner exists before calling toString()
     if (!onChainLobby.winner) {
       console.warn(
-        `[1v1 Sync] Lobby ${lobbyInConvex.lobbyId} has status 2 but winner is null, skipping sync`
+        `[1v1 Sync] Lobby ${lobbyInConvex.lobbyId} has status 3 but winner is null, skipping sync`
       );
       return false;
     }
@@ -752,7 +814,7 @@ const _syncResolvedLobby = async (
 
     console.log(`[1v1 Sync] Calling _internalSettleLobby for lobby ${lobbyInConvex.lobbyId} with winner ${winner.slice(0, 8)}...`);
 
-    // Update Convex to mark as resolved (status 2)
+    // Update Convex to mark as resolved (status 3)
     await ctx.runMutation(internal.lobbies._internalSettleLobby, {
       lobbyId: lobbyInConvex.lobbyId,
       winner,
@@ -947,21 +1009,97 @@ export const _getLobbyById = internalQuery({
 });
 
 /**
- * Internal query to get all lobbies at status 1 (pending settlement)
+ * Internal query to get all lobbies pending settlement (status 1 or 2)
+ * Status 1 = Awaiting VRF
+ * Status 2 = VRF Received (ready for settlement)
  */
 export const _getPendingLobbiesForSettlement = internalQuery({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db
+    const status1 = await ctx.db
       .query("oneVOneLobbies")
       .withIndex("by_status", (q) => q.eq("status", 1))
       .collect();
+
+    const status2 = await ctx.db
+      .query("oneVOneLobbies")
+      .withIndex("by_status", (q) => q.eq("status", 2))
+      .collect();
+
+    return [...status1, ...status2];
+  },
+});
+
+// Get CRANK_AUTHORITY from environment
+const CRANK_AUTHORITY_PRIVATE_KEY = process.env.CRANK_AUTHORITY_PRIVATE_KEY || "";
+
+/**
+ * Crank action to call settle_lobby on-chain
+ * This is called when a lobby is stuck at status 2 (VRF received) but winner not yet determined
+ * 
+ * The settle_lobby instruction is permissionless - anyone can call it after VRF callback
+ * has stored the randomness in the lobby account.
+ */
+export const _crankSettleLobby = internalAction({
+  args: {
+    lobbyId: v.number(),
+  },
+  handler: async (ctx, args): Promise<{
+    lobbyId: number;
+    success: boolean;
+    txSignature?: string;
+    error?: string;
+  }> => {
+    try {
+      console.log(`[1v1 Crank] Attempting to settle lobby ${args.lobbyId} on-chain...`);
+
+      if (!CRANK_AUTHORITY_PRIVATE_KEY) {
+        throw new Error("CRANK_AUTHORITY_PRIVATE_KEY not configured");
+      }
+
+      const crankClient = new Solana1v1Client(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
+
+      // Call settle_lobby on-chain
+      const txSignature = await crankClient.settleLobby(args.lobbyId);
+
+      console.log(`[1v1 Crank] settle_lobby succeeded for lobby ${args.lobbyId}: ${txSignature}`);
+
+      // After successful on-chain settlement, schedule a check to update Convex
+      await ctx.scheduler.runAfter(2000, internal.lobbies._checkAndSettleLobby, {
+        lobbyId: args.lobbyId,
+      });
+
+      return {
+        lobbyId: args.lobbyId,
+        success: true,
+        txSignature,
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error(`[1v1 Crank] Failed to settle lobby ${args.lobbyId}:`, errorMsg);
+
+      // Retry after delay if it failed
+      await ctx.scheduler.runAfter(10000, internal.lobbies._crankSettleLobby, {
+        lobbyId: args.lobbyId,
+      });
+
+      return {
+        lobbyId: args.lobbyId,
+        success: false,
+        error: errorMsg,
+      };
+    }
   },
 });
 
 /**
  * Check a single lobby and settle it if resolved on-chain
  * Called by scheduler after VRF delay for a specific lobby
+ * 
+ * New status flow:
+ * 1 = Awaiting VRF (Player B joined, VRF requested)
+ * 2 = VRF Received (randomness stored, ready for settlement)
+ * 3 = Resolved (winner determined, funds distributed)
  */
 export const _checkAndSettleLobby = internalAction({
   args: {
@@ -976,7 +1114,7 @@ export const _checkAndSettleLobby = internalAction({
     try {
       const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
       
-      // Get the lobby from Convex to verify it exists and is still at status 1
+      // Get the lobby from Convex to verify it exists and is pending
       const convexLobby = await ctx.runQuery(internal.lobbies._getLobbyById, {
         lobbyId: args.lobbyId,
       });
@@ -990,8 +1128,8 @@ export const _checkAndSettleLobby = internalAction({
         };
       }
 
-      // If already settled, skip
-      if (convexLobby.status !== 1) {
+      // If already resolved (status 3), skip
+      if (convexLobby.status >= 3) {
         console.log(`[1v1 Scheduler] Lobby ${args.lobbyId} already at status ${convexLobby.status}, skipping`);
         return {
           lobbyId: args.lobbyId,
@@ -1000,7 +1138,7 @@ export const _checkAndSettleLobby = internalAction({
         };
       }
 
-      // Check if resolved on-chain
+      // Check current state on-chain
       const lobbyPda = queryClient.getLobbyPdaForId(args.lobbyId);
       const onChainLobby = await queryClient.getLobbyAccount(lobbyPda);
 
@@ -1013,10 +1151,10 @@ export const _checkAndSettleLobby = internalAction({
         };
       }
 
-      console.log(`[1v1 Scheduler] Lobby ${args.lobbyId}: on-chain status = ${onChainLobby.status}`);
+      console.log(`[1v1 Scheduler] Lobby ${args.lobbyId}: on-chain status = ${onChainLobby.status}, Convex status = ${convexLobby.status}`);
 
-      // If resolved on-chain, update Convex
-      if (onChainLobby.status === 2 && onChainLobby.winner) {
+      // If fully resolved on-chain (status 3), update Convex
+      if (onChainLobby.status === 3 && onChainLobby.winner) {
         console.log(`[1v1 Scheduler] Settling lobby ${args.lobbyId} with winner ${onChainLobby.winner.toString().slice(0, 8)}...`);
         
         await ctx.runMutation(internal.lobbies._internalSettleLobby, {
@@ -1028,11 +1166,43 @@ export const _checkAndSettleLobby = internalAction({
         return {
           lobbyId: args.lobbyId,
           settled: true,
+          onChainStatus: 3,
+        };
+      }
+
+      // VRF received (status 2) - check if we need to call settle_lobby on-chain
+      if (onChainLobby.status === 2) {
+        // Update Convex status to 2 if needed
+        if (convexLobby.status < 2) {
+          console.log(`[1v1 Scheduler] Lobby ${args.lobbyId} has VRF (status 2). Updating Convex...`);
+          await ctx.runMutation(internal.lobbies._internalUpdateLobbyStatus, {
+            lobbyId: args.lobbyId,
+            status: 2,
+          });
+        }
+        
+        // Check if winner is not set - means we need to call settle_lobby on-chain
+        if (!onChainLobby.winner || onChainLobby.winner.toString() === "11111111111111111111111111111111") {
+          console.log(`[1v1 Scheduler] Lobby ${args.lobbyId} at status 2 but no winner - calling crank to settle`);
+          // Call the crank to settle on-chain
+          await ctx.scheduler.runAfter(0, internal.lobbies._crankSettleLobby, {
+            lobbyId: args.lobbyId,
+          });
+        } else {
+          // Winner exists, schedule follow-up to check for settlement
+          await ctx.scheduler.runAfter(5000, internal.lobbies._checkAndSettleLobby, {
+            lobbyId: args.lobbyId,
+          });
+        }
+
+        return {
+          lobbyId: args.lobbyId,
+          settled: false,
           onChainStatus: 2,
         };
       }
 
-      // Still pending on-chain (status 1) - wait for MagicBlock callback
+      // Still pending VRF (status 1) - wait for MagicBlock callback
       if (onChainLobby.status === 1) {
         console.log(`[1v1 Scheduler] Lobby ${args.lobbyId} at status 1 (AWAITING_VRF). Waiting for MagicBlock callback...`);
         

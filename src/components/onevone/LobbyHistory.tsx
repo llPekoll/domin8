@@ -9,7 +9,7 @@ interface LobbyData {
   playerA: string;
   playerB?: string;
   amount: number;
-  status: 0 | 1 | 2;
+  status: 0 | 1 | 2 | 3; // 0=Created, 1=Awaiting VRF, 2=VRF Received, 3=Resolved
   winner?: string;
   characterA: number;
   characterB?: number;
@@ -48,9 +48,11 @@ export function LobbyHistory({ lobbies, characters }: LobbyHistoryProps) {
       case 0:
         return { text: "Open", color: "bg-blue-500/20 text-blue-300 border-blue-500/50" };
       case 1:
-        return { text: "Resolved", color: "bg-green-500/20 text-green-300 border-green-500/50" };
-      case 2:
         return { text: "Awaiting VRF", color: "bg-yellow-500/20 text-yellow-300 border-yellow-500/50" };
+      case 2:
+        return { text: "VRF Received", color: "bg-orange-500/20 text-orange-300 border-orange-500/50" };
+      case 3:
+        return { text: "Resolved", color: "bg-green-500/20 text-green-300 border-green-500/50" };
       default:
         return { text: "Unknown", color: "bg-gray-500/20 text-gray-300 border-gray-500/50" };
     }
@@ -83,7 +85,7 @@ export function LobbyHistory({ lobbies, characters }: LobbyHistoryProps) {
       <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 lobby-history-scroll">
         {lobbies.map((lobby) => {
           const statusBadge = getStatusBadge(lobby.status);
-          const isResolved = lobby.status === 1;
+          const isResolved = lobby.status === 3;
           const isPlayerAWinner = lobby.winner === lobby.playerA;
           const isPlayerBWinner = lobby.winner === lobby.playerB;
 
