@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/domin8_prgm.json`.
  */
 export type Domin8Prgm = {
-  "address": "JBZ9jKkL5M8vRpLmhNwYT648e8WhCQKhQpRxt4QAb6zt",
+  "address": "3F4opHXEzCKmh3xEbm1fsW4NE7f6g5Bwca67swp1v1R3",
   "metadata": {
     "name": "domin8Prgm",
     "version": "0.1.0",
@@ -84,6 +84,30 @@ export type Domin8Prgm = {
               {
                 "kind": "arg",
                 "path": "roundId"
+              }
+            ]
+          }
+        },
+        {
+          "name": "activeGame",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  99,
+                  116,
+                  105,
+                  118,
+                  101,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
               }
             ]
           }
@@ -192,6 +216,30 @@ export type Domin8Prgm = {
               {
                 "kind": "arg",
                 "path": "roundId"
+              }
+            ]
+          }
+        },
+        {
+          "name": "activeGame",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  99,
+                  116,
+                  105,
+                  118,
+                  101,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
               }
             ]
           }
@@ -376,6 +424,30 @@ export type Domin8Prgm = {
           }
         },
         {
+          "name": "activeGame",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  99,
+                  116,
+                  105,
+                  118,
+                  101,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "admin",
           "writable": true,
           "signer": true
@@ -473,6 +545,30 @@ export type Domin8Prgm = {
                   102,
                   105,
                   103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "activeGame",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  99,
+                  116,
+                  105,
+                  118,
+                  101,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
                 ]
               }
             ]
@@ -683,6 +779,19 @@ export type Domin8Prgm = {
   ],
   "events": [
     {
+      "name": "betPlaced",
+      "discriminator": [
+        88,
+        88,
+        145,
+        226,
+        126,
+        206,
+        32,
+        0
+      ]
+    },
+    {
       "name": "gameCreated",
       "discriminator": [
         218,
@@ -693,6 +802,19 @@ export type Domin8Prgm = {
         112,
         96,
         2
+      ]
+    },
+    {
+      "name": "gameEnded",
+      "discriminator": [
+        35,
+        93,
+        113,
+        153,
+        29,
+        144,
+        200,
+        109
       ]
     }
   ],
@@ -847,6 +969,55 @@ export type Domin8Prgm = {
                 2
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "betPlaced",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "roundId",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "totalPot",
+            "type": "u64"
+          },
+          {
+            "name": "betIndex",
+            "type": "u64"
+          },
+          {
+            "name": "isNewUser",
+            "type": "bool"
+          },
+          {
+            "name": "skin",
+            "type": "u8"
+          },
+          {
+            "name": "position",
+            "type": {
+              "array": [
+                "u16",
+                2
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
@@ -1028,6 +1199,79 @@ export type Domin8Prgm = {
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "gameEnded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "roundId",
+            "type": "u64"
+          },
+          {
+            "name": "winner",
+            "type": "pubkey"
+          },
+          {
+            "name": "winningBetIndex",
+            "type": "u64"
+          },
+          {
+            "name": "winningBetAmount",
+            "type": "u64"
+          },
+          {
+            "name": "totalPot",
+            "type": "u64"
+          },
+          {
+            "name": "prize",
+            "type": "u64"
+          },
+          {
+            "name": "houseFee",
+            "type": "u64"
+          },
+          {
+            "name": "houseFeePercentage",
+            "type": "u64"
+          },
+          {
+            "name": "totalBets",
+            "type": "u64"
+          },
+          {
+            "name": "uniqueUsers",
+            "type": "u64"
+          },
+          {
+            "name": "winProbability",
+            "type": "u64"
+          },
+          {
+            "name": "vrfForce",
+            "type": "string"
+          },
+          {
+            "name": "vrfForceBytes",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "randomness",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }

@@ -2,19 +2,169 @@
  * Game Scheduler - Automated Game Progression (Risk-based Architecture)
  *
  * Handles scheduled execution of game state transitions:
- * 1. End game at endTimestamp (status: 0 → 1, winner selected on-chain)
- * 2. Send prize to winner (distributes funds)
+ * 1. Create new game round (when system is unlocked)
+ * 2. End game at endTimestamp (status: 0 → 1, winner selected on-chain)
+ * 3. Send prize to winner (distributes funds)
  *
  * This module is called by ctx.scheduler.runAfter() from eventListener.ts
  */
 "use node";
-import { internalAction } from "./_generated/server";
+import { internalAction, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { SolanaClient } from "./lib/solana";
 
 const RPC_ENDPOINT = process.env.SOLANA_RPC_ENDPOINT || "http://127.0.0.1:8899";
 const CRANK_AUTHORITY_PRIVATE_KEY = process.env.CRANK_AUTHORITY_PRIVATE_KEY || "";
+
+// ============================================================================
+// CREATE GAME ROUND SCHEDULER
+// ============================================================================
+
+/**
+ * Execute create game round action
+ * Creates a new game on-chain when the system is unlocked
+ *
+ * FLOW:
+ * 1. Check if system is unlocked (previous game finished)
+ * 2. Get next round ID from config
+ * 3. Create game round with random map
+ * 4. System gets locked until game completes
+ */
+export const executeCreateGameRound = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    console.log("\n[Scheduler] Executing create game round");
+
+    try {
+      const solanaClient = new SolanaClient(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
+
+      // 1. Get current config state
+      const config = await solanaClient.getGameConfig();
+
+      if (!config) {
+        console.error("Config not found - has initialize_config been called?");
+        return { success: false, error: "Config not found" };
+      }
+
+      // 2. Check if system is locked (game already in progress)
+      if (config.lock) {
+        console.log("System is locked - game already in progress");
+
+        // Get active game info
+        const activeGame = await solanaClient.getActiveGame();
+        console.log("Active game info:", {
+          roundId: activeGame?.gameRound,
+          status: activeGame?.status,
+          betCount: activeGame?.bets?.length || 0,
+          endDate: activeGame?.endDate ? new Date(activeGame.endDate * 1000).toISOString() : "not set",
+        });
+
+        return {
+          success: false,
+          error: "System locked",
+          activeRoundId: activeGame?.gameRound
+        };
+      }
+
+      // 3. Get next round ID from config
+      const nextRoundId = config.gameRound;
+      console.log(`Next round ID: ${nextRoundId}`);
+
+      // 4. Select random map (1 or 2 based on seed data)
+      const mapId = Math.random() < 0.5 ? 1 : 2;
+      console.log(`Selected map ID: ${mapId}`);
+
+      // 5. Create the game round on-chain
+      console.log(`Creating game round ${nextRoundId} with map ${mapId}...`);
+      const txResult = await solanaClient.createGameRound(nextRoundId, mapId);
+      const txSignature = txResult.signature;
+
+      // 6. Wait for confirmation
+      const confirmed = await solanaClient.confirmTransaction(txSignature);
+
+      if (confirmed) {
+        console.log(`✅ Game round ${nextRoundId} created successfully. Tx: ${txSignature}`);
+
+        // Save to database for tracking
+        await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
+          jobId: `create_game_${nextRoundId}`,
+          roundId: nextRoundId,
+          action: "create_game",
+          scheduledTime: Math.floor(Date.now() / 1000),
+        });
+
+        await ctx.runMutation(internal.gameSchedulerMutations.markJobCompleted, {
+          roundId: nextRoundId,
+          action: "create_game",
+        });
+
+        // The countdown will start when first bet is placed
+        // end_game will be scheduled when Helius webhook detects first bet
+        console.log(`Game ${nextRoundId} waiting for first bet to start countdown`);
+
+        return {
+          success: true,
+          roundId: nextRoundId,
+          mapId,
+          signature: txSignature
+        };
+      } else {
+        console.error(`❌ Transaction confirmation failed: ${txSignature}`);
+        return { success: false, error: "Transaction confirmation failed" };
+      }
+    } catch (error) {
+      console.error("Error creating game round:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  },
+});
+
+/**
+ * Get info about next round from blockchain config
+ * Useful for frontend to know if a game can be created
+ */
+export const getNextRoundInfo = internalAction({
+  args: {},
+  handler: async () => {
+    try {
+      const solanaClient = new SolanaClient(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
+
+      const config = await solanaClient.getGameConfig();
+      const activeGame = await solanaClient.getActiveGame();
+
+      return {
+        nextRoundId: config?.gameRound ?? 0,
+        isLocked: config?.lock ?? true,
+        roundTime: config?.roundTime ?? 60,
+        minBet: config?.minDepositAmount ?? 1_000_000,
+        maxBet: config?.maxDepositAmount ?? 10_000_000_000,
+        activeGame: activeGame ? {
+          roundId: activeGame.gameRound,
+          status: activeGame.status,
+          betCount: activeGame.bets?.length || 0,
+          startDate: activeGame.startDate,
+          endDate: activeGame.endDate,
+          totalPot: activeGame.totalDeposit,
+        } : null,
+      };
+    } catch (error) {
+      console.error("Error fetching next round info:", error);
+      return {
+        nextRoundId: 0,
+        isLocked: true,
+        roundTime: 60,
+        minBet: 1_000_000,
+        maxBet: 10_000_000_000,
+        activeGame: null,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  },
+});
 
 // ============================================================================
 // END GAME SCHEDULER

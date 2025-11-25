@@ -27,6 +27,7 @@ pub const MAX_BETS_PER_USER_LARGE: usize = 30; // Max bets per user for bets >= 
 pub const SMALL_BET_THRESHOLD: u64 = 10_000_000; // 0.01 SOL in lamports
 
 pub const BET_INFO_SIZE: usize = 2 + 8 + 1 + 4; // wallet_index (2) + amount (8) + skin (1) + position (2*2) = 15 bytes
+
 pub const BASE_GAME_ACCOUNT_SIZE: usize = 8 + // discriminator
     8 + // game_round
     8 + // start_date

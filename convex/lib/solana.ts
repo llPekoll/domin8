@@ -474,12 +474,12 @@ export class SolanaClient {
     }
   }
 
-  // Create a new game round with first bet (combines game creation + first bet)
+  // Create a new game round (admin only, no bets yet)
   async createGameRound(
     roundId: number,
     mapId: number
   ): Promise<{ signature: string }> {
-    const { config, gameRound } = this.getPDAs(roundId);
+    const { config, activeGame, gameRound } = this.getPDAs(roundId);
 
     if (!gameRound) {
       throw new Error("Failed to derive game round PDA");
@@ -491,6 +491,7 @@ export class SolanaClient {
         .accounts({
           config,
           game: gameRound,
+          activeGame,
           user: this.authority.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
         } as any)

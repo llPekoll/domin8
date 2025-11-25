@@ -26,6 +26,13 @@ pub struct CreateGameRound<'info> {
     )]
     pub game: Box<Account<'info, Domin8Game>>,
 
+    #[account(
+        mut,
+        seeds = [b"active_game"],
+        bump,
+    )]
+    pub active_game: Box<Account<'info, Domin8Game>>,
+
     #[account(mut)]
     pub user: Signer<'info>,
 
@@ -86,9 +93,28 @@ pub fn handler(ctx: Context<CreateGameRound>, round_id: u64, map: u8) -> Result<
     // Lock the system to prevent multiple concurrent games
     config.lock = true;
 
+    // Update active_game with full game data
+    let active_game = &mut ctx.accounts.active_game;
+    active_game.game_round = game.game_round;
+    active_game.start_date = game.start_date;
+    active_game.end_date = game.end_date;
+    active_game.total_deposit = game.total_deposit;
+    active_game.rand = game.rand;
+    active_game.map = game.map;
+    active_game.winner = game.winner;
+    active_game.winner_prize = game.winner_prize;
+    active_game.winning_bet_index = game.winning_bet_index;
+    active_game.user_count = game.user_count;
+    active_game.force = game.force;
+    active_game.status = game.status;
+    active_game.vrf_requested = game.vrf_requested;
+    active_game.wallets = game.wallets.clone();
+    active_game.bets = game.bets.clone();
+
     msg!("Game round {} created by admin: {}", round_id, user.key());
     msg!("Map ID: {}", map);
     msg!("VRF force (hex): {}", Utils::bytes_to_hex(&force));
+    msg!("Active game updated to point to round {}", round_id);
     msg!("Game empty, waiting for first bet");
 
     emit!(GameCreated {

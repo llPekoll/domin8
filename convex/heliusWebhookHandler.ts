@@ -209,6 +209,28 @@ export const processTransaction = internalAction({
         }
       }
 
+      // If events are empty, try to get round ID from current game config
+      if (!roundId) {
+        console.log("[Webhook Processor] No events found, fetching current game round from config");
+        try {
+          const connection = getConnection();
+          const [configPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from("domin8_config")],
+            PROGRAM_ID
+          );
+
+          const configAccount = await connection.getAccountInfo(configPda);
+          if (configAccount) {
+            // Read game_round from config (offset: 8 discriminator + 32 admin + 32 treasury = 72)
+            const gameRoundOffset = 72;
+            roundId = Number(configAccount.data.readBigUInt64LE(gameRoundOffset));
+            console.log(`[Webhook Processor] Extracted round ID from config: ${roundId}`);
+          }
+        } catch (err) {
+          console.error("[Webhook Processor] Could not fetch config:", err);
+        }
+      }
+
       // If we still don't have a round ID, we can't process this transaction
       if (!roundId) {
         console.error("[Webhook Processor] No round ID found in transaction", args.signature);

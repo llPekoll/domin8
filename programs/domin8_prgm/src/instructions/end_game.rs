@@ -26,6 +26,13 @@ pub struct EndGame<'info> {
     )]
     pub game: Box<Account<'info, Domin8Game>>,
 
+    #[account(
+        mut,
+        seeds = [b"active_game"],
+        bump,
+    )]
+    pub active_game: Box<Account<'info, Domin8Game>>,
+
     #[account(mut)]
     pub admin: Signer<'info>,
 
@@ -62,6 +69,7 @@ pub fn handler(
 
     // First, do all validations without mutable borrows
     let game_data = &ctx.accounts.game;
+    let active_game_data = &ctx.accounts.active_game;
     let config_data = &ctx.accounts.config;
 
     // Verify admin authorization
@@ -79,8 +87,8 @@ pub fn handler(
     // Verify treasury address matches config
     require!(treasury.key() == config_data.treasury, Domin8Error::Unauthorized);
 
-    // Ensure there are bets to process
-    require!(!game_data.bets.is_empty(), Domin8Error::NoBets);
+    // Ensure there are bets to process (check active_game, not game)
+    require!(!active_game_data.bets.is_empty(), Domin8Error::NoBets);
 
     // For multi-player games, request VRF if not done yet
     if game_data.user_count > 1 && !game_data.vrf_requested {
@@ -137,12 +145,12 @@ pub fn handler(
         game_data.rand
     };
 
-    // Select winner using weighted random selection based on bet amounts
+    // Select winner using weighted random selection based on bet amounts (use active_game data)
     let (selected_winner, winning_bet_index) = Utils::select_winner_by_weight(
         randomness,
-        &game_data.bets,
-        &game_data.wallets,
-        game_data.total_deposit
+        &active_game_data.bets,
+        &active_game_data.wallets,
+        active_game_data.total_deposit
     )?;
 
     // Calculate prize distribution from the FULL POT
@@ -192,7 +200,15 @@ pub fn handler(
 
     // Now do all mutable updates after transfers are complete
     let game = &mut ctx.accounts.game;
+    let active_game = &mut ctx.accounts.active_game;
     let config = &mut ctx.accounts.config;
+
+    // Transfer data from active_game to game without cloning (memory-efficient)
+    // Use std::mem::take to move the data instead of cloning to avoid OOM
+    game.wallets = std::mem::take(&mut active_game.wallets);
+    game.bets = std::mem::take(&mut active_game.bets);
+    game.total_deposit = active_game.total_deposit;
+    game.user_count = active_game.user_count;
 
     // Store winner prize amount in game state for later claiming
     game.winner_prize = winner_prize;
@@ -202,6 +218,13 @@ pub fn handler(
 
     // Close the game
     game.status = GAME_STATUS_CLOSED;
+
+    // Update active_game to match the game state
+    active_game.winner_prize = winner_prize;
+    active_game.rand = randomness;
+    active_game.winner = Some(selected_winner);
+    active_game.winning_bet_index = Some(winning_bet_index as u64);
+    active_game.status = GAME_STATUS_CLOSED;
 
     // Generate new VRF force seed for next game (using current randomness + game data)
     let mut new_force = [0u8; 32];
@@ -223,8 +246,46 @@ pub fn handler(
     // Minimal completion logging
     msg!("Game {} completed", round_id);
 
+    // Emit comprehensive event for off-chain tracking
+    emit!(GameEnded {
+        round_id,
+        winner: selected_winner,
+        winning_bet_index: winning_bet_index as u64,
+        winning_bet_amount: game.bets[winning_bet_index].amount,
+        total_pot,
+        prize: winner_prize,
+        house_fee: house_fee_amount,
+        house_fee_percentage: config.house_fee,
+        total_bets: game.bets.len() as u64,
+        unique_users: game.user_count,
+        win_probability: 0,
+        vrf_force: String::new(), // Removed expensive hex conversion
+        vrf_force_bytes: game.force,
+        randomness,
+        timestamp: clock.unix_timestamp,
+    });
+
     // Unlock the system to allow new game creation
     config.lock = false;
 
     Ok(())
+}
+
+#[event]
+pub struct GameEnded {
+    pub round_id: u64,
+    pub winner: Pubkey,
+    pub winning_bet_index: u64,
+    pub winning_bet_amount: u64,
+    pub total_pot: u64,
+    pub prize: u64,
+    pub house_fee: u64,
+    pub house_fee_percentage: u64, // basis points
+    pub total_bets: u64,
+    pub unique_users: u64,
+    pub win_probability: u64,      // winner's probability in basis points
+    pub vrf_force: String,         // hex string for readability
+    pub vrf_force_bytes: [u8; 32], // actual bytes used
+    pub randomness: u64,
+    pub timestamp: i64,
 }

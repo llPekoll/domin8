@@ -42,6 +42,24 @@ export default defineSchema({
     .index("by_status_and_round", ["status", "roundId"]) // Query by status, ordered by roundId
     .index("by_captured_at", ["capturedAt"]), // Chronological ordering
 
+  /**
+   * Webhook Logs - Record of all webhooks received from Helius
+   * Useful for debugging, audit trail, and replay
+   */
+  webhookLogs: defineTable({
+    signature: v.string(), // Transaction signature
+    timestamp: v.number(), // When webhook was received
+    slot: v.optional(v.number()), // Blockchain slot
+    roundId: v.optional(v.number()), // Extracted round ID (if available)
+    status: v.string(), // "processed" | "failed" | "ignored"
+    error: v.optional(v.string()), // Error message if failed
+    payload: v.optional(v.any()), // Raw webhook payload (for debugging)
+  })
+    .index("by_signature", ["signature"]) // Find webhook by tx signature
+    .index("by_timestamp", ["timestamp"]) // Chronological order
+    .index("by_round_id", ["roundId"]) // Find webhooks for a specific round
+    .index("by_status", ["status"]), // Query by processing status
+
   // ============================================================================
   // SCHEDULER TABLES
   // ============================================================================

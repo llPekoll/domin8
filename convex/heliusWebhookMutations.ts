@@ -9,6 +9,53 @@ import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
+ * Log a received webhook to the database
+ */
+export const logWebhook = internalMutation({
+  args: {
+    signature: v.string(),
+    timestamp: v.number(),
+    slot: v.optional(v.number()),
+    payload: v.any(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("webhookLogs", {
+      signature: args.signature,
+      timestamp: args.timestamp,
+      slot: args.slot,
+      status: "processing",
+      payload: args.payload,
+    });
+  },
+});
+
+/**
+ * Update webhook log status after processing
+ */
+export const updateWebhookStatus = internalMutation({
+  args: {
+    signature: v.string(),
+    status: v.string(),
+    roundId: v.optional(v.number()),
+    error: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const webhook = await ctx.db
+      .query("webhookLogs")
+      .withIndex("by_signature", (q) => q.eq("signature", args.signature))
+      .first();
+
+    if (webhook) {
+      await ctx.db.patch(webhook._id, {
+        status: args.status,
+        roundId: args.roundId,
+        error: args.error,
+      });
+    }
+  },
+});
+
+/**
  * Update or insert a game round state in the database
  */
 export const updateGameRound = internalMutation({

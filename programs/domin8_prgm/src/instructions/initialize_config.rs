@@ -12,6 +12,15 @@ pub struct InitializeConfig<'info> {
     )]
     pub config: Account<'info, Domin8Config>,
 
+    #[account(
+        init,
+        space = BASE_GAME_ACCOUNT_SIZE,
+        payer = admin,
+        seeds = [b"active_game"],
+        bump,
+    )]
+    pub active_game: Box<Account<'info, Domin8Game>>,
+
     #[account(mut)]
     pub admin: Signer<'info>,
 
@@ -74,6 +83,24 @@ pub fn handler(
     ]);
     initial_force.copy_from_slice(&hash.0);
     config.force = initial_force;
+
+    // Initialize active_game (empty game instance)
+    let active_game = &mut ctx.accounts.active_game;
+    active_game.game_round = 0; // No active game yet
+    active_game.start_date = 0;
+    active_game.end_date = 0;
+    active_game.total_deposit = 0;
+    active_game.rand = 0;
+    active_game.map = 0;
+    active_game.winner = None;
+    active_game.winner_prize = 0;
+    active_game.winning_bet_index = None;
+    active_game.user_count = 0;
+    active_game.force = [0u8; 32];
+    active_game.status = GAME_STATUS_WAITING;
+    active_game.vrf_requested = false;
+    active_game.wallets = Vec::new();
+    active_game.bets = Vec::new();
 
     msg!("Domin8 configuration initialized");
     msg!("Admin: {}", config.admin);

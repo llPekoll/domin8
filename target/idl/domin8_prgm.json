@@ -1,5 +1,5 @@
 {
-  "address": "JBZ9jKkL5M8vRpLmhNwYT648e8WhCQKhQpRxt4QAb6zt",
+  "address": "3F4opHXEzCKmh3xEbm1fsW4NE7f6g5Bwca67swp1v1R3",
   "metadata": {
     "name": "domin8_prgm",
     "version": "0.1.0",
@@ -78,6 +78,30 @@
               {
                 "kind": "arg",
                 "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "active_game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  99,
+                  116,
+                  105,
+                  118,
+                  101,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
               }
             ]
           }
@@ -186,6 +210,30 @@
               {
                 "kind": "arg",
                 "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "active_game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  99,
+                  116,
+                  105,
+                  118,
+                  101,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
               }
             ]
           }
@@ -370,6 +418,30 @@
           }
         },
         {
+          "name": "active_game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  99,
+                  116,
+                  105,
+                  118,
+                  101,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "admin",
           "writable": true,
           "signer": true
@@ -467,6 +539,30 @@
                   102,
                   105,
                   103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "active_game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  99,
+                  116,
+                  105,
+                  118,
+                  101,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
                 ]
               }
             ]
@@ -677,6 +773,19 @@
   ],
   "events": [
     {
+      "name": "BetPlaced",
+      "discriminator": [
+        88,
+        88,
+        145,
+        226,
+        126,
+        206,
+        32,
+        0
+      ]
+    },
+    {
       "name": "GameCreated",
       "discriminator": [
         218,
@@ -687,6 +796,19 @@
         112,
         96,
         2
+      ]
+    },
+    {
+      "name": "GameEnded",
+      "discriminator": [
+        35,
+        93,
+        113,
+        153,
+        29,
+        144,
+        200,
+        109
       ]
     }
   ],
@@ -841,6 +963,55 @@
                 2
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "BetPlaced",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total_pot",
+            "type": "u64"
+          },
+          {
+            "name": "bet_index",
+            "type": "u64"
+          },
+          {
+            "name": "is_new_user",
+            "type": "bool"
+          },
+          {
+            "name": "skin",
+            "type": "u8"
+          },
+          {
+            "name": "position",
+            "type": {
+              "array": [
+                "u16",
+                2
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
@@ -1022,6 +1193,79 @@
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GameEnded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "winner",
+            "type": "pubkey"
+          },
+          {
+            "name": "winning_bet_index",
+            "type": "u64"
+          },
+          {
+            "name": "winning_bet_amount",
+            "type": "u64"
+          },
+          {
+            "name": "total_pot",
+            "type": "u64"
+          },
+          {
+            "name": "prize",
+            "type": "u64"
+          },
+          {
+            "name": "house_fee",
+            "type": "u64"
+          },
+          {
+            "name": "house_fee_percentage",
+            "type": "u64"
+          },
+          {
+            "name": "total_bets",
+            "type": "u64"
+          },
+          {
+            "name": "unique_users",
+            "type": "u64"
+          },
+          {
+            "name": "win_probability",
+            "type": "u64"
+          },
+          {
+            "name": "vrf_force",
+            "type": "string"
+          },
+          {
+            "name": "vrf_force_bytes",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "randomness",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
