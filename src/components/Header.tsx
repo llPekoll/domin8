@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { generateRandomName } from "../lib/nameGenerator";
 // import { useActiveGame } from "../hooks/useActiveGame";
 import { logger } from "../lib/logger";
+import { Link } from "react-router-dom";
 
 export function Header() {
   const { connected, publicKey, externalWalletAddress, solBalance, isLoadingBalance } =
@@ -77,12 +78,12 @@ export function Header() {
                 >
                   Arena
                 </Link>*/}
-                {/*<Link
+                <Link
                   to="/1v1"
                   className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
                 >
                   1<span className="px-0.5">v</span>1
-                </Link>*/}
+                </Link>
                 {/*<Link
                   to="/referrals"
                   className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
