@@ -4,7 +4,7 @@ import { CharacterSelection2 } from "../components/CharacterSelection2";
 import { CreateLobby } from "../components/onevone/CreateLobby";
 import { LobbyList } from "../components/onevone/LobbyList";
 import { LobbyHistory } from "../components/onevone/LobbyHistory";
-import { OneVOneFightScene } from "../components/onevone/OneVOneFightScene";
+import { OneVOneArenaModal } from "../components/onevone/OneVOneArenaModal";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -33,9 +33,10 @@ export function OneVOnePage() {
   // Track selected character for 1v1 lobbies
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   
-  // Track which lobby we're currently fighting in (null = list view, number = fighting)
-  const [fightingLobbyId, setFightingLobbyId] = useState<number | null>(null);
-  const [isArenaMinimized, setIsArenaMinimized] = useState(false);
+  // Arena modal state
+  const [arenaModalOpen, setArenaModalOpen] = useState(false);
+  const [activeLobbyId, setActiveLobbyId] = useState<number | null>(null);
+  const [isCreator, setIsCreator] = useState(false); // true if user created the lobby
   
   // Get open lobbies from Convex (real-time updates)
   const openLobbies = useQuery(api.lobbies.getOpenLobbies) || [];
@@ -56,41 +57,58 @@ export function OneVOnePage() {
     return userLobbies.asPlayerA.filter((l: any) => l.status === 0);
   }, [publicKey, userLobbies]);
   
-  // Get specific lobby state when fighting (for real-time updates during fight)
-  // Must always call useQuery unconditionally - use fightingLobbyId || 0 as fallback
+  // Get specific lobby state when in arena (for real-time updates during fight)
   const lobbyStateQuery = useQuery(
     api.lobbies.getLobbyState, 
-    fightingLobbyId !== null ? { lobbyId: fightingLobbyId } : "skip"
+    activeLobbyId !== null ? { lobbyId: activeLobbyId } : "skip"
   );
   
-  // Only use the lobby state if we're actually fighting
-  const lobbyState = fightingLobbyId !== null ? lobbyStateQuery : null;
+  // Only use the lobby state if modal is open
+  const activeLobbyState = arenaModalOpen && activeLobbyId !== null ? lobbyStateQuery : null;
 
   const handleCharacterSelected = useCallback((character: Character | null) => {
     setSelectedCharacter(character);
   }, []);
 
+  // When user creates a lobby, open the arena modal
   const handleLobbyCreated = useCallback((lobbyId: number) => {
-    // After creating a lobby, stay on the list so they can see it
-    console.log("[1v1] Lobby created:", lobbyId);
+    logger.ui.info("[1v1] Lobby created, opening arena modal", { lobbyId });
+    setActiveLobbyId(lobbyId);
+    setIsCreator(true);
+    setArenaModalOpen(true);
   }, []);
 
   const handleLobbyCancelled = useCallback((lobbyId: number) => {
-    // Lobby was cancelled - the component will automatically refresh
-    console.log("[1v1] Lobby cancelled:", lobbyId);
-  }, []);
+    // Lobby was cancelled - close modal if viewing this lobby
+    logger.ui.info("[1v1] Lobby cancelled", { lobbyId });
+    if (activeLobbyId === lobbyId) {
+      setArenaModalOpen(false);
+      setActiveLobbyId(null);
+    }
+  }, [activeLobbyId]);
 
+  // When user joins a lobby, open the arena modal
   const handleLobbyJoined = useCallback((lobbyId: number) => {
-    // Player B joined, transition to fight view
-    setFightingLobbyId(lobbyId);
+    logger.ui.info("[1v1] Joined lobby, opening arena modal", { lobbyId });
+    setActiveLobbyId(lobbyId);
+    setIsCreator(false);
+    setArenaModalOpen(true);
   }, []);
 
+  // Handle arena modal close
+  const handleArenaClose = useCallback(() => {
+    setArenaModalOpen(false);
+    // Keep activeLobbyId for a moment in case user wants to reopen
+  }, []);
+
+  // Handle fight completion (from modal)
   const handleFightComplete = useCallback(() => {
-    // Fight finished, go back to list view
-    setFightingLobbyId(null);
-    setIsArenaMinimized(false);
+    logger.ui.info("[1v1] Fight complete");
+    setArenaModalOpen(false);
+    setActiveLobbyId(null);
   }, []);
 
+  // Double down handler for winner
   const handleDoubleDown = useCallback(async (amount: number) => {
     if (!connected || !publicKey || !selectedCharacter || !wallet) {
       toast.error("Please connect wallet and select a character");
@@ -104,7 +122,6 @@ export function OneVOnePage() {
       // Import utilities
       const { getSharedConnection } = await import("../lib/sharedConnection");
       const { buildCreateLobbyTransaction } = await import("../lib/solana-1v1-transactions");
-      const { Keypair } = await import("@solana/web3.js");
 
       const connection = getSharedConnection();
       
@@ -117,7 +134,7 @@ export function OneVOnePage() {
         connection
       );
 
-      // Serialize transaction for Privy (must be Uint8Array, not VersionedTransaction object)
+      // Serialize transaction for Privy
       const serializedTx = transaction.serialize();
 
       // Sign and send via Privy
@@ -131,7 +148,6 @@ export function OneVOnePage() {
       if (typeof txResult.signature === "string") {
         signature = txResult.signature;
       } else if (txResult.signature instanceof Uint8Array) {
-        // Convert Uint8Array to base58
         const bs58 = await import("bs58");
         signature = bs58.default.encode(txResult.signature);
       } else {
@@ -160,10 +176,10 @@ export function OneVOnePage() {
 
       if (result.success) {
         toast.success(`Double Down successful! Lobby #${result.lobbyId} created.`, { id: toastId });
-        // Transition to the new lobby? Or just show it in the list?
-        // For now, let's just go back to list view (which happens automatically if we don't set fightingLobbyId)
-        // But maybe we want to auto-minimize the arena or something?
-        setFightingLobbyId(null); // Ensure we exit the previous fight view
+        // Open the new lobby in the arena
+        setActiveLobbyId(result.lobbyId);
+        setIsCreator(true);
+        // Modal stays open with new lobby
       } else {
         throw new Error("Failed to create lobby in database");
       }
@@ -174,18 +190,13 @@ export function OneVOnePage() {
     }
   }, [connected, publicKey, selectedCharacter, wallet, createLobbyAction]);
 
-  // Determine which view to show
-  const currentView = useMemo(() => {
-    if (!connected || !publicKey) {
-      return "not-connected";
-    }
-    
-    if (fightingLobbyId !== null && lobbyState) {
-      return "fighting";
-    }
-    
-    return "lobby-list";
-  }, [connected, publicKey, fightingLobbyId, lobbyState]);
+  // Allow user to click on their own waiting lobby to reopen modal
+  const handleViewOwnLobby = useCallback((lobbyId: number) => {
+    logger.ui.info("[1v1] Viewing own lobby", { lobbyId });
+    setActiveLobbyId(lobbyId);
+    setIsCreator(true);
+    setArenaModalOpen(true);
+  }, []);
 
   return (
     <div className="min-h-screen w-full bg-black">
@@ -196,7 +207,7 @@ export function OneVOnePage() {
         <CharacterSelection2 onCharacterSelected={handleCharacterSelected} />
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Content Area - Always show lobby list */}
       <main className="pt-16 pb-32 px-4 container mx-auto">
         {!connected || !publicKey ? (
           // Not connected view
@@ -207,67 +218,48 @@ export function OneVOnePage() {
             </div>
           </div>
         ) : (
-          <>
-            {/* Lobby list + create view (Show if not fighting OR if fighting but minimized) */}
-            {(currentView !== "fighting" || isArenaMinimized) && (
-              <div className="max-w-6xl mx-auto">
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                  {/* Create Lobby Section */}
-                  <div>
-                    <CreateLobby
-                      selectedCharacter={selectedCharacter}
-                      onLobbyCreated={handleLobbyCreated}
-                      userOpenLobbies={userOpenLobbies}
-                      onLobbyCancelled={handleLobbyCancelled}
-                    />
-                  </div>
-
-                  {/* Open Lobbies List */}
-                  <div className="lg:col-span-2">
-                    <LobbyList
-                      lobbies={openLobbies as LobbyData[]}
-                      currentPlayerWallet={publicKey?.toString() || ""}
-                      selectedCharacter={selectedCharacter}
-                      onLobbyJoined={handleLobbyJoined}
-                    />
-                  </div>
-
-                  {/* Lobby History */}
-                  <div>
-                    <LobbyHistory lobbies={completedLobbies as LobbyData[]} />
-                  </div>
-                </div>
+          <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Create Lobby Section */}
+              <div>
+                <CreateLobby
+                  selectedCharacter={selectedCharacter}
+                  onLobbyCreated={handleLobbyCreated}
+                  userOpenLobbies={userOpenLobbies}
+                  onLobbyCancelled={handleLobbyCancelled}
+                  onViewLobby={handleViewOwnLobby}
+                />
               </div>
-            )}
 
-            {/* Fight view (Show if fighting) */}
-            {currentView === "fighting" && lobbyState && (
-              <div className={isArenaMinimized ? "fixed bottom-24 right-4 w-96 z-50 shadow-2xl transition-all duration-300" : "max-w-4xl mx-auto transition-all duration-300"}>
-                 <div className="bg-black border border-indigo-500 rounded-lg overflow-hidden">
-                     <div className="flex justify-between items-center p-2 bg-indigo-900/80 border-b border-indigo-500/50">
-                         <span className="text-sm font-bold text-indigo-300 flex items-center gap-2">
-                             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                             Lobby #{lobbyState.lobbyId}
-                         </span>
-                         <button 
-                             onClick={() => setIsArenaMinimized(!isArenaMinimized)}
-                             className="text-xs bg-indigo-800 hover:bg-indigo-700 text-white px-3 py-1 rounded border border-indigo-600 transition-colors"
-                         >
-                             {isArenaMinimized ? "Maximize Arena" : "Minimize"}
-                         </button>
-                     </div>
-                     <OneVOneFightScene
-                        lobby={lobbyState as LobbyData}
-                        onFightComplete={handleFightComplete}
-                        selectedCharacter={selectedCharacter}
-                        onDoubleDown={handleDoubleDown}
-                     />
-                 </div>
+              {/* Open Lobbies List */}
+              <div className="lg:col-span-2">
+                <LobbyList
+                  lobbies={openLobbies as LobbyData[]}
+                  currentPlayerWallet={publicKey?.toString() || ""}
+                  selectedCharacter={selectedCharacter}
+                  onLobbyJoined={handleLobbyJoined}
+                />
               </div>
-            )}
-          </>
+
+              {/* Lobby History */}
+              <div>
+                <LobbyHistory lobbies={completedLobbies as LobbyData[]} />
+              </div>
+            </div>
+          </div>
         )}
       </main>
+
+      {/* Arena Modal - Shows the Phaser game in a dialog */}
+      <OneVOneArenaModal
+        isOpen={arenaModalOpen}
+        onClose={handleArenaClose}
+        lobby={activeLobbyState as LobbyData | null}
+        selectedCharacter={selectedCharacter}
+        isCreator={isCreator}
+        onFightComplete={handleFightComplete}
+        onDoubleDown={handleDoubleDown}
+      />
     </div>
   );
 }

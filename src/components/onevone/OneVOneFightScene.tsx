@@ -1,11 +1,7 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EventBus } from "../../game/EventBus";
 import type { Character } from "../../types/character";
 import { usePrivyWallet } from "../../hooks/usePrivyWallet";
-import { useAction } from "convex/react";
-import { api } from "../../../convex/_generated/api";
-import { toast } from "sonner";
-import { logger } from "../../lib/logger";
 
 interface LobbyData {
   _id: string;
@@ -33,7 +29,7 @@ export function OneVOneFightScene({
   onFightComplete,
   onDoubleDown,
 }: OneVOneFightSceneProps) {
-  const { publicKey, wallet, connected } = usePrivyWallet();
+  const { publicKey } = usePrivyWallet();
   const containerRef = useRef<HTMLDivElement>(null);
   const [fightStarted, setFightStarted] = useState(false);
   const [fightResult, setFightResult] = useState<{

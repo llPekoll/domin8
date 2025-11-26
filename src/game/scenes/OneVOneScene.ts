@@ -5,6 +5,7 @@ import { AnimationManager } from "../managers/AnimationManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
 import { logger } from "../../lib/logger";
+import { RESOLUTION_SCALE } from "../main";
 
 /**
  * OneVOneScene - 1v1 Coinflip fight scene
@@ -12,9 +13,9 @@ import { logger } from "../../lib/logger";
  * Features:
  * - 2 players (Player A vs Player B)
  * - Fixed background
- * - 3 phases: loading → battle → results
+ * - 3 phases: waiting → battle → results
  * - Reuses PlayerManager, AnimationManager, BackgroundManager
- * - Polls Convex for lobby state updates
+ * - Supports modal-based workflow with single character spawn
  */
 
 interface FightData {
@@ -25,6 +26,13 @@ interface FightData {
   characterB: number;
   winner: string; // Winner's wallet address
   mapId: number;
+}
+
+interface SingleCharacterData {
+  playerId: string;
+  characterId: number;
+  position: "left" | "right";
+  displayName: string;
 }
 
 export class OneVOneScene extends Scene {
@@ -42,6 +50,7 @@ export class OneVOneScene extends Scene {
   private fightStarted: boolean = false;
   private battleMusic: Phaser.Sound.BaseSound | null = null;
   private audioUnlocked: boolean = false;
+  private spawnedCharacters: Set<string> = new Set();
 
   // UI elements
   private loadingText!: Phaser.GameObjects.Text;
@@ -65,6 +74,20 @@ export class OneVOneScene extends Scene {
     // Set background to a fixed arena (bg1 for now)
     this.backgroundManager.setBackgroundById(1);
 
+    // Create simple 1v1 map data with left/right spawn positions
+    const oneVOneMapData = {
+      spawnConfiguration: {
+        centerX: this.centerX / RESOLUTION_SCALE,
+        centerY: this.centerY / RESOLUTION_SCALE,
+        radiusX: (this.centerX * 0.5) / RESOLUTION_SCALE,
+        radiusY: (this.centerY * 0.3) / RESOLUTION_SCALE,
+        minSpawnRadius: 0,
+        maxSpawnRadius: 100,
+        minSpacing: 50,
+      },
+    };
+    this.playerManager.setMapData(oneVOneMapData);
+
     // Initialize SoundManager
     SoundManager.initialize();
 
@@ -81,7 +104,7 @@ export class OneVOneScene extends Scene {
   }
 
   private createUI() {
-    // Loading text (shown initially)
+    // Loading text (shown initially) - hidden by default for modal workflow
     this.loadingText = this.add.text(this.centerX, this.centerY - 40, "Loading fight...", {
       fontFamily: "metal-slug",
       fontSize: "20px",
@@ -93,6 +116,7 @@ export class OneVOneScene extends Scene {
     this.loadingText.setOrigin(0.5);
     this.loadingText.setScrollFactor(0);
     this.loadingText.setDepth(1000);
+    this.loadingText.setVisible(false); // Hidden by default
 
     // Battle text (shown during fight)
     this.battleText = this.add.text(this.centerX, this.centerY - 40, "⚔️ 1v1 FIGHT!", {
@@ -124,16 +148,69 @@ export class OneVOneScene extends Scene {
   }
 
   /**
-   * Start a 1v1 fight with the given data
+   * Spawn a single character in the arena (for waiting/joining states)
+   * This is called from React when a lobby is created or joined
+   */
+  public spawnSingleCharacter(data: SingleCharacterData) {
+    const characterKey = `character_${data.characterId}`;
+    
+    // Prevent duplicate spawns
+    if (this.spawnedCharacters.has(data.playerId)) {
+      logger.game.warn("[OneVOneScene] Character already spawned for player:", data.playerId);
+      return;
+    }
+    
+    logger.game.info("[OneVOneScene] Spawning single character", data);
+
+    // Calculate spawn position (left or right side of arena)
+    const spawnIndex = data.position === "left" ? 0 : 1;
+    
+    // Create participant data
+    const participant = {
+      _id: `${data.playerId}_1v1`,
+      playerId: data.playerId,
+      displayName: data.displayName,
+      character: {
+        id: data.characterId,
+        name: `Character ${data.characterId}`,
+        key: characterKey,
+      },
+      spawnIndex: spawnIndex,
+      isBot: false,
+      eliminated: false,
+      size: 1.5 * RESOLUTION_SCALE, // Slightly larger for visibility
+      betAmount: 0,
+    };
+
+    // Spawn the character with falling animation
+    this.playerManager.addParticipant(participant);
+    this.spawnedCharacters.add(data.playerId);
+
+    // Play challenger sound for dramatic entrance
+    SoundManager.playChallenger(this, 0.8);
+
+    logger.game.debug("[OneVOneScene] Character spawned successfully");
+  }
+
+  /**
+   * Start a 1v1 fight with the given data (legacy method - redirects to startFightAnimation)
    * This is called from the React component after blockchain confirmation
    */
   public startFight(data: FightData) {
+    this.startFightAnimation(data);
+  }
+
+  /**
+   * Start the fight animation sequence
+   * Called when both players are ready and winner is determined
+   */
+  public startFightAnimation(data: FightData) {
     if (this.fightStarted) {
       logger.game.warn("[OneVOneScene] Fight already in progress");
       return;
     }
 
-    logger.game.debug("[OneVOneScene] Starting 1v1 fight", data);
+    logger.game.info("[OneVOneScene] Starting 1v1 fight animation", data);
 
     this.fightData = data;
     this.fightStarted = true;
@@ -144,70 +221,77 @@ export class OneVOneScene extends Scene {
     // Show battle text
     this.battleText.setVisible(true);
 
-    // Play challenger sound for dramatic entrance
-    SoundManager.playChallenger(this, 0.8);
+    // Check if characters are already spawned (modal workflow)
+    const existingParticipants = this.playerManager.getParticipants();
+    const hasExistingCharacters = existingParticipants.size > 0;
 
-    // Create map data for 1v1 (simple centered arena)
-    const oneVOneMapData = {
-      spawnConfiguration: {
-        centerX: this.centerX,
-        centerY: this.centerY,
-        radiusX: this.centerX * 0.4, // Compact spawn radius for 1v1
-        radiusY: this.centerY * 0.3,
-        minSpawnRadius: 0,
-        maxSpawnRadius: 100,
-        minSpacing: 50,
-      },
-    };
+    if (!hasExistingCharacters) {
+      // Legacy flow: spawn both characters now
+      logger.game.debug("[OneVOneScene] No existing characters, spawning both");
+      
+      // Create participants for Player A
+      const participantA = {
+        _id: `${data.playerA}_1v1`,
+        playerId: data.playerA,
+        displayName: "Player A",
+        character: {
+          id: data.characterA,
+          name: `Character ${data.characterA}`,
+          key: `character_${data.characterA}`,
+        },
+        spawnIndex: 0,
+        isBot: false,
+        eliminated: false,
+        size: 1.5 * RESOLUTION_SCALE,
+        betAmount: 0,
+      };
 
-    // Set map data on player manager
-    this.playerManager.setMapData(oneVOneMapData);
+      // Create participants for Player B
+      const participantB = {
+        _id: `${data.playerB}_1v1`,
+        playerId: data.playerB,
+        displayName: "Player B",
+        character: {
+          id: data.characterB,
+          name: `Character ${data.characterB}`,
+          key: `character_${data.characterB}`,
+        },
+        spawnIndex: 1,
+        isBot: false,
+        eliminated: false,
+        size: 1.5 * RESOLUTION_SCALE,
+        betAmount: 0,
+      };
 
-    // Create participants for Player A
-    const participantA = {
-      _id: `${data.playerA}_1v1_a`,
-      playerId: data.playerA,
-      displayName: "Player A",
-      character: {
-        id: data.characterA,
-        name: `Character ${data.characterA}`,
-        key: `character_${data.characterA}`,
-      },
-      spawnIndex: 0, // Left position
-      isBot: false,
-      eliminated: false,
-      size: 1.2, // Slightly larger for visibility
-    };
+      // Spawn characters
+      this.playerManager.addParticipant(participantA);
+      this.playerManager.addParticipant(participantB);
 
-    // Create participants for Player B
-    const participantB = {
-      _id: `${data.playerB}_1v1_b`,
-      playerId: data.playerB,
-      displayName: "Player B",
-      character: {
-        id: data.characterB,
-        name: `Character ${data.characterB}`,
-        key: `character_${data.characterB}`,
-      },
-      spawnIndex: 1, // Right position (opposite side)
-      isBot: false,
-      eliminated: false,
-      size: 1.2, // Slightly larger for visibility
-    };
+      // Play challenger sound
+      SoundManager.playChallenger(this, 0.8);
 
-    // Spawn characters - this will handle falling animation automatically
-    this.playerManager.addParticipant(participantA);
-    this.playerManager.addParticipant(participantB);
+      // After characters land, play dramatic entrance then start battle
+      this.time.delayedCall(600, () => {
+        this.playEntranceAnimation();
+      });
 
-    // After characters land (400ms), play dramatic entrance
-    this.time.delayedCall(600, () => {
-      this.playEntranceAnimation();
-    });
+      this.time.delayedCall(1500, () => {
+        this.runBattle();
+      });
+    } else {
+      // Modal workflow: characters already spawned, start fight immediately
+      logger.game.debug("[OneVOneScene] Characters exist, starting fight sequence");
+      
+      // Play dramatic entrance immediately
+      this.time.delayedCall(200, () => {
+        this.playEntranceAnimation();
+      });
 
-    // Start battle animation sequence
-    this.time.delayedCall(1500, () => {
-      this.runBattle();
-    });
+      // Start battle after short delay
+      this.time.delayedCall(1000, () => {
+        this.runBattle();
+      });
+    }
 
     // Start battle music
     this.tryStartMusic();
@@ -296,8 +380,8 @@ export class OneVOneScene extends Scene {
             logger.game.debug("[OneVOneScene] 1v1 fight completed, emitting completion event");
             EventBus.emit("1v1-complete");
 
-            // Clean up
-            this.cleanup();
+            // Clean up (don't auto-cleanup - let React handle it via modal close)
+            // this.internalCleanup();
           });
         }
       );
@@ -313,12 +397,16 @@ export class OneVOneScene extends Scene {
 
       this.time.delayedCall(3000, () => {
         EventBus.emit("1v1-complete");
-        this.cleanup();
+        // Don't auto-cleanup - let React handle it
+        // this.internalCleanup();
       });
     }
   }
 
-  private cleanup() {
+  /**
+   * Clean up the scene state (public method for React to call)
+   */
+  public cleanup() {
     logger.game.debug("[OneVOneScene] Cleaning up scene");
 
     // Clear participants
@@ -328,6 +416,7 @@ export class OneVOneScene extends Scene {
     // Reset state
     this.fightData = null;
     this.fightStarted = false;
+    this.spawnedCharacters.clear();
 
     // Hide all UI
     this.loadingText.setVisible(false);
@@ -339,6 +428,13 @@ export class OneVOneScene extends Scene {
       this.battleMusic.stop();
       this.battleMusic = null;
     }
+  }
+
+  /**
+   * Internal cleanup (called by showResults)
+   */
+  private internalCleanup() {
+    this.cleanup();
   }
 
   private setupAudioUnlock() {

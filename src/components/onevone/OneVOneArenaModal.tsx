@@ -1,0 +1,428 @@
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import { EventBus } from "../../game/EventBus";
+import { logger } from "../../lib/logger";
+import { usePrivyWallet } from "../../hooks/usePrivyWallet";
+import type { Character } from "../../types/character";
+
+interface LobbyData {
+  _id: string;
+  lobbyId: number;
+  lobbyPda: string;
+  playerA: string;
+  playerB?: string;
+  amount: number;
+  status: 0 | 1 | 2; // 0 = Open, 1 = Awaiting VRF, 2 = Resolved
+  winner?: string;
+  characterA: number;
+  characterB?: number;
+  mapId: number;
+}
+
+interface OneVOneArenaModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  lobby: LobbyData | null;
+  selectedCharacter?: Character | null; // Optional - can be used for future features
+  isCreator: boolean; // true = Player A (created lobby), false = Player B (joined)
+  onFightComplete?: () => void;
+  onDoubleDown?: (amount: number) => void;
+}
+
+type ArenaState = "waiting" | "opponent-joining" | "vrf-pending" | "fighting" | "results";
+
+export function OneVOneArenaModal({
+  isOpen,
+  onClose,
+  lobby,
+  isCreator,
+  onFightComplete,
+  onDoubleDown,
+}: OneVOneArenaModalProps) {
+  // selectedCharacter can be used for future character-specific features
+  const { publicKey } = usePrivyWallet();
+  const [arenaState, setArenaState] = useState<ArenaState>("waiting");
+  const [fightResult, setFightResult] = useState<{ winner: string; isUserWinner: boolean } | null>(null);
+  const sceneInitialized = useRef(false);
+  const previousLobbyStatus = useRef<number | null>(null);
+  const previousSceneKey = useRef<string | null>(null);
+
+  // Get the Phaser game instance
+  const getPhaserGame = useCallback((): Phaser.Game | undefined => {
+    return (window as any).phaserGame;
+  }, []);
+
+  // Get the OneVOne scene
+  const getOneVOneScene = useCallback(() => {
+    const game = getPhaserGame();
+    if (!game || !game.scene) return null;
+    return game.scene.getScene("OneVOne") as any;
+  }, [getPhaserGame]);
+
+  // Switch to OneVOne scene when modal opens
+  useEffect(() => {
+    if (!isOpen || !lobby) {
+      // When modal closes, switch back to previous scene
+      if (previousSceneKey.current) {
+        const game = getPhaserGame();
+        if (game && game.scene) {
+          const oneVOneScene = getOneVOneScene();
+          if (oneVOneScene && typeof oneVOneScene.cleanup === "function") {
+            oneVOneScene.cleanup();
+          }
+          
+          // Stop OneVOne scene and restart previous scene
+          game.scene.stop("OneVOne");
+          game.scene.start(previousSceneKey.current);
+          logger.game.info("[ArenaModal] Switched back to", previousSceneKey.current);
+        }
+        previousSceneKey.current = null;
+      }
+      
+      sceneInitialized.current = false;
+      previousLobbyStatus.current = null;
+      setArenaState("waiting");
+      setFightResult(null);
+      return;
+    }
+
+    const game = getPhaserGame();
+    if (!game) {
+      logger.game.error("[ArenaModal] Phaser game not found");
+      return;
+    }
+
+    // Store current active scene to switch back later
+    const activeScenes = game.scene.getScenes(true);
+    if (activeScenes.length > 0 && activeScenes[0].scene.key !== "OneVOne") {
+      previousSceneKey.current = activeScenes[0].scene.key;
+    }
+
+    // Stop current scene and start OneVOne scene
+    if (previousSceneKey.current) {
+      game.scene.stop(previousSceneKey.current);
+    }
+    game.scene.start("OneVOne");
+    logger.game.info("[ArenaModal] Started OneVOne scene");
+
+    // Give scene time to initialize, then spawn the first character
+    const initTimer = setTimeout(() => {
+      const oneVOneScene = getOneVOneScene();
+      if (oneVOneScene && !sceneInitialized.current) {
+        sceneInitialized.current = true;
+        
+        // Spawn Player A's character
+        if (typeof oneVOneScene.spawnSingleCharacter === "function") {
+          logger.game.info("[ArenaModal] Spawning Player A character", {
+            characterId: lobby.characterA,
+            isCreator,
+          });
+          oneVOneScene.spawnSingleCharacter({
+            playerId: lobby.playerA,
+            characterId: lobby.characterA,
+            position: "left",
+            displayName: isCreator ? "You" : "Opponent",
+          });
+        }
+
+        // If Player B exists, also spawn them
+        if (lobby.playerB && lobby.characterB !== undefined) {
+          if (typeof oneVOneScene.spawnSingleCharacter === "function") {
+            logger.game.info("[ArenaModal] Spawning Player B character", {
+              characterId: lobby.characterB,
+            });
+            setTimeout(() => {
+              oneVOneScene.spawnSingleCharacter({
+                playerId: lobby.playerB!,
+                characterId: lobby.characterB!,
+                position: "right",
+                displayName: !isCreator ? "You" : "Opponent",
+              });
+            }, 500); // Slight delay for dramatic effect
+          }
+        }
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(initTimer);
+    };
+  }, [isOpen, lobby?.lobbyId, isCreator, getPhaserGame, getOneVOneScene]);
+
+  // Watch for lobby state changes (real-time updates from Convex)
+  useEffect(() => {
+    if (!isOpen || !lobby) return;
+
+    // Track status changes
+    if (previousLobbyStatus.current !== lobby.status) {
+      logger.game.info("[ArenaModal] Lobby status changed", {
+        from: previousLobbyStatus.current,
+        to: lobby.status,
+        lobbyId: lobby.lobbyId,
+      });
+      previousLobbyStatus.current = lobby.status;
+
+      // Update arena state based on lobby status
+      if (lobby.status === 0) {
+        // Open - waiting for opponent
+        if (lobby.playerB) {
+          setArenaState("opponent-joining");
+          
+          // If Player B just joined, spawn their character
+          if (lobby.characterB !== undefined && sceneInitialized.current) {
+            const scene = getOneVOneScene();
+            if (scene && typeof scene.spawnSingleCharacter === "function") {
+              logger.game.info("[ArenaModal] Player B joined - spawning character");
+              scene.spawnSingleCharacter({
+                playerId: lobby.playerB,
+                characterId: lobby.characterB,
+                position: "right",
+                displayName: !isCreator ? "You" : "Opponent",
+              });
+            }
+          }
+        } else {
+          setArenaState("waiting");
+        }
+      } else if (lobby.status === 1) {
+        // Awaiting VRF
+        setArenaState("vrf-pending");
+      } else if (lobby.status === 2 && lobby.winner) {
+        // Resolved - start fight animation
+        setArenaState("fighting");
+        
+        const scene = getOneVOneScene();
+        if (scene && typeof scene.startFightAnimation === "function") {
+          logger.game.info("[ArenaModal] Starting fight animation", {
+            winner: lobby.winner,
+          });
+          scene.startFightAnimation({
+            lobbyId: lobby.lobbyId,
+            playerA: lobby.playerA,
+            playerB: lobby.playerB || "",
+            characterA: lobby.characterA,
+            characterB: lobby.characterB || 0,
+            winner: lobby.winner,
+            mapId: lobby.mapId,
+          });
+        }
+      }
+    }
+  }, [isOpen, lobby, isCreator, getOneVOneScene]);
+
+  // Listen for fight completion event from Phaser
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleFightComplete = () => {
+      logger.game.info("[ArenaModal] Fight animation complete");
+      
+      if (lobby?.winner && publicKey) {
+        const isUserWinner = lobby.winner === publicKey.toString();
+        setFightResult({
+          winner: lobby.winner,
+          isUserWinner,
+        });
+        setArenaState("results");
+
+        // If user lost, auto-close after delay
+        if (!isUserWinner) {
+          setTimeout(() => {
+            onFightComplete?.();
+            onClose();
+          }, 3000);
+        }
+      }
+    };
+
+    EventBus.on("1v1-complete", handleFightComplete);
+
+    return () => {
+      EventBus.off("1v1-complete", handleFightComplete);
+    };
+  }, [isOpen, lobby, publicKey, onFightComplete, onClose]);
+
+  const formatAmount = (lamports: number) => {
+    return (lamports / 1e9).toFixed(4);
+  };
+
+  const prizeAmount = lobby ? lobby.amount * 2 * 0.98 : 0;
+
+  const handleDoubleDownClick = () => {
+    if (onDoubleDown && prizeAmount > 0) {
+      onDoubleDown(prizeAmount);
+      onClose();
+    }
+  };
+
+  const handleCollectAndLeave = () => {
+    onFightComplete?.();
+    onClose();
+  };
+
+  // Determine the status display text
+  const getStatusDisplay = () => {
+    switch (arenaState) {
+      case "waiting":
+        return {
+          title: "Waiting for Opponent",
+          subtitle: "Your character has entered the arena!",
+          showSpinner: true,
+        };
+      case "opponent-joining":
+        return {
+          title: "Opponent Joining",
+          subtitle: "Get ready to fight!",
+          showSpinner: true,
+        };
+      case "vrf-pending":
+        return {
+          title: "Generating Randomness",
+          subtitle: "Oracle is determining the winner...",
+          showSpinner: true,
+        };
+      case "fighting":
+        return {
+          title: "⚔️ FIGHT!",
+          subtitle: "",
+          showSpinner: false,
+        };
+      case "results":
+        return {
+          title: fightResult?.isUserWinner ? "🎉 VICTORY!" : "💀 DEFEAT",
+          subtitle: fightResult?.isUserWinner
+            ? `You won ${formatAmount(prizeAmount)} SOL!`
+            : "Better luck next time!",
+          showSpinner: false,
+        };
+      default:
+        return { title: "", subtitle: "", showSpinner: false };
+    }
+  };
+
+  const statusDisplay = getStatusDisplay();
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="bg-black border-2 border-indigo-500 text-white sm:max-w-4xl p-0 overflow-hidden"
+        showCloseButton={arenaState === "waiting" || arenaState === "results"}
+      >
+        {/* Arena Header */}
+        <DialogHeader className="p-4 bg-gradient-to-r from-indigo-900/80 to-purple-900/80 border-b border-indigo-500/50">
+          <DialogTitle className="text-xl font-bold text-indigo-200 flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              Lobby #{lobby?.lobbyId}
+            </span>
+            <span className="text-yellow-400 font-mono">
+              {lobby ? formatAmount(lobby.amount) : "0"} SOL
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+
+        {/* Phaser Game Container - The game canvas is rendered here */}
+        <div className="relative w-full aspect-video bg-gray-900 flex items-center justify-center">
+          {/* The actual Phaser game canvas will be rendered in #game-container which is in the main layout */}
+          {/* This area shows status overlays on top of the game */}
+          
+          {/* Status Overlay */}
+          {(arenaState === "waiting" || arenaState === "vrf-pending" || arenaState === "opponent-joining") && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10 pointer-events-none">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-white mb-2">{statusDisplay.title}</h2>
+                <p className="text-gray-300 mb-4">{statusDisplay.subtitle}</p>
+                {statusDisplay.showSpinner && (
+                  <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto"></div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Fight Banner */}
+          {arenaState === "fighting" && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+              <h2 className="text-4xl font-black text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)] animate-pulse">
+                {statusDisplay.title}
+              </h2>
+            </div>
+          )}
+        </div>
+
+        {/* Results Actions (only show when fight is complete and user won) */}
+        {arenaState === "results" && fightResult && (
+          <div className="p-6 bg-gray-900/80 border-t border-indigo-500/50">
+            <div className="text-center mb-4">
+              <h2
+                className={`text-3xl font-black mb-2 ${
+                  fightResult.isUserWinner
+                    ? "text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]"
+                    : "text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]"
+                }`}
+              >
+                {statusDisplay.title}
+              </h2>
+              <p className="text-gray-300">{statusDisplay.subtitle}</p>
+            </div>
+
+            {fightResult.isUserWinner ? (
+              <div className="space-y-3 max-w-sm mx-auto">
+                <button
+                  onClick={handleDoubleDownClick}
+                  className="w-full py-3 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white font-bold rounded-lg transform hover:scale-105 transition-all shadow-lg"
+                >
+                  DOUBLE DOWN! (Bet {formatAmount(prizeAmount)} SOL)
+                </button>
+                <button
+                  onClick={handleCollectAndLeave}
+                  className="w-full py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 font-semibold rounded-lg transition-colors"
+                >
+                  Collect & Leave
+                </button>
+              </div>
+            ) : (
+              <div className="text-center">
+                <p className="text-gray-400 text-sm mb-4">Returning to lobby list...</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Lobby Info Footer (show during waiting/pending states) */}
+        {(arenaState === "waiting" || arenaState === "opponent-joining" || arenaState === "vrf-pending") && (
+          <div className="p-4 bg-gray-900/60 border-t border-indigo-500/30">
+            <div className="flex justify-between items-center text-sm">
+              <div>
+                <span className="text-gray-400">Player A: </span>
+                <span className="text-indigo-300 font-mono">
+                  {lobby?.playerA.slice(0, 8)}...
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-400">Player B: </span>
+                <span className="text-indigo-300 font-mono">
+                  {lobby?.playerB ? `${lobby.playerB.slice(0, 8)}...` : "Waiting..."}
+                </span>
+              </div>
+            </div>
+            
+            {/* Close button for creator during waiting */}
+            {arenaState === "waiting" && isCreator && (
+              <div className="mt-4 text-center">
+                <p className="text-xs text-gray-500 mb-2">
+                  You can close this dialog and browse other lobbies while waiting.
+                </p>
+                <button
+                  onClick={onClose}
+                  className="text-sm text-indigo-400 hover:text-indigo-300 underline"
+                >
+                  Browse Other Lobbies
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

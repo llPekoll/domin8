@@ -17,6 +17,7 @@ interface CreateLobbyProps {
     status: number;
   }>;
   onLobbyCancelled?: (lobbyId: number) => void;
+  onViewLobby?: (lobbyId: number) => void;
 }
 
 const DEFAULT_BET_AMOUNT_SOL = 0.01;
@@ -26,6 +27,7 @@ export function CreateLobby({
   onLobbyCreated,
   userOpenLobbies = [],
   onLobbyCancelled,
+  onViewLobby,
 }: CreateLobbyProps) {
   const { connected, publicKey, wallet } = usePrivyWallet();
   const createLobbyAction = useAction(api.lobbies.createLobby);
@@ -204,7 +206,6 @@ export function CreateLobby({
       // Import utilities
       const { getSharedConnection } = await import("../../lib/sharedConnection");
       const { buildCreateLobbyTransaction } = await import("../../lib/solana-1v1-transactions");
-      const { Keypair } = await import("@solana/web3.js");
 
       const connection = getSharedConnection();
       const betAmountLamports = Math.floor(betAmount * 1e9); // Convert SOL to lamports
@@ -373,21 +374,32 @@ export function CreateLobby({
             {userOpenLobbies.map((lobby) => (
               <div
                 key={lobby._id}
-                className="bg-gray-800 border border-orange-400/50 rounded p-3 flex items-center justify-between"
+                className="bg-gray-800 border border-orange-400/50 rounded p-3"
               >
-                <div className="flex-1">
-                  <p className="text-sm text-indigo-400">
-                    Lobby #{lobby.lobbyId} - {formatAmount(lobby.amount)} SOL
-                  </p>
-                  <p className="text-xs text-gray-400">Waiting for Player B...</p>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex-1">
+                    <p className="text-sm text-indigo-400">
+                      Lobby #{lobby.lobbyId} - {formatAmount(lobby.amount)} SOL
+                    </p>
+                    <p className="text-xs text-gray-400">Waiting for Player B...</p>
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleCancelLobby(lobby)}
-                  disabled={cancellingLobbies.has(lobby.lobbyId) || isLoading}
-                  className="ml-3 px-3 py-1 bg-red-600 hover:bg-red-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-bold rounded transition-colors whitespace-nowrap"
-                >
-                  {cancellingLobbies.has(lobby.lobbyId) ? "Cancelling..." : "Cancel"}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => onViewLobby?.(lobby.lobbyId)}
+                    disabled={isLoading}
+                    className="flex-1 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-bold rounded transition-colors"
+                  >
+                    View Arena
+                  </button>
+                  <button
+                    onClick={() => handleCancelLobby(lobby)}
+                    disabled={cancellingLobbies.has(lobby.lobbyId) || isLoading}
+                    className="px-3 py-1 bg-red-600 hover:bg-red-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-bold rounded transition-colors whitespace-nowrap"
+                  >
+                    {cancellingLobbies.has(lobby.lobbyId) ? "Cancelling..." : "Cancel"}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
