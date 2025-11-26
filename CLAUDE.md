@@ -792,7 +792,7 @@ HELIUS_API_KEY=                                 # For blockchain event monitorin
 - One game instance for entire platform
 - Creates urgency and social dynamics
 - Simpler architecture than parallel games
-- Demo always running when no real players
+- Map carousel while waiting for players
 
 **3. Direct SOL (No Tokens)**
 - Users bet real SOL, not internal currency
@@ -829,7 +829,7 @@ HELIUS_API_KEY=                                 # For blockchain event monitorin
 ## Notes
 
 ### What's Implemented
-✅ Demo mode with 20 bots (client-side only)
+✅ Map carousel (engaging waiting state)
 ✅ Real game mode (Convex-managed)
 ✅ Magic Block VRF integration (cost-optimized)
 ✅ 7-instruction smart contract (optimized)
@@ -845,6 +845,7 @@ HELIUS_API_KEY=                                 # For blockchain event monitorin
 ✅ Single player full refund (0% house fee)
 
 ### Removed/Simplified
+❌ Demo mode (replaced with map carousel)
 ❌ active_game PDA (events-based sync instead)
 ❌ Orao VRF (replaced with Magic Block)
 ❌ VRF during betting (deferred to end_game)
@@ -859,7 +860,8 @@ HELIUS_API_KEY=                                 # For blockchain event monitorin
 ✅ **Fairness**: Single player full refund (0% fee)
 
 ### Flow Confirmed
-✅ Convex creates game (no bets, no VRF, no countdown)
+✅ Map carousel spins while waiting for players
+✅ Convex creates game (carousel stops on map)
 ✅ First bet starts countdown (60s)
 ✅ Betting phase: players place bets (no VRF)
 ✅ Countdown expires → end_game (1st call)
@@ -868,5 +870,5 @@ HELIUS_API_KEY=                                 # For blockchain event monitorin
 ✅ VRF callback stores randomness
 ✅ Convex calls end_game again (2nd call, ~3s later)
 ✅ Multi-player: 95/5 split, VRF randomness
-✅ Prize sent → return to demo
-✅ 15s later, Convex creates next game
+✅ Prize sent → return to carousel
+✅ Carousel resumes, ready for next game

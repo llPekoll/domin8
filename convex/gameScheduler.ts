@@ -533,13 +533,10 @@ export const executeSendPrize = internalAction({
             },
           });
           console.log(`Round ${roundId}: ✅ Verified: Prize successfully distributed`);
-          console.log(`Round ${roundId}: 🎉 GAME COMPLETE - Ready for next round`);
+          console.log(`Round ${roundId}: 🎉 GAME COMPLETE - Cron will create next game`);
         } else {
           console.warn(`Round ${roundId}: ⚠️ Prize may not have been fully sent (${updatedGame?.winnerPrize} remaining)`);
         }
-
-        // The system is now ready for the next game
-        // When a new bet is placed, it will trigger create_game_round automatically
       } else {
         console.error(`Round ${roundId}: ❌ Transaction confirmation failed: ${txSignature}`);
 

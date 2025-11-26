@@ -21,6 +21,19 @@ const crons = cronJobs();
 // crons.interval("sync-blockchain-state", { seconds: 45 }, internal.syncService.syncBlockchainState);
 
 /**
+ * Check and end open games - Monitors for games that need to be ended
+ * Runs every 40 seconds to:
+ * 1. Check if active game status is OPEN (has bets, countdown started)
+ * 2. If end_date has passed, schedule end_game instruction
+ * 3. After end_game, schedule send_prize_winner (2 seconds later)
+ */
+crons.interval(
+  "check-and-end-open-games",
+  { seconds: 40 },
+  internal.syncService.checkAndEndOpenGames
+);
+
+/**
  * 1v1 Lobby Recovery - Reconciles stuck lobbies
  * Runs every 30 seconds as a backup safety net
  * Checks for lobbies that are stuck in status 0 or have discrepancies between

@@ -394,3 +394,120 @@ export const bulkSendPrizes = internalAction({
     }
   },
 });
+
+// Game status constants (matching smart contract constants.rs)
+const GAME_STATUS = {
+  OPEN: 0,    // First bet placed, countdown started
+  CLOSED: 1,  // Game ended, winner selected
+  WAITING: 2, // Game created by backend, no bets yet
+} as const;
+
+/**
+ * Check for open games that need to be ended
+ *
+ * This cron runs every 40 seconds and uses blockchain state as source of truth:
+ * 1. Fetch active game PDA from blockchain
+ * 2. If status is OPEN (0) and end_date passed → call end_game
+ * 3. If status is CLOSED (1) and winnerPrize > 0 → call send_prize
+ * 4. If status is CLOSED (1) and winnerPrize = 0 → create next game (roundId + 1)
+ * 5. If no active game and system unlocked → create new game
+ */
+export const checkAndEndOpenGames = internalAction({
+  handler: async (ctx) => {
+    console.log("\n[Game End Checker] Running check for open games...");
+
+    try {
+      const solanaClient = new SolanaClient(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
+      const now = Math.floor(Date.now() / 1000);
+
+      // 1. Fetch active game from blockchain (source of truth)
+      const activeGame = await solanaClient.getActiveGame();
+      const config = await solanaClient.getGameConfig();
+
+      if (!config) {
+        console.log("[Game End Checker] Config not found");
+        return { checked: true, action: "none", reason: "no_config" };
+      }
+
+      console.log(`[Game End Checker] Config: lock=${config.lock}, gameRound=${config.gameRound}`);
+
+      // 2. No active game - check if we should create one
+      if (!activeGame) {
+        console.log("[Game End Checker] No active game found on blockchain");
+
+        if (!config.lock) {
+          console.log(`[Game End Checker] System unlocked, creating game round ${config.gameRound}...`);
+
+          await ctx.scheduler.runAfter(
+            0,
+            (internal as any).gameScheduler.executeCreateGameRound,
+            {}
+          );
+
+          return { checked: true, action: "create_game", roundId: config.gameRound };
+        }
+
+        return { checked: true, action: "none", reason: "system_locked" };
+      }
+
+      console.log(`[Game End Checker] Active game:`, {
+        roundId: activeGame.gameRound,
+        status: activeGame.status,
+        betCount: activeGame.bets?.length || 0,
+        endDate: activeGame.endDate ? new Date(activeGame.endDate * 1000).toISOString() : "not set",
+        winner: activeGame.winner,
+        winnerPrize: activeGame.winnerPrize,
+      });
+
+      // 3. Game is WAITING (status=2) - no bets yet, skip
+      if (activeGame.status === GAME_STATUS.WAITING) {
+        console.log(`[Game End Checker] Game ${activeGame.gameRound} is WAITING for first bet`);
+        return { checked: true, action: "none", reason: "waiting_for_bets" };
+      }
+
+      // 4. Game is OPEN (status=0) - check if end_date passed
+      if (activeGame.status === GAME_STATUS.OPEN) {
+        const BLOCKCHAIN_CLOCK_BUFFER = 1;
+
+        if (now >= activeGame.endDate + BLOCKCHAIN_CLOCK_BUFFER) {
+          console.log(`[Game End Checker] Game ${activeGame.gameRound} OPEN and expired, calling end_game...`);
+
+          await ctx.scheduler.runAfter(
+            0,
+            (internal as any).gameScheduler.executeEndGame,
+            { roundId: activeGame.gameRound }
+          );
+
+          return { checked: true, action: "end_game", roundId: activeGame.gameRound };
+        } else {
+          const remaining = activeGame.endDate + BLOCKCHAIN_CLOCK_BUFFER - now;
+          console.log(`[Game End Checker] Game ${activeGame.gameRound} has ${remaining}s remaining`);
+          return { checked: true, action: "none", reason: "game_not_ended", remainingSeconds: remaining };
+        }
+      }
+
+      // 5. Game is CLOSED (status=1) - create next game
+      // Prize sending is handled by executeEndGame flow, not here
+      if (activeGame.status === GAME_STATUS.CLOSED) {
+        console.log(`[Game End Checker] Game ${activeGame.gameRound} is CLOSED, creating next game (round ${activeGame.gameRound + 1})...`);
+
+        await ctx.scheduler.runAfter(
+          20000, // 20 seconds delay before next game
+          (internal as any).gameScheduler.executeCreateGameRound,
+          {}
+        );
+
+        return { checked: true, action: "create_next_game", nextRoundId: activeGame.gameRound + 1 };
+      }
+
+      return { checked: true, action: "none", reason: "unknown_status" };
+    } catch (error) {
+      console.error("[Game End Checker] Error:", error);
+      return {
+        checked: false,
+        action: "error",
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  },
+});
