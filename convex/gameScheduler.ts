@@ -371,7 +371,32 @@ export const executeEndGame = internalAction({
             console.log(`Round ${roundId}: send_prize already scheduled by webhook`);
           }
         } else {
-          console.warn(`Round ${roundId}: ⚠️ No winner found after end_game`);
+          // No winner yet - likely VRF pending for multi-player game
+          // Reschedule end_game to try again in 3 seconds
+          console.warn(`Round ${roundId}: ⚠️ No winner yet (VRF pending?), rescheduling end_game...`);
+
+          // Reset job status to pending so it can be rescheduled
+          await ctx.runMutation(internal.gameSchedulerMutations.markJobFailed, {
+            roundId,
+            action: "end_game",
+            error: "VRF pending - needs retry",
+          });
+
+          // Schedule retry
+          const retryJobId = await ctx.scheduler.runAfter(
+            3000, // 3 seconds
+            internal.gameScheduler.executeEndGame,
+            { roundId }
+          );
+
+          await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
+            jobId: retryJobId.toString(),
+            roundId,
+            action: "end_game",
+            scheduledTime: Math.floor(Date.now() / 1000) + 3,
+          });
+
+          console.log(`Round ${roundId}: Rescheduled end_game retry in 3s (jobId: ${retryJobId})`);
         }
       } else {
         console.error(`Round ${roundId}: ❌ Transaction confirmation failed: ${txSignature}`);
@@ -437,7 +462,23 @@ export const executeSendPrize = internalAction({
 
       // Check if game is closed (status: 1)
       if (gameRound.status !== 1) {
-        console.log(`Round ${roundId}: Game not closed yet (status: ${gameRound.status}), skipping`);
+        console.log(`Round ${roundId}: Game not closed yet (status: ${gameRound.status}), rescheduling...`);
+
+        // Reschedule send_prize to try again in 3 seconds
+        const retryJobId = await ctx.scheduler.runAfter(
+          3000,
+          internal.gameScheduler.executeSendPrize,
+          { roundId }
+        );
+
+        await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
+          jobId: retryJobId.toString(),
+          roundId,
+          action: "send_prize",
+          scheduledTime: Math.floor(Date.now() / 1000) + 3,
+        });
+
+        console.log(`Round ${roundId}: Rescheduled send_prize in 3s (jobId: ${retryJobId})`);
         return;
       }
 

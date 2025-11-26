@@ -486,14 +486,36 @@ export const checkAndEndOpenGames = internalAction({
 
       // 4. Game is OPEN (status=0) - schedule jobs or execute if expired
       if (activeGame.status === GAME_STATUS.OPEN) {
-        // Check if end_game already scheduled
+        const remaining = Math.max(0, activeGame.endDate + GAME_TIMING.BLOCKCHAIN_CLOCK_BUFFER - now);
+
+        // If game is past end time, ALWAYS schedule end_game (regardless of job status)
+        // This handles VRF retry cases where end_game "completed" but game is still OPEN
+        if (remaining === 0) {
+          console.log(`[Game Loop] ⚠️ Game ${activeGame.gameRound} is OPEN but past end time - forcing end_game`);
+
+          const jobId = await ctx.scheduler.runAfter(
+            0,
+            internal.gameScheduler.executeEndGame,
+            { roundId: activeGame.gameRound }
+          );
+
+          await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
+            jobId: jobId.toString(),
+            roundId: activeGame.gameRound,
+            action: "end_game",
+            scheduledTime: now,
+          });
+
+          return { checked: true, action: "forced_end_game", roundId: activeGame.gameRound };
+        }
+
+        // Check if end_game already scheduled (only if game hasn't ended yet)
         const endGameScheduled = await ctx.runQuery(
           internal.gameSchedulerMutations.isActionScheduled,
           { roundId: activeGame.gameRound, action: "end_game" }
         );
 
         if (endGameScheduled) {
-          const remaining = Math.max(0, activeGame.endDate + GAME_TIMING.BLOCKCHAIN_CLOCK_BUFFER - now);
           console.log(`[Game Loop] Jobs already scheduled for round ${activeGame.gameRound}, ${remaining}s remaining`);
           return { checked: true, action: "none", reason: "already_scheduled", remainingSeconds: remaining };
         }

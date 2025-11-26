@@ -5,17 +5,22 @@ import { logger } from "../../lib/logger";
 import { loadBackgroundConfig } from "../config/backgrounds";
 
 /**
- * MapCarousel Scene - Slot machine style map selection
+ * MapCarousel Scene - 3D Rotating Carousel
  *
- * Shows all available backgrounds spinning like a carousel/slot machine.
+ * Shows all available backgrounds spinning in a 3D circular carousel.
+ * Cards rotate around a center point with perspective effects:
+ * - Front cards appear larger and brighter
+ * - Back cards appear smaller and faded
+ * - Smooth rotation animation with depth sorting
+ *
  * When the backend creates a new game (with mapId), the carousel
- * slows down and stops on the selected map.
+ * slows down and stops with the selected map at the front.
  *
  * Flow:
  * 1. Previous game celebration ends
- * 2. MapCarousel starts spinning through backgrounds
+ * 2. MapCarousel starts spinning in 3D circle
  * 3. Backend creates game with mapId
- * 4. Carousel stops on selected map
+ * 4. Carousel stops on selected map (front position)
  * 5. Transition to Game scene with "insert-coin" mode
  */
 
@@ -24,17 +29,23 @@ interface CarouselCard {
   background: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite;
   mapId: number;
   mapName: string;
+  angle: number; // Angle in radians for 3D positioning
 }
 
 export class MapCarousel extends Scene {
   private cards: CarouselCard[] = [];
-  private currentIndex: number = 0;
+  private rotationAngle: number = 0; // Current rotation in radians
   private isSpinning: boolean = false;
   private targetMapId: number | null = null;
   private spinSpeed: number = 0;
-  private cardWidth: number = 300 * RESOLUTION_SCALE;
-  private cardHeight: number = 150 * RESOLUTION_SCALE;
-  private cardSpacing: number = 20 * RESOLUTION_SCALE;
+  private cardWidth: number = 240 * RESOLUTION_SCALE;  // Smaller cards
+  private cardHeight: number = 135 * RESOLUTION_SCALE;
+
+  // 3D Carousel parameters
+  private radiusX: number = 260 * RESOLUTION_SCALE; // Horizontal radius (ellipse width)
+  private radiusY: number = 15 * RESOLUTION_SCALE;  // Reduced: less vertical movement (keeps centered)
+  private perspectiveScale: number = 0.45; // How much cards shrink in back
+  private baseScale: number = 0.85; // Base scale for front card (smaller overall)
 
   // UI Elements
   private titleText!: Phaser.GameObjects.Text;
@@ -50,79 +61,78 @@ export class MapCarousel extends Scene {
   // Stopping animation state
   private isDecelerating: boolean = false;
   private decelerationStartTime: number = 0;
-  private decelerationDuration: number = 1500; // 1.5 seconds to stop
-  private startIndex: number = 0;
-  private targetIndex: number = 0;
+  private decelerationDuration: number = 2000; // 2 seconds to stop (smoother for 3D)
+  private startAngle: number = 0;
+  private targetAngle: number = 0;
 
   constructor() {
     super("MapCarousel");
   }
 
   create() {
-    logger.game.info("[MapCarousel] Creating carousel scene");
+    logger.game.info("[MapCarousel] Creating 3D carousel scene");
 
     const centerX = STAGE_WIDTH / 2;
     const centerY = STAGE_HEIGHT / 2;
 
-    // Dark background
+    // Dark background with gradient effect
     this.add.rectangle(centerX, centerY, STAGE_WIDTH, STAGE_HEIGHT, 0x0a0a0a, 0.95);
 
+    // Add subtle radial gradient overlay for depth
+    const gradientOverlay = this.add.graphics();
+    gradientOverlay.fillStyle(0x1a1a2e, 0.3);
+    gradientOverlay.fillCircle(centerX, centerY + 20 * RESOLUTION_SCALE, 350 * RESOLUTION_SCALE);
+    gradientOverlay.setDepth(-1);
+
     // Title
-    this.titleText = this.add.text(centerX, 40 * RESOLUTION_SCALE, "NEXT ARENA", {
+    this.titleText = this.add.text(centerX, 35 * RESOLUTION_SCALE, "NEXT ARENA", {
       fontFamily: "Jersey15",
-      fontSize: `${24 * RESOLUTION_SCALE}px`,
+      fontSize: `${28 * RESOLUTION_SCALE}px`,
       color: "#ffffff",
       stroke: "#000000",
-      strokeThickness: 2 * RESOLUTION_SCALE,
+      strokeThickness: 3 * RESOLUTION_SCALE,
     }).setOrigin(0.5);
 
     // Subtitle (changes based on state)
-    this.subtitleText = this.add.text(centerX, 70 * RESOLUTION_SCALE, "Selecting battlefield...", {
+    this.subtitleText = this.add.text(centerX, 68 * RESOLUTION_SCALE, "Selecting battlefield...", {
       fontFamily: "Jersey15",
       fontSize: `${14 * RESOLUTION_SCALE}px`,
       color: "#ffcc00",
     }).setOrigin(0.5);
 
-    // Center highlight glow (behind cards)
-    this.centerGlow = this.add.rectangle(
+    // Floor shadow ellipse (gives 3D ground plane effect)
+    this.centerGlow = this.add.ellipse(
       centerX,
-      centerY,
-      this.cardWidth + 40 * RESOLUTION_SCALE,
-      this.cardHeight + 40 * RESOLUTION_SCALE,
-      0xffcc00,
-      0.15
-    );
-    this.centerGlow.setDepth(0);
+      centerY + 80 * RESOLUTION_SCALE, // Fixed position below carousel
+      this.radiusX * 2,
+      40 * RESOLUTION_SCALE,
+      0x000000,
+      0.3
+    ) as unknown as Phaser.GameObjects.Rectangle;
+    this.centerGlow.setDepth(-2);
 
-    // Center highlight border (in front of cards)
+    // Center highlight (will follow front card)
     this.centerHighlight = this.add.rectangle(
       centerX,
       centerY,
-      this.cardWidth + 16 * RESOLUTION_SCALE,
-      this.cardHeight + 16 * RESOLUTION_SCALE
+      this.cardWidth * this.baseScale + 16 * RESOLUTION_SCALE,
+      this.cardHeight * this.baseScale + 16 * RESOLUTION_SCALE
     );
     this.centerHighlight.setStrokeStyle(3 * RESOLUTION_SCALE, 0xffcc00);
-    this.centerHighlight.setFillStyle(0x000000, 0);
-    this.centerHighlight.setDepth(100);
-
-    // Pulsing animation for the center highlight
-    this.tweens.add({
-      targets: [this.centerHighlight, this.centerGlow],
-      alpha: { from: 0.6, to: 1 },
-      duration: 800,
-      yoyo: true,
-      repeat: -1,
-      ease: "Quint.easeOut",
-    });
+    this.centerHighlight.setFillStyle(0xffcc00, 0.1);
+    this.centerHighlight.setDepth(200); // Always in front
+    this.centerHighlight.setAlpha(0); // Hidden until stopped
 
     // Create carousel cards from available maps
     this.createCarouselCards(centerX, centerY);
 
     // Map name display (below carousel)
-    this.mapNameText = this.add.text(centerX, STAGE_HEIGHT - 30 * RESOLUTION_SCALE, "", {
+    this.mapNameText = this.add.text(centerX, STAGE_HEIGHT - 25 * RESOLUTION_SCALE, "", {
       fontFamily: "Jersey15",
-      fontSize: `${18 * RESOLUTION_SCALE}px`,
+      fontSize: `${20 * RESOLUTION_SCALE}px`,
       color: "#ffffff",
+      stroke: "#000000",
+      strokeThickness: 2 * RESOLUTION_SCALE,
     }).setOrigin(0.5);
 
     // Start spinning
@@ -143,29 +153,32 @@ export class MapCarousel extends Scene {
       return;
     }
 
-    logger.game.debug("[MapCarousel] Creating cards for", maps.length, "maps");
+    logger.game.debug("[MapCarousel] Creating 3D cards for", maps.length, "maps");
 
-    // Create cards for each map (duplicate for smooth looping)
-    const allMapIds = maps.map((m: any) => m.id);
-    // Duplicate array for seamless looping
-    const extendedMaps = [...maps, ...maps, ...maps];
+    // Calculate angle step between cards (evenly distributed around circle)
+    const angleStep = (Math.PI * 2) / maps.length;
 
-    extendedMaps.forEach((map: any, index: number) => {
-      const card = this.createCard(map, index, centerX, centerY);
+    maps.forEach((map: any, index: number) => {
+      const angle = index * angleStep;
+      const card = this.createCard(map, index, centerX, centerY, angle);
       this.cards.push(card);
     });
 
-    // Position cards initially
+    // Position cards in 3D space
     this.positionCards();
   }
 
-  private createCard(map: any, index: number, centerX: number, centerY: number): CarouselCard {
-    const container = this.add.container(0, centerY);
+  private createCard(map: any, index: number, centerX: number, centerY: number, angle: number): CarouselCard {
+    const container = this.add.container(centerX, centerY);
 
-    // Card background (border)
-    const cardBg = this.add.rectangle(0, 0, this.cardWidth + 8, this.cardHeight + 8, 0x333333);
-    cardBg.setStrokeStyle(2 * RESOLUTION_SCALE, 0x666666);
+    // Card background (border) with rounded corners effect
+    const cardBg = this.add.rectangle(0, 0, this.cardWidth + 8, this.cardHeight + 8, 0x222222);
+    cardBg.setStrokeStyle(3 * RESOLUTION_SCALE, 0x444444);
     container.add(cardBg);
+
+    // Inner card frame
+    const innerFrame = this.add.rectangle(0, 0, this.cardWidth, this.cardHeight, 0x111111);
+    container.add(innerFrame);
 
     // Load background config
     const bgConfig = loadBackgroundConfig(map.id);
@@ -192,13 +205,32 @@ export class MapCarousel extends Scene {
 
     container.add(bgImage);
 
-    // Map name label on card
-    const nameLabel = this.add.text(0, this.cardHeight / 2 - 15 * RESOLUTION_SCALE, map.name || `Map ${map.id}`, {
+    // Reflection/shine effect at top of card
+    const shine = this.add.rectangle(
+      0,
+      -this.cardHeight / 2 + 15 * RESOLUTION_SCALE,
+      this.cardWidth - 20,
+      20 * RESOLUTION_SCALE,
+      0xffffff,
+      0.1
+    );
+    container.add(shine);
+
+    // Map name label on card (bottom)
+    const labelBg = this.add.rectangle(
+      0,
+      this.cardHeight / 2 - 20 * RESOLUTION_SCALE,
+      this.cardWidth,
+      35 * RESOLUTION_SCALE,
+      0x000000,
+      0.7
+    );
+    container.add(labelBg);
+
+    const nameLabel = this.add.text(0, this.cardHeight / 2 - 20 * RESOLUTION_SCALE, map.name || `Map ${map.id}`, {
       fontFamily: "Jersey15",
-      fontSize: `${12 * RESOLUTION_SCALE}px`,
+      fontSize: `${14 * RESOLUTION_SCALE}px`,
       color: "#ffffff",
-      backgroundColor: "#000000aa",
-      padding: { x: 8, y: 4 },
     }).setOrigin(0.5);
     container.add(nameLabel);
 
@@ -207,46 +239,75 @@ export class MapCarousel extends Scene {
       background: bgImage,
       mapId: map.id,
       mapName: map.name || `Map ${map.id}`,
+      angle: angle,
     };
   }
 
   private positionCards() {
     const centerX = STAGE_WIDTH / 2;
-    const totalWidth = this.cardWidth + this.cardSpacing;
+    const centerY = STAGE_HEIGHT / 2;
 
-    this.cards.forEach((card, index) => {
-      // Calculate position relative to current index
-      const offset = index - this.currentIndex;
-      const x = centerX + offset * totalWidth;
+    // Sort cards by depth for proper rendering order
+    const cardPositions: { card: CarouselCard; depth: number; x: number; y: number; scale: number; alpha: number }[] = [];
 
-      card.container.setX(x);
+    this.cards.forEach((card) => {
+      // Calculate card's current angle (base angle + rotation)
+      const currentAngle = card.angle + this.rotationAngle;
 
-      // Scale and alpha based on distance from center
-      const distance = Math.abs(offset);
-      const scale = Math.max(0.6, 1 - distance * 0.15);
-      const alpha = Math.max(0.3, 1 - distance * 0.25);
+      // 3D position calculation
+      // sin gives X position (-1 to 1, left to right)
+      // cos gives depth (-1 = back, 1 = front)
+      const x = centerX + Math.sin(currentAngle) * this.radiusX;
+      const depth = Math.cos(currentAngle); // -1 (back) to 1 (front)
 
-      card.container.setScale(scale);
-      card.container.setAlpha(alpha);
+      // Y position: slightly lower for cards in back (perspective)
+      const y = centerY + (1 - depth) * this.radiusY;
 
-      // Depth based on distance (center cards on top)
-      card.container.setDepth(10 - distance);
+      // Scale: larger in front, smaller in back
+      // depth goes from -1 (back) to 1 (front)
+      // Scale from (1 - perspectiveScale) to 1, then apply baseScale
+      const normalizedDepth = (depth + 1) / 2; // 0 (back) to 1 (front)
+      const depthScale = (1 - this.perspectiveScale) + normalizedDepth * this.perspectiveScale;
+      const scale = depthScale * this.baseScale; // Apply base scale to make everything smaller
+
+      // Alpha: more transparent in back
+      const alpha = 0.4 + normalizedDepth * 0.6;
+
+      cardPositions.push({ card, depth, x, y, scale, alpha });
     });
+
+    // Sort by depth (back cards first, so front cards render on top)
+    cardPositions.sort((a, b) => a.depth - b.depth);
+
+    // Apply positions and depth ordering
+    cardPositions.forEach((pos, index) => {
+      pos.card.container.setX(pos.x);
+      pos.card.container.setY(pos.y);
+      pos.card.container.setScale(pos.scale);
+      pos.card.container.setAlpha(pos.alpha);
+      pos.card.container.setDepth(index + 1); // Depth order based on sort
+    });
+
+    // Update map name text with front card's name
+    const frontCard = cardPositions[cardPositions.length - 1];
+    if (frontCard && this.isSpinning) {
+      this.mapNameText.setText(frontCard.card.mapName);
+    }
   }
 
   private startSpinning() {
     this.isSpinning = true;
-    this.spinSpeed = 0.03; // Cards per frame (slower, more visible)
+    this.spinSpeed = 0.015; // Radians per frame (smooth rotation)
 
-    // Spin animation
+    // Spin animation - use requestAnimationFrame-like timing for smoothness
     this.autoSpinTimer = this.time.addEvent({
-      delay: 60, // Slower update rate
+      delay: 16, // ~60fps for smooth rotation
       callback: this.updateSpin,
       callbackScope: this,
       loop: true,
     });
 
-    logger.game.debug("[MapCarousel] Started spinning");
+    logger.game.debug("[MapCarousel] Started 3D spinning");
   }
 
   // Quint.easeOut function: 1 - (1 - t)^5
@@ -254,17 +315,24 @@ export class MapCarousel extends Scene {
     return 1 - Math.pow(1 - t, 5);
   }
 
+  // Quint.easeInOut for smoother deceleration
+  private quintEaseInOut(t: number): number {
+    return t < 0.5
+      ? 16 * t * t * t * t * t
+      : 1 - Math.pow(-2 * t + 2, 5) / 2;
+  }
+
   private updateSpin() {
     if (!this.isSpinning) return;
 
-    // Handle deceleration with Quint.easeOut
+    // Handle deceleration with easing
     if (this.isDecelerating) {
       const elapsed = Date.now() - this.decelerationStartTime;
       const progress = Math.min(elapsed / this.decelerationDuration, 1);
       const easedProgress = this.quintEaseOut(progress);
 
-      // Interpolate from startIndex to targetIndex using eased progress
-      this.currentIndex = this.startIndex + (this.targetIndex - this.startIndex) * easedProgress;
+      // Interpolate from startAngle to targetAngle using eased progress
+      this.rotationAngle = this.startAngle + (this.targetAngle - this.startAngle) * easedProgress;
 
       this.positionCards();
 
@@ -275,13 +343,12 @@ export class MapCarousel extends Scene {
       return;
     }
 
-    // Normal spinning
-    this.currentIndex += this.spinSpeed;
+    // Normal spinning (rotate in one direction)
+    this.rotationAngle += this.spinSpeed;
 
-    // Loop around
-    const totalCards = this.cards.length;
-    if (this.currentIndex >= totalCards) {
-      this.currentIndex -= totalCards / 3; // Reset to middle third
+    // Keep angle within 0 to 2*PI range
+    if (this.rotationAngle >= Math.PI * 2) {
+      this.rotationAngle -= Math.PI * 2;
     }
 
     // If we have a target, start deceleration
@@ -296,33 +363,47 @@ export class MapCarousel extends Scene {
   private startDeceleration() {
     this.isDecelerating = true;
     this.decelerationStartTime = Date.now();
-    this.startIndex = this.currentIndex;
-    this.targetIndex = this.findCardIndexForMap(this.targetMapId!);
+    this.startAngle = this.rotationAngle;
 
-    // Ensure we spin forward at least a bit before stopping (minimum 2 cards)
-    const minSpin = 2;
-    if (this.targetIndex <= this.startIndex + minSpin) {
-      // Add one full rotation of the map count
-      const mapsCount = (allMapsData || []).length;
-      this.targetIndex += mapsCount;
+    // Find the target angle to bring the selected map to the front (angle = 0)
+    const targetCard = this.cards.find(c => c.mapId === this.targetMapId);
+    if (!targetCard) {
+      logger.game.warn("[MapCarousel] Target map not found:", this.targetMapId);
+      this.targetAngle = this.startAngle;
+      return;
     }
 
-    logger.game.info("[MapCarousel] Starting deceleration", {
-      from: this.startIndex,
-      to: this.targetIndex,
+    // Calculate angle needed to bring target card to front (cos = 1, so card.angle + rotation = 0)
+    // We want: targetCard.angle + targetAngle ≡ 0 (mod 2π)
+    // So: targetAngle = -targetCard.angle
+    let rawTargetAngle = -targetCard.angle;
+
+    // Normalize to 0 to 2π
+    while (rawTargetAngle < 0) rawTargetAngle += Math.PI * 2;
+    while (rawTargetAngle >= Math.PI * 2) rawTargetAngle -= Math.PI * 2;
+
+    // Ensure we spin forward at least one full rotation for dramatic effect
+    const minRotation = Math.PI * 2; // At least one full spin
+    let angleDiff = rawTargetAngle - this.startAngle;
+
+    // Always spin forward (positive direction)
+    if (angleDiff <= 0) {
+      angleDiff += Math.PI * 2;
+    }
+
+    // Add minimum rotation
+    this.targetAngle = this.startAngle + angleDiff + minRotation;
+
+    logger.game.info("[MapCarousel] Starting 3D deceleration", {
+      fromAngle: this.startAngle.toFixed(2),
+      toAngle: this.targetAngle.toFixed(2),
+      targetMapId: this.targetMapId,
       duration: this.decelerationDuration,
     });
   }
 
-  private findCardIndexForMap(mapId: number): number {
-    // Find the card in the middle section (for smooth stopping)
-    const mapsCount = (allMapsData || []).length;
-    for (let i = mapsCount; i < mapsCount * 2; i++) {
-      if (this.cards[i]?.mapId === mapId) {
-        return i;
-      }
-    }
-    return this.currentIndex;
+  private findCardByMapId(mapId: number): CarouselCard | undefined {
+    return this.cards.find(c => c.mapId === mapId);
   }
 
   private stopOnMap(mapId: number) {
@@ -334,47 +415,63 @@ export class MapCarousel extends Scene {
       this.autoSpinTimer.destroy();
     }
 
-    // Snap to exact position
-    const targetIndex = this.findCardIndexForMap(mapId);
-    this.currentIndex = targetIndex;
+    // Snap rotation to exact target angle
+    this.rotationAngle = this.targetAngle;
     this.positionCards();
 
-    // Update UI
-    const selectedCard = this.cards[targetIndex];
+    // Find the selected card
+    const selectedCard = this.findCardByMapId(mapId);
     if (selectedCard) {
       this.mapNameText.setText(selectedCard.mapName);
       this.subtitleText.setText("Arena selected!");
       this.subtitleText.setColor("#00ff00");
 
-      // Change highlight to green for selected state
+      // Position highlight on the front card
+      const centerX = STAGE_WIDTH / 2;
+      const centerY = STAGE_HEIGHT / 2;
+      this.centerHighlight.setPosition(centerX, centerY);
       this.centerHighlight.setStrokeStyle(4 * RESOLUTION_SCALE, 0x00ff00);
-      this.centerGlow.setFillStyle(0x00ff00, 0.2);
+      this.centerHighlight.setFillStyle(0x00ff00, 0.15);
 
-      // Highlight selected card with Quint.easeOut
+      // Fade in and scale the highlight
       this.tweens.add({
-        targets: selectedCard.container,
+        targets: this.centerHighlight,
+        alpha: 1,
         scaleX: 1.1,
         scaleY: 1.1,
         duration: 400,
         ease: "Quint.easeOut",
       });
 
-      // Expand the highlight with Quint.easeOut
+      // Pulse animation on the selected card
       this.tweens.add({
-        targets: this.centerHighlight,
-        scaleX: 1.15,
-        scaleY: 1.15,
+        targets: selectedCard.container,
+        scaleX: selectedCard.container.scaleX * 1.1,
+        scaleY: selectedCard.container.scaleY * 1.1,
+        duration: 300,
+        ease: "Quint.easeOut",
+        yoyo: true,
+        repeat: 1,
+      });
+
+      // Add glow effect to floor shadow
+      this.tweens.add({
+        targets: this.centerGlow,
+        alpha: 0.6,
         duration: 400,
         ease: "Quint.easeOut",
       });
 
-      this.tweens.add({
-        targets: this.centerGlow,
-        alpha: 0.4,
-        scaleX: 1.2,
-        scaleY: 1.2,
-        duration: 400,
-        ease: "Quint.easeOut",
+      // Fade out back cards for focus effect
+      this.cards.forEach(card => {
+        if (card.mapId !== mapId) {
+          this.tweens.add({
+            targets: card.container,
+            alpha: 0.2,
+            duration: 400,
+            ease: "Quint.easeOut",
+          });
+        }
       });
     }
 
@@ -453,5 +550,6 @@ export class MapCarousel extends Scene {
     this.cards = [];
     this.targetMapId = null;
     this.isDecelerating = false;
+    this.rotationAngle = 0;
   }
 }

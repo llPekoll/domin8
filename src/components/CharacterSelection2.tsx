@@ -160,7 +160,6 @@ const CharacterSelection2 = memo(function CharacterSelection({
         <div
           className="relative w-[220px] h-[280px] flex flex-row items-start justify-between p-4 pl-1"
           style={{
-            backgroundImage: "url(/assets/hud/charSelect.png)",
             backgroundSize: "100% 100%",
             backgroundRepeat: "no-repeat",
             imageRendering: "pixelated",
