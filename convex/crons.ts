@@ -5,16 +5,12 @@
  *                         SCHEDULING ARCHITECTURE
  * ═══════════════════════════════════════════════════════════════════════════════
  *
- * PRIMARY: Helius Webhook (heliusWebhookHandler.ts)
- * - Triggers on first bet → schedules entire job chain:
+ * PRIMARY: 60-second Cron (syncService.checkAndEndOpenGames)
+ * - Polls blockchain via SolanaClient.getActiveGame()
+ * - When OPEN game detected → schedules precise job chain:
  *   - end_game at endTimestamp + 1s
  *   - send_prize at endTimestamp + 5s
  *   - create_game at endTimestamp + 19s
- *
- * BACKUP: Recovery Cron (this file)
- * - Runs every 2 minutes
- * - Catches missed webhook events
- * - Self-healing for stuck games
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  *                              GAME LOOP FLOW
