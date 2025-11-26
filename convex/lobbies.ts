@@ -71,6 +71,8 @@ export const getLobbyState = query({
 
 /**
  * Get lobbies created or modified by a specific player
+ * Returns lobbies grouped by status in descending order (3, 2, 1, 0)
+ * Status: 0=Created, 1=Awaiting VRF, 2=VRF Received, 3=Resolved
  */
 export const getPlayerLobbies = query({
   args: {
@@ -87,7 +89,21 @@ export const getPlayerLobbies = query({
       .withIndex("by_player_b", (q) => q.eq("playerB", args.playerWallet))
       .collect();
 
+    // Combine all lobbies and deduplicate by lobbyId, keeping the highest status
+    const allLobbiesMap = new Map<number, typeof lobbiesAsPlayerA[0]>();
+    for (const lobby of [...lobbiesAsPlayerA, ...lobbiesAsPlayerB]) {
+      const existing = allLobbiesMap.get(lobby.lobbyId);
+      // Keep the lobby with the higher status
+      if (!existing || lobby.status > existing.status) {
+        allLobbiesMap.set(lobby.lobbyId, lobby);
+      }
+    }
+
+    const allLobbies = Array.from(allLobbiesMap.values());
+
     return {
+      all: allLobbies,
+      byStatus: allLobbies,
       asPlayerA: lobbiesAsPlayerA,
       asPlayerB: lobbiesAsPlayerB,
     };
@@ -192,6 +208,17 @@ export const createLobbyInDb = mutation({
     mapId: v.number(),
   },
   handler: async (ctx, args) => {
+    // Check if lobby already exists to prevent duplicates
+    const existing = await ctx.db
+      .query("oneVOneLobbies")
+      .filter((q) => q.eq(q.field("lobbyId"), args.lobbyId))
+      .first();
+
+    if (existing) {
+      // Lobby already exists, return existing doc id
+      return existing._id;
+    }
+
     const docId = await ctx.db.insert("oneVOneLobbies", {
       lobbyId: args.lobbyId,
       lobbyPda: args.lobbyPda,
@@ -278,6 +305,17 @@ export const _internalCreateLobby = internalMutation({
     mapId: v.number(),
   },
   handler: async (ctx, args) => {
+    // Check if lobby already exists to prevent duplicates
+    const existing = await ctx.db
+      .query("oneVOneLobbies")
+      .filter((q) => q.eq(q.field("lobbyId"), args.lobbyId))
+      .first();
+
+    if (existing) {
+      // Lobby already exists, return existing doc id
+      return existing._id;
+    }
+
     const docId = await ctx.db.insert("oneVOneLobbies", {
       lobbyId: args.lobbyId,
       lobbyPda: args.lobbyPda,
