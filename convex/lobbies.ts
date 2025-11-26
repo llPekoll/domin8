@@ -61,8 +61,7 @@ export const getLobbyState = query({
   handler: async (ctx, args) => {
     const lobby = await ctx.db
       .query("oneVOneLobbies")
-      .withIndex("by_status", (q) => q.eq("status", -1)) // Placeholder to get all
-      .filter((q) => q.eq(q.field("lobbyId"), args.lobbyId))
+      .withIndex("by_lobbyId", (q) => q.eq("lobbyId", args.lobbyId))
       .first();
 
     return lobby || null;

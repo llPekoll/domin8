@@ -7,7 +7,7 @@ import { useAssets } from "../../contexts/AssetsContext";
 import type { Character } from "../../types/character";
 import Phaser from "phaser";
 import { Boot } from "../../game/scenes/Boot";
-import { Preloader } from "../../game/scenes/Preloader";
+import { OneVOnePreloader } from "../../game/scenes/OneVOnePreloader";
 import { OneVOneScene } from "../../game/scenes/OneVOneScene";
 import { setCharactersData, setAllMapsData, STAGE_WIDTH, STAGE_HEIGHT } from "../../game/main";
 
@@ -70,7 +70,10 @@ export function OneVOneArenaModal({
     // Don't create if already exists
     if (gameInstanceRef.current) return;
 
-    logger.game.info("[ArenaModal] Creating dedicated Phaser game instance");
+    logger.game.info("[ArenaModal] Creating dedicated Phaser game instance", {
+      hasCharacters: characters.length,
+      hasMaps: maps.length,
+    });
 
     // Set global data for Preloader
     setCharactersData(characters);
@@ -97,36 +100,22 @@ export function OneVOneArenaModal({
         disableWebAudio: false,
         noAudio: false,
       },
-      scene: [Boot, Preloader, OneVOneScene],
+      scene: [Boot, OneVOnePreloader, OneVOneScene],
     };
 
     gameInstanceRef.current = new Phaser.Game(config);
 
-    // Listen for preloader complete and start OneVOne scene
-    const handlePreloaderComplete = () => {
-      logger.game.info("[ArenaModal] Preloader complete, starting OneVOne scene");
-      const game = gameInstanceRef.current;
-      if (game) {
-        // Stop any default scene that started
-        game.scene.stop("Demo");
-        game.scene.stop("Game");
-        // Start OneVOne scene
-        game.scene.start("OneVOne");
-      }
-    };
-    EventBus.on("preloader-complete", handlePreloaderComplete);
-
-    // Listen for scene ready
+    // Listen for scene ready (OneVOnePreloader starts OneVOne directly)
     const handleSceneReady = (scene: Phaser.Scene) => {
+      logger.game.info("[ArenaModal] Scene ready:", scene.scene.key);
       if (scene.scene.key === "OneVOne") {
-        logger.game.info("[ArenaModal] OneVOne scene ready");
+        logger.game.info("[ArenaModal] OneVOne scene ready - setting gameReady=true");
         setGameReady(true);
       }
     };
     EventBus.on("current-scene-ready", handleSceneReady);
 
     return () => {
-      EventBus.off("preloader-complete", handlePreloaderComplete);
       EventBus.off("current-scene-ready", handleSceneReady);
     };
   }, [isOpen, characters, maps]);
@@ -339,6 +328,20 @@ export function OneVOneArenaModal({
 
   const statusDisplay = getStatusDisplay();
 
+  // Debug logging
+  useEffect(() => {
+    if (isOpen) {
+      logger.game.info("[ArenaModal] Modal state:", {
+        isOpen,
+        lobby: lobby ? { lobbyId: lobby.lobbyId, amount: lobby.amount, playerA: lobby.playerA } : null,
+        gameReady,
+        arenaState,
+        hasCharacters: !!characters?.length,
+        hasMaps: !!maps?.length,
+      });
+    }
+  }, [isOpen, lobby, gameReady, arenaState, characters, maps]);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -346,27 +349,33 @@ export function OneVOneArenaModal({
         showCloseButton={arenaState === "waiting" || arenaState === "results"}
       >
         {/* Arena Header */}
-        <DialogHeader className="p-4 bg-gradient-to-r from-indigo-900/90 to-purple-900/90 border-b border-indigo-500/50">
+        <DialogHeader className="p-4 pr-12 bg-gradient-to-r from-indigo-900/90 to-purple-900/90 border-b border-indigo-500/50">
           <DialogTitle className="text-xl font-bold text-indigo-200 flex items-center justify-between">
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              Lobby #{lobby?.lobbyId}
+              Lobby #{lobby?.lobbyId ?? "..."}
             </span>
-            <span className="text-yellow-400 font-mono">
-              {lobby ? formatAmount(lobby.amount) : "0"} SOL
+            <span className="text-yellow-400 font-mono text-lg">
+              {lobby ? formatAmount(lobby.amount) : "..."} SOL
             </span>
           </DialogTitle>
         </DialogHeader>
 
-        {/* Phaser Game Container - Canvas will be moved here */}
+        {/* Phaser Game Container - Canvas will be rendered here */}
         <div 
           ref={modalGameContainerRef}
           className="relative w-full aspect-video bg-gray-900 flex items-center justify-center overflow-hidden [&>canvas]:max-w-full [&>canvas]:max-h-full [&>canvas]:object-contain"
         >
-          {/* The Phaser canvas will be moved into this container when modal opens */}
+          {/* Loading indicator while Phaser initializes */}
+          {!gameReady && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center z-5">
+              <div className="animate-spin w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full mb-4"></div>
+              <p className="text-gray-400 text-sm">Loading arena...</p>
+            </div>
+          )}
           
           {/* Status Banner - Small overlay at top, doesn't block the arena view */}
-          {(arenaState === "waiting" || arenaState === "vrf-pending" || arenaState === "opponent-joining") && (
+          {gameReady && (arenaState === "waiting" || arenaState === "vrf-pending" || arenaState === "opponent-joining") && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
               <div className="text-center bg-black/70 px-6 py-3 rounded-lg border border-indigo-500/50">
                 <div className="flex items-center gap-3">
@@ -438,13 +447,13 @@ export function OneVOneArenaModal({
               <div>
                 <span className="text-gray-400">Player A: </span>
                 <span className="text-indigo-300 font-mono">
-                  {lobby?.playerA.slice(0, 8)}...
+                  {lobby?.playerA ? `${lobby.playerA.slice(0, 4)}...${lobby.playerA.slice(-4)}` : "Loading..."}
                 </span>
               </div>
               <div>
                 <span className="text-gray-400">Player B: </span>
                 <span className="text-indigo-300 font-mono">
-                  {lobby?.playerB ? `${lobby.playerB.slice(0, 8)}...` : "Waiting..."}
+                  {lobby?.playerB ? `${lobby.playerB.slice(0, 4)}...${lobby.playerB.slice(-4)}` : "Waiting..."}
                 </span>
               </div>
             </div>

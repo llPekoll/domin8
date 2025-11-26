@@ -216,5 +216,6 @@ export default defineSchema({
     .index("by_status", ["status"]) // Query open lobbies (status = 0)
     .index("by_player_a", ["playerA"]) // Query lobbies by Player A
     .index("by_player_b", ["playerB"]) // Query lobbies by Player B
-    .index("by_status_and_created", ["status", "createdAt"]), // For pagination and stuck lobby detection
+    .index("by_status_and_created", ["status", "createdAt"]) // For pagination and stuck lobby detection
+    .index("by_lobbyId", ["lobbyId"]), // Query specific lobby by ID
 });
