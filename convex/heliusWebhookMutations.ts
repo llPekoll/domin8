@@ -87,7 +87,7 @@ export const updateGameRound = internalMutation({
       status: args.status,
       startTimestamp: args.startTimestamp,
       endTimestamp: args.endTimestamp,
-      capturedAt: Date.now(),
+      capturedAt: Math.floor(Date.now() / 1000), // Unix timestamp in seconds (consistent with other files)
       mapId: args.mapId,
       betCount: args.betCount,
       betAmounts: args.betAmounts,

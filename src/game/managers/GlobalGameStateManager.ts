@@ -1,16 +1,31 @@
 import { Game as PhaserGame } from "phaser";
 import { EventBus } from "../EventBus";
 import { logger } from "../../lib/logger";
+import { GAME_TIMING } from "../constants";
 
 /**
  * GlobalGameStateManager - Single Source of Truth for Game State
  *
- * Unified manager that replaces both SceneManager and GamePhaseManager
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *                              GAME LOOP (NO DEMO)
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * This is a continuous loop - no demo mode:
+ *
+ *  1. MAP_CAROUSEL (IDLE) → Rolling backgrounds, waiting for game creation
+ *  2. INSERT_COIN (status=2) → Game created, waiting for first bet
+ *  3. WAITING (status=0) → First bet placed, 60s countdown
+ *  4. VRF_PENDING → Countdown ended, waiting for winner
+ *  5. FIGHTING → 2s battle animations
+ *  6. CELEBRATING → 10s winner celebration
+ *  7. CLEANUP → 1s fade, back to MapCarousel
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
  *
  * Responsibilities:
  * 1. Detect game phase from blockchain state
  * 2. Handle initial state on page load
- * 3. Manage scene transitions (Demo ↔ Game)
+ * 3. Manage scene transitions (MapCarousel ↔ Game)
  * 4. Coordinate animations via events
  * 5. Track celebration windows for late joiners
  *
@@ -22,13 +37,13 @@ import { logger } from "../../lib/logger";
  */
 
 export enum GamePhase {
-  IDLE = "idle", // No game, show demo
+  IDLE = "idle", // No game, show MapCarousel (rolling backgrounds)
   INSERT_COIN = "insert_coin", // Game created, waiting for first bet (status=2)
-  WAITING = "waiting", // Accepting bets, countdown active (status=0)
+  WAITING = "waiting", // Accepting bets, 60s countdown active (status=0)
   VRF_PENDING = "vrf_pending", // Countdown ended, waiting for winner
-  FIGHTING = "fighting", // Battle animations (3s)
-  CELEBRATING = "celebrating", // Winner celebration (15s)
-  CLEANUP = "cleanup", // Fading out, preparing for next game
+  FIGHTING = "fighting", // Battle animations (2s)
+  CELEBRATING = "celebrating", // Winner celebration (10s)
+  CLEANUP = "cleanup", // Fading out (1s), transition to MapCarousel
 }
 
 export class GlobalGameStateManager {
@@ -55,9 +70,9 @@ export class GlobalGameStateManager {
   // Local countdown timer
   private countdownInterval: NodeJS.Timeout | null = null;
 
-  // Constants
-  private readonly CELEBRATION_DURATION = 7000;
-  private readonly BATTLE_DURATION = 2000;
+  // Use constants from game/constants.ts
+  private readonly CELEBRATION_DURATION = GAME_TIMING.CELEBRATION_DURATION;
+  private readonly BATTLE_DURATION = GAME_TIMING.BATTLE_DURATION;
 
   constructor(game: PhaserGame) {
     this.game = game;
@@ -152,7 +167,7 @@ export class GlobalGameStateManager {
         }
       );
 
-      // ✅ If Game scene just started and we have pending state (from Demo→Game transition), update it
+      // ✅ If Game scene just started and we have pending state (from MapCarousel→Game transition), update it
       if (scene.scene.key === "Game" && this.pendingInitialGameState && !this.isTransitioning) {
         logger.game.debug(
           `[GlobalGameStateManager] [${timestamp}] ✅ Updating Game scene with pending state`,
@@ -365,7 +380,7 @@ export class GlobalGameStateManager {
     if (previousPhase === GamePhase.IDLE && targetPhase !== GamePhase.IDLE) {
       this.pendingInitialGameState = gameState;
       logger.game.debug(
-        "[GlobalGameStateManager] 📦 Stored pending game state for Demo→Game transition",
+        "[GlobalGameStateManager] 📦 Stored pending game state for MapCarousel→Game transition",
         {
           hasBets: !!gameState?.bets,
           betCount: gameState?.bets?.length || 0,
@@ -408,9 +423,9 @@ export class GlobalGameStateManager {
       this.transitionToGame();
     }
 
-    // CLEANUP → IDLE: Show Demo scene
+    // CLEANUP → IDLE: Show MapCarousel scene
     if (oldPhase === GamePhase.CLEANUP && newPhase === GamePhase.IDLE) {
-      this.transitionToDemo();
+      this.transitionToMapCarousel();
     }
   }
 
@@ -430,12 +445,12 @@ export class GlobalGameStateManager {
     // Handle entering new phases
     switch (newPhase) {
       case GamePhase.IDLE:
-        // Notify demo scene to start
-        EventBus.emit("demo-mode-active", true);
+        // MapCarousel will show - emit event for any listeners
+        EventBus.emit("carousel-active", true);
         break;
 
       case GamePhase.WAITING:
-        // Stop demo mode
+        // Game is active with bets
         EventBus.emit("game-started");
         break;
 
@@ -532,10 +547,10 @@ export class GlobalGameStateManager {
     // Tell Game scene to cleanup (fade out animations)
     EventBus.emit("cleanup-game");
 
-    // Transition back to Demo scene after cleanup animations (1 second fade)
+    // Transition back to MapCarousel after cleanup animations
     setTimeout(() => {
       if (this.currentPhase === GamePhase.CLEANUP) {
-        logger.game.debug("[GlobalGameStateManager] Cleanup complete, transitioning to Demo");
+        logger.game.debug("[GlobalGameStateManager] Cleanup complete, transitioning to MapCarousel");
 
         // ✅ Reset all game state
         this.currentPhase = GamePhase.IDLE;
@@ -548,28 +563,28 @@ export class GlobalGameStateManager {
 
         EventBus.emit("game-phase-changed", GamePhase.IDLE);
 
-        // ✅ Directly transition to Demo scene
-        this.transitionToDemo();
+        // ✅ Directly transition to MapCarousel scene
+        this.transitionToMapCarousel();
       }
-    }, 1000);
+    }, GAME_TIMING.CLEANUP_DURATION);
   }
 
   /**
-   * Transition from Demo to Game scene
+   * Transition from MapCarousel to Game scene
    */
   private transitionToGame() {
-    const demoScene = this.game.scene.getScene("Demo");
-    if (!demoScene?.scene.isActive()) return;
+    const carouselScene = this.game.scene.getScene("MapCarousel");
+    if (!carouselScene?.scene.isActive()) return;
     if (this.isTransitioning) return;
 
-    logger.game.debug("[GlobalGameStateManager] 🎬 Transitioning: Demo → Game");
+    logger.game.debug("[GlobalGameStateManager] 🎬 Transitioning: MapCarousel → Game");
     this.isTransitioning = true;
 
     // Create wipe transition effect
-    const camera = demoScene.cameras.main;
+    const camera = carouselScene.cameras.main;
     const fx = camera.postFX.addWipe();
 
-    demoScene.events.once("transitionout", () => {
+    carouselScene.events.once("transitionout", () => {
       this.isTransitioning = false;
       EventBus.emit("scene-transition-complete", "Game");
 
@@ -585,7 +600,7 @@ export class GlobalGameStateManager {
       }
     });
 
-    demoScene.scene.transition({
+    carouselScene.scene.transition({
       target: "Game",
       duration: 700,
       moveBelow: true,
@@ -596,14 +611,14 @@ export class GlobalGameStateManager {
   }
 
   /**
-   * Transition from Game to Demo scene
+   * Transition from Game to MapCarousel scene
    */
-  private transitionToDemo() {
+  private transitionToMapCarousel() {
     const gameScene = this.game.scene.getScene("Game") as any;
     if (!gameScene?.scene.isActive()) return;
     if (this.isTransitioning) return;
 
-    logger.game.debug("[GlobalGameStateManager] 🎬 Transitioning: Game → Demo");
+    logger.game.debug("[GlobalGameStateManager] 🎬 Transitioning: Game → MapCarousel");
     this.isTransitioning = true;
 
     // Create wipe transition effect
@@ -612,11 +627,11 @@ export class GlobalGameStateManager {
 
     gameScene.events.once("transitionout", () => {
       this.isTransitioning = false;
-      EventBus.emit("scene-transition-complete", "Demo");
+      EventBus.emit("scene-transition-complete", "MapCarousel");
     });
 
     gameScene.scene.transition({
-      target: "Demo",
+      target: "MapCarousel",
       duration: 1000,
       moveBelow: true,
       onUpdate: (progress: number) => {

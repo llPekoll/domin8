@@ -1,8 +1,32 @@
 /**
- * Convex Cron Jobs for Domin8 Game Management (Risk-based Architecture)
+ * Convex Cron Jobs for Domin8 Game Management
  *
- * Scheduled functions for periodic maintenance tasks.
- * Uses simple polling pattern from risk.fun worker (proven, reliable).
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *                         SCHEDULING ARCHITECTURE
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * PRIMARY: Helius Webhook (heliusWebhookHandler.ts)
+ * - Triggers on first bet → schedules entire job chain:
+ *   - end_game at endTimestamp + 1s
+ *   - send_prize at endTimestamp + 5s
+ *   - create_game at endTimestamp + 19s
+ *
+ * BACKUP: Recovery Cron (this file)
+ * - Runs every 2 minutes
+ * - Catches missed webhook events
+ * - Self-healing for stuck games
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *                              GAME LOOP FLOW
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ *  1. MAP CAROUSEL → 2. INSERT COIN (WAITING) → 3. BETTING (OPEN)
+ *       ↑                                              ↓
+ *       └──── 7. CLEANUP ← 6. CELEBRATION ← 5. FIGHTING ← 4. END GAME (CLOSED)
+ *
+ * Timing: 60s betting + 1s end_game + 4s send_prize + 14s create_game = ~79s cycle
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
  */
 import { cronJobs } from "convex/server";
 import { internal } from "./_generated/api";
@@ -10,78 +34,25 @@ import { internal } from "./_generated/api";
 const crons = cronJobs();
 
 /**
- * PRIMARY SYNC SERVICE - Syncs blockchain state to Convex database
- * Runs every 10 seconds (matches risk.fun worker pattern)
+ * MAIN GAME LOOP CRON - Primary scheduler for game progression
  *
- * Functionality:
- * 1. Fetches active game from blockchain (getActiveGame)
- * 2. Syncs to Convex database
- * 3. Schedules endGame action when game expires
- */
-// crons.interval("sync-blockchain-state", { seconds: 45 }, internal.syncService.syncBlockchainState);
-
-/**
- * Check and end open games - Monitors for games that need to be ended
- * Runs every 40 seconds to:
- * 1. Check if active game status is OPEN (has bets, countdown started)
- * 2. If end_date has passed, schedule end_game instruction
- * 3. After end_game, schedule send_prize_winner (2 seconds later)
+ * Runs every 60 seconds to:
+ * 1. Check if active game has bets and needs job scheduling
+ * 2. Schedule precise jobs via runAfter() for end_game, send_prize, create_game
+ * 3. Handle recovery for any missed/failed jobs
+ *
+ * When a game is OPEN with endTimestamp set, schedules jobs at exact times.
+ * This is simpler and more reliable than webhook-driven scheduling.
  */
 crons.interval(
-  "check-and-end-open-games",
-  { seconds: 40 },
+  "game-loop-scheduler",
+  { seconds: 60 },
   internal.syncService.checkAndEndOpenGames
 );
 
 /**
- * 1v1 Lobby Recovery - Reconciles stuck lobbies
- * Runs every 30 seconds as a backup safety net
- * Checks for lobbies that are stuck in status 0 or have discrepancies between
- * on-chain and Convex state, and attempts to sync them
- * NOTE: Uncomment after Convex regenerates the API with lobbies module
- */
-// crons.interval(
-//   "sync-1v1-stuck-lobbies",
-//   { seconds: 30 },
-//   internal.lobbies.syncLobbyFromBlockchain
-// );
-
-/**
- * Game recovery - self-healing system that catches unsent prizes
- * Runs every 30 seconds to check for finished games with unclaimed prizes
- * TODO: Implement recoverUnsentPrizes function in syncService.ts
- */
-// crons.interval(
-//   "recover-unsent-prizes",
-//   { seconds: 30 },
-//   internal.syncService.recoverUnsentPrizes
-// );
-
-/**
- * Transaction cleanup - removes 7-day old transactions
- */
-// TODO LATER: priority low
-
-/**
- * Game cleanup - removes old game accounts (2+ days old)
- * Runs every 2 days to delete old PDAs and recover rent
- *
- * Benefits:
- * - Recovers rent from closed game accounts (~0.01-0.05 SOL per game)
- * - Keeps blockchain storage clean
- * - Net profit: Rent recovered > transaction fees
- */
-// crons.interval(
-//   "cleanup-old-games",
-//   { hours: 48 }, // Every 2 days
-//   internal.cleanupService.cleanupOldGames
-// );
-
-/**
- * Scheduled jobs cleanup - removes old completed/failed jobs (safety net)
+ * Scheduled jobs cleanup - removes old completed/failed jobs
  * Runs every 6 hours to clean up jobs older than 7 days
- * Note: Jobs should be marked completed/failed immediately by the scheduler,
- * but this cron provides a safety net for any edge cases
  */
 crons.interval(
   "cleanup-old-scheduled-jobs",

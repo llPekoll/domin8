@@ -3,6 +3,7 @@
  */
 import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+import { GAME_STATUS } from "./constants";
 
 /**
  * Upsert game state from blockchain to database
@@ -39,8 +40,14 @@ export const upsertGameState = internalMutation({
 
     const roundId = gameRound.roundId;
 
-    // Convert status: 0 = "waiting" (open), 1 = "finished" (closed)
-    const status = gameRound.status === 0 ? "waiting" : "finished";
+    // Convert blockchain status to database format
+    // GAME_STATUS: OPEN=0, CLOSED=1, WAITING=2
+    const statusMap: Record<number, string> = {
+      [GAME_STATUS.OPEN]: "waiting",      // OPEN (has bets) → "waiting" in DB
+      [GAME_STATUS.CLOSED]: "finished",   // CLOSED (ended) → "finished" in DB
+      [GAME_STATUS.WAITING]: "waiting",   // WAITING (no bets) → "waiting" in DB
+    };
+    const status = statusMap[gameRound.status] ?? "waiting";
 
     // Store map ID directly from blockchain (no lookup needed)
     const mapId = gameRound.map;
@@ -116,67 +123,6 @@ export const upsertGameState = internalMutation({
       await db.insert("gameRoundStates", gameData);
       console.log(`[Sync Mutations] Created game ${roundId} (status: ${status}, map: ${gameRound.map})`);
     }
-  },
-});
-
-/**
- * Query to find ended games still in "waiting" status
- * Returns games where endTimestamp < currentTime and status = "waiting"
- */
-export const getEndedWaitingGames = internalQuery({
-  args: {
-    currentTime: v.number(),
-  },
-  handler: async (ctx, { currentTime }) => {
-    const { db } = ctx;
-
-    // Find all games in "waiting" status that have passed their end time
-    const endedGames = await db
-      .query("gameRoundStates")
-      .withIndex("by_status", (q) => q.eq("status", "waiting"))
-      .filter((q) => q.lt(q.field("endTimestamp"), currentTime))
-      .collect();
-
-    // Return simplified game data
-    return endedGames.map((game) => ({
-      _id: game._id,
-      roundId: game.roundId,
-      endTimestamp: game.endTimestamp,
-      startTimestamp: game.startTimestamp,
-      betCount: game.betCount,
-      totalPot: game.totalPot,
-    }));
-  },
-});
-
-/**
- * Query to find finished games (for prize distribution check)
- * Returns games in "finished" status, ordered by most recent first
- */
-export const getFinishedGames = internalQuery({
-  args: {
-    limit: v.number(),
-  },
-  handler: async (ctx, { limit }) => {
-    const { db } = ctx;
-
-    // Find all games in "finished" status, ordered by roundId descending (most recent first)
-    const finishedGames = await db
-      .query("gameRoundStates")
-      .withIndex("by_status", (q) => q.eq("status", "finished"))
-      .order("desc")
-      .take(limit);
-
-    // Return simplified game data
-    return finishedGames.map((game) => ({
-      _id: game._id,
-      roundId: game.roundId,
-      endTimestamp: game.endTimestamp,
-      startTimestamp: game.startTimestamp,
-      betCount: game.betCount,
-      totalPot: game.totalPot,
-      winner: game.winner,
-    }));
   },
 });
 

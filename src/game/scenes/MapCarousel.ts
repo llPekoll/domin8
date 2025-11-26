@@ -40,10 +40,19 @@ export class MapCarousel extends Scene {
   private titleText!: Phaser.GameObjects.Text;
   private subtitleText!: Phaser.GameObjects.Text;
   private mapNameText!: Phaser.GameObjects.Text;
+  private centerHighlight!: Phaser.GameObjects.Rectangle;
+  private centerGlow!: Phaser.GameObjects.Rectangle;
 
   // Timers
   private spinCheckTimer?: Phaser.Time.TimerEvent;
   private autoSpinTimer?: Phaser.Time.TimerEvent;
+
+  // Stopping animation state
+  private isDecelerating: boolean = false;
+  private decelerationStartTime: number = 0;
+  private decelerationDuration: number = 1500; // 1.5 seconds to stop
+  private startIndex: number = 0;
+  private targetIndex: number = 0;
 
   constructor() {
     super("MapCarousel");
@@ -73,6 +82,38 @@ export class MapCarousel extends Scene {
       fontSize: `${14 * RESOLUTION_SCALE}px`,
       color: "#ffcc00",
     }).setOrigin(0.5);
+
+    // Center highlight glow (behind cards)
+    this.centerGlow = this.add.rectangle(
+      centerX,
+      centerY,
+      this.cardWidth + 40 * RESOLUTION_SCALE,
+      this.cardHeight + 40 * RESOLUTION_SCALE,
+      0xffcc00,
+      0.15
+    );
+    this.centerGlow.setDepth(0);
+
+    // Center highlight border (in front of cards)
+    this.centerHighlight = this.add.rectangle(
+      centerX,
+      centerY,
+      this.cardWidth + 16 * RESOLUTION_SCALE,
+      this.cardHeight + 16 * RESOLUTION_SCALE
+    );
+    this.centerHighlight.setStrokeStyle(3 * RESOLUTION_SCALE, 0xffcc00);
+    this.centerHighlight.setFillStyle(0x000000, 0);
+    this.centerHighlight.setDepth(100);
+
+    // Pulsing animation for the center highlight
+    this.tweens.add({
+      targets: [this.centerHighlight, this.centerGlow],
+      alpha: { from: 0.6, to: 1 },
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: "Quint.easeOut",
+    });
 
     // Create carousel cards from available maps
     this.createCarouselCards(centerX, centerY);
@@ -208,10 +249,33 @@ export class MapCarousel extends Scene {
     logger.game.debug("[MapCarousel] Started spinning");
   }
 
+  // Quint.easeOut function: 1 - (1 - t)^5
+  private quintEaseOut(t: number): number {
+    return 1 - Math.pow(1 - t, 5);
+  }
+
   private updateSpin() {
     if (!this.isSpinning) return;
 
-    // Move current index
+    // Handle deceleration with Quint.easeOut
+    if (this.isDecelerating) {
+      const elapsed = Date.now() - this.decelerationStartTime;
+      const progress = Math.min(elapsed / this.decelerationDuration, 1);
+      const easedProgress = this.quintEaseOut(progress);
+
+      // Interpolate from startIndex to targetIndex using eased progress
+      this.currentIndex = this.startIndex + (this.targetIndex - this.startIndex) * easedProgress;
+
+      this.positionCards();
+
+      // Check if deceleration is complete
+      if (progress >= 1) {
+        this.stopOnMap(this.targetMapId!);
+      }
+      return;
+    }
+
+    // Normal spinning
     this.currentIndex += this.spinSpeed;
 
     // Loop around
@@ -220,23 +284,34 @@ export class MapCarousel extends Scene {
       this.currentIndex -= totalCards / 3; // Reset to middle third
     }
 
-    // If we have a target, slow down as we approach
-    if (this.targetMapId !== null) {
-      const targetIndex = this.findCardIndexForMap(this.targetMapId);
-      const distance = Math.abs(targetIndex - this.currentIndex);
-
-      if (distance < 3) {
-        this.spinSpeed *= 0.92; // Slow down
-      }
-
-      // Stop when we're close enough and slow enough
-      if (distance < 0.1 && this.spinSpeed < 0.02) {
-        this.stopOnMap(this.targetMapId);
-        return;
-      }
+    // If we have a target, start deceleration
+    if (this.targetMapId !== null && !this.isDecelerating) {
+      this.startDeceleration();
+      return;
     }
 
     this.positionCards();
+  }
+
+  private startDeceleration() {
+    this.isDecelerating = true;
+    this.decelerationStartTime = Date.now();
+    this.startIndex = this.currentIndex;
+    this.targetIndex = this.findCardIndexForMap(this.targetMapId!);
+
+    // Ensure we spin forward at least a bit before stopping (minimum 2 cards)
+    const minSpin = 2;
+    if (this.targetIndex <= this.startIndex + minSpin) {
+      // Add one full rotation of the map count
+      const mapsCount = (allMapsData || []).length;
+      this.targetIndex += mapsCount;
+    }
+
+    logger.game.info("[MapCarousel] Starting deceleration", {
+      from: this.startIndex,
+      to: this.targetIndex,
+      duration: this.decelerationDuration,
+    });
   }
 
   private findCardIndexForMap(mapId: number): number {
@@ -252,6 +327,7 @@ export class MapCarousel extends Scene {
 
   private stopOnMap(mapId: number) {
     this.isSpinning = false;
+    this.isDecelerating = false;
     this.spinSpeed = 0;
 
     if (this.autoSpinTimer) {
@@ -270,13 +346,35 @@ export class MapCarousel extends Scene {
       this.subtitleText.setText("Arena selected!");
       this.subtitleText.setColor("#00ff00");
 
-      // Highlight selected card
+      // Change highlight to green for selected state
+      this.centerHighlight.setStrokeStyle(4 * RESOLUTION_SCALE, 0x00ff00);
+      this.centerGlow.setFillStyle(0x00ff00, 0.2);
+
+      // Highlight selected card with Quint.easeOut
       this.tweens.add({
         targets: selectedCard.container,
         scaleX: 1.1,
         scaleY: 1.1,
-        duration: 300,
-        ease: "Back.easeOut",
+        duration: 400,
+        ease: "Quint.easeOut",
+      });
+
+      // Expand the highlight with Quint.easeOut
+      this.tweens.add({
+        targets: this.centerHighlight,
+        scaleX: 1.15,
+        scaleY: 1.15,
+        duration: 400,
+        ease: "Quint.easeOut",
+      });
+
+      this.tweens.add({
+        targets: this.centerGlow,
+        alpha: 0.4,
+        scaleX: 1.2,
+        scaleY: 1.2,
+        duration: 400,
+        ease: "Quint.easeOut",
       });
     }
 
@@ -354,5 +452,6 @@ export class MapCarousel extends Scene {
 
     this.cards = [];
     this.targetMapId = null;
+    this.isDecelerating = false;
   }
 }

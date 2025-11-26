@@ -13,16 +13,10 @@ import { internalAction, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { SolanaClient } from "./lib/solana";
+import { GAME_STATUS, GAME_TIMING } from "./constants";
 
 const RPC_ENDPOINT = process.env.SOLANA_RPC_ENDPOINT || "http://127.0.0.1:8899";
 const CRANK_AUTHORITY_PRIVATE_KEY = process.env.CRANK_AUTHORITY_PRIVATE_KEY || "";
-
-// Game status constants (matching smart contract constants.rs)
-const GAME_STATUS = {
-  OPEN: 0,    // First bet placed, countdown started
-  CLOSED: 1,  // Game ended, winner selected
-  WAITING: 2, // Game created by backend, no bets yet
-} as const;
 
 // ============================================================================
 // CREATE GAME ROUND SCHEDULER
@@ -243,7 +237,7 @@ export const executeEndGame = internalAction({
 
           if (!alreadyScheduled) {
             const jobId = await ctx.scheduler.runAfter(
-              0, // Execute immediately
+              GAME_TIMING.SEND_PRIZE_DELAY,
               internal.gameScheduler.executeSendPrize,
               { roundId }
             );
@@ -253,7 +247,7 @@ export const executeEndGame = internalAction({
               jobId: jobId.toString(),
               roundId,
               action: "send_prize",
-              scheduledTime: Math.floor(Date.now() / 1000),
+              scheduledTime: Math.floor(Date.now() / 1000) + GAME_TIMING.SEND_PRIZE_DELAY / 1000,
             });
 
             console.log(`Round ${roundId}: Scheduled send_prize (jobId: ${jobId})`);
@@ -264,10 +258,9 @@ export const executeEndGame = internalAction({
 
       // 2. Verify time window has closed (with buffer for blockchain clock)
       const currentTime = Math.floor(Date.now() / 1000);
-      const BLOCKCHAIN_CLOCK_BUFFER = 1; // seconds to account for blockchain clock drift
 
-      if (currentTime < activeGame.endDate + BLOCKCHAIN_CLOCK_BUFFER) {
-        const remaining = activeGame.endDate + BLOCKCHAIN_CLOCK_BUFFER - currentTime;
+      if (currentTime < activeGame.endDate + GAME_TIMING.BLOCKCHAIN_CLOCK_BUFFER) {
+        const remaining = activeGame.endDate + GAME_TIMING.BLOCKCHAIN_CLOCK_BUFFER - currentTime;
         console.log(
           `Round ${roundId}: Waiting for time window (${remaining}s remaining), skipping`
         );
@@ -350,22 +343,33 @@ export const executeEndGame = internalAction({
             participantCount: updatedGame.bets?.length || 0,
           });
 
-          // Schedule sendPrizeWinner
-          const jobId = await ctx.scheduler.runAfter(
-            1000, // 1 second delay
-            internal.gameScheduler.executeSendPrize,
-            { roundId }
+          // Check if send_prize already scheduled (by webhook)
+          // Only schedule as fallback if webhook missed it
+          const sendPrizeScheduled = await ctx.runQuery(
+            internal.gameSchedulerMutations.isActionScheduled,
+            { roundId, action: "send_prize" }
           );
 
-          // Save job to database
-          await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
-            jobId: jobId.toString(),
-            roundId,
-            action: "send_prize",
-            scheduledTime: Math.floor(Date.now() / 1000) + 1, // 1 second from now
-          });
+          if (!sendPrizeScheduled) {
+            // Schedule sendPrizeWinner (fallback - webhook should have done this)
+            const jobId = await ctx.scheduler.runAfter(
+              GAME_TIMING.SEND_PRIZE_DELAY,
+              internal.gameScheduler.executeSendPrize,
+              { roundId }
+            );
 
-          console.log(`Round ${roundId}: Scheduled send_prize (jobId: ${jobId})`);
+            // Save job to database
+            await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
+              jobId: jobId.toString(),
+              roundId,
+              action: "send_prize",
+              scheduledTime: Math.floor(Date.now() / 1000) + GAME_TIMING.SEND_PRIZE_DELAY / 1000,
+            });
+
+            console.log(`Round ${roundId}: Scheduled send_prize as fallback (jobId: ${jobId})`);
+          } else {
+            console.log(`Round ${roundId}: send_prize already scheduled by webhook`);
+          }
         } else {
           console.warn(`Round ${roundId}: ⚠️ No winner found after end_game`);
         }
