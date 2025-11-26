@@ -199,7 +199,7 @@ export function OneVOnePage() {
   }, []);
 
   return (
-    <div className="min-h-screen w-full bg-black">
+    <div className="min-h-screen w-full bg-gray-950">
       <Header />
       
       {/* Character Selection (fixed, always visible) */}

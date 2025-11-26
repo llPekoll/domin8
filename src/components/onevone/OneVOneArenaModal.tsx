@@ -3,7 +3,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { EventBus } from "../../game/EventBus";
 import { logger } from "../../lib/logger";
 import { usePrivyWallet } from "../../hooks/usePrivyWallet";
+import { useAssets } from "../../contexts/AssetsContext";
 import type { Character } from "../../types/character";
+import Phaser from "phaser";
+import { Boot } from "../../game/scenes/Boot";
+import { Preloader } from "../../game/scenes/Preloader";
+import { OneVOneScene } from "../../game/scenes/OneVOneScene";
+import { setCharactersData, setAllMapsData, STAGE_WIDTH, STAGE_HEIGHT } from "../../game/main";
 
 interface LobbyData {
   _id: string;
@@ -41,113 +47,144 @@ export function OneVOneArenaModal({
 }: OneVOneArenaModalProps) {
   // selectedCharacter can be used for future character-specific features
   const { publicKey } = usePrivyWallet();
+  const { characters, maps } = useAssets();
   const [arenaState, setArenaState] = useState<ArenaState>("waiting");
   const [fightResult, setFightResult] = useState<{ winner: string; isUserWinner: boolean } | null>(null);
+  const [gameReady, setGameReady] = useState(false);
   const sceneInitialized = useRef(false);
   const previousLobbyStatus = useRef<number | null>(null);
-  const previousSceneKey = useRef<string | null>(null);
+  const modalGameContainerRef = useRef<HTMLDivElement>(null);
+  const gameInstanceRef = useRef<Phaser.Game | null>(null);
 
-  // Get the Phaser game instance
-  const getPhaserGame = useCallback((): Phaser.Game | undefined => {
-    return (window as any).phaserGame;
-  }, []);
-
-  // Get the OneVOne scene
+  // Get the OneVOne scene from the modal's game instance
   const getOneVOneScene = useCallback(() => {
-    const game = getPhaserGame();
+    const game = gameInstanceRef.current;
     if (!game || !game.scene) return null;
     return game.scene.getScene("OneVOne") as any;
-  }, [getPhaserGame]);
+  }, []);
 
-  // Switch to OneVOne scene when modal opens
+  // Create dedicated Phaser game instance for modal
   useEffect(() => {
-    if (!isOpen || !lobby) {
-      // When modal closes, switch back to previous scene
-      if (previousSceneKey.current) {
-        const game = getPhaserGame();
-        if (game && game.scene) {
-          const oneVOneScene = getOneVOneScene();
-          if (oneVOneScene && typeof oneVOneScene.cleanup === "function") {
-            oneVOneScene.cleanup();
-          }
-          
-          // Stop OneVOne scene and restart previous scene
-          game.scene.stop("OneVOne");
-          game.scene.start(previousSceneKey.current);
-          logger.game.info("[ArenaModal] Switched back to", previousSceneKey.current);
-        }
-        previousSceneKey.current = null;
+    if (!isOpen || !modalGameContainerRef.current || !characters || !maps) return;
+
+    // Don't create if already exists
+    if (gameInstanceRef.current) return;
+
+    logger.game.info("[ArenaModal] Creating dedicated Phaser game instance");
+
+    // Set global data for Preloader
+    setCharactersData(characters);
+    setAllMapsData(maps);
+
+    const config: Phaser.Types.Core.GameConfig = {
+      type: Phaser.AUTO,
+      width: STAGE_WIDTH,
+      height: STAGE_HEIGHT,
+      transparent: true,
+      parent: modalGameContainerRef.current,
+      pixelArt: true,
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: STAGE_WIDTH,
+        height: STAGE_HEIGHT,
+      },
+      render: {
+        antialiasGL: false,
+        pixelArt: true,
+      },
+      audio: {
+        disableWebAudio: false,
+        noAudio: false,
+      },
+      scene: [Boot, Preloader, OneVOneScene],
+    };
+
+    gameInstanceRef.current = new Phaser.Game(config);
+
+    // Listen for preloader complete and start OneVOne scene
+    const handlePreloaderComplete = () => {
+      logger.game.info("[ArenaModal] Preloader complete, starting OneVOne scene");
+      const game = gameInstanceRef.current;
+      if (game) {
+        // Stop any default scene that started
+        game.scene.stop("Demo");
+        game.scene.stop("Game");
+        // Start OneVOne scene
+        game.scene.start("OneVOne");
       }
-      
+    };
+    EventBus.on("preloader-complete", handlePreloaderComplete);
+
+    // Listen for scene ready
+    const handleSceneReady = (scene: Phaser.Scene) => {
+      if (scene.scene.key === "OneVOne") {
+        logger.game.info("[ArenaModal] OneVOne scene ready");
+        setGameReady(true);
+      }
+    };
+    EventBus.on("current-scene-ready", handleSceneReady);
+
+    return () => {
+      EventBus.off("preloader-complete", handlePreloaderComplete);
+      EventBus.off("current-scene-ready", handleSceneReady);
+    };
+  }, [isOpen, characters, maps]);
+
+  // Cleanup game instance when modal closes
+  useEffect(() => {
+    if (!isOpen && gameInstanceRef.current) {
+      logger.game.info("[ArenaModal] Destroying Phaser game instance");
+      gameInstanceRef.current.destroy(true);
+      gameInstanceRef.current = null;
+      setGameReady(false);
       sceneInitialized.current = false;
       previousLobbyStatus.current = null;
       setArenaState("waiting");
       setFightResult(null);
-      return;
+    }
+  }, [isOpen]);
+
+  // Spawn characters when game is ready and lobby data is available
+  useEffect(() => {
+    if (!isOpen || !lobby || !gameReady) return;
+
+    const oneVOneScene = getOneVOneScene();
+    if (!oneVOneScene || sceneInitialized.current) return;
+
+    sceneInitialized.current = true;
+    logger.game.info("[ArenaModal] Spawning Player A character", {
+      characterId: lobby.characterA,
+      isCreator,
+    });
+
+    // Spawn Player A's character
+    if (typeof oneVOneScene.spawnSingleCharacter === "function") {
+      oneVOneScene.spawnSingleCharacter({
+        playerId: lobby.playerA,
+        characterId: lobby.characterA,
+        position: "left",
+        displayName: isCreator ? "You" : "Opponent",
+      });
     }
 
-    const game = getPhaserGame();
-    if (!game) {
-      logger.game.error("[ArenaModal] Phaser game not found");
-      return;
-    }
-
-    // Store current active scene to switch back later
-    const activeScenes = game.scene.getScenes(true);
-    if (activeScenes.length > 0 && activeScenes[0].scene.key !== "OneVOne") {
-      previousSceneKey.current = activeScenes[0].scene.key;
-    }
-
-    // Stop current scene and start OneVOne scene
-    if (previousSceneKey.current) {
-      game.scene.stop(previousSceneKey.current);
-    }
-    game.scene.start("OneVOne");
-    logger.game.info("[ArenaModal] Started OneVOne scene");
-
-    // Give scene time to initialize, then spawn the first character
-    const initTimer = setTimeout(() => {
-      const oneVOneScene = getOneVOneScene();
-      if (oneVOneScene && !sceneInitialized.current) {
-        sceneInitialized.current = true;
-        
-        // Spawn Player A's character
+    // If Player B exists, also spawn them
+    if (lobby.playerB && lobby.characterB !== undefined) {
+      logger.game.info("[ArenaModal] Spawning Player B character", {
+        characterId: lobby.characterB,
+      });
+      setTimeout(() => {
         if (typeof oneVOneScene.spawnSingleCharacter === "function") {
-          logger.game.info("[ArenaModal] Spawning Player A character", {
-            characterId: lobby.characterA,
-            isCreator,
-          });
           oneVOneScene.spawnSingleCharacter({
-            playerId: lobby.playerA,
-            characterId: lobby.characterA,
-            position: "left",
-            displayName: isCreator ? "You" : "Opponent",
+            playerId: lobby.playerB!,
+            characterId: lobby.characterB!,
+            position: "right",
+            displayName: !isCreator ? "You" : "Opponent",
           });
         }
-
-        // If Player B exists, also spawn them
-        if (lobby.playerB && lobby.characterB !== undefined) {
-          if (typeof oneVOneScene.spawnSingleCharacter === "function") {
-            logger.game.info("[ArenaModal] Spawning Player B character", {
-              characterId: lobby.characterB,
-            });
-            setTimeout(() => {
-              oneVOneScene.spawnSingleCharacter({
-                playerId: lobby.playerB!,
-                characterId: lobby.characterB!,
-                position: "right",
-                displayName: !isCreator ? "You" : "Opponent",
-              });
-            }, 500); // Slight delay for dramatic effect
-          }
-        }
-      }
-    }, 500);
-
-    return () => {
-      clearTimeout(initTimer);
-    };
-  }, [isOpen, lobby?.lobbyId, isCreator, getPhaserGame, getOneVOneScene]);
+      }, 500);
+    }
+  }, [isOpen, lobby, gameReady, isCreator, getOneVOneScene]);
 
   // Watch for lobby state changes (real-time updates from Convex)
   useEffect(() => {
@@ -309,7 +346,7 @@ export function OneVOneArenaModal({
         showCloseButton={arenaState === "waiting" || arenaState === "results"}
       >
         {/* Arena Header */}
-        <DialogHeader className="p-4 bg-gradient-to-r from-indigo-900/80 to-purple-900/80 border-b border-indigo-500/50">
+        <DialogHeader className="p-4 bg-gradient-to-r from-indigo-900/90 to-purple-900/90 border-b border-indigo-500/50">
           <DialogTitle className="text-xl font-bold text-indigo-200 flex items-center justify-between">
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
@@ -321,20 +358,26 @@ export function OneVOneArenaModal({
           </DialogTitle>
         </DialogHeader>
 
-        {/* Phaser Game Container - The game canvas is rendered here */}
-        <div className="relative w-full aspect-video bg-gray-900 flex items-center justify-center">
-          {/* The actual Phaser game canvas will be rendered in #game-container which is in the main layout */}
-          {/* This area shows status overlays on top of the game */}
+        {/* Phaser Game Container - Canvas will be moved here */}
+        <div 
+          ref={modalGameContainerRef}
+          className="relative w-full aspect-video bg-gray-900 flex items-center justify-center overflow-hidden [&>canvas]:max-w-full [&>canvas]:max-h-full [&>canvas]:object-contain"
+        >
+          {/* The Phaser canvas will be moved into this container when modal opens */}
           
-          {/* Status Overlay */}
+          {/* Status Banner - Small overlay at top, doesn't block the arena view */}
           {(arenaState === "waiting" || arenaState === "vrf-pending" || arenaState === "opponent-joining") && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10 pointer-events-none">
-              <div className="text-center">
-                <h2 className="text-2xl font-bold text-white mb-2">{statusDisplay.title}</h2>
-                <p className="text-gray-300 mb-4">{statusDisplay.subtitle}</p>
-                {statusDisplay.showSpinner && (
-                  <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto"></div>
-                )}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+              <div className="text-center bg-black/70 px-6 py-3 rounded-lg border border-indigo-500/50">
+                <div className="flex items-center gap-3">
+                  {statusDisplay.showSpinner && (
+                    <div className="animate-spin w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full"></div>
+                  )}
+                  <div>
+                    <h2 className="text-lg font-bold text-white">{statusDisplay.title}</h2>
+                    <p className="text-gray-300 text-sm">{statusDisplay.subtitle}</p>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -351,7 +394,7 @@ export function OneVOneArenaModal({
 
         {/* Results Actions (only show when fight is complete and user won) */}
         {arenaState === "results" && fightResult && (
-          <div className="p-6 bg-gray-900/80 border-t border-indigo-500/50">
+          <div className="p-6 bg-gray-900/95 border-t border-indigo-500/50">
             <div className="text-center mb-4">
               <h2
                 className={`text-3xl font-black mb-2 ${
@@ -390,7 +433,7 @@ export function OneVOneArenaModal({
 
         {/* Lobby Info Footer (show during waiting/pending states) */}
         {(arenaState === "waiting" || arenaState === "opponent-joining" || arenaState === "vrf-pending") && (
-          <div className="p-4 bg-gray-900/60 border-t border-indigo-500/30">
+          <div className="p-4 bg-gray-900/95 border-t border-indigo-500/30">
             <div className="flex justify-between items-center text-sm">
               <div>
                 <span className="text-gray-400">Player A: </span>
