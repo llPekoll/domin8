@@ -38,8 +38,9 @@ export class MapCarousel extends Scene {
   private isSpinning: boolean = false;
   private targetMapId: number | null = null;
   private spinSpeed: number = 0;
-  private cardWidth: number = 240 * RESOLUTION_SCALE;  // Smaller cards
-  private cardHeight: number = 135 * RESOLUTION_SCALE;
+  // Card dimensions match stage aspect ratio (396:180 = 2.2:1)
+  private cardWidth: number = 220 * RESOLUTION_SCALE;
+  private cardHeight: number = 100 * RESOLUTION_SCALE;
 
   // 3D Carousel parameters
   private radiusX: number = 260 * RESOLUTION_SCALE; // Horizontal radius (ellipse width)
@@ -191,10 +192,10 @@ export class MapCarousel extends Scene {
         bgImage = this.add.image(0, 0, bgConfig.textureKey);
       }
 
-      // Scale to fit card
-      const scaleX = this.cardWidth / bgImage.width;
-      const scaleY = this.cardHeight / bgImage.height;
-      const scale = Math.max(scaleX, scaleY);
+      // Scale to fit inside card (contain, not cover)
+      const scaleX = (this.cardWidth - 8) / bgImage.width;
+      const scaleY = (this.cardHeight - 8) / bgImage.height;
+      const scale = Math.min(scaleX, scaleY);
       bgImage.setScale(scale);
     } else {
       // Fallback colored rectangle
@@ -208,28 +209,28 @@ export class MapCarousel extends Scene {
     // Reflection/shine effect at top of card
     const shine = this.add.rectangle(
       0,
-      -this.cardHeight / 2 + 15 * RESOLUTION_SCALE,
-      this.cardWidth - 20,
-      20 * RESOLUTION_SCALE,
+      -this.cardHeight / 2 + 10 * RESOLUTION_SCALE,
+      this.cardWidth - 16,
+      12 * RESOLUTION_SCALE,
       0xffffff,
-      0.1
+      0.08
     );
     container.add(shine);
 
     // Map name label on card (bottom)
     const labelBg = this.add.rectangle(
       0,
-      this.cardHeight / 2 - 20 * RESOLUTION_SCALE,
+      this.cardHeight / 2 - 12 * RESOLUTION_SCALE,
       this.cardWidth,
-      35 * RESOLUTION_SCALE,
+      22 * RESOLUTION_SCALE,
       0x000000,
       0.7
     );
     container.add(labelBg);
 
-    const nameLabel = this.add.text(0, this.cardHeight / 2 - 20 * RESOLUTION_SCALE, map.name || `Map ${map.id}`, {
+    const nameLabel = this.add.text(0, this.cardHeight / 2 - 12 * RESOLUTION_SCALE, map.name || `Map ${map.id}`, {
       fontFamily: "Jersey15",
-      fontSize: `${14 * RESOLUTION_SCALE}px`,
+      fontSize: `${11 * RESOLUTION_SCALE}px`,
       color: "#ffffff",
     }).setOrigin(0.5);
     container.add(nameLabel);
@@ -477,17 +478,17 @@ export class MapCarousel extends Scene {
 
     logger.game.info("[MapCarousel] Stopped on map:", mapId);
 
-    // Transition to Game scene after delay
-    this.time.delayedCall(1500, () => {
+    // Transition to Game scene after delay (2s extra to appreciate the selection)
+    this.time.delayedCall(3500, () => {
       this.transitionToGame();
     });
   }
 
   private setupEventListeners() {
-    // Listen for active game updates
-    EventBus.on("active-game-updated", this.onActiveGameUpdated, this);
+    // Listen for blockchain state updates (new game created)
+    EventBus.on("blockchain-state-update", this.onBlockchainUpdate, this);
 
-    // Check periodically for game creation
+    // Also check periodically as backup
     this.spinCheckTimer = this.time.addEvent({
       delay: 500,
       callback: this.checkForExistingGame,
@@ -496,21 +497,28 @@ export class MapCarousel extends Scene {
     });
   }
 
-  private onActiveGameUpdated(gameData: any) {
-    logger.game.debug("[MapCarousel] Active game updated:", gameData);
+  private onBlockchainUpdate(gameData: any) {
+    if (this.targetMapId !== null) return; // Already targeting a map
+    if (!this.isSpinning) return; // Not spinning anymore
+
+    logger.game.debug("[MapCarousel] Blockchain update received:", gameData?.status);
 
     if (gameData && gameData.status !== undefined) {
+      // WAITING (0) or OPEN (1) means a game exists
       if (gameData.status === GAME_STATUS.WAITING || gameData.status === GAME_STATUS.OPEN) {
-        // Game created! Stop on this map
-        const mapId = gameData.map?.id || gameData.map || 1;
+        // Game created! Trigger the dramatic spin & land
+        const mapId = typeof gameData.map === 'object'
+          ? gameData.map?.id
+          : gameData.map || 1;
         this.targetMapId = mapId;
-        logger.game.info("[MapCarousel] Game created, targeting map:", mapId);
+        logger.game.info("[MapCarousel] 🎰 New game detected! Spinning to map:", mapId);
       }
     }
   }
 
   private checkForExistingGame() {
     if (this.targetMapId !== null) return; // Already targeting
+    if (!this.isSpinning) return; // Not spinning
 
     if (activeGameData && activeGameData.status !== undefined) {
       if (activeGameData.status === GAME_STATUS.WAITING || activeGameData.status === GAME_STATUS.OPEN) {
@@ -518,7 +526,7 @@ export class MapCarousel extends Scene {
           ? activeGameData.map?.id
           : activeGameData.map || 1;
         this.targetMapId = mapId;
-        logger.game.info("[MapCarousel] Found existing game, targeting map:", mapId);
+        logger.game.info("[MapCarousel] 🎰 Found existing game, spinning to map:", mapId);
       }
     }
   }
@@ -538,7 +546,7 @@ export class MapCarousel extends Scene {
 
   shutdown() {
     // Cleanup
-    EventBus.off("active-game-updated", this.onActiveGameUpdated, this);
+    EventBus.off("blockchain-state-update", this.onBlockchainUpdate, this);
 
     if (this.spinCheckTimer) {
       this.spinCheckTimer.destroy();

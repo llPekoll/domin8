@@ -346,6 +346,15 @@ export class GlobalGameStateManager {
   private handlePhaseTransition(targetPhase: GamePhase, gameState: any) {
     const oldPhase = this.currentPhase;
 
+    // ✅ PROTECT celebration: Never interrupt celebration with other phases
+    if (oldPhase === GamePhase.CELEBRATING || oldPhase === GamePhase.FIGHTING) {
+      // During battle/celebration, ignore blockchain updates that might show VRF_PENDING
+      if (targetPhase === GamePhase.VRF_PENDING || targetPhase === GamePhase.INSERT_COIN) {
+        logger.game.debug(`[GlobalGameStateManager] 🛡️ Protecting ${oldPhase} from ${targetPhase}`);
+        return; // Don't transition
+      }
+    }
+
     // ✅ Special case: VRF_PENDING + winner arrives → Go to FIGHTING
     if (oldPhase === GamePhase.VRF_PENDING && this.checkHasWinner(gameState)) {
       logger.game.debug("=".repeat(60));
@@ -418,12 +427,16 @@ export class GlobalGameStateManager {
    * Handle scene transitions based on phase changes
    */
   private handleSceneTransition(oldPhase: GamePhase, newPhase: GamePhase) {
-    // IDLE → Any game phase: Show Game scene
+    // ✅ IDLE → Game: Let MapCarousel handle this transition!
+    // MapCarousel will spin, land on the selected map, wait 3.5s, then transition to Game.
+    // We do NOT auto-transition here to avoid racing with MapCarousel's animation.
     if (oldPhase === GamePhase.IDLE && newPhase !== GamePhase.IDLE) {
-      this.transitionToGame();
+      logger.game.debug("[GlobalGameStateManager] 🎰 IDLE → Game: MapCarousel handles transition (not us)");
+      // Don't call transitionToGame() - MapCarousel will do it after spin animation
+      return;
     }
 
-    // CLEANUP → IDLE: Show MapCarousel scene
+    // CLEANUP → IDLE: Show MapCarousel scene (we handle this)
     if (oldPhase === GamePhase.CLEANUP && newPhase === GamePhase.IDLE) {
       this.transitionToMapCarousel();
     }
@@ -538,35 +551,24 @@ export class GlobalGameStateManager {
    * Start cleanup sequence
    */
   private startCleanupSequence() {
-    logger.game.debug("[GlobalGameStateManager] 🧹 Starting cleanup");
+    logger.game.debug("[GlobalGameStateManager] 🧹 Starting cleanup - direct swipe to carousel");
 
     // Set phase to CLEANUP
     this.currentPhase = GamePhase.CLEANUP;
     EventBus.emit("game-phase-changed", GamePhase.CLEANUP);
 
-    // Tell Game scene to cleanup (fade out animations)
-    EventBus.emit("cleanup-game");
+    // ✅ Reset all game state immediately
+    this.currentGameState = null;
+    this.currentGameEndTimestamp = 0;
+    this.lastCountdownSeconds = -1;
+    this.battleSequenceStarted = false;
+    this.celebrationSequenceStarted = false;
+    this.celebrationStartTime = 0;
 
-    // Transition back to MapCarousel after cleanup animations
-    setTimeout(() => {
-      if (this.currentPhase === GamePhase.CLEANUP) {
-        logger.game.debug("[GlobalGameStateManager] Cleanup complete, transitioning to MapCarousel");
-
-        // ✅ Reset all game state
-        this.currentPhase = GamePhase.IDLE;
-        this.currentGameState = null;
-        this.currentGameEndTimestamp = 0;
-        this.lastCountdownSeconds = -1;
-        this.battleSequenceStarted = false;
-        this.celebrationSequenceStarted = false;
-        this.celebrationStartTime = 0;
-
-        EventBus.emit("game-phase-changed", GamePhase.IDLE);
-
-        // ✅ Directly transition to MapCarousel scene
-        this.transitionToMapCarousel();
-      }
-    }, GAME_TIMING.CLEANUP_DURATION);
+    // ✅ Direct swipe transition to MapCarousel (no fade-out delay)
+    this.currentPhase = GamePhase.IDLE;
+    EventBus.emit("game-phase-changed", GamePhase.IDLE);
+    this.transitionToMapCarousel();
   }
 
   /**

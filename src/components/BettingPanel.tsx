@@ -254,11 +254,7 @@ const BettingPanel = memo(function BettingPanel({
 
       // Place bet
       // placeBet(amount, skin, position) - displayName and mapId are not used by the smart contract
-      const betResult = await placeBet(
-        amount,
-        selectedCharacter.id,
-        position
-      );
+      const betResult = await placeBet(amount, selectedCharacter.id, position);
       const { signature: signatureHex, roundId, betIndex } = betResult;
 
       logger.ui.debug("[BettingPanel] Transaction successful:", {
@@ -627,9 +623,6 @@ const BettingPanel = memo(function BettingPanel({
                 : "Insert coin"}
         </button>
       </div>
-      <p className="text-center text-white text-sm mt-2 bg-red-700">
-        You need at least 0.004 SOL to create a game
-      </p>
     </div>
   );
 });
