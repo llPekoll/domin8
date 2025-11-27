@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Header } from "../components/Header";
 import { CharacterSelection2 } from "../components/CharacterSelection2";
 import { CreateLobby } from "../components/onevone/CreateLobby";
@@ -54,19 +54,6 @@ export function OneVOnePage() {
   
   // Get completed lobbies for history
   const completedLobbies = useQuery(api.lobbies.getCompletedLobbies, { limit: 20 }) || [];
-  
-  // Get user's personal lobbies (for cancel functionality)
-  // Must always pass a value to useQuery - pass empty string as default
-  const userLobbies = useQuery(
-    api.lobbies.getPlayerLobbies,
-    publicKey ? { playerWallet: publicKey.toString() } : { playerWallet: "" }
-  );
-  
-  const userOpenLobbies = useMemo(() => {
-    if (!publicKey || !userLobbies?.asPlayerA) return [];
-    // Filter to only lobbies user created (as Player A) that are still open (status = 0)
-    return userLobbies.asPlayerA.filter((l: any) => l.status === 0);
-  }, [publicKey, userLobbies]);
   
   // Get specific lobby state when in arena (for real-time updates during fight)
   const lobbyStateQuery = useQuery(
@@ -201,14 +188,6 @@ export function OneVOnePage() {
     }
   }, [connected, publicKey, selectedCharacter, wallet, createLobbyAction]);
 
-  // Allow user to click on their own waiting lobby to reopen modal
-  const handleViewOwnLobby = useCallback((lobbyId: number) => {
-    logger.ui.info("[1v1] Viewing own lobby", { lobbyId });
-    setActiveLobbyId(lobbyId);
-    setIsCreator(true);
-    setArenaModalOpen(true);
-  }, []);
-
   return (
     <div className="min-h-screen w-full bg-gray-950">
       <Header />
@@ -237,9 +216,6 @@ export function OneVOnePage() {
                   <CreateLobby
                     selectedCharacter={selectedCharacter}
                     onLobbyCreated={handleLobbyCreated}
-                    userOpenLobbies={userOpenLobbies}
-                    onLobbyCancelled={handleLobbyCancelled}
-                    onViewLobby={handleViewOwnLobby}
                   />
                 </div>
 
@@ -250,6 +226,7 @@ export function OneVOnePage() {
                     currentPlayerWallet={publicKey?.toString() || ""}
                     selectedCharacter={selectedCharacter}
                     onLobbyJoined={handleLobbyJoined}
+                    onLobbyCancelled={handleLobbyCancelled}
                   />
                   </div>
                   

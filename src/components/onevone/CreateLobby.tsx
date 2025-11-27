@@ -9,15 +9,6 @@ import type { Character } from "../../types/character";
 interface CreateLobbyProps {
   selectedCharacter: Character | null;
   onLobbyCreated?: (lobbyId: number) => void;
-  userOpenLobbies?: Array<{
-    _id: string;
-    lobbyId: number;
-    lobbyPda: string;
-    amount: number;
-    status: number;
-  }>;
-  onLobbyCancelled?: (lobbyId: number) => void;
-  onViewLobby?: (lobbyId: number) => void;
 }
 
 const DEFAULT_BET_AMOUNT_SOL = 0.01;
@@ -25,17 +16,12 @@ const DEFAULT_BET_AMOUNT_SOL = 0.01;
 export function CreateLobby({
   selectedCharacter,
   onLobbyCreated,
-  userOpenLobbies = [],
-  onLobbyCancelled,
-  onViewLobby,
 }: CreateLobbyProps) {
   const { connected, publicKey, wallet } = usePrivyWallet();
   const createLobbyAction = useAction(api.lobbies.createLobby);
-  const cancelLobbyAction = useAction(api.lobbies.cancelLobby);
 
   const [betAmount, setBetAmount] = useState<number>(DEFAULT_BET_AMOUNT_SOL);
   const [isLoading, setIsLoading] = useState(false);
-  const [cancellingLobbies, setCancellingLobbies] = useState<Set<number>>(new Set());
 
   const handleAmountChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,149 +32,6 @@ export function CreateLobby({
     },
     []
   );
-
-  const handleCancelLobby = useCallback(
-    async (lobby: any) => {
-      if (!connected || !publicKey || !wallet) {
-        toast.error("Please connect wallet");
-        return;
-      }
-
-      // Confirm cancellation
-      const confirmed = window.confirm(
-        `Cancel lobby #${lobby.lobbyId}? You will receive a refund of ${(
-          lobby.amount / 1e9
-        ).toFixed(4)} SOL minus gas fees.`
-      );
-      if (!confirmed) return;
-
-      setCancellingLobbies((prev) => new Set(prev).add(lobby.lobbyId));
-
-      try {
-        // Import utilities
-        const { getSharedConnection } = await import("../../lib/sharedConnection");
-        const {
-          buildCancelLobbyTransactionOptimized,
-          sendOptimizedTransaction,
-          waitForConfirmationOptimized,
-        } = await import("../../lib/solana-1v1-transactions-helius");
-        const { PublicKey } = await import("@solana/web3.js");
-
-        const connection = getSharedConnection();
-
-        logger.ui.info("Cancelling lobby", {
-          lobbyId: lobby.lobbyId,
-          playerA: publicKey.toString(),
-        });
-
-        // Build optimized cancel transaction
-        const lobbyPda = new PublicKey(lobby.lobbyPda);
-        const { transaction, metrics } = await buildCancelLobbyTransactionOptimized(
-          publicKey,
-          lobby.lobbyId,
-          lobbyPda,
-          connection
-        );
-
-        // Get the block height for later validation
-        const { blockhash: _, lastValidBlockHeight } =
-          await connection.getLatestBlockhash("confirmed");
-
-        logger.ui.info("Transaction optimization metrics", {
-          computeUnits: metrics.optimizedCU,
-          priorityFee: metrics.priorityFee,
-          estimatedCost: (metrics.estimatedCost / 1e9).toFixed(6) + " SOL",
-        });
-
-        logger.ui.debug("Signing and sending optimized cancel transaction with Privy wallet");
-
-        // Send with Helius optimizations
-        const network = import.meta.env.VITE_SOLANA_NETWORK || "devnet";
-        const signature = await sendOptimizedTransaction(
-          connection,
-          transaction,
-          publicKey,
-          wallet,
-          lastValidBlockHeight,
-          network
-        );
-
-        logger.ui.info("Optimized cancel transaction sent", {
-          signature: signature.slice(0, 8) + "...",
-          lobbyId: lobby.lobbyId,
-        });
-        toast.loading("Waiting for transaction confirmation...", { id: "cancel-tx-confirm" });
-
-        // Wait for confirmation
-        const isConfirmed = await waitForConfirmationOptimized(
-          connection,
-          signature,
-          lastValidBlockHeight
-        );
-
-        if (!isConfirmed) {
-          toast.error("Transaction confirmation timeout", { id: "cancel-tx-confirm" });
-          logger.ui.error("Cancel transaction confirmation timed out", { signature });
-          return;
-        }
-
-        toast.success("Transaction confirmed!", { id: "cancel-tx-confirm" });
-        logger.ui.info("Cancel transaction confirmed on blockchain", { signature });
-
-        // Call Convex action to update database
-        logger.ui.debug("Calling Convex action to cancel lobby in database");
-
-        const result = await cancelLobbyAction({
-          lobbyId: lobby.lobbyId,
-          transactionHash: signature,
-        });
-
-        if (result.success) {
-          logger.ui.info("Lobby cancelled successfully", {
-            lobbyId: result.lobbyId,
-          });
-
-          toast.success(`Lobby #${result.lobbyId} cancelled! Refund sent to your wallet.`, {
-            duration: 5000,
-          });
-
-          // Callback to parent component
-          onLobbyCancelled?.(result.lobbyId);
-        } else {
-          toast.error("Failed to cancel lobby in database");
-          logger.ui.error("Convex action failed");
-        }
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        logger.ui.error("Failed to cancel lobby:", error);
-
-        // Provide user-friendly error messages
-        if (errorMsg.includes("User rejected")) {
-          toast.error("Transaction rejected by user");
-        } else if (errorMsg.includes("confirmation timeout")) {
-          toast.error("Transaction confirmation timed out. Please check your wallet.");
-        } else if (errorMsg.includes("insufficient funds")) {
-          toast.error("Insufficient SOL for transaction fee");
-        } else if (errorMsg.includes("InvalidLobbyStatus")) {
-          toast.error("Lobby already joined or invalid status");
-        } else {
-          toast.error("Failed to cancel lobby: " + errorMsg);
-        }
-      } finally {
-        setCancellingLobbies((prev) => {
-          const next = new Set(prev);
-          next.delete(lobby.lobbyId);
-          return next;
-        });
-      }
-    },
-    [connected, publicKey, wallet, cancelLobbyAction, onLobbyCancelled]
-  );
-
-  // Convert SOL from lamports for display
-  const formatAmount = (lamports: number) => {
-    return (lamports / 1e9).toFixed(4);
-  };
 
   const handleCreateLobby = useCallback(async () => {
     if (!connected || !publicKey || !selectedCharacter || !wallet) {
@@ -365,46 +208,6 @@ export function CreateLobby({
       >
         {isLoading ? "Creating..." : "Create Lobby"}
       </button>
-
-      {/* My Open Lobbies Section */}
-      {userOpenLobbies.length > 0 && (
-        <div className="mt-6 pt-6 border-t border-indigo-400/20">
-          <h3 className="text-lg font-bold text-indigo-200 mb-3">Your Open Lobbies</h3>
-          <div className="space-y-2">
-            {userOpenLobbies.map((lobby) => (
-              <div
-                key={lobby._id}
-                className="bg-gray-800 border border-orange-400/50 rounded p-3"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex-1">
-                    <p className="text-sm text-indigo-400">
-                      Lobby #{lobby.lobbyId} - {formatAmount(lobby.amount)} SOL
-                    </p>
-                    <p className="text-xs text-gray-400">Waiting for Player B...</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => onViewLobby?.(lobby.lobbyId)}
-                    disabled={isLoading}
-                    className="flex-1 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-bold rounded transition-colors"
-                  >
-                    View Arena
-                  </button>
-                  <button
-                    onClick={() => handleCancelLobby(lobby)}
-                    disabled={cancellingLobbies.has(lobby.lobbyId) || isLoading}
-                    className="px-3 py-1 bg-red-600 hover:bg-red-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-xs font-bold rounded transition-colors whitespace-nowrap"
-                  >
-                    {cancellingLobbies.has(lobby.lobbyId) ? "Cancelling..." : "Cancel"}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

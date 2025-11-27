@@ -1,8 +1,19 @@
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import { EventBus } from "../../game/EventBus";
+import { logger } from "../../lib/logger";
+import { useAssets } from "../../contexts/AssetsContext";
+import type { Character } from "../../types/character";
+import Phaser from "phaser";
+import { OneVOneBoot } from "../../game/scenes/OneVOneBoot";
+import { OneVOnePreloader } from "../../game/scenes/OneVOnePreloader";
+import { OneVOneScene } from "../../game/scenes/OneVOneScene";
+import { setCharactersData, setAllMapsData, STAGE_WIDTH, STAGE_HEIGHT } from "../../game/main";
 
 interface LobbyData {
   _id: string;
   lobbyId: number;
+  lobbyPda?: string;
   playerA: string;
   amount: number;
   characterA: number;
@@ -14,55 +25,253 @@ interface LobbyDetailsDialogProps {
   isOpen: boolean;
   onClose: () => void;
   lobby: LobbyData | null;
+  currentPlayerWallet: string;
+  selectedCharacter: Character | null;
   onJoin: (lobbyId: number) => void;
+  onCancel: (lobbyId: number) => void;
 }
 
-export function LobbyDetailsDialog({ isOpen, onClose, lobby, onJoin }: LobbyDetailsDialogProps) {
+export function LobbyDetailsDialog({ 
+  isOpen, 
+  onClose, 
+  lobby, 
+  currentPlayerWallet,
+  selectedCharacter,
+  onJoin, 
+  onCancel 
+}: LobbyDetailsDialogProps) {
+  const { characters, maps } = useAssets();
+  const [gameReady, setGameReady] = useState(false);
+  const [containerReady, setContainerReady] = useState(false);
+  const sceneInitialized = useRef(false);
+  const modalGameContainerRef = useRef<HTMLDivElement>(null);
+  const gameInstanceRef = useRef<Phaser.Game | null>(null);
+
+  const isCreator = lobby?.playerA === currentPlayerWallet;
+
+  // Callback ref to detect when container is mounted
+  const containerRefCallback = useCallback((node: HTMLDivElement | null) => {
+    modalGameContainerRef.current = node;
+    if (node) {
+      logger.game.debug("[LobbyDetails] Container ref attached");
+      setContainerReady(true);
+    } else {
+      setContainerReady(false);
+    }
+  }, []);
+
+  // Get the OneVOne scene from the modal's game instance
+  const getOneVOneScene = useCallback(() => {
+    const game = gameInstanceRef.current;
+    if (!game || !game.scene) return null;
+    return game.scene.getScene("OneVOne") as any;
+  }, []);
+
+  // Create dedicated Phaser game instance for modal
+  useEffect(() => {
+    if (!isOpen || !containerReady || !modalGameContainerRef.current || !characters || !maps) return;
+    
+    // Don't create if already exists
+    if (gameInstanceRef.current) return;
+
+    logger.game.info("[LobbyDetails] Creating dedicated Phaser game instance", {
+      hasCharacters: characters.length,
+      hasMaps: maps.length,
+    });
+
+    // Set global data for Preloader
+    setCharactersData(characters);
+    setAllMapsData(maps);
+
+    const config: Phaser.Types.Core.GameConfig = {
+      type: Phaser.AUTO,
+      width: STAGE_WIDTH,
+      height: STAGE_HEIGHT,
+      transparent: true,
+      parent: modalGameContainerRef.current,
+      pixelArt: true,
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: STAGE_WIDTH,
+        height: STAGE_HEIGHT,
+      },
+      render: {
+        antialiasGL: false,
+        pixelArt: true,
+      },
+      audio: {
+        disableWebAudio: false,
+        noAudio: false,
+      },
+      scene: [OneVOneBoot, OneVOnePreloader, OneVOneScene],
+    };
+
+    gameInstanceRef.current = new Phaser.Game(config);
+
+    // Listen for scene ready (OneVOnePreloader starts OneVOne directly)
+    const handleSceneReady = (scene: Phaser.Scene) => {
+      logger.game.info("[LobbyDetails] Scene ready:", scene.scene.key);
+      if (scene.scene.key === "OneVOne") {
+        logger.game.info("[LobbyDetails] OneVOne scene ready - setting gameReady=true");
+        setGameReady(true);
+      }
+    };
+    EventBus.on("current-scene-ready", handleSceneReady);
+
+    return () => {
+      EventBus.off("current-scene-ready", handleSceneReady);
+    };
+  }, [isOpen, containerReady, characters, maps]);
+
+  // Cleanup game instance when modal closes
+  useEffect(() => {
+    if (!isOpen && gameInstanceRef.current) {
+      logger.game.info("[LobbyDetails] Destroying Phaser game instance");
+      gameInstanceRef.current.destroy(true);
+      gameInstanceRef.current = null;
+      setGameReady(false);
+      setContainerReady(false);
+      sceneInitialized.current = false;
+    }
+  }, [isOpen]);
+
+  // Spawn Player A's character when game is ready and lobby data is available
+  useEffect(() => {
+    if (!isOpen || !lobby || !gameReady) return;
+
+    const oneVOneScene = getOneVOneScene();
+    if (!oneVOneScene || sceneInitialized.current) return;
+
+    sceneInitialized.current = true;
+    logger.game.info("[LobbyDetails] Spawning Player A character", {
+      characterId: lobby.characterA,
+      isCreator,
+    });
+
+    // Spawn Player A's character
+    if (typeof oneVOneScene.spawnSingleCharacter === "function") {
+      oneVOneScene.spawnSingleCharacter({
+        playerId: lobby.playerA,
+        characterId: lobby.characterA,
+        position: "left",
+        displayName: isCreator ? "You" : "Challenger",
+      });
+    }
+  }, [isOpen, lobby, gameReady, isCreator, getOneVOneScene]);
+
+  // Get character name from characterA id
+  const characterName = characters?.find((c: Character) => c.id === lobby?.characterA)?.name || `Character #${lobby?.characterA}`;
+
   if (!lobby) return null;
 
+  const formatAmount = (lamports: number) => {
+    return (lamports / 1e9).toFixed(4);
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-900 border border-indigo-500/30 text-white sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-indigo-400">
-            Lobby #{lobby.lobbyId}
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="bg-black border-2 border-indigo-500/30 text-white sm:max-w-4xl p-0 overflow-hidden">
+        {/* Header */}
+        <DialogHeader className="p-4 pr-12 bg-gradient-to-r from-indigo-900/90 to-purple-900/90 border-b border-indigo-500/30/50">
+          <DialogTitle className="text-xl font-bold text-indigo-200 flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              Lobby #{lobby.lobbyId}
+            </span>
+            <span className="text-yellow-400 font-mono text-lg">
+              {formatAmount(lobby.amount)} SOL
+            </span>
           </DialogTitle>
         </DialogHeader>
-        
-        <div className="space-y-4">
-          {/* Player Info */}
-          <div className="bg-black/50 p-4 rounded-lg border border-indigo-500/30/30">
-            <p className="text-sm text-gray-400 mb-1">Challenger</p>
-            <p className="font-mono text-indigo-300 break-all">{lobby.playerA}</p>
-          </div>
 
-          {/* Game Settings */}
-          <div className="grid grid-cols-2 gap-4">
+        {/* Phaser Game Container - Shows Player A's character */}
+        <div 
+          ref={containerRefCallback}
+          className="relative w-full aspect-video bg-gray-900 flex items-center justify-center overflow-hidden [&>canvas]:max-w-full [&>canvas]:max-h-full [&>canvas]:object-contain"
+        >
+          {/* Loading indicator while Phaser initializes */}
+          {!gameReady && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center z-5">
+              <div className="animate-spin w-10 h-10 border-4 border-indigo-500/30 border-t-transparent rounded-full mb-4"></div>
+              <p className="text-gray-400 text-sm">Loading arena...</p>
+            </div>
+          )}
+          
+          {/* Status Banner */}
+          {gameReady && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+              <div className="text-center bg-black/70 px-6 py-3 rounded-lg border border-indigo-500/30/50">
+                <div className="flex items-center gap-3">
+                  <div className="animate-spin w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full"></div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">
+                      {isCreator ? "Waiting for Opponent" : "Ready to Battle!"}
+                    </h2>
+                    <p className="text-gray-300 text-sm">
+                      {isCreator ? "Your character is waiting in the arena" : "Join this lobby to fight!"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Lobby Info Footer */}
+        <div className="p-4 bg-gray-900/95 border-t border-indigo-500/30/30">
+          <div className="grid grid-cols-3 gap-4 mb-4">
             <div className="bg-black/50 p-3 rounded-lg border border-indigo-500/30/30">
+              <p className="text-xs text-gray-400 mb-1">Challenger</p>
+              <p className="text-sm font-mono text-indigo-300 truncate">{lobby.playerA}</p>
+            </div>
+            <div className="bg-black/50 p-3 rounded-lg border border-indigo-500/30/30 text-center">
+              <p className="text-xs text-gray-400 mb-1">Character</p>
+              <p className="text-sm font-semibold text-indigo-200">{characterName}</p>
+            </div>
+            <div className="bg-black/50 p-3 rounded-lg border border-indigo-500/30/30 text-center">
               <p className="text-xs text-gray-400 mb-1">Bet Amount</p>
-              <p className="text-lg font-bold text-yellow-400">{(lobby.amount / 1e9).toFixed(2)} SOL</p>
-            </div>
-            <div className="bg-black/50 p-3 rounded-lg border border-indigo-500/30/30">
-              <p className="text-xs text-gray-400 mb-1">Map ID</p>
-              <p className="text-lg font-bold text-indigo-300">#{lobby.mapId}</p>
+              <p className="text-lg font-bold text-yellow-400">{formatAmount(lobby.amount)} SOL</p>
             </div>
           </div>
 
-          {/* Character Preview (Placeholder) */}
-          <div className="bg-black/50 p-4 rounded-lg border border-indigo-500/30/30 text-center">
-            <p className="text-sm text-gray-400 mb-2">Character #{lobby.characterA}</p>
-            <div className="h-32 flex items-center justify-center bg-gray-800 rounded">
-               <span className="text-gray-500">Character Preview</span>
+          {/* Action Buttons */}
+          {isCreator ? (
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500 text-center mb-2">
+                You can close this dialog and browse other lobbies while waiting.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={onClose}
+                  className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 font-semibold rounded-lg transition-colors"
+                >
+                  Browse Other Lobbies
+                </button>
+                <button
+                  onClick={() => onCancel(lobby.lobbyId)}
+                  className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg transition-colors"
+                >
+                  Cancel Lobby
+                </button>
+              </div>
             </div>
-          </div>
-
-          {/* Action Button */}
-          <button
-            onClick={() => onJoin(lobby.lobbyId)}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg shadow-indigo-900/20"
-          >
-            Join Battle ({(lobby.amount / 1e9).toFixed(2)} SOL)
-          </button>
+          ) : (
+            <div className="space-y-2">
+              {!selectedCharacter && (
+                <p className="text-xs text-yellow-400 text-center mb-2">
+                  ⚠️ Select a character before joining
+                </p>
+              )}
+              <button
+                onClick={() => onJoin(lobby.lobbyId)}
+                disabled={!selectedCharacter}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg shadow-indigo-900/20"
+              >
+                Join Battle ({formatAmount(lobby.amount)} SOL)
+              </button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
