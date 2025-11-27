@@ -9,7 +9,6 @@
  */
 
 import {
-  mutation,
   query,
   action,
   internalMutation,
@@ -121,97 +120,6 @@ export const getStuckLobbies = internalQuery({
     });
 
     return stuckLobbies;
-  },
-});
-
-// ============================================================================
-// PUBLIC MUTATIONS (Called by Actions)
-// ============================================================================
-
-/**
- * Public mutation wrapper for creating lobbies
- * Used by the createLobby action
- */
-export const createLobbyInDb = mutation({
-  args: {
-    lobbyId: v.number(),
-    lobbyPda: v.string(),
-    playerA: v.string(),
-    amount: v.number(),
-    characterA: v.number(),
-    mapId: v.number(),
-  },
-  handler: async (ctx, args) => {
-    const docId = await ctx.db.insert("oneVOneLobbies", {
-      lobbyId: args.lobbyId,
-      lobbyPda: args.lobbyPda,
-      playerA: args.playerA,
-      playerB: undefined,
-      amount: args.amount,
-      status: 0, // Created, waiting for Player B
-      winner: undefined,
-      characterA: args.characterA,
-      characterB: undefined,
-      mapId: args.mapId,
-      createdAt: Date.now(),
-      resolvedAt: undefined,
-    });
-    return docId;
-  },
-});
-
-/**
- * Public mutation wrapper for joining lobbies
- * Used by the joinLobby action
- */
-export const joinLobbyInDb = mutation({
-  args: {
-    lobbyId: v.number(),
-    playerB: v.string(),
-    characterB: v.number(),
-    winner: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const lobby = await ctx.db
-      .query("oneVOneLobbies")
-      .filter((q) => q.eq(q.field("lobbyId"), args.lobbyId))
-      .first();
-
-    if (!lobby) {
-      throw new Error(`Lobby ${args.lobbyId} not found`);
-    }
-
-    await ctx.db.patch(lobby._id, {
-      playerB: args.playerB,
-      characterB: args.characterB,
-      winner: args.winner,
-      status: 1, // Resolved
-      resolvedAt: Date.now(),
-    });
-
-    return lobby._id;
-  },
-});
-
-/**
- * Public mutation wrapper for canceling lobbies
- * Used by the cancelLobby action
- */
-export const cancelLobbyInDb = mutation({
-  args: {
-    lobbyId: v.number(),
-  },
-  handler: async (ctx, args) => {
-    const lobby = await ctx.db
-      .query("oneVOneLobbies")
-      .filter((q) => q.eq(q.field("lobbyId"), args.lobbyId))
-      .first();
-
-    if (lobby) {
-      await ctx.db.delete(lobby._id);
-    }
-
-    return true;
   },
 });
 

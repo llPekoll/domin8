@@ -1,5 +1,5 @@
 import { Scene } from "phaser";
-import { currentMapData, charactersData, allMapsData, demoMapData, activeGameData, blockchainDataReady } from "../main";
+import { currentMapData, charactersData, allMapsData, demoMapData, activeGameData, blockchainDataReady, GAME_STATUS } from "../main";
 import { logger } from "../../lib/logger";
 import { loadBackgroundConfig } from "../config/backgrounds";
 import { EventBus } from "../EventBus";
@@ -398,6 +398,11 @@ export class Preloader extends Scene {
 
   /**
    * Wait for blockchain data (with timeout), then start appropriate scene
+   *
+   * Scene Decision Logic:
+   * - No game data / CLOSED (2): MapCarousel (spinning background selection)
+   * - WAITING (0): Game scene with "Insert Coin" mode (waiting for first bet)
+   * - OPEN (1): Game scene with active betting and countdown
    */
   private waitForBlockchainThenStartScene() {
     const maxWaitTime = 2000; // Wait max 2 seconds for blockchain
@@ -407,30 +412,60 @@ export class Preloader extends Scene {
     const checkAndStart = () => {
       if (blockchainDataReady || elapsedTime >= maxWaitTime) {
         // Blockchain loaded or timeout reached, make decision
-        const hasActiveGame =
-          activeGameData &&
-          activeGameData.bets &&
-          activeGameData.bets.length > 0 &&
-          activeGameData.status !== undefined;
+        // Handle status as BN or number (blockchain returns BN)
+        const rawStatus = activeGameData?.status;
+        const gameStatus = typeof rawStatus === 'object' && rawStatus?.toNumber
+          ? rawStatus.toNumber()
+          : rawStatus;
 
         logger.game.debug("[Preloader] Starting scene decision:", {
           blockchainReady: blockchainDataReady,
           timedOut: elapsedTime >= maxWaitTime,
-          hasActiveGame,
+          rawStatus,
+          gameStatus,
+          activeGameData: activeGameData ? {
+            status: gameStatus,
+            gameRound: activeGameData.gameRound?.toString?.() || activeGameData.gameRound,
+            betsCount: activeGameData.bets?.length,
+          } : null,
           elapsedMs: elapsedTime,
         });
 
-        if (hasActiveGame) {
-          if (this.scene.isActive("Demo")) {
-            this.scene.stop("Demo");
+        // Stop any currently running scenes
+        ["Demo", "Game", "MapCarousel"].forEach((sceneName) => {
+          if (this.scene.isActive(sceneName)) {
+            this.scene.stop(sceneName);
           }
-          this.scene.start("Game");
+        });
+
+        // Decide which scene to start based on game status
+        // gameStatus can be 0 (WAITING), 1 (OPEN), or 2 (CLOSED)
+        if (activeGameData && (gameStatus === 0 || gameStatus === 1 || gameStatus === 2)) {
+          if (gameStatus === GAME_STATUS.WAITING) {
+            // Game created by backend, waiting for first bet
+            // Show Game scene with "Insert Coin" mode
+            logger.game.info("[Preloader] Starting Game scene (WAITING - Insert Coin mode)");
+            this.scene.start("Game", { mode: "insert-coin" });
+          } else if (gameStatus === GAME_STATUS.OPEN) {
+            // Game has bets, countdown is running
+            // Show Game scene with active betting
+            logger.game.info("[Preloader] Starting Game scene (OPEN - Active betting)");
+            this.scene.start("Game", { mode: "betting" });
+          } else if (gameStatus === GAME_STATUS.CLOSED) {
+            // Game ended, show MapCarousel for next game selection
+            logger.game.info("[Preloader] Starting MapCarousel (CLOSED - Game ended)");
+            this.scene.start("MapCarousel");
+          } else {
+            // Unknown status, default to MapCarousel
+            logger.game.warn("[Preloader] Unknown game status:", gameStatus);
+            this.scene.start("MapCarousel");
+          }
         } else {
-          if (this.scene.isActive("Game")) {
-            this.scene.stop("Game");
-          }
-          this.scene.start("Demo");
+          // No active game data, show MapCarousel
+          logger.game.info("[Preloader] Starting MapCarousel (No active game)");
+          this.scene.start("MapCarousel");
         }
+
         EventBus.emit("preloader-complete");
       } else {
         // Still waiting for blockchain, check again

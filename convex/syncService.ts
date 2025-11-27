@@ -13,6 +13,7 @@ import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { SolanaClient } from "./lib/solana";
+import { GAME_STATUS, GAME_TIMING } from "./constants";
 
 const RPC_ENDPOINT = process.env.SOLANA_RPC_ENDPOINT || "http://127.0.0.1:8899";
 const CRANK_AUTHORITY_PRIVATE_KEY = process.env.CRANK_AUTHORITY_PRIVATE_KEY || "";
@@ -106,10 +107,9 @@ async function scheduleEndGameAction(ctx: any, roundId: number, endTimestamp: nu
       return;
     }
 
-    // Calculate delay: schedule for endTimestamp + 1 second
+    // Calculate delay: schedule for endTimestamp + buffer
     const now = Math.floor(Date.now() / 1000);
-    const BLOCKCHAIN_CLOCK_BUFFER = 1; // seconds
-    const targetTime = endTimestamp + BLOCKCHAIN_CLOCK_BUFFER;
+    const targetTime = endTimestamp;
     const delayMs = Math.max(0, (targetTime - now) * 1000);
 
     console.log(
@@ -391,6 +391,260 @@ export const bulkSendPrizes = internalAction({
     } catch (error) {
       console.error("[Bulk Prize Distribution] Fatal error:", error);
       throw error;
+    }
+  },
+});
+
+// GAME_STATUS imported from ./constants
+
+/**
+ * MAIN GAME LOOP CRON - Primary scheduler for game progression
+ *
+ * Runs every 60 seconds (matching betting round duration).
+ * Uses blockchain state as source of truth via SolanaClient.getActiveGame().
+ *
+ * Logic:
+ * 1. Fetch active game PDA from blockchain
+ * 2. If status is OPEN (0) and endTimestamp set → schedule precise jobs if not already scheduled
+ * 3. If status is OPEN (0) and end_date passed → execute end_game immediately (recovery)
+ * 4. If status is CLOSED (1) and winnerPrize > 0 → schedule send_prize
+ * 5. If status is CLOSED (1) and winnerPrize = 0 → schedule create_game
+ * 6. If no active game and system unlocked → create new game
+ *
+ * All operations check for existing scheduled jobs to avoid duplicates.
+ */
+export const checkAndEndOpenGames = internalAction({
+  handler: async (ctx) => {
+    console.log("\n[Game Loop] Running game state check...");
+
+    try {
+      const solanaClient = new SolanaClient(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
+      const now = Math.floor(Date.now() / 1000);
+
+      // 1. Fetch active game from blockchain (source of truth)
+      const activeGame = await solanaClient.getActiveGame();
+      const config = await solanaClient.getGameConfig();
+
+      if (!config) {
+        console.log("[Game Loop] Config not found");
+        return { checked: true, action: "none", reason: "no_config" };
+      }
+
+      console.log(`[Game Loop] Config: lock=${config.lock}, gameRound=${config.gameRound}`);
+
+      // 2. No active game - check if we should create one
+      if (!activeGame) {
+        console.log("[Game Loop] No active game found on blockchain");
+
+        if (!config.lock) {
+          // Check if create_game already scheduled
+          const alreadyScheduled = await ctx.runQuery(
+            internal.gameSchedulerMutations.isActionScheduled,
+            { roundId: config.gameRound, action: "create_game" }
+          );
+
+          if (alreadyScheduled) {
+            console.log(`[Game Loop] create_game already scheduled for round ${config.gameRound}`);
+            return { checked: true, action: "none", reason: "already_scheduled" };
+          }
+
+          console.log(`[Game Loop] System unlocked, creating game round ${config.gameRound}...`);
+
+          const jobId = await ctx.scheduler.runAfter(
+            0,
+            internal.gameScheduler.executeCreateGameRound,
+            {}
+          );
+
+          await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
+            jobId: jobId.toString(),
+            roundId: config.gameRound,
+            action: "create_game",
+            scheduledTime: now,
+          });
+
+          return { checked: true, action: "create_game", roundId: config.gameRound };
+        }
+
+        return { checked: true, action: "none", reason: "system_locked" };
+      }
+
+      console.log(`[Game Loop] Active game:`, {
+        roundId: activeGame.gameRound,
+        status: activeGame.status,
+        betCount: activeGame.bets?.length || 0,
+        endDate: activeGame.endDate ? new Date(activeGame.endDate * 1000).toISOString() : "not set",
+        winner: activeGame.winner,
+        winnerPrize: activeGame.winnerPrize,
+      });
+
+      // 3. Game is WAITING (status=2) - no bets yet, skip
+      if (activeGame.status === GAME_STATUS.WAITING) {
+        console.log(`[Game Loop] Game ${activeGame.gameRound} is WAITING for first bet`);
+        return { checked: true, action: "none", reason: "waiting_for_bets" };
+      }
+
+      // 4. Game is OPEN (status=0) - schedule jobs or execute if expired
+      if (activeGame.status === GAME_STATUS.OPEN) {
+        const remaining = Math.max(0, activeGame.endDate - now);
+
+        // If game is past end time, ALWAYS schedule end_game (regardless of job status)
+        // This handles VRF retry cases where end_game "completed" but game is still OPEN
+        if (remaining === 0) {
+          console.log(`[Game Loop] ⚠️ Game ${activeGame.gameRound} is OPEN but past end time - forcing end_game`);
+
+          const jobId = await ctx.scheduler.runAfter(
+            0,
+            internal.gameScheduler.executeEndGame,
+            { roundId: activeGame.gameRound }
+          );
+
+          await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
+            jobId: jobId.toString(),
+            roundId: activeGame.gameRound,
+            action: "end_game",
+            scheduledTime: now,
+          });
+
+          return { checked: true, action: "forced_end_game", roundId: activeGame.gameRound };
+        }
+
+        // Check if end_game already scheduled (only if game hasn't ended yet)
+        const endGameScheduled = await ctx.runQuery(
+          internal.gameSchedulerMutations.isActionScheduled,
+          { roundId: activeGame.gameRound, action: "end_game" }
+        );
+
+        if (endGameScheduled) {
+          console.log(`[Game Loop] Jobs already scheduled for round ${activeGame.gameRound}, ${remaining}s remaining`);
+          return { checked: true, action: "none", reason: "already_scheduled", remainingSeconds: remaining };
+        }
+
+        // Jobs not scheduled yet - schedule the entire chain
+        const endTime = activeGame.endDate;
+        const endGameDelayMs = Math.max(0, (endTime - now) * 1000);
+        const sendPrizeDelayMs = endGameDelayMs + GAME_TIMING.SEND_PRIZE_DELAY;
+        const createGameDelayMs = sendPrizeDelayMs + GAME_TIMING.CREATE_GAME_DELAY;
+
+        console.log(`[Game Loop] Scheduling job chain for round ${activeGame.gameRound}:`);
+        console.log(`  - end_game in ${Math.round(endGameDelayMs / 1000)}s`);
+        console.log(`  - send_prize in ${Math.round(sendPrizeDelayMs / 1000)}s`);
+        console.log(`  - create_game in ${Math.round(createGameDelayMs / 1000)}s`);
+
+        // Schedule end_game
+        const endGameJobId = await ctx.scheduler.runAfter(
+          endGameDelayMs,
+          internal.gameScheduler.executeEndGame,
+          { roundId: activeGame.gameRound }
+        );
+
+        await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
+          jobId: endGameJobId.toString(),
+          roundId: activeGame.gameRound,
+          action: "end_game",
+          scheduledTime: endTime,
+        });
+
+        // Schedule send_prize
+        const sendPrizeJobId = await ctx.scheduler.runAfter(
+          sendPrizeDelayMs,
+          internal.gameScheduler.executeSendPrize,
+          { roundId: activeGame.gameRound }
+        );
+
+        await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
+          jobId: sendPrizeJobId.toString(),
+          roundId: activeGame.gameRound,
+          action: "send_prize",
+          scheduledTime: endTime + GAME_TIMING.SEND_PRIZE_DELAY / 1000,
+        });
+
+        // Schedule create_game (next round)
+        const createGameJobId = await ctx.scheduler.runAfter(
+          createGameDelayMs,
+          internal.gameScheduler.executeCreateGameRound,
+          {}
+        );
+
+        await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
+          jobId: createGameJobId.toString(),
+          roundId: activeGame.gameRound + 1,
+          action: "create_game",
+          scheduledTime: endTime + (GAME_TIMING.SEND_PRIZE_DELAY + GAME_TIMING.CREATE_GAME_DELAY) / 1000,
+        });
+
+        console.log(`[Game Loop] ✅ All jobs scheduled for round ${activeGame.gameRound}`);
+        return { checked: true, action: "scheduled_job_chain", roundId: activeGame.gameRound };
+      }
+
+      // 5. Game is CLOSED (status=1) - check if prize needs sending or next game needs creating
+      if (activeGame.status === GAME_STATUS.CLOSED) {
+        // Check if prize still needs to be sent
+        if (activeGame.winnerPrize > 0 && activeGame.winner) {
+          const sendPrizeScheduled = await ctx.runQuery(
+            internal.gameSchedulerMutations.isActionScheduled,
+            { roundId: activeGame.gameRound, action: "send_prize" }
+          );
+
+          if (!sendPrizeScheduled) {
+            console.log(`[Game Loop] ⚠️ RECOVERY: Prize not sent for round ${activeGame.gameRound}, scheduling...`);
+
+            const jobId = await ctx.scheduler.runAfter(
+              0,
+              internal.gameScheduler.executeSendPrize,
+              { roundId: activeGame.gameRound }
+            );
+
+            await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
+              jobId: jobId.toString(),
+              roundId: activeGame.gameRound,
+              action: "send_prize",
+              scheduledTime: now,
+            });
+
+            return { checked: true, action: "send_prize_recovery", roundId: activeGame.gameRound };
+          }
+
+          return { checked: true, action: "none", reason: "send_prize_already_scheduled" };
+        }
+
+        // Prize already sent, check if next game needs creating
+        const createGameScheduled = await ctx.runQuery(
+          internal.gameSchedulerMutations.isActionScheduled,
+          { roundId: activeGame.gameRound + 1, action: "create_game" }
+        );
+
+        if (!createGameScheduled) {
+          console.log(`[Game Loop] ⚠️ RECOVERY: Next game not scheduled, creating round ${activeGame.gameRound + 1}...`);
+
+          const jobId = await ctx.scheduler.runAfter(
+            0,
+            internal.gameScheduler.executeCreateGameRound,
+            {}
+          );
+
+          await ctx.runMutation(internal.gameSchedulerMutations.upsertScheduledJob, {
+            jobId: jobId.toString(),
+            roundId: activeGame.gameRound + 1,
+            action: "create_game",
+            scheduledTime: now,
+          });
+
+          return { checked: true, action: "create_next_game_recovery", nextRoundId: activeGame.gameRound + 1 };
+        }
+
+        console.log(`[Game Loop] Game ${activeGame.gameRound} is CLOSED, next game already scheduled`);
+        return { checked: true, action: "none", reason: "next_game_already_scheduled" };
+      }
+
+      return { checked: true, action: "none", reason: "unknown_status" };
+    } catch (error) {
+      console.error("[Game Loop] Error:", error);
+      return {
+        checked: false,
+        action: "error",
+        error: error instanceof Error ? error.message : String(error)
+      };
     }
   },
 });

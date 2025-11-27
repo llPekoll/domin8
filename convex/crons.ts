@@ -1,8 +1,28 @@
 /**
- * Convex Cron Jobs for Domin8 Game Management (Risk-based Architecture)
+ * Convex Cron Jobs for Domin8 Game Management
  *
- * Scheduled functions for periodic maintenance tasks.
- * Uses simple polling pattern from risk.fun worker (proven, reliable).
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *                         SCHEDULING ARCHITECTURE
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * PRIMARY: 60-second Cron (syncService.checkAndEndOpenGames)
+ * - Polls blockchain via SolanaClient.getActiveGame()
+ * - When OPEN game detected → schedules precise job chain:
+ *   - end_game at endTimestamp + 1s
+ *   - send_prize at endTimestamp + 5s
+ *   - create_game at endTimestamp + 19s
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *                              GAME LOOP FLOW
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ *  1. MAP CAROUSEL → 2. INSERT COIN (WAITING) → 3. BETTING (OPEN)
+ *       ↑                                              ↓
+ *       └──── 7. CLEANUP ← 6. CELEBRATION ← 5. FIGHTING ← 4. END GAME (CLOSED)
+ *
+ * Timing: 60s betting + 1s end_game + 4s send_prize + 14s create_game = ~79s cycle
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
  */
 import { cronJobs } from "convex/server";
 import { internal } from "./_generated/api";
@@ -10,65 +30,25 @@ import { internal } from "./_generated/api";
 const crons = cronJobs();
 
 /**
- * PRIMARY SYNC SERVICE - Syncs blockchain state to Convex database
- * Runs every 10 seconds (matches risk.fun worker pattern)
+ * MAIN GAME LOOP CRON - Primary scheduler for game progression
  *
- * Functionality:
- * 1. Fetches active game from blockchain (getActiveGame)
- * 2. Syncs to Convex database
- * 3. Schedules endGame action when game expires
- */
-crons.interval("sync-blockchain-state", { seconds: 45 }, internal.syncService.syncBlockchainState);
-
-/**
- * 1v1 Lobby Recovery - Reconciles stuck lobbies
- * Runs every 30 seconds as a backup safety net
- * Checks for lobbies that are stuck in status 0 or have discrepancies between
- * on-chain and Convex state, and attempts to sync them
- * NOTE: Uncomment after Convex regenerates the API with lobbies module
+ * Runs every 60 seconds to:
+ * 1. Check if active game has bets and needs job scheduling
+ * 2. Schedule precise jobs via runAfter() for end_game, send_prize, create_game
+ * 3. Handle recovery for any missed/failed jobs
+ *
+ * When a game is OPEN with endTimestamp set, schedules jobs at exact times.
+ * This is simpler and more reliable than webhook-driven scheduling.
  */
 crons.interval(
-  "sync-1v1-stuck-lobbies",
-  { seconds: 30 },
-  internal.lobbies.syncLobbyFromBlockchain
+  "game-loop-scheduler",
+  { seconds: 50 },
+  internal.syncService.checkAndEndOpenGames
 );
 
 /**
- * Game recovery - self-healing system that catches unsent prizes
- * Runs every 30 seconds to check for finished games with unclaimed prizes
- * TODO: Implement recoverUnsentPrizes function in syncService.ts
- */
-// crons.interval(
-//   "recover-unsent-prizes",
-//   { seconds: 30 },
-//   internal.syncService.recoverUnsentPrizes
-// );
-
-/**
- * Transaction cleanup - removes 7-day old transactions
- */
-// TODO LATER: priority low
-
-/**
- * Game cleanup - removes old game accounts (2+ days old)
- * Runs every 2 days to delete old PDAs and recover rent
- *
- * Benefits:
- * - Recovers rent from closed game accounts (~0.01-0.05 SOL per game)
- * - Keeps blockchain storage clean
- * - Net profit: Rent recovered > transaction fees
- */
-crons.interval(
-  "cleanup-old-games",
-  { hours: 48 }, // Every 2 days
-  internal.cleanupService.cleanupOldGames
-);
-
-/**
- * Scheduled jobs cleanup - removes old completed/failed jobs (safety net)
+ * Scheduled jobs cleanup - removes old completed/failed jobs
  * Runs every 6 hours to clean up jobs older than 7 days
- * Note: Jobs should be marked completed/failed immediately by the scheduler,
- * but this cron provides a safety net for any edge cases
  */
 crons.interval(
   "cleanup-old-scheduled-jobs",
@@ -79,12 +59,12 @@ crons.interval(
 /**
  * NFT Collection Holder Scanning - Pre-cache ALL holders of each collection
  * Runs every 12 hours to scan complete holder lists for instant verification
- * 
+ *
  * Benefits:
  * - Instant NFT verification (no API calls during character selection)
  * - Massive API savings (one comprehensive scan vs thousands of individual checks)
  * - Better UX (no loading spinners for NFT-gated characters)
- * 
+ *
  * Backup: Manual refresh button for users (rate-limited every 5 minutes)
  */
 crons.interval(

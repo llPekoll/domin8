@@ -36,7 +36,9 @@ export function BlockchainDebugDialog() {
     : "0";
 
   // Show tooltip when there's a winner and game is in results/closed state
+  // Smart contract constants.rs: OPEN=0, CLOSED=1, WAITING=2
   const shouldShowTooltip = useMemo(() => {
+    // GAME_STATUS_CLOSED = 1 - Show tooltip only when game has ended
     if (!hasWinner || activeGame?.status !== 1 || !activeGame?.endTimestamp) {
       return false;
     }

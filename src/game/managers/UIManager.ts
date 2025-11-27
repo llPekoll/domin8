@@ -32,6 +32,10 @@ export class UIManager {
   private winnerContainer!: Phaser.GameObjects.Container;
   private multiplierText!: Phaser.GameObjects.Text;
 
+  // Insert Coin UI (waiting for first bet)
+  private insertCoinText!: Phaser.GameObjects.Text;
+  private insertCoinTween!: Phaser.Tweens.Tween;
+
   constructor(scene: Scene, centerX: number) {
     this.scene = scene;
     this.centerX = centerX;
@@ -59,10 +63,18 @@ export class UIManager {
         this.hideAllUI();
         break;
 
+      case GamePhase.INSERT_COIN:
+        // Game created, waiting for first bet - show INSERT COIN
+        console.log("[UIManager] 🪙 Showing INSERT COIN");
+        this.hideAllUI();
+        this.showInsertCoin();
+        break;
+
       case GamePhase.WAITING:
         // Waiting for bets - show countdown
         this.vrfOverlay.setVisible(false);
         this.vrfContainer.setVisible(false);
+        this.hideInsertCoin();
         // Countdown visibility handled by updateTimer
         break;
 
@@ -73,6 +85,7 @@ export class UIManager {
         this.vrfContainer.setVisible(true);
         this.timerContainer.setVisible(false);
         this.timerBackground.setVisible(false);
+        this.hideInsertCoin();
         break;
 
       case GamePhase.FIGHTING:
@@ -80,11 +93,13 @@ export class UIManager {
         console.log("[UIManager] ⚔️ Hiding VRF overlay for battle");
         this.vrfOverlay.setVisible(false);
         this.vrfContainer.setVisible(false);
+        this.hideInsertCoin();
         break;
 
       case GamePhase.CELEBRATING:
         // Winner celebration - show winner UI
         console.log("[UIManager] 🎉 Showing winner UI for celebration");
+        this.hideInsertCoin();
         this.showWinnerUI();
         break;
 
@@ -103,7 +118,8 @@ export class UIManager {
       this.timerBackground &&
       this.demoCountdownText &&
       this.winnerContainer &&
-      this.multiplierText
+      this.multiplierText &&
+      this.insertCoinText
     );
   }
 
@@ -117,6 +133,7 @@ export class UIManager {
     this.vrfOverlay.setVisible(false);
     this.vrfContainer.setVisible(false);
     this.winnerContainer.setVisible(false);
+    this.hideInsertCoin();
 
     // Clear cached data for next game
     this.cachedBetAmounts = [];
@@ -143,15 +160,25 @@ export class UIManager {
     // Calculate multiplier from winner's bet (use cached amounts since live data gets cleared)
     let multiplier = 0;
     const winningBetIndex = this.gameState?.winningBetIndex;
-    console.log(`[UIManager] Multiplier calc: winningBetIndex=${winningBetIndex}, cached bets=${this.cachedBetAmounts.length}, prize=${winnerPrizeNum}`);
+    console.log(
+      `[UIManager] Multiplier calc: winningBetIndex=${winningBetIndex}, cached bets=${this.cachedBetAmounts.length}, prize=${winnerPrizeNum}`
+    );
 
-    if (winningBetIndex !== null && winningBetIndex !== undefined && this.cachedBetAmounts.length > 0) {
+    if (
+      winningBetIndex !== null &&
+      winningBetIndex !== undefined &&
+      this.cachedBetAmounts.length > 0
+    ) {
       // winningBetIndex might be a BN object
-      const betIdx = typeof winningBetIndex === 'object' && winningBetIndex.toNumber
-        ? winningBetIndex.toNumber()
-        : Number(winningBetIndex);
+      const betIdx =
+        typeof winningBetIndex === "object" && winningBetIndex.toNumber
+          ? winningBetIndex.toNumber()
+          : Number(winningBetIndex);
 
-      console.log(`[UIManager] Bet index: ${betIdx}, cachedBetAmount:`, this.cachedBetAmounts[betIdx]);
+      console.log(
+        `[UIManager] Bet index: ${betIdx}, cachedBetAmount:`,
+        this.cachedBetAmounts[betIdx]
+      );
 
       if (this.cachedBetAmounts[betIdx]) {
         const winnerBetAmount = this.cachedBetAmounts[betIdx] / 1e9;
@@ -186,10 +213,12 @@ export class UIManager {
     } else if (winnerWallet) {
       // Show winner name for non-winners
       const mappedName = this.playerNamesMap.get(winnerWallet);
-      console.log(`[UIManager] Looking up winner: ${winnerWallet}, found: ${mappedName}, map size: ${this.playerNamesMap.size}`);
+      console.log(
+        `[UIManager] Looking up winner: ${winnerWallet}, found: ${mappedName}, map size: ${this.playerNamesMap.size}`
+      );
 
-      const winnerDisplayName = mappedName ||
-        `${winnerWallet.slice(0, 4)}...${winnerWallet.slice(-4)}`;
+      const winnerDisplayName =
+        mappedName || `${winnerWallet.slice(0, 4)}...${winnerWallet.slice(-4)}`;
 
       this.winnerContainer.setVisible(true);
       this.winnerContainer.setAlpha(1);
@@ -213,9 +242,8 @@ export class UIManager {
     }
 
     // Format multiplier (e.g., x2.5 or x10)
-    const multiplierStr = multiplier >= 10
-      ? `x${Math.round(multiplier)}`
-      : `x${multiplier.toFixed(1)}`;
+    const multiplierStr =
+      multiplier >= 10 ? `x${Math.round(multiplier)}` : `x${multiplier.toFixed(1)}`;
 
     this.multiplierText.setText(multiplierStr);
     this.multiplierText.setVisible(true);
@@ -259,6 +287,50 @@ export class UIManager {
     });
   }
 
+  /**
+   * Show INSERT COIN text with blinking animation
+   */
+  private showInsertCoin() {
+    if (!this.insertCoinText) {
+      console.log("[UIManager] ⚠️ showInsertCoin called but insertCoinText not created yet");
+      return;
+    }
+
+    console.log("[UIManager] 🪙 showInsertCoin() - Making INSERT COIN visible");
+    this.insertCoinText.setVisible(true);
+    this.insertCoinText.setAlpha(1);
+
+    // Stop existing tween if any
+    if (this.insertCoinTween) {
+      this.insertCoinTween.destroy();
+    }
+
+    // Create blinking animation (classic arcade style)
+    this.insertCoinTween = this.scene.tweens.add({
+      targets: this.insertCoinText,
+      alpha: { from: 1, to: 0.2 },
+      duration: 500,
+      ease: "Sine.easeInOut",
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
+  /**
+   * Hide INSERT COIN text and stop animation
+   */
+  private hideInsertCoin() {
+    if (!this.insertCoinText) return;
+
+    this.insertCoinText.setVisible(false);
+
+    // Stop blinking animation
+    if (this.insertCoinTween) {
+      this.insertCoinTween.destroy();
+      this.insertCoinTween = undefined!;
+    }
+  }
+
   updateCenter(centerX: number) {
     this.centerX = centerX;
     // Update positions of UI elements that use centerX
@@ -282,6 +354,9 @@ export class UIManager {
     }
     if (this.winnerContainer) {
       this.winnerContainer.setX(centerX);
+    }
+    if (this.insertCoinText) {
+      this.insertCoinText.setX(centerX);
     }
   }
 
@@ -433,6 +508,22 @@ export class UIManager {
 
     // Add to container
     this.winnerContainer.add([this.phaseText, this.subText, this.multiplierText]);
+
+    // Create INSERT COIN text (blinking, Metal Slug style)
+    // Position similar to demo countdown (75% down + 35 offset)
+    const insertCoinY = this.scene.cameras.main.height / 2 + 35;
+    this.insertCoinText = this.scene.add.text(this.centerX, insertCoinY, "INSERT COIN!", {
+      fontFamily: "metal-slug",
+      fontSize: "30px", // Same size as demo countdown
+      color: "#FFD700", // Gold color
+      stroke: "#000000",
+      strokeThickness: 3,
+      resolution: 4,
+    });
+    this.insertCoinText.setOrigin(0.5);
+    this.insertCoinText.setDepth(1000);
+    this.insertCoinText.setScrollFactor(0);
+    this.insertCoinText.setVisible(false);
   }
 
   updateGameState(gameState: any) {
@@ -441,9 +532,21 @@ export class UIManager {
     // Cache bet amounts while they're available (before game ends and clears them)
     if (gameState?.betAmounts && gameState.betAmounts.length > 0) {
       this.cachedBetAmounts = gameState.betAmounts.map((amt: any) =>
-        typeof amt === 'object' && amt.toNumber ? amt.toNumber() : Number(amt)
+        typeof amt === "object" && amt.toNumber ? amt.toNumber() : Number(amt)
       );
       console.log(`[UIManager] Cached ${this.cachedBetAmounts.length} bet amounts`);
+    }
+
+    // Check if we should show INSERT COIN based on game status
+    // Smart contract constants.rs: OPEN=0, CLOSED=1, WAITING=2
+    const status = gameState?.status;
+    const isInsertCoin = status === 2 || status === "waiting" || status === "Waiting";
+
+    if (isInsertCoin && this.isUIReady()) {
+      console.log("[UIManager] 🪙 Status is WAITING (2) - showing INSERT COIN");
+      this.showInsertCoin();
+    } else if (!isInsertCoin && this.isUIReady()) {
+      this.hideInsertCoin();
     }
   }
 
@@ -454,7 +557,9 @@ export class UIManager {
         this.playerNamesMap.set(walletAddress, displayName);
       }
     });
-    console.log(`[UIManager] Player names updated: ${this.playerNamesMap.size} with names, ${playerNames.length} total`);
+    console.log(
+      `[UIManager] Player names updated: ${this.playerNamesMap.size} with names, ${playerNames.length} total`
+    );
     console.log(`[UIManager] Names map:`, Object.fromEntries(this.playerNamesMap));
   }
 
@@ -508,5 +613,10 @@ export class UIManager {
   // Cleanup event listeners
   destroy() {
     EventBus.off("game-phase-changed", this.onPhaseChanged.bind(this));
+
+    // Cleanup insert coin tween
+    if (this.insertCoinTween) {
+      this.insertCoinTween.destroy();
+    }
   }
 }

@@ -94,7 +94,6 @@ export default function App() {
     EventBus.emit("blockchain-state-update", fullData);
     console.log(`📡 [App] [${timestamp}] ✅ blockchain-state-update event emitted`);
   }, [stableGameState]);
-
   return (
     <div className="relative min-h-screen overflow-hidden">
       {/* Landscape Enforcer - Highest priority overlay */}

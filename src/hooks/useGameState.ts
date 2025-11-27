@@ -47,10 +47,11 @@ export function useGameState() {
   const error = null;
 
   // Helper to convert blockchain status to expected format
+  // Smart contract constants.rs: OPEN=0, CLOSED=1, WAITING=2
   const formatStatus = (status: number): GameState["status"] => {
-    // Status is a u8 in the smart contract: 0 = Open/Waiting, 1 = Closed/Finished
-    if (status === 0) return "Waiting";
-    if (status === 1) return "Finished";
+    if (status === 0) return "Open";      // GAME_STATUS_OPEN = 0 (betting active)
+    if (status === 1) return "Finished";  // GAME_STATUS_CLOSED = 1 (game ended)
+    if (status === 2) return "Waiting";   // GAME_STATUS_WAITING = 2 (no bets yet)
     return "Waiting"; // Default to waiting
   };
 
@@ -87,7 +88,7 @@ export function useGameState() {
       vrfFeeLamports: 0.001, // 0.001 SOL
       vrfNetworkState: "Devnet",
       vrfTreasury: "VRF Treasury",
-      gameLocked: activeGame?.status === 1 || false, // Locked when status = 1 (Closed)
+      gameLocked: activeGame?.status === 1 || false, // Locked when GAME_STATUS_CLOSED = 1
     }),
     [activeGame]
   );
