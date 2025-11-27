@@ -57,6 +57,17 @@ export function OneVOneArenaModal({
   const modalGameContainerRef = useRef<HTMLDivElement>(null);
   const gameInstanceRef = useRef<Phaser.Game | null>(null);
 
+  // Callback ref to detect when container is mounted
+  const containerRefCallback = useCallback((node: HTMLDivElement | null) => {
+    modalGameContainerRef.current = node;
+    if (node) {
+      console.log("[ArenaModal] Container ref attached:", node);
+      setContainerReady(true);
+    } else {
+      setContainerReady(false);
+    }
+  }, []);
+
   // Get the OneVOne scene from the modal's game instance
   const getOneVOneScene = useCallback(() => {
     const game = gameInstanceRef.current;
@@ -66,10 +77,10 @@ export function OneVOneArenaModal({
 
   // Create dedicated Phaser game instance for modal
   useEffect(() => {
-    if (!isOpen || !modalGameContainerRef.current || !characters || !maps) return;
-
+    if (!isOpen || !containerReady || !modalGameContainerRef.current || !characters || !maps)     return;
+    
     // Don't create if already exists
-    if (gameInstanceRef.current) return;
+    if (gameInstanceRef.current)       return;
 
     logger.game.info("[ArenaModal] Creating dedicated Phaser game instance", {
       hasCharacters: characters.length,
@@ -104,7 +115,7 @@ export function OneVOneArenaModal({
       scene: [OneVOneBoot, OneVOnePreloader, OneVOneScene],
     };
 
-        gameInstanceRef.current = new Phaser.Game(config);
+    gameInstanceRef.current = new Phaser.Game(config);
 
     // Listen for scene ready (OneVOnePreloader starts OneVOne directly)
     const handleSceneReady = (scene: Phaser.Scene) => {
@@ -366,7 +377,7 @@ export function OneVOneArenaModal({
         {/* Phaser Game Container - Canvas will be rendered here */}
         <div 
           ref={containerRefCallback}
-          className="relative w-full aspect-[2.2/1] bg-gray-900 flex items-center justify-center overflow-hidden [&>canvas]:max-w-full [&>canvas]:max-h-full [&>canvas]:object-contain"
+          className="relative w-full aspect-video bg-gray-900 flex items-center justify-center overflow-hidden [&>canvas]:max-w-full [&>canvas]:max-h-full [&>canvas]:object-contain"
         >
           {/* Loading indicator while Phaser initializes */}
           {!gameReady && (
