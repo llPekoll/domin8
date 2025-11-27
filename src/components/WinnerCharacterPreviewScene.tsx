@@ -67,7 +67,13 @@ export const WinnerCharacterPreviewScene: React.FC<WinnerCharacterPreviewScenePr
 
   // Display character when characterName changes
   useEffect(() => {
-    if (!isReady || !sceneRef.current || !characterName || !characters || characters.length === 0) {
+    if (!isReady || !sceneRef.current || !characterName) {
+      console.log("[WinnerCharacterPreviewScene] Waiting for scene:", { isReady, hasScene: !!sceneRef.current, characterName });
+      return;
+    }
+
+    if (!characters || characters.length === 0) {
+      console.log("[WinnerCharacterPreviewScene] Characters not loaded yet, waiting...");
       return;
     }
 
@@ -77,8 +83,11 @@ export const WinnerCharacterPreviewScene: React.FC<WinnerCharacterPreviewScenePr
     );
 
     if (!characterData) {
+      console.warn("[WinnerCharacterPreviewScene] Character not found:", characterName, "Available:", characters.map((c: any) => c.name));
       return;
     }
+
+    console.log("[WinnerCharacterPreviewScene] Displaying character:", characterName, characterData);
 
     const characterKey = characterData.name.toLowerCase().replace(/\s+/g, "-");
     const scene = sceneRef.current;

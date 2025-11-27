@@ -1,9 +1,34 @@
-import { Wallet, Zap, Trophy, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Wallet, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import { Button } from "~/components/ui/button";
 
+const carouselSlides = [
+  { image: "/carousel/1.png", caption: "Insert coin to play" },
+  { image: "/carousel/2.png", caption: "Wait for other players" },
+  { image: "/carousel/3.png", caption: "Win the game and take the prize" },
+];
+
 export function ConnectWalletOverlay() {
   const { login } = usePrivy();
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  const nextSlide = () => {
+    setCurrentSlide((prev) => (prev + 1) % carouselSlides.length);
+  };
+
+  const prevSlide = () => {
+    setCurrentSlide((prev) => (prev - 1 + carouselSlides.length) % carouselSlides.length);
+  };
+
+  // Auto-advance every 5 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % carouselSlides.length);
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   const handleConnect = () => {
     try {
@@ -42,15 +67,63 @@ export function ConnectWalletOverlay() {
             Connect your wallet to compete and win real SOL
           </p>
 
-          {/* Quick Features */}
-          <div className="grid grid-cols-2 gap-4 mb-8">
-            <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-gradient-to-br from-amber-900/30 to-orange-900/30 border border-amber-700/40">
-              <Zap className="w-8 h-8 text-amber-400" />
-              <p className="text-white font-bold text-sm text-center">Instant Play</p>
+          {/* Carousel */}
+          <div className="relative mb-8">
+            {/* Carousel Container */}
+            <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-amber-900/30 to-orange-900/30 border border-amber-700/40">
+              {/* Slides Container */}
+              <div
+                className="flex transition-transform duration-500 ease-in-out"
+                style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+              >
+                {carouselSlides.map((slide, index) => (
+                  <div key={index} className="w-full flex-shrink-0">
+                    <div className="aspect-video">
+                      <img
+                        src={slide.image}
+                        alt={slide.caption}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Caption */}
+              <p className="text-white font-bold text-center py-3 px-4 text-sm transition-opacity duration-300">
+                {carouselSlides[currentSlide].caption}
+              </p>
+
+              {/* Left Arrow */}
+              <button
+                onClick={prevSlide}
+                className="absolute left-2 top-[calc(50%-20px)] -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5 text-white" />
+              </button>
+
+              {/* Right Arrow */}
+              <button
+                onClick={nextSlide}
+                className="absolute right-2 top-[calc(50%-20px)] -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-colors"
+              >
+                <ChevronRight className="w-5 h-5 text-white" />
+              </button>
             </div>
-            <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-gradient-to-br from-amber-900/30 to-orange-900/30 border border-amber-700/40">
-              <Trophy className="w-8 h-8 text-amber-400" />
-              <p className="text-white font-bold text-sm text-center">Real Prizes</p>
+
+            {/* Dots */}
+            <div className="flex justify-center gap-2 mt-3">
+              {carouselSlides.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentSlide(index)}
+                  className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                    index === currentSlide
+                      ? "bg-amber-400 w-4"
+                      : "bg-gray-500 hover:bg-gray-400"
+                  }`}
+                />
+              ))}
             </div>
           </div>
 
