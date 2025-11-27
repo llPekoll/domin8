@@ -1,5 +1,5 @@
 import { Scene } from "phaser";
-import { charactersData, allMapsData } from "../main";
+import { charactersData, allMapsData, STAGE_WIDTH, STAGE_HEIGHT } from "../main";
 import { logger } from "../../lib/logger";
 import { loadBackgroundConfig } from "../config/backgrounds";
 import { EventBus } from "../EventBus";
@@ -16,9 +16,13 @@ export class OneVOnePreloader extends Scene {
   }
 
   init() {
+    // Use camera center for positioning (STAGE_WIDTH=1188, STAGE_HEIGHT=540)
+    const centerX = STAGE_WIDTH / 2;
+    const centerY = STAGE_HEIGHT / 2;
+    
     // Simple progress bar
-    this.add.rectangle(512, 384, 468, 32).setStrokeStyle(1, 0xffffff);
-    const bar = this.add.rectangle(512 - 230, 384, 4, 28, 0xffffff);
+    this.add.rectangle(centerX, centerY, 468, 32).setStrokeStyle(1, 0xffffff);
+    const bar = this.add.rectangle(centerX - 230, centerY, 4, 28, 0xffffff);
 
     this.load.on("progress", (progress: number) => {
       bar.width = 4 + 460 * progress;
@@ -26,7 +30,7 @@ export class OneVOnePreloader extends Scene {
   }
 
   preload() {
-    this.load.setPath("assets");
+        this.load.setPath("assets");
 
     // Load fonts
     this.load.addFile(
@@ -53,6 +57,7 @@ export class OneVOnePreloader extends Scene {
 
     // Check data availability
     if (!charactersData || charactersData.length === 0) {
+      console.error("[OneVOnePreloader] No characters data available!");
       logger.game.error("[OneVOnePreloader] No characters data available!");
       return;
     }
@@ -61,7 +66,7 @@ export class OneVOnePreloader extends Scene {
       return;
     }
 
-    logger.game.debug("[OneVOnePreloader] Loading assets for 1v1 modal");
+        logger.game.debug("[OneVOnePreloader] Loading assets for 1v1 modal");
 
     // Load all character sprites
     charactersData.forEach((character) => {
@@ -259,7 +264,7 @@ export class OneVOnePreloader extends Scene {
     });
 
     // Directly start OneVOne scene (the key difference from main Preloader)
-    logger.game.info("[OneVOnePreloader] Assets loaded, starting OneVOne scene");
+        logger.game.info("[OneVOnePreloader] Assets loaded, starting OneVOne scene");
     this.scene.start("OneVOne");
     EventBus.emit("preloader-complete");
   }

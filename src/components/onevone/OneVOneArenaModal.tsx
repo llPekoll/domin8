@@ -6,7 +6,7 @@ import { usePrivyWallet } from "../../hooks/usePrivyWallet";
 import { useAssets } from "../../contexts/AssetsContext";
 import type { Character } from "../../types/character";
 import Phaser from "phaser";
-import { Boot } from "../../game/scenes/Boot";
+import { OneVOneBoot } from "../../game/scenes/OneVOneBoot";
 import { OneVOnePreloader } from "../../game/scenes/OneVOnePreloader";
 import { OneVOneScene } from "../../game/scenes/OneVOneScene";
 import { setCharactersData, setAllMapsData, STAGE_WIDTH, STAGE_HEIGHT } from "../../game/main";
@@ -51,6 +51,7 @@ export function OneVOneArenaModal({
   const [arenaState, setArenaState] = useState<ArenaState>("waiting");
   const [fightResult, setFightResult] = useState<{ winner: string; isUserWinner: boolean } | null>(null);
   const [gameReady, setGameReady] = useState(false);
+  const [containerReady, setContainerReady] = useState(false);
   const sceneInitialized = useRef(false);
   const previousLobbyStatus = useRef<number | null>(null);
   const modalGameContainerRef = useRef<HTMLDivElement>(null);
@@ -100,10 +101,10 @@ export function OneVOneArenaModal({
         disableWebAudio: false,
         noAudio: false,
       },
-      scene: [Boot, OneVOnePreloader, OneVOneScene],
+      scene: [OneVOneBoot, OneVOnePreloader, OneVOneScene],
     };
 
-    gameInstanceRef.current = new Phaser.Game(config);
+        gameInstanceRef.current = new Phaser.Game(config);
 
     // Listen for scene ready (OneVOnePreloader starts OneVOne directly)
     const handleSceneReady = (scene: Phaser.Scene) => {
@@ -118,7 +119,7 @@ export function OneVOneArenaModal({
     return () => {
       EventBus.off("current-scene-ready", handleSceneReady);
     };
-  }, [isOpen, characters, maps]);
+  }, [isOpen, containerReady, characters, maps]);
 
   // Cleanup game instance when modal closes
   useEffect(() => {
@@ -127,6 +128,7 @@ export function OneVOneArenaModal({
       gameInstanceRef.current.destroy(true);
       gameInstanceRef.current = null;
       setGameReady(false);
+      setContainerReady(false);
       sceneInitialized.current = false;
       previousLobbyStatus.current = null;
       setArenaState("waiting");
@@ -363,8 +365,8 @@ export function OneVOneArenaModal({
 
         {/* Phaser Game Container - Canvas will be rendered here */}
         <div 
-          ref={modalGameContainerRef}
-          className="relative w-full aspect-video bg-gray-900 flex items-center justify-center overflow-hidden [&>canvas]:max-w-full [&>canvas]:max-h-full [&>canvas]:object-contain"
+          ref={containerRefCallback}
+          className="relative w-full aspect-[2.2/1] bg-gray-900 flex items-center justify-center overflow-hidden [&>canvas]:max-w-full [&>canvas]:max-h-full [&>canvas]:object-contain"
         >
           {/* Loading indicator while Phaser initializes */}
           {!gameReady && (
