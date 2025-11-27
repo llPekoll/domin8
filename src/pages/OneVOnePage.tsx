@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Header } from "../components/Header";
 import { CharacterSelection2 } from "../components/CharacterSelection2";
 import { CreateLobby } from "../components/onevone/CreateLobby";
@@ -10,6 +10,8 @@ import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { logger } from "../lib/logger";
+import { useAssets } from "../contexts/AssetsContext";
+import { setCharactersData } from "../game/main";
 import type { Character } from "../types/character";
 
 interface LobbyData {
@@ -28,7 +30,16 @@ interface LobbyData {
 
 export function OneVOnePage() {
   const { connected, publicKey, wallet } = usePrivyWallet();
+  const { characters } = useAssets();
   const createLobbyAction = useAction(api.lobbies.createLobby);
+  
+  // Sync characters to Phaser's global state for CharacterPreviewScene
+  useEffect(() => {
+    if (characters && characters.length > 0) {
+      logger.game.debug('[OneVOnePage] Syncing characters to Phaser global state', { count: characters.length });
+      setCharactersData(characters);
+    }
+  }, [characters]);
   
   // Track selected character for 1v1 lobbies
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
