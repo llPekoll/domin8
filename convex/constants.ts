@@ -17,22 +17,16 @@
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 
-// Game loop timing constants (in milliseconds unless noted)
+// Game loop timing constants (in milliseconds)
 export const GAME_TIMING = {
-  /** Cron check interval - primary scheduler (matches betting round duration) */
-  CRON_INTERVAL: 60_000, // 60 seconds
-
-  /** Buffer after endTimestamp before calling end_game */
-  END_GAME_BUFFER: 1_000, // 1 second
+  /** Cron check interval - primary scheduler (slightly less than betting round) */
+  CRON_INTERVAL: 50_000, // 50 seconds
 
   /** Delay before sending prize after end_game */
-  SEND_PRIZE_DELAY: 4_000, // 4 seconds after end_game
+  SEND_PRIZE_DELAY: 2_000, // 2 seconds after end_game
 
   /** Delay before creating next game after send_prize */
   CREATE_GAME_DELAY: 14_000, // 14 seconds after send_prize
-
-  /** Buffer for blockchain clock drift (in seconds, not ms) */
-  BLOCKCHAIN_CLOCK_BUFFER: 1, // 1 second
 } as const;
 
 // Game status constants (matching smart contract constants.rs)

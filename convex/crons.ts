@@ -42,7 +42,7 @@ const crons = cronJobs();
  */
 crons.interval(
   "game-loop-scheduler",
-  { seconds: 60 },
+  { seconds: 50 },
   internal.syncService.checkAndEndOpenGames
 );
 

@@ -259,8 +259,8 @@ export const executeEndGame = internalAction({
       // 2. Verify time window has closed (with buffer for blockchain clock)
       const currentTime = Math.floor(Date.now() / 1000);
 
-      if (currentTime < activeGame.endDate + GAME_TIMING.BLOCKCHAIN_CLOCK_BUFFER) {
-        const remaining = activeGame.endDate + GAME_TIMING.BLOCKCHAIN_CLOCK_BUFFER - currentTime;
+      if (currentTime < activeGame.endDate) {
+        const remaining = activeGame.endDate - currentTime;
         console.log(
           `Round ${roundId}: Waiting for time window (${remaining}s remaining), skipping`
         );

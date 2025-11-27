@@ -109,7 +109,7 @@ async function scheduleEndGameAction(ctx: any, roundId: number, endTimestamp: nu
 
     // Calculate delay: schedule for endTimestamp + buffer
     const now = Math.floor(Date.now() / 1000);
-    const targetTime = endTimestamp + GAME_TIMING.BLOCKCHAIN_CLOCK_BUFFER;
+    const targetTime = endTimestamp;
     const delayMs = Math.max(0, (targetTime - now) * 1000);
 
     console.log(
@@ -486,7 +486,7 @@ export const checkAndEndOpenGames = internalAction({
 
       // 4. Game is OPEN (status=0) - schedule jobs or execute if expired
       if (activeGame.status === GAME_STATUS.OPEN) {
-        const remaining = Math.max(0, activeGame.endDate + GAME_TIMING.BLOCKCHAIN_CLOCK_BUFFER - now);
+        const remaining = Math.max(0, activeGame.endDate - now);
 
         // If game is past end time, ALWAYS schedule end_game (regardless of job status)
         // This handles VRF retry cases where end_game "completed" but game is still OPEN
@@ -521,7 +521,7 @@ export const checkAndEndOpenGames = internalAction({
         }
 
         // Jobs not scheduled yet - schedule the entire chain
-        const endTime = activeGame.endDate + GAME_TIMING.BLOCKCHAIN_CLOCK_BUFFER;
+        const endTime = activeGame.endDate;
         const endGameDelayMs = Math.max(0, (endTime - now) * 1000);
         const sendPrizeDelayMs = endGameDelayMs + GAME_TIMING.SEND_PRIZE_DELAY;
         const createGameDelayMs = sendPrizeDelayMs + GAME_TIMING.CREATE_GAME_DELAY;
