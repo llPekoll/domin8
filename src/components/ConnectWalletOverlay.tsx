@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Wallet, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import { Button } from "~/components/ui/button";
 
@@ -45,27 +45,16 @@ export function ConnectWalletOverlay() {
 
       {/* Centered CTA Card */}
       <div className="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
-        <div className="bg-gradient-to-b from-gray-900/95 to-black/95 backdrop-blur-xl border-2 border-amber-500/50 rounded-2xl shadow-2xl max-w-md w-full p-8 pointer-events-auto">
-          {/* Animated Icon */}
-          <div className="flex justify-center mb-6">
-            <div className="relative">
-              {/* Pulsing glow effect */}
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full blur-2xl opacity-60 animate-pulse"></div>
-              <div className="relative w-24 h-24 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-2xl transform hover:scale-110 transition-transform">
-                <Wallet className="w-12 h-12 text-white" />
-              </div>
-            </div>
+        <div className="bg-gradient-to-b from-gray-900/95 to-black/95 backdrop-blur-xl border-2 border-amber-500/50 rounded-2xl shadow-2xl max-w-md pt-4 w-full p-8 pointer-events-auto">
+          {/* Logo */}
+          <div className="flex justify-center ">
+            <img src="/assets/logo.webp" alt="Domin8 Logo" className="h-32 w-auto object-contain" />
           </div>
 
           {/* Headline */}
           <h2 className="text-center text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 mb-3 animate-pulse">
             Join the Battle!
           </h2>
-
-          {/* Subheadline */}
-          <p className="text-center text-gray-300 text-lg mb-8">
-            Connect your wallet to compete and win real SOL
-          </p>
 
           {/* Carousel */}
           <div className="relative mb-8">
@@ -118,9 +107,7 @@ export function ConnectWalletOverlay() {
                   key={index}
                   onClick={() => setCurrentSlide(index)}
                   className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                    index === currentSlide
-                      ? "bg-amber-400 w-4"
-                      : "bg-gray-500 hover:bg-gray-400"
+                    index === currentSlide ? "bg-amber-400 w-4" : "bg-gray-500 hover:bg-gray-400"
                   }`}
                 />
               ))}
