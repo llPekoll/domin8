@@ -8,6 +8,7 @@
 import { useActiveGame } from "./useActiveGame";
 import { useMemo } from "react";
 import { logger } from "../lib/logger";
+import { GAME_STATUS } from "../game/constants";
 
 export interface BetEntry {
   wallet: string;
@@ -17,7 +18,7 @@ export interface BetEntry {
 
 export interface GameState {
   roundId: number;
-  status: "Waiting" | "AwaitingWinnerRandomness" | "Finished";
+  status: "Waiting" | "Open" | "Closed";
   startTimestamp: number;
   endTimestamp: number;
   bets: BetEntry[];
@@ -49,9 +50,9 @@ export function useGameState() {
   // Helper to convert blockchain status to expected format
   // Smart contract constants.rs: OPEN=0, CLOSED=1, WAITING=2
   const formatStatus = (status: number): GameState["status"] => {
-    if (status === 0) return "Open";      // GAME_STATUS_OPEN = 0 (betting active)
-    if (status === 1) return "Finished";  // GAME_STATUS_CLOSED = 1 (game ended)
-    if (status === 2) return "Waiting";   // GAME_STATUS_WAITING = 2 (no bets yet)
+    if (status === GAME_STATUS.OPEN) return "Open";       // 0 - betting active
+    if (status === GAME_STATUS.CLOSED) return "Closed";   // 1 - game ended
+    if (status === GAME_STATUS.WAITING) return "Waiting"; // 2 - no bets yet
     return "Waiting"; // Default to waiting
   };
 

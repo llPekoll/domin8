@@ -335,7 +335,7 @@ export class SolanaClient {
   // End game and lock for winner selection (risk-based architecture)
   // HELIUS OPTIMIZED: Uses confirmed commitment, CU optimization, priority fees, and retry logic
   async endGame(roundId: number): Promise<{ signature: string }> {
-    const { config, activeGame } = this.getPDAs();
+    const { config } = this.getPDAs();
     const { gameRound } = this.getPDAs(roundId);
 
     if (!gameRound) {
@@ -477,10 +477,7 @@ export class SolanaClient {
   }
 
   // Create a new game round (admin only, no bets yet)
-  async createGameRound(
-    roundId: number,
-    mapId: number
-  ): Promise<{ signature: string }> {
+  async createGameRound(roundId: number, mapId: number): Promise<{ signature: string }> {
     const { config, activeGame, gameRound } = this.getPDAs(roundId);
 
     if (!gameRound) {

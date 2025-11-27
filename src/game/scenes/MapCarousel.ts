@@ -1,6 +1,13 @@
 import { Scene } from "phaser";
 import { EventBus } from "../EventBus";
-import { allMapsData, activeGameData, GAME_STATUS, STAGE_WIDTH, STAGE_HEIGHT, RESOLUTION_SCALE } from "../main";
+import {
+  allMapsData,
+  activeGameData,
+  GAME_STATUS,
+  STAGE_WIDTH,
+  STAGE_HEIGHT,
+  RESOLUTION_SCALE,
+} from "../main";
 import { logger } from "../../lib/logger";
 import { loadBackgroundConfig } from "../config/backgrounds";
 
@@ -44,12 +51,11 @@ export class MapCarousel extends Scene {
 
   // 3D Carousel parameters
   private radiusX: number = 260 * RESOLUTION_SCALE; // Horizontal radius (ellipse width)
-  private radiusY: number = 15 * RESOLUTION_SCALE;  // Reduced: less vertical movement (keeps centered)
+  private radiusY: number = 15 * RESOLUTION_SCALE; // Reduced: less vertical movement (keeps centered)
   private perspectiveScale: number = 0.45; // How much cards shrink in back
   private baseScale: number = 0.85; // Base scale for front card (smaller overall)
 
   // UI Elements
-  private titleText!: Phaser.GameObjects.Text;
   private subtitleText!: Phaser.GameObjects.Text;
   private mapNameText!: Phaser.GameObjects.Text;
   private centerHighlight!: Phaser.GameObjects.Rectangle;
@@ -85,21 +91,14 @@ export class MapCarousel extends Scene {
     gradientOverlay.fillCircle(centerX, centerY + 20 * RESOLUTION_SCALE, 350 * RESOLUTION_SCALE);
     gradientOverlay.setDepth(-1);
 
-    // Title
-    this.titleText = this.add.text(centerX, 35 * RESOLUTION_SCALE, "NEXT ARENA", {
-      fontFamily: "Jersey15",
-      fontSize: `${28 * RESOLUTION_SCALE}px`,
-      color: "#ffffff",
-      stroke: "#000000",
-      strokeThickness: 3 * RESOLUTION_SCALE,
-    }).setOrigin(0.5);
-
     // Subtitle (changes based on state)
-    this.subtitleText = this.add.text(centerX, 68 * RESOLUTION_SCALE, "Selecting battlefield...", {
-      fontFamily: "Jersey15",
-      fontSize: `${14 * RESOLUTION_SCALE}px`,
-      color: "#ffcc00",
-    }).setOrigin(0.5);
+    this.subtitleText = this.add
+      .text(centerX, 68 * RESOLUTION_SCALE, "Selecting battlefield...", {
+        fontFamily: "Jersey15",
+        fontSize: `${14 * RESOLUTION_SCALE}px`,
+        color: "#ffcc00",
+      })
+      .setOrigin(0.5);
 
     // Floor shadow ellipse (gives 3D ground plane effect)
     this.centerGlow = this.add.ellipse(
@@ -128,13 +127,15 @@ export class MapCarousel extends Scene {
     this.createCarouselCards(centerX, centerY);
 
     // Map name display (below carousel)
-    this.mapNameText = this.add.text(centerX, STAGE_HEIGHT - 25 * RESOLUTION_SCALE, "", {
-      fontFamily: "Jersey15",
-      fontSize: `${20 * RESOLUTION_SCALE}px`,
-      color: "#ffffff",
-      stroke: "#000000",
-      strokeThickness: 2 * RESOLUTION_SCALE,
-    }).setOrigin(0.5);
+    this.mapNameText = this.add
+      .text(centerX, STAGE_HEIGHT - 25 * RESOLUTION_SCALE, "", {
+        fontFamily: "Jersey15",
+        fontSize: `${20 * RESOLUTION_SCALE}px`,
+        color: "#ffffff",
+        stroke: "#000000",
+        strokeThickness: 2 * RESOLUTION_SCALE,
+      })
+      .setOrigin(0.5);
 
     // Start spinning
     this.startSpinning();
@@ -161,7 +162,7 @@ export class MapCarousel extends Scene {
 
     maps.forEach((map: any, index: number) => {
       const angle = index * angleStep;
-      const card = this.createCard(map, index, centerX, centerY, angle);
+      const card = this.createCard(map, centerX, centerY, angle);
       this.cards.push(card);
     });
 
@@ -169,7 +170,7 @@ export class MapCarousel extends Scene {
     this.positionCards();
   }
 
-  private createCard(map: any, index: number, centerX: number, centerY: number, angle: number): CarouselCard {
+  private createCard(map: any, centerX: number, centerY: number, angle: number): CarouselCard {
     const container = this.add.container(centerX, centerY);
 
     // Card background (border) with rounded corners effect
@@ -228,11 +229,13 @@ export class MapCarousel extends Scene {
     );
     container.add(labelBg);
 
-    const nameLabel = this.add.text(0, this.cardHeight / 2 - 12 * RESOLUTION_SCALE, map.name || `Map ${map.id}`, {
-      fontFamily: "Jersey15",
-      fontSize: `${11 * RESOLUTION_SCALE}px`,
-      color: "#ffffff",
-    }).setOrigin(0.5);
+    const nameLabel = this.add
+      .text(0, this.cardHeight / 2 - 12 * RESOLUTION_SCALE, map.name || `Map ${map.id}`, {
+        fontFamily: "Jersey15",
+        fontSize: `${11 * RESOLUTION_SCALE}px`,
+        color: "#ffffff",
+      })
+      .setOrigin(0.5);
     container.add(nameLabel);
 
     return {
@@ -249,7 +252,14 @@ export class MapCarousel extends Scene {
     const centerY = STAGE_HEIGHT / 2;
 
     // Sort cards by depth for proper rendering order
-    const cardPositions: { card: CarouselCard; depth: number; x: number; y: number; scale: number; alpha: number }[] = [];
+    const cardPositions: {
+      card: CarouselCard;
+      depth: number;
+      x: number;
+      y: number;
+      scale: number;
+      alpha: number;
+    }[] = [];
 
     this.cards.forEach((card) => {
       // Calculate card's current angle (base angle + rotation)
@@ -268,7 +278,7 @@ export class MapCarousel extends Scene {
       // depth goes from -1 (back) to 1 (front)
       // Scale from (1 - perspectiveScale) to 1, then apply baseScale
       const normalizedDepth = (depth + 1) / 2; // 0 (back) to 1 (front)
-      const depthScale = (1 - this.perspectiveScale) + normalizedDepth * this.perspectiveScale;
+      const depthScale = 1 - this.perspectiveScale + normalizedDepth * this.perspectiveScale;
       const scale = depthScale * this.baseScale; // Apply base scale to make everything smaller
 
       // Alpha: more transparent in back
@@ -316,13 +326,6 @@ export class MapCarousel extends Scene {
     return 1 - Math.pow(1 - t, 5);
   }
 
-  // Quint.easeInOut for smoother deceleration
-  private quintEaseInOut(t: number): number {
-    return t < 0.5
-      ? 16 * t * t * t * t * t
-      : 1 - Math.pow(-2 * t + 2, 5) / 2;
-  }
-
   private updateSpin() {
     if (!this.isSpinning) return;
 
@@ -367,7 +370,7 @@ export class MapCarousel extends Scene {
     this.startAngle = this.rotationAngle;
 
     // Find the target angle to bring the selected map to the front (angle = 0)
-    const targetCard = this.cards.find(c => c.mapId === this.targetMapId);
+    const targetCard = this.cards.find((c) => c.mapId === this.targetMapId);
     if (!targetCard) {
       logger.game.warn("[MapCarousel] Target map not found:", this.targetMapId);
       this.targetAngle = this.startAngle;
@@ -404,7 +407,7 @@ export class MapCarousel extends Scene {
   }
 
   private findCardByMapId(mapId: number): CarouselCard | undefined {
-    return this.cards.find(c => c.mapId === mapId);
+    return this.cards.find((c) => c.mapId === mapId);
   }
 
   private stopOnMap(mapId: number) {
@@ -464,7 +467,7 @@ export class MapCarousel extends Scene {
       });
 
       // Fade out back cards for focus effect
-      this.cards.forEach(card => {
+      this.cards.forEach((card) => {
         if (card.mapId !== mapId) {
           this.tweens.add({
             targets: card.container,
@@ -507,9 +510,7 @@ export class MapCarousel extends Scene {
       // WAITING (0) or OPEN (1) means a game exists
       if (gameData.status === GAME_STATUS.WAITING || gameData.status === GAME_STATUS.OPEN) {
         // Game created! Trigger the dramatic spin & land
-        const mapId = typeof gameData.map === 'object'
-          ? gameData.map?.id
-          : gameData.map || 1;
+        const mapId = typeof gameData.map === "object" ? gameData.map?.id : gameData.map || 1;
         this.targetMapId = mapId;
         logger.game.info("[MapCarousel] 🎰 New game detected! Spinning to map:", mapId);
       }
@@ -521,10 +522,12 @@ export class MapCarousel extends Scene {
     if (!this.isSpinning) return; // Not spinning
 
     if (activeGameData && activeGameData.status !== undefined) {
-      if (activeGameData.status === GAME_STATUS.WAITING || activeGameData.status === GAME_STATUS.OPEN) {
-        const mapId = typeof activeGameData.map === 'object'
-          ? activeGameData.map?.id
-          : activeGameData.map || 1;
+      if (
+        activeGameData.status === GAME_STATUS.WAITING ||
+        activeGameData.status === GAME_STATUS.OPEN
+      ) {
+        const mapId =
+          typeof activeGameData.map === "object" ? activeGameData.map?.id : activeGameData.map || 1;
         this.targetMapId = mapId;
         logger.game.info("[MapCarousel] 🎰 Found existing game, spinning to map:", mapId);
       }

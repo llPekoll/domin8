@@ -1,12 +1,6 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "~/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Trophy, X } from "lucide-react";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { calculateBadges, getBadgeTextureKeys } from "../game/utils/badgeUtils";
@@ -59,10 +53,6 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
           pointsColor: "text-indigo-100",
         };
     }
-  };
-
-  const truncateAddress = (address: string) => {
-    return `${address.slice(0, 4)}...${address.slice(-4)}`;
   };
 
   const isCurrentUser = (walletAddress: string) => {

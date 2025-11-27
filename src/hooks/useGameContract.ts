@@ -50,6 +50,7 @@ import { type Domin8Prgm } from "../../target/types/domin8_prgm";
 import Domin8PrgmIDL from "../../target/idl/domin8_prgm.json";
 import { logger } from "../lib/logger";
 import { getSharedConnection } from "~/lib/sharedConnection";
+import { BetEntry } from "./useGameState";
 
 // Extract Program ID from IDL
 export const DOMIN8_PROGRAM_ID = new PublicKey(Domin8PrgmIDL.address);
@@ -169,20 +170,15 @@ async function sendOptimizedTransactionWithPrivy(
   network: string
 ): Promise<string> {
   // HELIUS BEST PRACTICE #1: Use 'confirmed' commitment for blockhash
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
 
   logger.solana.debug("[sendOptimizedTx] Got blockhash", {
-    blockhash: blockhash.slice(0, 8) + '...',
-    lastValidBlockHeight
+    blockhash: blockhash.slice(0, 8) + "...",
+    lastValidBlockHeight,
   });
 
   // HELIUS BEST PRACTICE #2: Simulate to optimize compute units
-  const computeUnits = await simulateForComputeUnits(
-    connection,
-    instructions,
-    payer,
-    blockhash
-  );
+  const computeUnits = await simulateForComputeUnits(connection, instructions, payer, blockhash);
 
   // HELIUS BEST PRACTICE #3: Get dynamic priority fee
   const priorityFee = await getPriorityFeeForInstructions(
@@ -194,7 +190,7 @@ async function sendOptimizedTransactionWithPrivy(
 
   logger.solana.debug("[sendOptimizedTx] Optimized parameters", {
     computeUnits,
-    priorityFee
+    priorityFee,
   });
 
   // Build final optimized transaction with compute budget instructions
@@ -224,9 +220,9 @@ async function sendOptimizedTransactionWithPrivy(
       logger.solana.debug(`[sendOptimizedTx] Attempt ${attempt + 1}/${maxRetries}`);
 
       // Check blockhash validity before retry
-      const currentBlockHeight = await connection.getBlockHeight('confirmed');
+      const currentBlockHeight = await connection.getBlockHeight("confirmed");
       if (currentBlockHeight > lastValidBlockHeight) {
-        throw new Error('Blockhash expired, need to rebuild transaction');
+        throw new Error("Blockhash expired, need to rebuild transaction");
       }
 
       // Sign and send with Privy
@@ -255,7 +251,9 @@ async function sendOptimizedTransactionWithPrivy(
       );
 
       if (confirmed) {
-        logger.solana.info(`[sendOptimizedTx] Transaction confirmed on attempt ${attempt + 1}: ${signature}`);
+        logger.solana.info(
+          `[sendOptimizedTx] Transaction confirmed on attempt ${attempt + 1}: ${signature}`
+        );
         break;
       } else {
         logger.solana.warn(`[sendOptimizedTx] Confirmation timeout on attempt ${attempt + 1}`);
@@ -268,7 +266,7 @@ async function sendOptimizedTransactionWithPrivy(
       }
 
       // Exponential backoff: 1s, 2s, 3s
-      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
     }
   }
 
@@ -324,13 +322,14 @@ async function simulateForComputeUnits(
     }
 
     // Add 10% buffer (Helius recommendation)
-    const optimizedCU = simulation.value.unitsConsumed < 1000
-      ? 1000
-      : Math.ceil(simulation.value.unitsConsumed * 1.1);
+    const optimizedCU =
+      simulation.value.unitsConsumed < 1000
+        ? 1000
+        : Math.ceil(simulation.value.unitsConsumed * 1.1);
 
     logger.solana.debug("[simulateForComputeUnits] Optimized CU", {
       consumed: simulation.value.unitsConsumed,
-      withBuffer: optimizedCU
+      withBuffer: optimizedCU,
     });
 
     return optimizedCU;
@@ -374,13 +373,15 @@ async function getPriorityFeeForInstructions(
         jsonrpc: "2.0",
         id: "helius-priority-fee",
         method: "getPriorityFeeEstimate",
-        params: [{
-          transaction: serializedTx,
-          options: {
-            recommended: true  // Use Helius recommended fee
-          }
-        }]
-      })
+        params: [
+          {
+            transaction: serializedTx,
+            options: {
+              recommended: true, // Use Helius recommended fee
+            },
+          },
+        ],
+      }),
     });
 
     const data = await response.json();
@@ -423,37 +424,40 @@ async function confirmTransactionWithPolling(
 
       if (status) {
         if (status.err) {
-          logger.solana.error('[confirmTransactionWithPolling] Transaction failed:', status.err);
+          logger.solana.error("[confirmTransactionWithPolling] Transaction failed:", status.err);
           return false;
         }
 
-        if (status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized') {
+        if (
+          status.confirmationStatus === "confirmed" ||
+          status.confirmationStatus === "finalized"
+        ) {
           return true;
         }
       }
 
       // Check blockhash expiry
-      const currentBlockHeight = await connection.getBlockHeight('confirmed');
+      const currentBlockHeight = await connection.getBlockHeight("confirmed");
       if (currentBlockHeight > lastValidBlockHeight) {
-        logger.solana.warn('[confirmTransactionWithPolling] Blockhash expired during polling');
+        logger.solana.warn("[confirmTransactionWithPolling] Blockhash expired during polling");
         return false;
       }
     } catch (error) {
-      logger.solana.warn('[confirmTransactionWithPolling] Status check failed:', error);
+      logger.solana.warn("[confirmTransactionWithPolling] Status check failed:", error);
     }
 
-    await new Promise(resolve => setTimeout(resolve, interval));
+    await new Promise((resolve) => setTimeout(resolve, interval));
   }
 
-  logger.solana.warn('[confirmTransactionWithPolling] Confirmation timeout');
+  logger.solana.warn("[confirmTransactionWithPolling] Confirmation timeout");
   return false;
 }
 
 // Game status constants (matching smart contract)
 export const GAME_STATUS = {
   WAITING: 0, // Game created, no bets yet
-  OPEN: 1,    // First bet placed, countdown started
-  CLOSED: 2,  // Game ended, winner selected
+  OPEN: 1, // First bet placed, countdown started
+  CLOSED: 2, // Game ended, winner selected
 } as const;
 
 // Type definitions
@@ -518,7 +522,7 @@ export const useGameContract = () => {
   }, []);
 
   // Create Anchor Provider and Program
-  const { provider, program, walletAdapter } = useMemo<{
+  const { program, walletAdapter } = useMemo<{
     provider: AnchorProvider | null;
     program: Program<Domin8Prgm> | null;
     walletAdapter: PrivyWalletAdapter | null;
@@ -702,7 +706,9 @@ export const useGameContract = () => {
         const { gameConfigPda, activeGamePda } = derivePDAs();
 
         // Fetch active game state
-        const activeGameAccount = await program.account.domin8Game.fetch(activeGamePda).catch(() => null);
+        const activeGameAccount = await program.account.domin8Game
+          .fetch(activeGamePda)
+          .catch(() => null);
 
         if (!activeGameAccount) {
           throw new Error("No active game found. Please wait for a new game to be created.");
@@ -733,7 +739,7 @@ export const useGameContract = () => {
           activeRoundId,
           betIndex,
           gameStatus,
-          endTimestamp: endTimestamp > 0 ? new Date(endTimestamp * 1000).toISOString() : "not set"
+          endTimestamp: endTimestamp > 0 ? new Date(endTimestamp * 1000).toISOString() : "not set",
         });
 
         // Derive game round PDA

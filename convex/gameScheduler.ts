@@ -9,7 +9,7 @@
  * This module is called by ctx.scheduler.runAfter() from eventListener.ts
  */
 "use node";
-import { internalAction, internalQuery } from "./_generated/server";
+import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { SolanaClient } from "./lib/solana";
@@ -58,13 +58,15 @@ export const executeCreateGameRound = internalAction({
           roundId: activeGame?.gameRound,
           status: activeGame?.status,
           betCount: activeGame?.bets?.length || 0,
-          endDate: activeGame?.endDate ? new Date(activeGame.endDate * 1000).toISOString() : "not set",
+          endDate: activeGame?.endDate
+            ? new Date(activeGame.endDate * 1000).toISOString()
+            : "not set",
         });
 
         return {
           success: false,
           error: "System locked",
-          activeRoundId: activeGame?.gameRound
+          activeRoundId: activeGame?.gameRound,
         };
       }
 
@@ -108,7 +110,7 @@ export const executeCreateGameRound = internalAction({
           success: true,
           roundId: nextRoundId,
           mapId,
-          signature: txSignature
+          signature: txSignature,
         };
       } else {
         console.error(`❌ Transaction confirmation failed: ${txSignature}`);
@@ -118,7 +120,7 @@ export const executeCreateGameRound = internalAction({
       console.error("Error creating game round:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   },
@@ -143,14 +145,16 @@ export const getNextRoundInfo = internalAction({
         roundTime: config?.roundTime ?? 60,
         minBet: config?.minDepositAmount ?? 1_000_000,
         maxBet: config?.maxDepositAmount ?? 10_000_000_000,
-        activeGame: activeGame ? {
-          roundId: activeGame.gameRound,
-          status: activeGame.status,
-          betCount: activeGame.bets?.length || 0,
-          startDate: activeGame.startDate,
-          endDate: activeGame.endDate,
-          totalPot: activeGame.totalDeposit,
-        } : null,
+        activeGame: activeGame
+          ? {
+              roundId: activeGame.gameRound,
+              status: activeGame.status,
+              betCount: activeGame.bets?.length || 0,
+              startDate: activeGame.startDate,
+              endDate: activeGame.endDate,
+              totalPot: activeGame.totalDeposit,
+            }
+          : null,
       };
     } catch (error) {
       console.error("Error fetching next round info:", error);
@@ -161,7 +165,7 @@ export const getNextRoundInfo = internalAction({
         minBet: 1_000_000,
         maxBet: 10_000_000_000,
         activeGame: null,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   },
@@ -191,14 +195,14 @@ export const executeEndGame = internalAction({
     try {
       const solanaClient = new SolanaClient(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
 
-      
-
       // 1. Get current game state from blockchain (active_game PDA)
       let activeGame = await solanaClient.getActiveGame();
 
       // If this is not the active game, use getGameRound to fetch specific round data
       if (activeGame?.gameRound !== roundId) {
-        console.log(`Round ${roundId}: Not the active game (active: ${activeGame?.gameRound}), fetching specific round data`);
+        console.log(
+          `Round ${roundId}: Not the active game (active: ${activeGame?.gameRound}), fetching specific round data`
+        );
         activeGame = await solanaClient.getGameRound(roundId);
         if (!activeGame) {
           console.log(`Round ${roundId}: No game found on blockchain, skipping`);
@@ -214,7 +218,9 @@ export const executeEndGame = internalAction({
       // Check game status
       // GAME_STATUS: OPEN=0 (can end), CLOSED=1 (already ended), WAITING=2 (no bets yet)
       if (activeGame.status === GAME_STATUS.WAITING) {
-        console.log(`Round ${roundId}: Game is WAITING for first bet (status: ${activeGame.status}), cannot end yet`);
+        console.log(
+          `Round ${roundId}: Game is WAITING for first bet (status: ${activeGame.status}), cannot end yet`
+        );
         return;
       }
 
@@ -230,10 +236,13 @@ export const executeEndGame = internalAction({
           console.log(`Round ${roundId}: Game closed but prize not sent yet, scheduling...`);
 
           // Check if already scheduled
-          const alreadyScheduled = await ctx.runQuery(internal.gameSchedulerMutations.isActionScheduled, {
-            roundId,
-            action: "send_prize",
-          });
+          const alreadyScheduled = await ctx.runQuery(
+            internal.gameSchedulerMutations.isActionScheduled,
+            {
+              roundId,
+              action: "send_prize",
+            }
+          );
 
           if (!alreadyScheduled) {
             const jobId = await ctx.scheduler.runAfter(
@@ -264,7 +273,7 @@ export const executeEndGame = internalAction({
         console.log(
           `Round ${roundId}: Waiting for time window (${remaining}s remaining), skipping`
         );
-        
+
         // Update the scheduled job to execute at the correct time
         const newScheduledTime = currentTime + remaining;
         await ctx.runMutation(internal.gameSchedulerMutations.updateScheduledJobTime, {
@@ -272,9 +281,11 @@ export const executeEndGame = internalAction({
           action: "end_game",
           scheduledTime: newScheduledTime,
         });
-        
-        console.log(`Round ${roundId}: Updated job to execute at ${new Date(newScheduledTime * 1000).toISOString()}`);
-        
+
+        console.log(
+          `Round ${roundId}: Updated job to execute at ${new Date(newScheduledTime * 1000).toISOString()}`
+        );
+
         return;
       }
 
@@ -302,7 +313,9 @@ export const executeEndGame = internalAction({
       }
 
       // 4c. CASE: Multiple players → END GAME NORMALLY
-      console.log(`Round ${roundId}: 🎮 MULTIPLE PLAYERS (${uniquePlayers} unique) - Ending game...`);
+      console.log(
+        `Round ${roundId}: 🎮 MULTIPLE PLAYERS (${uniquePlayers} unique) - Ending game...`
+      );
 
       // 5. Call Solana endGame() instruction
       console.log(`Round ${roundId}: Calling end_game instruction...`);
@@ -332,9 +345,10 @@ export const executeEndGame = internalAction({
 
           // Send webhook notification for winner
           const winningBetIndex = updatedGame.winningBetIndex ?? -1;
-          const winnerBet = winningBetIndex >= 0 && updatedGame.bets?.[winningBetIndex] 
-            ? updatedGame.bets[winningBetIndex] 
-            : null;
+          const winnerBet =
+            winningBetIndex >= 0 && updatedGame.bets?.[winningBetIndex]
+              ? updatedGame.bets[winningBetIndex]
+              : null;
 
           await ctx.runAction(internal.webhooks.notifyGameWinner, {
             roundId,
@@ -369,7 +383,9 @@ export const executeEndGame = internalAction({
               prizeSent: false, // Prize not sent yet at this point
             },
           });
-          console.log(`Round ${roundId}: Synced finished game state to database (${bets.length} bets, ${wallets.length} wallets)`);
+          console.log(
+            `Round ${roundId}: Synced finished game state to database (${bets.length} bets, ${wallets.length} wallets)`
+          );
 
           // Check if send_prize already scheduled (by webhook)
           // Only schedule as fallback if webhook missed it
@@ -401,7 +417,9 @@ export const executeEndGame = internalAction({
         } else {
           // No winner yet - likely VRF pending for multi-player game
           // Reschedule end_game to try again in 3 seconds
-          console.warn(`Round ${roundId}: ⚠️ No winner yet (VRF pending?), rescheduling end_game...`);
+          console.warn(
+            `Round ${roundId}: ⚠️ No winner yet (VRF pending?), rescheduling end_game...`
+          );
 
           // Reset job status to pending so it can be rescheduled
           await ctx.runMutation(internal.gameSchedulerMutations.markJobFailed, {
@@ -484,13 +502,17 @@ export const executeSendPrize = internalAction({
 
       // Verify this is the correct round
       if (gameRound.gameRound !== roundId) {
-        console.log(`Round ${roundId}: Not the active game (active: ${gameRound.gameRound}), skipping`);
+        console.log(
+          `Round ${roundId}: Not the active game (active: ${gameRound.gameRound}), skipping`
+        );
         return;
       }
 
       // Check if game is closed (status: 1)
       if (gameRound.status !== 1) {
-        console.log(`Round ${roundId}: Game not closed yet (status: ${gameRound.status}), rescheduling...`);
+        console.log(
+          `Round ${roundId}: Game not closed yet (status: ${gameRound.status}), rescheduling...`
+        );
 
         // Reschedule send_prize to try again in 3 seconds
         const retryJobId = await ctx.scheduler.runAfter(
@@ -528,25 +550,24 @@ export const executeSendPrize = internalAction({
 
         // mark game as complete in database
         await ctx.runMutation(internal.syncServiceMutations.upsertGameState, {
-            gameRound: {
-              roundId: gameRound.gameRound,
-              status: gameRound.status,
-              startTimestamp: gameRound.startDate,
-              endTimestamp: gameRound.endDate,
-              map: gameRound.map,
-              betCount: gameRound.bets.length,
-              betAmounts: gameRound.bets.map((b) => b.amount),
-              betSkin: gameRound.bets.map((b) => b.skin),
-              betPosition: gameRound.bets.map((b) => b.position),
-              betWalletIndex: gameRound.bets.map((b) => b.walletIndex),
-              wallets: gameRound.wallets,
-              totalPot: gameRound.totalDeposit,
-              winner: gameRound.winner,
-              winningBetIndex: gameRound.winningBetIndex ?? undefined,
-              prizeSent: true,
-            },
-          });
-
+          gameRound: {
+            roundId: gameRound.gameRound,
+            status: gameRound.status,
+            startTimestamp: gameRound.startDate,
+            endTimestamp: gameRound.endDate,
+            map: gameRound.map,
+            betCount: gameRound.bets.length,
+            betAmounts: gameRound.bets.map((b) => b.amount),
+            betSkin: gameRound.bets.map((b) => b.skin),
+            betPosition: gameRound.bets.map((b) => b.position),
+            betWalletIndex: gameRound.bets.map((b) => b.walletIndex),
+            wallets: gameRound.wallets,
+            totalPot: gameRound.totalDeposit,
+            winner: gameRound.winner,
+            winningBetIndex: gameRound.winningBetIndex ?? undefined,
+            prizeSent: true,
+          },
+        });
 
         console.log(`Round ${roundId}: 🎉 GAME COMPLETE - System ready for next game`);
         return;
@@ -580,7 +601,9 @@ export const executeSendPrize = internalAction({
               participantWallets: gameRound.wallets,
               winnerWallet: gameRound.winner.toString(),
             });
-            console.log(`Round ${roundId}: Player stats updated for ${gameRound.wallets.length} participants`);
+            console.log(
+              `Round ${roundId}: Player stats updated for ${gameRound.wallets.length} participants`
+            );
           } catch (statsError) {
             console.error(`Round ${roundId}: Failed to update player stats:`, statsError);
           }
@@ -627,7 +650,9 @@ export const executeSendPrize = internalAction({
         if (updatedGame?.winnerPrize === 0) {
           console.log(`Round ${roundId}: ✅ Verified: Prize successfully distributed`);
         } else {
-          console.warn(`Round ${roundId}: ⚠️ winnerPrize not zeroed (${updatedGame?.winnerPrize} remaining) - this may be expected behavior`);
+          console.warn(
+            `Round ${roundId}: ⚠️ winnerPrize not zeroed (${updatedGame?.winnerPrize} remaining) - this may be expected behavior`
+          );
         }
         console.log(`Round ${roundId}: 🎉 GAME COMPLETE - Cron will create next game`);
       } else {

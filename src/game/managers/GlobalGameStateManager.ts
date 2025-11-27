@@ -431,7 +431,9 @@ export class GlobalGameStateManager {
     // MapCarousel will spin, land on the selected map, wait 3.5s, then transition to Game.
     // We do NOT auto-transition here to avoid racing with MapCarousel's animation.
     if (oldPhase === GamePhase.IDLE && newPhase !== GamePhase.IDLE) {
-      logger.game.debug("[GlobalGameStateManager] 🎰 IDLE → Game: MapCarousel handles transition (not us)");
+      logger.game.debug(
+        "[GlobalGameStateManager] 🎰 IDLE → Game: MapCarousel handles transition (not us)"
+      );
       // Don't call transitionToGame() - MapCarousel will do it after spin animation
       return;
     }
@@ -569,47 +571,6 @@ export class GlobalGameStateManager {
     this.currentPhase = GamePhase.IDLE;
     EventBus.emit("game-phase-changed", GamePhase.IDLE);
     this.transitionToMapCarousel();
-  }
-
-  /**
-   * Transition from MapCarousel to Game scene
-   */
-  private transitionToGame() {
-    const carouselScene = this.game.scene.getScene("MapCarousel");
-    if (!carouselScene?.scene.isActive()) return;
-    if (this.isTransitioning) return;
-
-    logger.game.debug("[GlobalGameStateManager] 🎬 Transitioning: MapCarousel → Game");
-    this.isTransitioning = true;
-
-    // Create wipe transition effect
-    const camera = carouselScene.cameras.main;
-    const fx = camera.postFX.addWipe();
-
-    carouselScene.events.once("transitionout", () => {
-      this.isTransitioning = false;
-      EventBus.emit("scene-transition-complete", "Game");
-
-      // ✅ Update Game scene with pending state after transition completes
-      if (this.pendingInitialGameState) {
-        logger.game.debug(
-          "[GlobalGameStateManager] 🎯 Transition complete, updating Game scene with pending state"
-        );
-        setTimeout(() => {
-          this.updateActiveSceneWithGameState(this.pendingInitialGameState);
-          this.pendingInitialGameState = null;
-        }, 100); // Small delay to ensure Game scene is fully active
-      }
-    });
-
-    carouselScene.scene.transition({
-      target: "Game",
-      duration: 700,
-      moveBelow: true,
-      onUpdate: (progress: number) => {
-        fx.progress = progress;
-      },
-    });
   }
 
   /**
