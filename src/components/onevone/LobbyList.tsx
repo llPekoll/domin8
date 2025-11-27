@@ -193,7 +193,7 @@ export function LobbyList({
 
   if (lobbies.length === 0) {
     return (
-      <div className="bg-gray-900 border-2 border-indigo-500 rounded-lg p-6">
+      <div className="bg-gray-900 border-1 border-indigo-500/30 rounded-lg p-6">
         <h2 className="text-xl font-bold text-indigo-200 mb-4">Open Lobbies</h2>
         <div className="text-center py-8">
           <p className="text-gray-400 mb-2">No open lobbies at the moment</p>
@@ -205,7 +205,7 @@ export function LobbyList({
 
   return (
     <>
-    <div className="bg-gray-900 border-2 border-indigo-500 rounded-lg p-6">
+    <div className="bg-gray-900 border-2 border-indigo-500/30 rounded-lg p-6">
       <h2 className="text-xl font-bold text-indigo-200 mb-4">Open Lobbies ({lobbies.length})</h2>
 
       <div className="space-y-3">

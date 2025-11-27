@@ -174,7 +174,7 @@ export function MyLobbies({
   }
 
   return (
-    <div className="bg-gray-900 border-2 border-orange-500 rounded-lg p-6 mb-6">
+    <div className="bg-gray-900 border-1 border-orange-500 rounded-lg p-6 mb-6">
       <h2 className="text-xl font-bold text-orange-200 mb-4">
         My Open Lobbies ({myOpenLobbies.length})
       </h2>

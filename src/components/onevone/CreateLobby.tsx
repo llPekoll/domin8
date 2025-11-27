@@ -323,7 +323,7 @@ export function CreateLobby({
   }
 
   return (
-    <div className="bg-gray-900 border-2 border-indigo-500 rounded-lg p-6">
+    <div className="bg-gray-900 border-1 border-indigo-500/30 rounded-lg p-6">
       <h2 className="text-xl font-bold text-indigo-200 mb-4">Create Lobby</h2>
 
       {/* Selected Character Display */}
@@ -344,7 +344,7 @@ export function CreateLobby({
           min="0"
           max="100"
           step="0.01"
-          className="w-full px-3 py-2 bg-gray-800 border border-indigo-500/30 rounded text-indigo-200 focus:border-indigo-400 focus:outline-none"
+          className="w-full px-3 py-2 bg-gray-800 border border-indigo-500/30/30 rounded text-indigo-200 focus:border-indigo-400 focus:outline-none"
           disabled={isLoading}
         />
         <p className="text-xs text-gray-400 mt-1">Min: 0.01 SOL | Max: 100 SOL</p>

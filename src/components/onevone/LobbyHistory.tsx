@@ -21,26 +21,32 @@ interface LobbyData {
 interface LobbyHistoryProps {
   lobbies: LobbyData[];
   characters?: Map<number, Character>;
+  maxLobbies?: number;
 }
 
-export function LobbyHistory({ lobbies, characters }: LobbyHistoryProps) {
+const MAX_LOBBIES_DEFAULT = 50;
+
+export function LobbyHistory({ lobbies, maxLobbies = MAX_LOBBIES_DEFAULT }: LobbyHistoryProps) {
+  const displayedLobbies = useMemo(() => {
+    return lobbies.slice(0, maxLobbies);
+  }, [lobbies, maxLobbies]);
+
   const formatAmount = (lamports: number) => {
-    return (lamports / 1e9).toFixed(4);
+    return (lamports / 1e9).toFixed(3);
   };
 
-  const formatDate = (timestamp: number | undefined) => {
-    if (!timestamp) return "N/A";
+  const formatTime = (timestamp: number | undefined) => {
+    if (!timestamp) return "--:--";
     const date = new Date(timestamp);
     return date.toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit",
     });
   };
 
   const formatWallet = (wallet: string | undefined) => {
-    if (!wallet) return "Unknown";
-    return wallet.slice(0, 8) + "..." + wallet.slice(-4);
+    if (!wallet) return "---";
+    return wallet.slice(0, 4) + "..." + wallet.slice(-4);
   };
 
   const getStatusBadge = (status: number) => {
@@ -48,42 +54,39 @@ export function LobbyHistory({ lobbies, characters }: LobbyHistoryProps) {
       case 0:
         return { text: "Open", color: "bg-blue-500/20 text-blue-300 border-blue-500/50" };
       case 1:
-        return { text: "Awaiting VRF", color: "bg-yellow-500/20 text-yellow-300 border-yellow-500/50" };
+        return { text: "VRF...", color: "bg-yellow-500/20 text-yellow-300 border-yellow-500/50" };
       case 2:
-        return { text: "VRF Received", color: "bg-orange-500/20 text-orange-300 border-orange-500/50" };
+        return { text: "VRF ✓", color: "bg-orange-500/20 text-orange-300 border-orange-500/50" };
       case 3:
-        return { text: "Resolved", color: "bg-green-500/20 text-green-300 border-green-500/50" };
+        return { text: "Done", color: "bg-green-500/20 text-green-300 border-green-500/50" };
       default:
-        return { text: "Unknown", color: "bg-gray-500/20 text-gray-300 border-gray-500/50" };
+        return { text: "?", color: "bg-gray-500/20 text-gray-300 border-gray-500/50" };
     }
   };
 
-  const getCharacterName = (characterId: number): string => {
-    if (characters?.has(characterId)) {
-      return characters.get(characterId)?.name || `Character ${characterId}`;
-    }
-    return `Char ${characterId}`;
-  };
-
-  if (lobbies.length === 0) {
+  if (displayedLobbies.length === 0) {
     return (
-      <div className="bg-gray-900 border-2 border-indigo-500 rounded-lg p-6">
-        <h2 className="text-xl font-bold text-indigo-200 mb-4">Lobby History</h2>
-        <div className="text-center py-8">
-          <p className="text-gray-400">No completed lobbies yet</p>
+      <div className="lobby-history-sidebar">
+        <div className="lobby-history-header">
+          <h2 className="text-sm font-bold text-indigo-200">History</h2>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-gray-500 text-xs">No history yet</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-900 border-2 border-indigo-500 rounded-lg p-6">
-      <h2 className="text-xl font-bold text-indigo-200 mb-4">
-        Lobby History ({lobbies.length})
-      </h2>
+    <div className="lobby-history-sidebar">
+      <div className="lobby-history-header">
+        <h2 className="text-sm font-bold text-indigo-200">
+          History <span className="text-indigo-400/60">({displayedLobbies.length}{lobbies.length > maxLobbies ? `/${lobbies.length}` : ""})</span>
+        </h2>
+      </div>
 
-      <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 lobby-history-scroll">
-        {lobbies.map((lobby) => {
+      <div className="lobby-history-content lobby-history-scroll">
+        {displayedLobbies.map((lobby) => {
           const statusBadge = getStatusBadge(lobby.status);
           const isResolved = lobby.status === 3;
           const isPlayerAWinner = lobby.winner === lobby.playerA;
@@ -92,92 +95,40 @@ export function LobbyHistory({ lobbies, characters }: LobbyHistoryProps) {
           return (
             <div
               key={lobby._id}
-              className="bg-gray-800/60 border border-indigo-400/40 rounded-lg p-3 hover:bg-gray-800 hover:border-indigo-400/60 transition-all"
+              className="lobby-history-card"
             >
-              {/* Header: Lobby ID, Status, and Amount */}
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <p className="text-xs font-bold text-indigo-300">#{lobby.lobbyId}</p>
-                  <span
-                    className={`px-2 py-0.5 rounded border text-xs font-semibold whitespace-nowrap ${statusBadge.color}`}
-                  >
+              {/* Header: ID + Status + Amount */}
+              <div className="lobby-history-card-header">
+                <div className="flex items-center gap-2">
+                  <span className="text-indigo-300 font-bold text-xs">#{lobby.lobbyId}</span>
+                  <span className={`lobby-status-badge ${statusBadge.color}`}>
                     {statusBadge.text}
                   </span>
                 </div>
-                <p className="text-xs font-bold text-indigo-300 whitespace-nowrap">
-                  {formatAmount(lobby.amount)} SOL
-                </p>
-              </div>
-
-              {/* Players Info - Compact Layout */}
-              <div className="space-y-2 mb-2">
-                {/* Player A */}
-                <div className="bg-gray-900/40 rounded p-2">
-                  <p className="text-xs text-gray-400 mb-0.5">Player A</p>
-                  <div className="flex items-center justify-between gap-1">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-indigo-300 font-mono truncate">
-                        {formatWallet(lobby.playerA)}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {getCharacterName(lobby.characterA)}
-                      </p>
-                    </div>
-                    {isResolved && isPlayerAWinner && (
-                      <span className="px-2 py-0.5 bg-yellow-500/30 text-yellow-300 text-xs font-bold rounded border border-yellow-500/60 whitespace-nowrap ml-2">
-                        👑 Won
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Player B */}
-                <div className="bg-gray-900/40 rounded p-2">
-                  <p className="text-xs text-gray-400 mb-0.5">
-                    {lobby.playerB ? "Player B" : "Waiting..."}
-                  </p>
-                  {lobby.playerB ? (
-                    <div className="flex items-center justify-between gap-1">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-indigo-300 font-mono truncate">
-                          {formatWallet(lobby.playerB)}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">
-                          {lobby.characterB ? getCharacterName(lobby.characterB) : "N/A"}
-                        </p>
-                      </div>
-                      {isResolved && isPlayerBWinner && (
-                        <span className="px-2 py-0.5 bg-yellow-500/30 text-yellow-300 text-xs font-bold rounded border border-yellow-500/60 whitespace-nowrap ml-2">
-                          👑 Won
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-500 italic">Cancelled or waiting</p>
-                  )}
+                <div className="flex items-center gap-1">
+                  <span className="text-indigo-300 font-semibold text-xs">{formatAmount(lobby.amount)}</span>
+                  <span className="text-gray-500 text-[10px]">SOL</span>
                 </div>
               </div>
 
-              {/* Winner Info */}
-              {isResolved && (
-                <div className="bg-indigo-900/30 border border-indigo-400/40 rounded p-2 mb-2">
-                  <p className="text-xs text-indigo-300 mb-1 font-semibold">🏆 Winner</p>
-                  {lobby.winner ? (
-                    <p className="text-xs text-yellow-300 font-mono font-bold">
-                      {formatWallet(lobby.winner)}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-gray-500 italic">No winner recorded</p>
-                  )}
-                </div>
-              )}
-
-              {/* Footer: Timestamps - Compact */}
-              <div className="text-xs text-gray-500 space-y-0.5 border-t border-indigo-400/20 pt-2">
-                <p className="truncate">Created: {formatDate(lobby.createdAt)}</p>
-                {isResolved && (
-                  <p className="truncate">Resolved: {formatDate(lobby.resolvedAt)}</p>
+              {/* Players row */}
+              <div className="lobby-history-players">
+                <span className="text-gray-500 text-[10px]">A:</span>
+                <span className={`font-mono text-[11px] ${isPlayerAWinner ? 'text-yellow-300 font-bold' : 'text-indigo-300'}`}>
+                  {formatWallet(lobby.playerA)}
+                  {isPlayerAWinner && ' 👑'}
+                </span>
+                <span className="text-gray-600 text-[10px] mx-1">vs</span>
+                <span className="text-gray-500 text-[10px]">B:</span>
+                {lobby.playerB ? (
+                  <span className={`font-mono text-[11px] ${isPlayerBWinner ? 'text-yellow-300 font-bold' : 'text-indigo-300'}`}>
+                    {formatWallet(lobby.playerB)}
+                    {isPlayerBWinner && ' 👑'}
+                  </span>
+                ) : (
+                  <span className="text-gray-600 italic text-[11px]">---</span>
                 )}
+                <span className="text-gray-500 text-[10px] ml-auto">{formatTime(isResolved ? lobby.resolvedAt : lobby.createdAt)}</span>
               </div>
             </div>
           );

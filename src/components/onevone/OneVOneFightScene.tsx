@@ -109,7 +109,7 @@ export function OneVOneFightScene({
         <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-white mb-2">Waiting for Opponent...</h2>
-            <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto"></div>
+            <div className="animate-spin w-8 h-8 border-4 border-indigo-500/30 border-t-transparent rounded-full mx-auto"></div>
           </div>
         </div>
       )}
@@ -130,7 +130,7 @@ export function OneVOneFightScene({
       {/* Result Overlay (Only shown after fight animation completes) */}
       {fightResult && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-20 animate-in fade-in duration-500">
-          <div className="text-center p-8 bg-gray-900 border-2 border-indigo-500 rounded-xl max-w-md w-full">
+          <div className="text-center p-8 bg-gray-900 border-2 border-indigo-500/30 rounded-xl max-w-md w-full">
             {isWinner ? (
               <>
                 <h2 className="text-4xl font-black text-yellow-400 mb-2 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]">

@@ -358,11 +358,11 @@ export function OneVOneArenaModal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="bg-black border-2 border-indigo-500 text-white sm:max-w-4xl p-0 overflow-hidden"
+        className="bg-black border-2 border-indigo-500/30 text-white sm:max-w-4xl p-0 overflow-hidden"
         showCloseButton={arenaState === "waiting" || arenaState === "results"}
       >
         {/* Arena Header */}
-        <DialogHeader className="p-4 pr-12 bg-gradient-to-r from-indigo-900/90 to-purple-900/90 border-b border-indigo-500/50">
+        <DialogHeader className="p-4 pr-12 bg-gradient-to-r from-indigo-900/90 to-purple-900/90 border-b border-indigo-500/30/50">
           <DialogTitle className="text-xl font-bold text-indigo-200 flex items-center justify-between">
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
@@ -382,7 +382,7 @@ export function OneVOneArenaModal({
           {/* Loading indicator while Phaser initializes */}
           {!gameReady && (
             <div className="absolute inset-0 flex flex-col items-center justify-center z-5">
-              <div className="animate-spin w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full mb-4"></div>
+              <div className="animate-spin w-10 h-10 border-4 border-indigo-500/30 border-t-transparent rounded-full mb-4"></div>
               <p className="text-gray-400 text-sm">Loading arena...</p>
             </div>
           )}
@@ -390,7 +390,7 @@ export function OneVOneArenaModal({
           {/* Status Banner - Small overlay at top, doesn't block the arena view */}
           {gameReady && (arenaState === "waiting" || arenaState === "vrf-pending" || arenaState === "opponent-joining") && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-              <div className="text-center bg-black/70 px-6 py-3 rounded-lg border border-indigo-500/50">
+              <div className="text-center bg-black/70 px-6 py-3 rounded-lg border border-indigo-500/30/50">
                 <div className="flex items-center gap-3">
                   {statusDisplay.showSpinner && (
                     <div className="animate-spin w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full"></div>
@@ -416,7 +416,7 @@ export function OneVOneArenaModal({
 
         {/* Results Actions (only show when fight is complete and user won) */}
         {arenaState === "results" && fightResult && (
-          <div className="p-6 bg-gray-900/95 border-t border-indigo-500/50">
+          <div className="p-6 bg-gray-900/95 border-t border-indigo-500/30/50">
             <div className="text-center mb-4">
               <h2
                 className={`text-3xl font-black mb-2 ${
@@ -455,7 +455,7 @@ export function OneVOneArenaModal({
 
         {/* Lobby Info Footer (show during waiting/pending states) */}
         {(arenaState === "waiting" || arenaState === "opponent-joining" || arenaState === "vrf-pending") && (
-          <div className="p-4 bg-gray-900/95 border-t border-indigo-500/30">
+          <div className="p-4 bg-gray-900/95 border-t border-indigo-500/30/30">
             <div className="flex justify-between items-center text-sm">
               <div>
                 <span className="text-gray-400">Player A: </span>

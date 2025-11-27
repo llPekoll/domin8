@@ -219,7 +219,7 @@ export function OneVOnePage() {
       </div>
 
       {/* Main Content Area - Always show lobby list */}
-      <main className="pt-16 pb-32 px-4 container mx-auto">
+      <main className="pt-16 pb-32 px-4 ">
         {!connected || !publicKey ? (
           // Not connected view
           <div className="flex items-center justify-center min-h-[60vh]">
@@ -229,35 +229,38 @@ export function OneVOnePage() {
             </div>
           </div>
         ) : (
-          <div className="max-w-6xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Create Lobby Section */}
-              <div>
-                <CreateLobby
-                  selectedCharacter={selectedCharacter}
-                  onLobbyCreated={handleLobbyCreated}
-                  userOpenLobbies={userOpenLobbies}
-                  onLobbyCancelled={handleLobbyCancelled}
-                  onViewLobby={handleViewOwnLobby}
-                />
-              </div>
+          <>
+            <div className="max-w-7xl mx-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
+                {/* Create Lobby Section */}
+                <div>
+                  <CreateLobby
+                    selectedCharacter={selectedCharacter}
+                    onLobbyCreated={handleLobbyCreated}
+                    userOpenLobbies={userOpenLobbies}
+                    onLobbyCancelled={handleLobbyCancelled}
+                    onViewLobby={handleViewOwnLobby}
+                  />
+                </div>
 
-              {/* Open Lobbies List */}
-              <div className="lg:col-span-2">
-                <LobbyList
-                  lobbies={openLobbies as LobbyData[]}
-                  currentPlayerWallet={publicKey?.toString() || ""}
-                  selectedCharacter={selectedCharacter}
-                  onLobbyJoined={handleLobbyJoined}
-                />
+                {/* Open Lobbies List */}
+                <div className="lg:col-span-3">
+                  <LobbyList
+                    lobbies={openLobbies as LobbyData[]}
+                    currentPlayerWallet={publicKey?.toString() || ""}
+                    selectedCharacter={selectedCharacter}
+                    onLobbyJoined={handleLobbyJoined}
+                  />
+                  </div>
+                  
+                  {/* Lobby History */}
+                  <div className="lg:col-span-2">
+                    <LobbyHistory lobbies={completedLobbies as LobbyData[]} maxLobbies={50} />
+                  </div>
+                </div>
               </div>
-
-              {/* Lobby History */}
-              <div>
-                <LobbyHistory lobbies={completedLobbies as LobbyData[]} />
-              </div>
-            </div>
-          </div>
+            
+          </>
         )}
       </main>
 

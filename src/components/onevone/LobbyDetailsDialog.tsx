@@ -22,7 +22,7 @@ export function LobbyDetailsDialog({ isOpen, onClose, lobby, onJoin }: LobbyDeta
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-900 border border-indigo-500 text-white sm:max-w-md">
+      <DialogContent className="bg-gray-900 border border-indigo-500/30 text-white sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-indigo-400">
             Lobby #{lobby.lobbyId}
@@ -31,25 +31,25 @@ export function LobbyDetailsDialog({ isOpen, onClose, lobby, onJoin }: LobbyDeta
         
         <div className="space-y-4">
           {/* Player Info */}
-          <div className="bg-black/50 p-4 rounded-lg border border-indigo-500/30">
+          <div className="bg-black/50 p-4 rounded-lg border border-indigo-500/30/30">
             <p className="text-sm text-gray-400 mb-1">Challenger</p>
             <p className="font-mono text-indigo-300 break-all">{lobby.playerA}</p>
           </div>
 
           {/* Game Settings */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-black/50 p-3 rounded-lg border border-indigo-500/30">
+            <div className="bg-black/50 p-3 rounded-lg border border-indigo-500/30/30">
               <p className="text-xs text-gray-400 mb-1">Bet Amount</p>
               <p className="text-lg font-bold text-yellow-400">{(lobby.amount / 1e9).toFixed(2)} SOL</p>
             </div>
-            <div className="bg-black/50 p-3 rounded-lg border border-indigo-500/30">
+            <div className="bg-black/50 p-3 rounded-lg border border-indigo-500/30/30">
               <p className="text-xs text-gray-400 mb-1">Map ID</p>
               <p className="text-lg font-bold text-indigo-300">#{lobby.mapId}</p>
             </div>
           </div>
 
           {/* Character Preview (Placeholder) */}
-          <div className="bg-black/50 p-4 rounded-lg border border-indigo-500/30 text-center">
+          <div className="bg-black/50 p-4 rounded-lg border border-indigo-500/30/30 text-center">
             <p className="text-sm text-gray-400 mb-2">Character #{lobby.characterA}</p>
             <div className="h-32 flex items-center justify-center bg-gray-800 rounded">
                <span className="text-gray-500">Character Preview</span>
