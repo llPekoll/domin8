@@ -51,6 +51,7 @@ export const getPlayersByWallets = query({
         return {
           walletAddress,
           displayName: player?.displayName || null,
+          totalWins: player?.totalWins || 0,
         };
       })
     );
@@ -296,6 +297,63 @@ export const verifyAndPlaceBet = action({
 });
 
 /**
+ * Update game stats for all participants after a game ends (internal - called from gameScheduler)
+ *
+ * - Increments totalGamesPlayed for all participants
+ * - Increments totalWins for the winner
+ * - Creates player records if they don't exist
+ *
+ * @param participantWallets - Array of all unique wallet addresses that participated
+ * @param winnerWallet - The winner's wallet address
+ */
+export const updateGameStatsForParticipants = internalMutation({
+  args: {
+    participantWallets: v.array(v.string()),
+    winnerWallet: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { participantWallets, winnerWallet } = args;
+
+    console.log(`[Player Stats] Updating stats for ${participantWallets.length} participants, winner: ${winnerWallet.slice(0, 8)}...`);
+
+    for (const walletAddress of participantWallets) {
+      const isWinner = walletAddress === winnerWallet;
+
+      // Find existing player
+      const player = await ctx.db
+        .query("players")
+        .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
+        .first();
+
+      if (player) {
+        // Update existing player
+        await ctx.db.patch(player._id, {
+          totalGamesPlayed: player.totalGamesPlayed + 1,
+          totalWins: player.totalWins + (isWinner ? 1 : 0),
+          lastActive: Date.now(),
+        });
+      } else {
+        // Create new player record
+        await ctx.db.insert("players", {
+          walletAddress,
+          displayName: undefined,
+          externalWalletAddress: undefined,
+          lastActive: Date.now(),
+          totalGamesPlayed: 1,
+          totalWins: isWinner ? 1 : 0,
+          totalPoints: 0,
+          achievements: [],
+        });
+      }
+
+      console.log(`[Player Stats] Updated ${walletAddress.slice(0, 8)}... (gamesPlayed+1${isWinner ? ', wins+1' : ''})`);
+    }
+
+    console.log(`[Player Stats] ✅ All participant stats updated`);
+  },
+});
+
+/**
  * Award points to a player (internal - called from backend)
  *
  * Awards points based on SOL amount (1 point per 0.001 SOL).
@@ -418,6 +476,61 @@ export const getPlayerStatsFromHistory = query({
       totalWinningsSOL,
       totalWinningsLamports,
     };
+  },
+});
+
+/**
+ * Get recent games for a player
+ *
+ * @param walletAddress - Player's wallet address
+ * @param limit - Number of games to return (default: 10)
+ * @returns Array of recent games with result info
+ */
+export const getRecentGames = query({
+  args: {
+    walletAddress: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 10;
+
+    // Get all finished games
+    const finishedGames = await ctx.db
+      .query("gameRoundStates")
+      .withIndex("by_status", (q) => q.eq("status", "finished"))
+      .order("desc")
+      .collect();
+
+    // Filter games where this player participated
+    const playerGames = finishedGames
+      .filter((game) => game.wallets?.includes(args.walletAddress))
+      .slice(0, limit);
+
+    // Map to a simpler format
+    return playerGames.map((game) => {
+      const isWinner = game.winner === args.walletAddress;
+      const playerBetIndex = game.wallets?.indexOf(args.walletAddress) ?? -1;
+
+      // Calculate player's total bet amount (they may have multiple bets)
+      let playerBetAmount = 0;
+      if (game.betWalletIndex && game.betAmounts) {
+        for (let i = 0; i < game.betWalletIndex.length; i++) {
+          if (game.betWalletIndex[i] === playerBetIndex) {
+            playerBetAmount += game.betAmounts[i] ?? 0;
+          }
+        }
+      }
+
+      return {
+        roundId: game.roundId,
+        timestamp: game.endTimestamp || game.capturedAt,
+        isWinner,
+        playerCount: game.wallets?.length ?? 0,
+        totalPot: game.totalPot ?? 0,
+        playerBetAmount,
+        prizeWon: isWinner ? Math.floor((game.totalPot ?? 0) * 0.95) : 0,
+      };
+    });
   },
 });
 

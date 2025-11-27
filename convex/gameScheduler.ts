@@ -324,7 +324,8 @@ export const executeEndGame = internalAction({
         // 7. Wait for blockchain to update, then schedule prize distribution
         await new Promise((resolve) => setTimeout(resolve, 2000)); // 2 second buffer
 
-        const updatedGame = await solanaClient.getActiveGame();
+        // Use getGameRound to fetch from specific game PDA (not active_game which may be cleared)
+        const updatedGame = await solanaClient.getGameRound(roundId);
         if (updatedGame?.winner) {
           console.log(`Round ${roundId}: Winner selected: ${updatedGame.winner}`);
           console.log(`Round ${roundId}: Prize amount: ${updatedGame.winnerPrize} lamports`);
@@ -342,6 +343,33 @@ export const executeEndGame = internalAction({
             totalPot: updatedGame.totalDeposit || 0,
             participantCount: updatedGame.bets?.length || 0,
           });
+
+          // Sync finished game state to database (with winner, all bets, wallets)
+          // Use activeGame for bet data (doesn't change after game ends)
+          // Use updatedGame for winner info (added after end_game)
+          const bets = activeGame?.bets || updatedGame.bets || [];
+          const wallets = activeGame?.wallets || updatedGame.wallets || [];
+
+          await ctx.runMutation(internal.syncServiceMutations.upsertGameState, {
+            gameRound: {
+              roundId: updatedGame.gameRound,
+              status: updatedGame.status,
+              startTimestamp: updatedGame.startDate,
+              endTimestamp: updatedGame.endDate,
+              map: updatedGame.map,
+              betCount: bets.length,
+              betAmounts: bets.map((b) => b.amount),
+              betSkin: bets.map((b) => b.skin),
+              betPosition: bets.map((b) => b.position),
+              betWalletIndex: bets.map((b) => b.walletIndex),
+              wallets: wallets,
+              totalPot: updatedGame.totalDeposit || activeGame?.totalDeposit || 0,
+              winner: updatedGame.winner,
+              winningBetIndex: updatedGame.winningBetIndex ?? undefined,
+              prizeSent: false, // Prize not sent yet at this point
+            },
+          });
+          console.log(`Round ${roundId}: Synced finished game state to database (${bets.length} bets, ${wallets.length} wallets)`);
 
           // Check if send_prize already scheduled (by webhook)
           // Only schedule as fallback if webhook missed it
@@ -510,6 +538,8 @@ export const executeSendPrize = internalAction({
               betAmounts: gameRound.bets.map((b) => b.amount),
               betSkin: gameRound.bets.map((b) => b.skin),
               betPosition: gameRound.bets.map((b) => b.position),
+              betWalletIndex: gameRound.bets.map((b) => b.walletIndex),
+              wallets: gameRound.wallets,
               totalPot: gameRound.totalDeposit,
               winner: gameRound.winner,
               winningBetIndex: gameRound.winningBetIndex ?? undefined,
@@ -542,46 +572,64 @@ export const executeSendPrize = internalAction({
           action: "send_prize",
         });
 
+        // Update player stats (totalGamesPlayed, totalWins) for all participants
+        // This runs after prize transaction is confirmed, regardless of winnerPrize value
+        if (gameRound.wallets && gameRound.wallets.length > 0 && gameRound.winner) {
+          try {
+            await ctx.runMutation(internal.players.updateGameStatsForParticipants, {
+              participantWallets: gameRound.wallets,
+              winnerWallet: gameRound.winner.toString(),
+            });
+            console.log(`Round ${roundId}: Player stats updated for ${gameRound.wallets.length} participants`);
+          } catch (statsError) {
+            console.error(`Round ${roundId}: Failed to update player stats:`, statsError);
+          }
+        }
+
+        // Award points to winner for the prize amount
+        if (gameRound.winner && gameRound.winnerPrize > 0) {
+          try {
+            await ctx.runMutation(internal.players.awardPointsInternal, {
+              walletAddress: gameRound.winner.toString(),
+              amountLamports: gameRound.winnerPrize,
+            });
+            console.log(`Round ${roundId}: Points awarded to winner for prize`);
+          } catch (pointsError) {
+            console.error(`Round ${roundId}: Failed to award points to winner:`, pointsError);
+          }
+        }
+
         // 4. Verify prize was sent and update database
         await new Promise((resolve) => setTimeout(resolve, 1000));
         const updatedGame = await solanaClient.getGameRound(roundId);
 
-        if (updatedGame?.winnerPrize === 0) {
-          // Award points to winner for the prize amount
-          if (gameRound.winner) {
-            try {
-              await ctx.runMutation(internal.players.awardPointsInternal, {
-                walletAddress: gameRound.winner.toString(),
-                amountLamports: gameRound.winnerPrize,
-              });
-              console.log(`Round ${roundId}: Points awarded to winner for prize`);
-            } catch (pointsError) {
-              console.error(`Round ${roundId}: Failed to award points to winner:`, pointsError);
-            }
-          }
+        // Update database with final game state
+        await ctx.runMutation(internal.syncServiceMutations.upsertGameState, {
+          gameRound: {
+            roundId: gameRound.gameRound,
+            status: gameRound.status,
+            startTimestamp: gameRound.startDate,
+            endTimestamp: gameRound.endDate,
+            map: gameRound.map,
+            betCount: gameRound.bets.length,
+            betAmounts: gameRound.bets.map((b) => b.amount),
+            betSkin: gameRound.bets.map((b) => b.skin),
+            betPosition: gameRound.bets.map((b) => b.position),
+            betWalletIndex: gameRound.bets.map((b) => b.walletIndex),
+            wallets: gameRound.wallets,
+            totalPot: gameRound.totalDeposit,
+            winner: gameRound.winner,
+            winningBetIndex: gameRound.winningBetIndex ?? undefined,
+            prizeSent: true,
+          },
+        });
 
-          await ctx.runMutation(internal.syncServiceMutations.upsertGameState, {
-            gameRound: {
-              roundId: updatedGame.gameRound,
-              status: updatedGame.status,
-              startTimestamp: updatedGame.startDate,
-              endTimestamp: updatedGame.endDate,
-              map: updatedGame.map,
-              betCount: updatedGame.bets.length,
-              betAmounts: updatedGame.bets.map((b) => b.amount),
-              betSkin: updatedGame.bets.map((b) => b.skin),
-              betPosition: updatedGame.bets.map((b) => b.position),
-              totalPot: updatedGame.totalDeposit,
-              winner: updatedGame.winner,
-              winningBetIndex: updatedGame.winningBetIndex ?? undefined,
-              prizeSent: true,
-            },
-          });
+        if (updatedGame?.winnerPrize === 0) {
           console.log(`Round ${roundId}: ✅ Verified: Prize successfully distributed`);
-          console.log(`Round ${roundId}: 🎉 GAME COMPLETE - Cron will create next game`);
         } else {
-          console.warn(`Round ${roundId}: ⚠️ Prize may not have been fully sent (${updatedGame?.winnerPrize} remaining)`);
+          console.warn(`Round ${roundId}: ⚠️ winnerPrize not zeroed (${updatedGame?.winnerPrize} remaining) - this may be expected behavior`);
         }
+        console.log(`Round ${roundId}: 🎉 GAME COMPLETE - Cron will create next game`);
       } else {
         console.error(`Round ${roundId}: ❌ Transaction confirmation failed: ${txSignature}`);
 

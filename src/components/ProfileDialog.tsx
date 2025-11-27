@@ -13,7 +13,7 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { toast } from "sonner";
-import { User, Copy, Check, Share2, Trophy, Coins } from "lucide-react";
+import { User, Trophy, X } from "lucide-react";
 import { logger } from "../lib/logger";
 
 interface ProfileDialogProps {
@@ -31,15 +31,24 @@ export function ProfileDialog({
 }: ProfileDialogProps) {
   const [displayName, setDisplayName] = useState(currentName || "");
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
 
   const updateDisplayName = useMutation(api.players.updateDisplayName);
 
-  // Fetch player stats from game history
-  const playerStats = useQuery(
-    api.players.getPlayerStatsFromHistory,
+  // Fetch player data
+  const playerData = useQuery(
+    api.players.getPlayer,
     { walletAddress }
   );
+
+  // Fetch recent games
+  const recentGames = useQuery(
+    api.players.getRecentGames,
+    { walletAddress, limit: 10 }
+  );
+
+  const totalWins = playerData?.totalWins ?? 0;
+  const totalGames = playerData?.totalGamesPlayed ?? 0;
+  const totalLosses = totalGames - totalWins;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,130 +84,40 @@ export function ProfileDialog({
     }
   };
 
-  const truncateAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  const formatTimestamp = (timestamp: number) => {
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   };
 
-  const handleCopyAddress = async () => {
-    try {
-      await navigator.clipboard.writeText(walletAddress);
-      setIsCopied(true);
-      toast.success("Wallet address copied to clipboard!");
-      setTimeout(() => setIsCopied(false), 2000);
-    } catch (error) {
-      logger.ui.error("Failed to copy address:", error);
-      toast.error("Failed to copy address");
-    }
-  };
-
-  const handleShareOnX = () => {
-    const gameUrl = window.location.origin;
-    const tweetText = `Join me in Royal Rumble! 🎮👑
-
-    Battle for glory and SOL prizes in this epic Web3 arena game on Solana!
-    
-    Check it out here: ${gameUrl}
-
-    #RoyalRumble #Solana #Web3Gaming #PlayToEarn`;
-    
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
-    window.open(twitterUrl, '_blank', 'width=550,height=420');
+  const formatSol = (lamports: number) => {
+    return (lamports / 1_000_000_000).toFixed(3);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className="sm:max-w-[425px] bg-gradient-to-b from-amber-900/95 to-amber-950/95 backdrop-blur-sm border-2 border-amber-600/60">
+      <DialogContent showCloseButton={false} className="sm:max-w-[550px] bg-gradient-to-b from-indigo-950/98 to-slate-950/98 backdrop-blur-md border border-indigo-500/40">
+        {/* Custom close button */}
+        <button
+          onClick={() => onOpenChange(false)}
+          className="absolute top-4 right-4 text-white hover:text-yellow-400 transition-colors border-2 border-white/50 hover:border-yellow-400 rounded-full p-1"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-amber-100 flex items-center gap-2">
-              <User className="w-5 h-5" />
-              Profile Settings
-            </DialogTitle>
-            <button
-              onClick={handleShareOnX}
-              className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white rounded-lg transition-all text-sm font-semibold shadow-lg"
-              title="Share game on X"
-            >
-              <Share2 className="w-4 h-4" />
-              Share
-            </button>
-          </div>
-          <DialogDescription className="text-amber-300/80">
-            Customize your profile settings and display name.
+          <DialogTitle className="text-indigo-100 flex items-center gap-2">
+            <User className="w-5 h-5" />
+            Profile Settings
+          </DialogTitle>
+          <DialogDescription className="text-indigo-300/80">
+            Customize your display name.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+          {/* Display Name */}
           <div className="space-y-2">
-            <Label htmlFor="wallet" className="text-amber-300">
-              Wallet Address
-            </Label>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 px-3 py-2 bg-black/30 rounded-md text-amber-400 font-mono text-sm border border-amber-700/50">
-                {truncateAddress(walletAddress)}
-              </div>
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                onClick={() => void handleCopyAddress()}
-                className="border-amber-700/50 text-amber-300 hover:bg-amber-700/40 bg-amber-800/30 transition-all"
-                title="Copy full address"
-              >
-                {isCopied ? (
-                  <Check className="w-4 h-4 text-green-400" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-
-          {/* Player Stats Section */}
-          <div className="space-y-2">
-            <Label className="text-amber-300">Game Statistics</Label>
-            <div className="grid grid-cols-2 gap-3">
-              {/* Total Wins */}
-              <div className="px-3 py-3 bg-black/30 rounded-md border border-amber-700/50">
-                <div className="flex items-center gap-2 mb-1">
-                  <Trophy className="w-4 h-4 text-yellow-400" />
-                  <span className="text-xs text-amber-400/80">Total Wins</span>
-                </div>
-                <div className="text-xl font-bold text-amber-100">
-                  {playerStats ? playerStats.totalWins : "..."}
-                </div>
-              </div>
-
-              {/* Total Winnings */}
-              <div className="px-3 py-3 bg-black/30 rounded-md border border-amber-700/50">
-                <div className="flex items-center gap-2 mb-1">
-                  <Coins className="w-4 h-4 text-yellow-400" />
-                  <span className="text-xs text-amber-400/80">Total Winnings</span>
-                </div>
-                <div className="text-xl font-bold text-amber-100 flex items-center gap-1">
-                  {playerStats ? (
-                    <>
-                      <img
-                        src="/sol-logo.svg"
-                        alt="SOL"
-                        className="w-4 h-4"
-                        style={{
-                          filter:
-                            "brightness(0) saturate(100%) invert(81%) sepia(13%) saturate(891%) hue-rotate(196deg) brightness(95%) contrast(92%)",
-                        }}
-                      />
-                      {playerStats.totalWinningsSOL.toFixed(4)}
-                    </>
-                  ) : (
-                    "..."
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="displayName" className="text-amber-300">
+            <Label htmlFor="displayName" className="text-indigo-300 text-lg">
               Display Name
             </Label>
             <Input
@@ -206,29 +125,78 @@ export function ProfileDialog({
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="Enter your display name"
-              className="bg-black/30 border-amber-700/50 text-amber-100 placeholder:text-amber-600 focus:outline-none focus:border-amber-500"
+              className="bg-black/30 border-indigo-500/40 text-indigo-100 text-lg placeholder:text-indigo-600 focus:outline-none focus:border-indigo-400"
               maxLength={20}
               minLength={3}
               required
             />
-            <p className="text-xs text-amber-400/70">
+            <p className="text-sm text-indigo-400/70">
               3-20 characters. This will be shown in the game.
             </p>
           </div>
 
+          {/* Recent Games Header with Stats */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-indigo-100 text-2xl font-semibold">Recent Games</Label>
+              <div className="flex items-center gap-4 text-lg">
+                <div className="flex items-center gap-1.5">
+                  <Trophy className="w-5 h-5 text-green-400" />
+                  <span className="text-green-300 font-bold text-xl">{totalWins}</span>
+                  <span className="text-indigo-400">wins</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-red-300 font-bold text-xl">{totalLosses}</span>
+                  <span className="text-indigo-400">losses</span>
+                </div>
+              </div>
+            </div>
+            <div className="bg-black/30 rounded-md border border-indigo-500/40 max-h-[250px] overflow-y-auto">
+              {recentGames === undefined ? (
+                <div className="text-center py-4 text-indigo-400/60 text-lg">Loading...</div>
+              ) : recentGames.length === 0 ? (
+                <div className="text-center py-4 text-indigo-400/60 text-lg">No games played yet</div>
+              ) : (
+                <div className="divide-y divide-indigo-500/20">
+                  {recentGames.map((game) => (
+                    <div
+                      key={game.roundId}
+                      className={`px-3 py-2 flex items-center justify-between ${
+                        game.isWinner ? "bg-green-900/20" : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`text-base font-bold px-2 py-0.5 rounded ${
+                          game.isWinner
+                            ? "bg-green-500/30 text-green-300"
+                            : "bg-red-500/30 text-red-300"
+                        }`}>
+                          {game.isWinner ? "WIN" : "LOSS"}
+                        </span>
+                        <span className="text-base text-indigo-400">
+                          {formatTimestamp(game.timestamp)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-base">
+                        <span className="text-indigo-300">
+                          {game.playerCount} players
+                        </span>
+                        <span className="text-indigo-100 font-semibold text-lg">
+                          {game.isWinner ? "+" : "-"}{formatSol(game.isWinner ? game.prizeWon : game.playerBetAmount)} SOL
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="border-amber-600/50 text-amber-300 hover:bg-amber-700/40 bg-amber-800/30"
-            >
-              Cancel
-            </Button>
             <Button
               type="submit"
               disabled={isUpdating}
-              className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold disabled:from-gray-600 disabled:to-gray-700 disabled:opacity-50"
+              className="w-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold disabled:from-gray-600 disabled:to-gray-700 disabled:opacity-50"
             >
               {isUpdating ? "Updating..." : "Save Changes"}
             </Button>

@@ -29,6 +29,7 @@ export default defineSchema({
     betAmounts: v.optional(v.array(v.number())), // Array of bet amounts
     betSkin: v.optional(v.array(v.number())), // Array of skin IDs (u8) - character customization
     betPosition: v.optional(v.array(v.array(v.number()))), // Array of [x, y] positions (u16)
+    betWalletIndex: v.optional(v.array(v.number())), // Index into wallets array for each bet
     wallets: v.optional(v.array(v.string())), // Array of unique wallet addresses (base58)
     totalPot: v.optional(v.number()), // Total accumulated pot in lamports
     winner: v.optional(v.union(v.string(), v.null())), // Winner wallet (base58), null if not determined

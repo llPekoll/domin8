@@ -7,7 +7,7 @@ import { isMobile, isTablet } from "react-device-detect";
 
 export function LastWinnerCard() {
   const lastFinishedGame = useQuery(api.stats.getLastFinishedGame);
-  console.log({ lastFinishedGame });
+  console.log("[LastWinnerCard] lastFinishedGame:", lastFinishedGame, "characterName:", lastFinishedGame?.characterName);
   // Get display name for the winner
   const playerInfo = useQuery(
     api.players.getPlayer,

@@ -77,6 +77,8 @@ async function syncActiveGame(ctx: any, activeGame: any) {
         betAmounts: activeGame.bets?.map((b: any) => b.amount),
         betSkin: activeGame.bets?.map((b: any) => b.skin),
         betPosition: activeGame.bets?.map((b: any) => b.position),
+        betWalletIndex: activeGame.bets?.map((b: any) => b.walletIndex),
+        wallets: activeGame.wallets,
         totalPot: activeGame.totalDeposit,
         winner: activeGame.winner,
         winningBetIndex: activeGame.winningBetIndex ?? undefined,
@@ -477,6 +479,9 @@ export const checkAndEndOpenGames = internalAction({
         winner: activeGame.winner,
         winnerPrize: activeGame.winnerPrize,
       });
+
+      // Sync game state to database
+      await syncActiveGame(ctx, activeGame);
 
       // 3. Game is WAITING (status=2) - no bets yet, skip
       if (activeGame.status === GAME_STATUS.WAITING) {
