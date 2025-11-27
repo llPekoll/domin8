@@ -106,20 +106,20 @@ export function LobbyHistory({ lobbies, maxLobbies = MAX_LOBBIES_DEFAULT }: Lobb
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="text-indigo-300 font-semibold text-xs">{formatAmount(lobby.amount)}</span>
-                  <span className="text-gray-500 text-[10px]">SOL</span>
+                  <span className="text-indigo-300 font-semibold">{formatAmount(lobby.amount)}</span>
+                  <span className="text-gray-500">SOL</span>
                 </div>
               </div>
 
               {/* Players row */}
               <div className="lobby-history-players">
-                <span className="text-gray-500 text-[10px]">A:</span>
+                <span className="text-gray-500 text-[14px]">A:</span>
                 <span className={`font-mono text-[11px] ${isPlayerAWinner ? 'text-yellow-300 font-bold' : 'text-indigo-300'}`}>
                   {formatWallet(lobby.playerA)}
                   {isPlayerAWinner && ' 👑'}
                 </span>
-                <span className="text-gray-600 text-[10px] mx-1">vs</span>
-                <span className="text-gray-500 text-[10px]">B:</span>
+                <span className="text-gray-600 text-[14px] mx-1">vs</span>
+                <span className="text-gray-500 text-[14px]">B:</span>
                 {lobby.playerB ? (
                   <span className={`font-mono text-[11px] ${isPlayerBWinner ? 'text-yellow-300 font-bold' : 'text-indigo-300'}`}>
                     {formatWallet(lobby.playerB)}
@@ -128,7 +128,7 @@ export function LobbyHistory({ lobbies, maxLobbies = MAX_LOBBIES_DEFAULT }: Lobb
                 ) : (
                   <span className="text-gray-600 italic text-[11px]">---</span>
                 )}
-                <span className="text-gray-500 text-[10px] ml-auto">{formatTime(isResolved ? lobby.resolvedAt : lobby.createdAt)}</span>
+                <span className="text-gray-500 text-[14px] ml-auto">{formatTime(isResolved ? lobby.resolvedAt : lobby.createdAt)}</span>
               </div>
             </div>
           );

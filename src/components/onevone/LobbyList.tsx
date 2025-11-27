@@ -384,36 +384,40 @@ export function LobbyList({
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {displayedLobbies.map((lobby) => (
             <div 
               key={lobby._id} 
-              className={`bg-gray-800 border rounded-lg p-4 cursor-pointer hover:bg-gray-700 transition-colors ${
-                activeTab === "my" ? "border-indigo-400/50" : "border-indigo-400/50"
-              }`}
+              className="bg-gray-800 border border-indigo-400/30 rounded-lg p-3 cursor-pointer hover:bg-gray-700 hover:border-indigo-400/60 transition-colors"
               onClick={() => setSelectedLobby(lobby)}
             >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex-1">
-                  <p className="text-sm text-indigo-400">
-                    Lobby #{lobby.lobbyId}
-                  </p>
-                  <p className="text-indigo-200 font-semibold">
+              <div className="flex items-center gap-4">
+                {/* Lobby ID & Amount */}
+                <div className="min-w-[100px]">
+                  <p className="text-xs text-gray-400">Lobby #{lobby.lobbyId}</p>
+                  <p className="text-lg font-bold text-yellow-400">
                     {formatAmount(lobby.amount)} SOL
                   </p>
                 </div>
 
-                <div className="flex-1 text-center">
-                  <p className="text-xs text-gray-400">
-                    {activeTab === "my" ? "Status" : "Player A"}
-                  </p>
-                  <p className="text-xs text-indigo-300 font-mono truncate">
-                    {activeTab === "my" 
-                      ? "Waiting for opponent" 
-                      : `${lobby.playerA.slice(0, 8)}...`}
-                  </p>
+                {/* Character & Player Info */}
+                <div className="flex-1 flex items-center gap-3">
+                  <div className="px-2 py-1 bg-indigo-900/50 rounded text-xs">
+                    <span className="text-gray-400">Char:</span>{" "}
+                    <span className="text-indigo-300">#{lobby.characterA}</span>
+                  </div>
+                  <div className="px-2 py-1 bg-gray-700/50 rounded text-xs">
+                    <span className="text-gray-400">Map:</span>{" "}
+                    <span className="text-gray-300">#{lobby.mapId}</span>
+                  </div>
+                  {activeTab === "open" && (
+                    <p className="text-xs text-gray-500 font-mono truncate max-w-[120px]">
+                      {lobby.playerA.slice(0, 4)}...{lobby.playerA.slice(-4)}
+                    </p>
+                  )}
                 </div>
 
+                {/* Action Button */}
                 {activeTab === "open" ? (
                   <button
                     onClick={(e) => {
@@ -426,7 +430,7 @@ export function LobbyList({
                       !selectedCharacter ||
                       lobby.playerA === currentPlayerWallet
                     }
-                    className="ml-4 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-bold rounded transition-colors whitespace-nowrap"
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-bold rounded transition-colors whitespace-nowrap"
                   >
                     {joiningLobbies.has(lobby.lobbyId) ? "Joining..." : "Join"}
                   </button>
@@ -434,18 +438,11 @@ export function LobbyList({
                   <button
                     onClick={(e) => handleCancelLobby(lobby, e)}
                     disabled={cancellingLobbies.has(lobby.lobbyId)}
-                    className="ml-4 px-3 py-1 bg-red-600 hover:bg-red-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-bold rounded transition-colors whitespace-nowrap"
+                    className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-bold rounded transition-colors whitespace-nowrap"
                   >
-                    {cancellingLobbies.has(lobby.lobbyId) ? "Cancelling..." : "Cancel"}
+                    {cancellingLobbies.has(lobby.lobbyId) ? "..." : "Cancel"}
                   </button>
                 )}
-              </div>
-
-              {/* Status Info */}
-              <div className="flex gap-2 text-xs text-gray-400">
-                <span className="px-2 py-1 bg-gray-700 rounded">
-                  Status: {lobby.status === 0 ? "Waiting" : lobby.status === 1 ? "Awaiting VRF" : "Resolved"}
-                </span>
               </div>
             </div>
           ))}

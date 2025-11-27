@@ -171,15 +171,15 @@ export function LobbyDetailsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="bg-black border-2 border-indigo-500/30 text-white sm:max-w-4xl p-0 overflow-hidden">
+      <DialogContent className="bg-black border-2 border-indigo-500/30 text-white sm:max-w-3xl p-0 overflow-hidden">
         {/* Header */}
-        <DialogHeader className="p-4 pr-12 bg-gradient-to-r from-indigo-900/90 to-purple-900/90 border-b border-indigo-500/30/50">
-          <DialogTitle className="text-xl font-bold text-indigo-200 flex items-center justify-between">
+        <DialogHeader className="p-3 pr-12 bg-gradient-to-r from-indigo-900/90 to-purple-900/90 border-b border-indigo-500/30/50">
+          <DialogTitle className="text-lg font-bold text-indigo-200 flex items-center justify-between">
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
               Lobby #{lobby.lobbyId}
             </span>
-            <span className="text-yellow-400 font-mono text-lg">
+            <span className="text-yellow-400 font-mono">
               {formatAmount(lobby.amount)} SOL
             </span>
           </DialogTitle>
@@ -188,27 +188,27 @@ export function LobbyDetailsDialog({
         {/* Phaser Game Container - Shows Player A's character */}
         <div 
           ref={containerRefCallback}
-          className="relative w-full aspect-video bg-gray-900 flex items-center justify-center overflow-hidden [&>canvas]:max-w-full [&>canvas]:max-h-full [&>canvas]:object-contain"
+          className="relative w-full aspect-[16/9] max-h-[50vh] bg-gray-900 flex items-center justify-center overflow-hidden [&>canvas]:max-w-full [&>canvas]:max-h-full [&>canvas]:object-contain"
         >
           {/* Loading indicator while Phaser initializes */}
           {!gameReady && (
             <div className="absolute inset-0 flex flex-col items-center justify-center z-5">
-              <div className="animate-spin w-10 h-10 border-4 border-indigo-500/30 border-t-transparent rounded-full mb-4"></div>
+              <div className="animate-spin w-8 h-8 border-4 border-indigo-500/30 border-t-transparent rounded-full mb-2"></div>
               <p className="text-gray-400 text-sm">Loading arena...</p>
             </div>
           )}
           
           {/* Status Banner */}
           {gameReady && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-              <div className="text-center bg-black/70 px-6 py-3 rounded-lg border border-indigo-500/30/50">
-                <div className="flex items-center gap-3">
-                  <div className="animate-spin w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full"></div>
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+              <div className="text-center bg-black/70 px-4 py-2 rounded-lg border border-indigo-500/30/50">
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full"></div>
                   <div>
-                    <h2 className="text-lg font-bold text-white">
+                    <h2 className="text-sm font-bold text-white">
                       {isCreator ? "Waiting for Opponent" : "Ready to Battle!"}
                     </h2>
-                    <p className="text-gray-300 text-sm">
+                    <p className="text-gray-300 text-xs">
                       {isCreator ? "Your character is waiting in the arena" : "Join this lobby to fight!"}
                     </p>
                   </div>
@@ -218,46 +218,41 @@ export function LobbyDetailsDialog({
           )}
         </div>
 
-        {/* Lobby Info Footer */}
-        <div className="p-4 bg-gray-900/95 border-t border-indigo-500/30/30">
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <div className="bg-black/50 p-3 rounded-lg border border-indigo-500/30/30">
-              <p className="text-xs text-gray-400 mb-1">Challenger</p>
-              <p className="text-sm font-mono text-indigo-300 truncate">{lobby.playerA}</p>
+        {/* Lobby Info Footer - Compact */}
+        <div className="p-3 bg-gray-900/95 border-t border-indigo-500/30/30">
+          <div className="flex gap-3 mb-3">
+            <div className="flex-1 bg-black/50 p-2 rounded-lg border border-indigo-500/30/30">
+              <p className="text-xs text-gray-400">Challenger</p>
+              <p className="text-xs font-mono text-indigo-300 truncate">{lobby.playerA}</p>
             </div>
-            <div className="bg-black/50 p-3 rounded-lg border border-indigo-500/30/30 text-center">
-              <p className="text-xs text-gray-400 mb-1">Character</p>
+            <div className="bg-black/50 px-4 py-2 rounded-lg border border-indigo-500/30/30 text-center">
+              <p className="text-xs text-gray-400">Character</p>
               <p className="text-sm font-semibold text-indigo-200">{characterName}</p>
             </div>
-            <div className="bg-black/50 p-3 rounded-lg border border-indigo-500/30/30 text-center">
-              <p className="text-xs text-gray-400 mb-1">Bet Amount</p>
-              <p className="text-lg font-bold text-yellow-400">{formatAmount(lobby.amount)} SOL</p>
+            <div className="bg-black/50 px-4 py-2 rounded-lg border border-indigo-500/30/30 text-center">
+              <p className="text-xs text-gray-400">Bet</p>
+              <p className="text-sm font-bold text-yellow-400">{formatAmount(lobby.amount)} SOL</p>
             </div>
           </div>
 
           {/* Action Buttons */}
           {isCreator ? (
-            <div className="space-y-2">
-              <p className="text-xs text-gray-500 text-center mb-2">
-                You can close this dialog and browse other lobbies while waiting.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={onClose}
-                  className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 font-semibold rounded-lg transition-colors"
-                >
-                  Browse Other Lobbies
-                </button>
-                <button
-                  onClick={() => onCancel(lobby.lobbyId)}
-                  className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg transition-colors"
-                >
-                  Cancel Lobby
-                </button>
-              </div>
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm font-semibold rounded-lg transition-colors"
+              >
+                Browse Other Lobbies
+              </button>
+              <button
+                onClick={() => onCancel(lobby.lobbyId)}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-bold rounded-lg transition-colors"
+              >
+                Cancel Lobby
+              </button>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div>
               {!selectedCharacter && (
                 <p className="text-xs text-yellow-400 text-center mb-2">
                   ⚠️ Select a character before joining
@@ -266,7 +261,7 @@ export function LobbyDetailsDialog({
               <button
                 onClick={() => onJoin(lobby.lobbyId)}
                 disabled={!selectedCharacter}
-                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg shadow-indigo-900/20"
+                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-lg shadow-indigo-900/20"
               >
                 Join Battle ({formatAmount(lobby.amount)} SOL)
               </button>
