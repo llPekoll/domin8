@@ -155,6 +155,17 @@ export class Preloader extends Scene {
     // Load winner throne
     this.load.image("throne", "misc/throne.png");
 
+    // Load badge assets
+    this.load.image("badge-lvl1-1", "badge/badge-lvl1-1.png");
+    this.load.image("badge-lvl1-2", "badge/badge-lvl1-2.png");
+    this.load.image("badge-lvl1-3", "badge/badge-lvl1-3.png");
+    this.load.image("badge-lvl2-1", "badge/badge-lvl2-1.png");
+    this.load.image("badge-lvl2-2", "badge/badge-lvl2-2.png");
+    this.load.image("badge-lvl2-3", "badge/badge-lvl2-3.png");
+    this.load.image("badge-lvl2-4", "badge/badge-lvl2-4.png");
+    this.load.image("badge-lvl3-1", "badge/badge-lvl3-1.png");
+    this.load.image("badge-lvl4-1", "badge/badge-lvl4-1.png");
+
     // Load sound effects
     this.load.audio("battle-theme", "sounds/battleThemeA.mp3");
     this.load.audio("domin8-intro", "sounds/domin8-intro.mp3");

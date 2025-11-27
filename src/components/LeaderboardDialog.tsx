@@ -7,8 +7,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-import { Trophy, Medal, Award, Crown } from "lucide-react";
+import { Trophy, X } from "lucide-react";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
+import { calculateBadges, getBadgeTextureKeys } from "../game/utils/badgeUtils";
 
 interface LeaderboardDialogProps {
   open: boolean;
@@ -19,34 +20,49 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
   const { publicKey } = usePrivyWallet();
   const leaderboard = useQuery(api.players.getLeaderboard, { limit: 50 });
 
-  const getRankIcon = (rank: number) => {
+  const getRankStyle = (rank: number) => {
     switch (rank) {
       case 1:
-        return <Crown className="w-5 h-5 text-yellow-400" />;
+        return {
+          bg: "bg-gradient-to-r from-yellow-900/50 via-yellow-700/30 to-yellow-900/50",
+          rankBg: "bg-gradient-to-br from-yellow-400 via-yellow-300 to-yellow-500 text-yellow-900",
+          glow: "shadow-[0_0_12px_rgba(234,179,8,0.5)]",
+          nameColor: "text-yellow-100",
+          statsColor: "text-yellow-200",
+          pointsColor: "text-yellow-300",
+        };
       case 2:
-        return <Medal className="w-5 h-5 text-gray-400" />;
+        return {
+          bg: "bg-gradient-to-r from-slate-700/40 via-slate-500/25 to-slate-700/40",
+          rankBg: "bg-gradient-to-br from-slate-300 via-slate-200 to-slate-400 text-slate-800",
+          glow: "",
+          nameColor: "text-slate-100",
+          statsColor: "text-slate-200",
+          pointsColor: "text-slate-100",
+        };
       case 3:
-        return <Award className="w-5 h-5 text-amber-600" />;
+        return {
+          bg: "bg-gradient-to-r from-amber-900/40 via-amber-700/25 to-amber-900/40",
+          rankBg: "bg-gradient-to-br from-amber-500 via-amber-400 to-amber-600 text-amber-950",
+          glow: "",
+          nameColor: "text-amber-100",
+          statsColor: "text-amber-200",
+          pointsColor: "text-amber-200",
+        };
       default:
-        return <Trophy className="w-4 h-4 text-indigo-400" />;
-    }
-  };
-
-  const getRankColor = (rank: number) => {
-    switch (rank) {
-      case 1:
-        return "bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-yellow-500/40";
-      case 2:
-        return "bg-gradient-to-r from-gray-400/20 to-gray-500/20 border-gray-400/40";
-      case 3:
-        return "bg-gradient-to-r from-amber-600/20 to-amber-700/20 border-amber-600/40";
-      default:
-        return "bg-indigo-900/20 border-indigo-500/30";
+        return {
+          bg: "bg-indigo-900/50",
+          rankBg: "bg-indigo-700 text-indigo-100",
+          glow: "",
+          nameColor: "text-indigo-50",
+          statsColor: "text-indigo-200",
+          pointsColor: "text-indigo-100",
+        };
     }
   };
 
   const truncateAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+    return `${address.slice(0, 4)}...${address.slice(-4)}`;
   };
 
   const isCurrentUser = (walletAddress: string) => {
@@ -55,100 +71,136 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
 
   const calculateWinRate = (wins: number, totalGames: number) => {
     if (totalGames === 0) return "0%";
-    return `${((wins / totalGames) * 100).toFixed(1)}%`;
+    return `${((wins / totalGames) * 100).toFixed(0)}%`;
+  };
+
+  // Render badges based on total wins
+  const renderBadges = (totalWins: number) => {
+    if (totalWins <= 0) return null;
+
+    const badges = calculateBadges(totalWins);
+    const badgeKeys = getBadgeTextureKeys(badges);
+
+    if (badgeKeys.length === 0) return null;
+
+    return (
+      <div className="flex items-center gap-1">
+        {badgeKeys.map((key, index) => (
+          <img
+            key={`${key}-${index}`}
+            src={`/assets/badge/${key}.png`}
+            alt={key}
+            className="w-8 h-8 object-contain"
+            style={{ imageRendering: "pixelated" }}
+          />
+        ))}
+      </div>
+    );
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-[600px] bg-gradient-to-b from-indigo-900/95 to-indigo-950/95 backdrop-blur-sm border-2 border-indigo-600/60 max-h-[80vh]"
+        className="sm:max-w-[700px] bg-gradient-to-b from-indigo-950/98 to-slate-950/98 backdrop-blur-md border border-indigo-500/40 max-h-[80vh]"
       >
-        <DialogHeader>
-          <DialogTitle className="text-indigo-100 flex items-center gap-2 text-2xl">
-            <Trophy className="w-6 h-6 text-yellow-400" />
-            Leaderboard
+        {/* Custom close button */}
+        <button
+          onClick={() => onOpenChange(false)}
+          className="absolute top-4 right-4 text-white hover:text-yellow-400 transition-colors border-2 border-white/50 hover:border-yellow-400 rounded-full p-1"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <DialogHeader className="pb-4">
+          <DialogTitle className="text-indigo-100 flex items-center justify-center gap-3 text-4xl font-bold tracking-wide">
+            <Trophy className="w-8 h-8 text-yellow-400" />
+            LEADERBOARD
           </DialogTitle>
-          <DialogDescription className="text-indigo-300/80">
-            Top players ranked by total points earned
-          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2 overflow-y-auto max-h-[60vh] pr-2">
+        <div className="overflow-y-auto max-h-[55vh] pr-1 scrollbar-thin scrollbar-thumb-indigo-700/50 scrollbar-track-transparent">
           {leaderboard === undefined ? (
-            <div className="text-center py-8 text-indigo-300/60">Loading leaderboard...</div>
+            <div className="text-center py-6 text-indigo-400/60">Loading...</div>
           ) : leaderboard.length === 0 ? (
-            <div className="text-center py-8 text-indigo-300/60">
-              No players on the leaderboard yet. Be the first to earn points!
-            </div>
+            <div className="text-center py-6 text-indigo-400/60">No players yet. Be the first!</div>
           ) : (
-            leaderboard.map((player) => (
-              <div
-                key={player.walletAddress}
-                className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${getRankColor(
-                  player.rank
-                )} ${isCurrentUser(player.walletAddress) ? "ring-2 ring-indigo-400" : ""}`}
-              >
-                {/* Rank */}
-                <div className="flex items-center justify-center w-12 flex-shrink-0">
-                  {player.rank <= 3 ? (
-                    <div className="flex flex-col items-center">
-                      {getRankIcon(player.rank)}
-                      <span className="text-xs text-indigo-300 mt-1">#{player.rank}</span>
-                    </div>
-                  ) : (
-                    <span className="text-lg font-bold text-indigo-300">#{player.rank}</span>
-                  )}
-                </div>
+            <table className="w-full">
+              <thead className="sticky top-0 bg-indigo-950/95 z-10">
+                <tr className="text-base text-indigo-300/70 uppercase">
+                  <th className=" py-2 pl-3 text-center">#</th>
+                  <th className="text-left py-2">Player</th>
+                  <th className="text-center  w-20">Games</th>
+                  <th className="text-center py-2 w-20">Wins</th>
+                  <th className="text-center py-2 w-20">Win%</th>
+                  <th className="text-right py-2 pr-3 w-24">Points</th>
+                </tr>
+              </thead>
+              <tbody className="space-y-1">
+                {leaderboard.map((player) => {
+                  const style = getRankStyle(player.rank);
+                  const isCurrent = isCurrentUser(player.walletAddress);
 
-                {/* Player Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-xs text-indigo-400/80">Win Rate</span>
-                    <span className="text-sm font-bold text-indigo-200">
-                      {calculateWinRate(player.totalWins, player.totalGamesPlayed)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-indigo-100 font-semibold truncate">
-                      {player.displayName}
-                    </span>
-                    {isCurrentUser(player.walletAddress) && (
-                      <span className="px-2 py-0.5 bg-indigo-500/30 text-indigo-200 text-xs rounded-full">
-                        You
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-indigo-400/60 font-mono">
-                    {truncateAddress(player.walletAddress)}
-                  </div>
-                </div>
+                  return (
+                    <tr
+                      key={player.walletAddress}
+                      className={`rounded-md ${style.bg} ${style.glow} ${
+                        isCurrent ? "ring-1 ring-indigo-400/60" : ""
+                      }`}
+                    >
+                      {/* Rank */}
+                      <td className="py-3 pl-3 w-14">
+                        <div
+                          className={`w-10 h-10 rounded flex items-center justify-center text-lg font-bold ${style.rankBg}`}
+                        >
+                          {player.rank}
+                        </div>
+                      </td>
 
-                {/* Stats */}
-                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <div className="flex items-center gap-1">
-                    <span className="text-yellow-400">🏆</span>
-                    <span className="text-lg font-bold text-indigo-100">
-                      {player.totalPoints.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="text-xs text-indigo-400/80">
-                    {player.totalWins} {player.totalWins === 1 ? "win" : "wins"} /{" "}
-                    {player.totalGamesPlayed} {player.totalGamesPlayed === 1 ? "game" : "games"}
-                  </div>
-                </div>
-              </div>
-            ))
+                      {/* Player Info */}
+                      <td className="py-3">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`font-semibold text-xl truncate max-w-[180px] ${style.nameColor}`}
+                          >
+                            {player.displayName}
+                          </span>
+                          {renderBadges(player.totalWins)}
+                          {isCurrent && (
+                            <span className="px-2 py-1 bg-indigo-500/60 text-white text-sm rounded font-medium">
+                              YOU
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Games */}
+                      <td className={`text-center py-3 font-semibold text-xl ${style.statsColor}`}>
+                        {player.totalGamesPlayed}
+                      </td>
+
+                      {/* Wins */}
+                      <td className={`text-center py-3 font-semibold text-xl ${style.statsColor}`}>
+                        {player.totalWins}
+                      </td>
+
+                      {/* Win% */}
+                      <td className={`text-center py-3 font-semibold text-xl ${style.statsColor}`}>
+                        {calculateWinRate(player.totalWins, player.totalGamesPlayed)}
+                      </td>
+
+                      {/* Points */}
+                      <td
+                        className={`text-right py-3 pr-3 font-bold text-2xl ${style.pointsColor}`}
+                      >
+                        {player.totalPoints.toLocaleString()}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           )}
-        </div>
-
-        <div className="flex justify-end pt-2 border-t border-indigo-500/30">
-          <button
-            onClick={() => onOpenChange(false)}
-            className="px-4 py-2 bg-indigo-700/50 hover:bg-indigo-600/50 text-indigo-100 rounded-lg transition-all"
-          >
-            Close
-          </button>
         </div>
       </DialogContent>
     </Dialog>

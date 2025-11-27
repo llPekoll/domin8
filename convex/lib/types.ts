@@ -57,6 +57,7 @@ export interface GameRound {
   betAmounts?: number[];
   betSkin?: number[];
   betPosition?: number[][];
+  betWalletIndex?: number[];
 }
 
 // PDA seeds (updated for risk-based architecture)

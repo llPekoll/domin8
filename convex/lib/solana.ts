@@ -243,6 +243,7 @@ export class SolanaClient {
         betAmounts: bets.map((b) => b.amount),
         betSkin: bets.map((b) => b.skin),
         betPosition: bets.map((b) => b.position),
+        betWalletIndex: bets.map((b) => b.walletIndex),
       };
     } catch (error) {
       // Game round account doesn't exist yet (no bets placed)
@@ -309,6 +310,7 @@ export class SolanaClient {
         betAmounts: bets.map((b) => b.amount),
         betSkin: bets.map((b) => b.skin),
         betPosition: bets.map((b) => b.position),
+        betWalletIndex: bets.map((b) => b.walletIndex),
       };
     } catch (error) {
       console.log("Error fetching active game:", error);

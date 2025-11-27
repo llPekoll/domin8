@@ -6,9 +6,6 @@ import {
   LogOut,
   Wallet,
   Download,
-  Plus,
-  ArrowUpRight,
-  User,
   ChevronDown,
   Copy,
   Check,
@@ -16,30 +13,24 @@ import {
 import { Button } from "./ui/button";
 import { isPhantomInstalled, openPhantomDownload } from "../lib/solana-wallet-utils";
 import { toast } from "sonner";
-import { WithdrawDialog } from "./WithdrawDialog";
-import { useFundWallet } from "../hooks/useFundWallet";
 
 interface PrivyWalletButtonProps {
   className?: string;
   compact?: boolean;
   showDisconnect?: boolean;
   onWalletConnected?: (address: string) => void;
-  onShowProfile?: () => void;
 }
 
 export function PrivyWalletButton({
   className = "",
   compact = false,
   onWalletConnected,
-  onShowProfile,
 }: PrivyWalletButtonProps) {
   const { ready, authenticated, login, logout, user } = usePrivy();
   const { wallets } = useWallets();
-  const { handleAddFunds } = useFundWallet();
   const [isMounted, setIsMounted] = useState(false);
   const [hasPhantom, setHasPhantom] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
 
   // Get Privy embedded wallet from user.linkedAccounts (more reliable)
   const embeddedWalletAccount = user?.linkedAccounts?.find(
@@ -101,29 +92,6 @@ export function PrivyWalletButton({
     }
   }, [authenticated, walletAddress, onWalletConnected]);
 
-  const onAddFundsClick = async () => {
-    setDropdownOpen(false);
-
-    if (!embeddedWallet) {
-      toast.error("No in-game wallet found. Please reconnect to create one.");
-      return;
-    }
-
-    await handleAddFunds(embeddedWallet.address);
-  };
-
-  const handleWithdraw = () => {
-    setDropdownOpen(false);
-    setShowWithdrawDialog(true);
-  };
-
-  const handleProfile = () => {
-    setDropdownOpen(false);
-    if (onShowProfile) {
-      onShowProfile();
-    }
-  };
-
   const handleDisconnect = async () => {
     setDropdownOpen(false);
     await logout();
@@ -179,103 +147,25 @@ export function PrivyWalletButton({
 
   if (compact) {
     return (
-      <>
-        <WithdrawDialog isOpen={showWithdrawDialog} onClose={() => setShowWithdrawDialog(false)} />
-        <div className={`relative ${className}`} ref={dropdownRef}>
+      <div className={`relative ${className}`} ref={dropdownRef}>
         <button
           onClick={() => setDropdownOpen(!dropdownOpen)}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-700 bg-gray-800/50 backdrop-blur-sm hover:bg-gray-800 transition-colors"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-950/80 border border-indigo-500/40 backdrop-blur-md hover:bg-indigo-800/50 transition-colors"
         >
           <Wallet className="w-4 h-4 text-indigo-400" />
-          <span className="text-xs font-medium text-gray-200 uppercase tracking-wide">
+          <span className="text-xs font-medium text-indigo-100 uppercase tracking-wide">
             {walletAddress.slice(0, 4)}...{walletAddress.slice(-4)}
           </span>
           <ChevronDown
-            className={`w-3 h-3 text-gray-400 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
+            className={`w-3 h-3 text-indigo-300 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
           />
         </button>
 
         {dropdownOpen && (
-          <div className="absolute right-0 mt-2 w-48 rounded-lg border border-gray-700 bg-gray-800 shadow-xl z-50">
-            <div className="py-1">
-              <button
-                onClick={() => void handleCopyAddress()}
-                className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
-              >
-                {isCopied ? (
-                  <>
-                    <Check className="w-4 h-4 text-green-400" />
-                    <span className="text-green-400">Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4" />
-                    Copy Address
-                  </>
-                )}
-              </button>
-              <div className="border-t border-gray-700 my-1" />
-              <button
-                onClick={() => void onAddFundsClick()}
-                className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Add Funds
-              </button>
-              <button
-                onClick={handleWithdraw}
-                className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
-              >
-                <ArrowUpRight className="w-4 h-4" />
-                Withdraw Funds
-              </button>
-              <button
-                onClick={handleProfile}
-                className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
-              >
-                <User className="w-4 h-4" />
-                Profile
-              </button>
-              <div className="border-t border-gray-700 my-1" />
-              <button
-                onClick={() => void handleDisconnect()}
-                className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-gray-700 flex items-center gap-2"
-              >
-                <LogOut className="w-4 h-4" />
-                Disconnect
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-      </>
-    );
-  }
-
-  return (
-    <>
-      <WithdrawDialog isOpen={showWithdrawDialog} onClose={() => setShowWithdrawDialog(false)} />
-      <div className={`relative ${className}`} ref={dropdownRef}>
-      <button
-        onClick={() => setDropdownOpen(!dropdownOpen)}
-        className="flex items-center gap-3 px-4 py-2 rounded-lg border border-gray-700 bg-gray-800/50 backdrop-blur-sm hover:bg-gray-800 transition-colors"
-      >
-        <Wallet className="w-4 h-4 text-indigo-400" />
-        <div className="h-4 w-px bg-gray-700" />
-        <span className="text-xs font-medium text-gray-300 uppercase tracking-wide">
-          {walletAddress.slice(0, 4)}...{walletAddress.slice(-4)}
-        </span>
-        <ChevronDown
-          className={`w-4 h-4 text-gray-400 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
-        />
-      </button>
-
-      {dropdownOpen && (
-        <div className="absolute right-0 mt-2 w-56 rounded-lg border border-gray-700 bg-gray-800 shadow-xl z-50">
-          <div className="py-1">
+          <div className="absolute right-0 mt-2 w-44 bg-indigo-950/95 border border-indigo-500/40 rounded-lg shadow-lg backdrop-blur-md overflow-hidden z-50">
             <button
               onClick={() => void handleCopyAddress()}
-              className="w-full px-4 py-2.5 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-3 transition-colors"
+              className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-indigo-800/50 transition-colors text-indigo-100"
             >
               {isCopied ? (
                 <>
@@ -284,45 +174,69 @@ export function PrivyWalletButton({
                 </>
               ) : (
                 <>
-                  <Copy className="w-4 h-4" />
-                  Copy Address
+                  <Copy className="w-4 h-4 text-indigo-400" />
+                  <span>Copy Address</span>
                 </>
               )}
             </button>
-            <div className="border-t border-gray-700 my-1" />
-            <button
-              onClick={() => void onAddFundsClick()}
-              className="w-full px-4 py-2.5 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-3 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add Funds
-            </button>
-            <button
-              onClick={handleWithdraw}
-              className="w-full px-4 py-2.5 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-3 transition-colors"
-            >
-              <ArrowUpRight className="w-4 h-4" />
-              Withdraw Funds
-            </button>
-            <button
-              onClick={handleProfile}
-              className="w-full px-4 py-2.5 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-3 transition-colors"
-            >
-              <User className="w-4 h-4" />
-              Profile
-            </button>
-            <div className="border-t border-gray-700 my-1" />
+            <div className="h-px bg-indigo-500/30" />
             <button
               onClick={() => void handleDisconnect()}
-              className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-gray-700 flex items-center gap-3 transition-colors"
+              className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-indigo-800/50 transition-colors text-red-400"
             >
               <LogOut className="w-4 h-4" />
-              Disconnect
+              <span>Disconnect</span>
             </button>
           </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`relative ${className}`} ref={dropdownRef}>
+      <button
+        onClick={() => setDropdownOpen(!dropdownOpen)}
+        className="flex items-center gap-3 px-4 py-2 rounded-lg bg-indigo-950/80 border border-indigo-500/40 backdrop-blur-md hover:bg-indigo-800/50 transition-colors"
+      >
+        <Wallet className="w-4 h-4 text-indigo-400" />
+        <div className="h-4 w-px bg-indigo-500/30" />
+        <span className="text-xs font-medium text-indigo-100 uppercase tracking-wide">
+          {walletAddress.slice(0, 4)}...{walletAddress.slice(-4)}
+        </span>
+        <ChevronDown
+          className={`w-4 h-4 text-indigo-300 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {dropdownOpen && (
+        <div className="absolute right-0 mt-2 w-44 bg-indigo-950/95 border border-indigo-500/40 rounded-lg shadow-lg backdrop-blur-md overflow-hidden z-50">
+          <button
+            onClick={() => void handleCopyAddress()}
+            className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-indigo-800/50 transition-colors text-indigo-100"
+          >
+            {isCopied ? (
+              <>
+                <Check className="w-4 h-4 text-green-400" />
+                <span className="text-green-400">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4 text-indigo-400" />
+                <span>Copy Address</span>
+              </>
+            )}
+          </button>
+          <div className="h-px bg-indigo-500/30" />
+          <button
+            onClick={() => void handleDisconnect()}
+            className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-indigo-800/50 transition-colors text-red-400"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Disconnect</span>
+          </button>
         </div>
       )}
     </div>
-    </>
   );
 }

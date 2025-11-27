@@ -23,6 +23,7 @@ export class Game extends Scene {
   private introPlayed: boolean = false;
   private characters: any[] = [];
   private playerNames: Map<string, string> = new Map(); // wallet -> displayName
+  private playerWins: Map<string, number> = new Map(); // wallet -> totalWins
 
   // Arena mask
   private currentMapId: number | null = null;
@@ -37,12 +38,16 @@ export class Game extends Scene {
     this.characters = characters || [];
   }
 
-  // Set player names mapping (wallet address -> display name)
-  setPlayerNames(playerNames: Array<{ walletAddress: string; displayName: string | null }>) {
+  // Set player names and stats mapping (wallet address -> display name, totalWins)
+  setPlayerNames(playerNames: Array<{ walletAddress: string; displayName: string | null; totalWins?: number }>) {
     this.playerNames.clear();
-    playerNames.forEach(({ walletAddress, displayName }) => {
+    this.playerWins.clear();
+    playerNames.forEach(({ walletAddress, displayName, totalWins }) => {
       if (displayName) {
         this.playerNames.set(walletAddress, displayName);
+      }
+      if (totalWins !== undefined) {
+        this.playerWins.set(walletAddress, totalWins);
       }
     });
 
