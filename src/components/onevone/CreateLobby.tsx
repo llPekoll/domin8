@@ -169,13 +169,13 @@ export function CreateLobby({
     <div className="bg-gray-900 border-1 border-indigo-500/30 rounded-lg p-6">
       <h2 className="text-xl font-bold text-indigo-200 mb-4">Create Lobby</h2>
 
-      {/* Selected Character Display */}
+      {/* Selected Character Display
       <div className="mb-4 p-3 bg-gray-800 border border-indigo-400/50 rounded">
         <p className="text-xs text-indigo-400 mb-1">Your Character</p>
         <p className="text-indigo-200 font-semibold">
           {selectedCharacter ? selectedCharacter.name : "No character selected"}
         </p>
-      </div>
+      </div> */}
 
       {/* Bet Amount Input */}
       <div className="mb-4">
