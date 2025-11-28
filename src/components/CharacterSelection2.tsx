@@ -4,7 +4,8 @@ import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useNFTCharacters } from "../hooks/useNFTCharacters";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
-import { BadgeCheck, Star, ChevronLeft, ChevronRight, Lock, Crown } from "lucide-react";
+// import { BadgeCheck, Star, ChevronLeft, ChevronRight, Lock, Crown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock, Crown } from "lucide-react";
 import { CharacterPreviewScene } from "./CharacterPreviewScene";
 import { NFTCharacterModal } from "./NFTCharacterModal";
 import { useAssets } from "../contexts/AssetsContext";
@@ -158,7 +159,7 @@ const CharacterSelection2 = memo(function CharacterSelection({
       <div className="fixed bottom-0 left-0 z-50">
         {/* Container with charSelect.png background */}
         <div
-          className="relative w-[220px] h-[280px] flex flex-row items-start justify-between p-4 pl-1"
+          className="bg-black/40 relative w-[160px] h-[280px] flex flex-row items-start justify-between p-4 pl-1 backdrop-blur-sm rounded-tr-lg shadow-lg border-t border-r border-amber-500/30"
           style={{
             backgroundSize: "100% 100%",
             backgroundRepeat: "no-repeat",
@@ -236,7 +237,7 @@ const CharacterSelection2 = memo(function CharacterSelection({
           </div>
 
           {/* NFT Button - Top Right */}
-          {externalWalletAddress && (
+          {/*{externalWalletAddress && (
             <button
               onClick={() => setShowNFTModal(true)}
               disabled={isLoadingNFTs}
@@ -263,7 +264,7 @@ const CharacterSelection2 = memo(function CharacterSelection({
                 NFT
               </span>
             </button>
-          )}
+          )}*/}
         </div>
       </div>
 

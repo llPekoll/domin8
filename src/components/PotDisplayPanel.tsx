@@ -66,7 +66,7 @@ export function PotDisplayPanel() {
   const statusText = getStatusText();
 
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
+    <div className="fixed top-12 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
       <div className="bg-black/40 backdrop-blur-sm rounded-lg shadow-lg border border-amber-500/30">
         <div className="flex items-center gap-4 p-3">
           {/* Chest Image */}

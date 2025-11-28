@@ -169,7 +169,9 @@ export function Header() {
                                 }}
                               />
                               {solBalance.toFixed(4)}
-                              <ChevronDown className={`w-3 h-3 transition-transform ${showBalanceMenu ? 'rotate-180' : ''}`} />
+                              <ChevronDown
+                                className={`w-3 h-3 transition-transform ${showBalanceMenu ? "rotate-180" : ""}`}
+                              />
                             </>
                           ) : (
                             <span className="text-sm">--</span>
@@ -183,7 +185,7 @@ export function Header() {
                           <button
                             onClick={() => {
                               if (publicKey) {
-                                handleAddFunds(publicKey.toString());
+                                void handleAddFunds(publicKey.toString());
                               }
                               setShowBalanceMenu(false);
                             }}
@@ -226,10 +228,7 @@ export function Header() {
 
                 {/* Wallet Connect Button */}
                 <div className="flex items-center">
-                  <PrivyWalletButton
-                    compact={false}
-                    showDisconnect={true}
-                  />
+                  <PrivyWalletButton compact={false} showDisconnect={true} />
                 </div>
               </div>
             </div>
@@ -249,10 +248,7 @@ export function Header() {
 
       <LeaderboardDialog open={showLeaderboardDialog} onOpenChange={setShowLeaderboardDialog} />
 
-      <WithdrawDialog
-        isOpen={showWithdrawDialog}
-        onClose={() => setShowWithdrawDialog(false)}
-      />
+      <WithdrawDialog isOpen={showWithdrawDialog} onClose={() => setShowWithdrawDialog(false)} />
     </>
   );
 }
