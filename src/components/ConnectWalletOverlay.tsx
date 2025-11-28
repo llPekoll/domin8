@@ -57,7 +57,7 @@ export function ConnectWalletOverlay() {
           </h2>
 
           {/* Carousel */}
-          <div className="relative mb-8">
+          <div className="relative mb-8 ">
             {/* Carousel Container */}
             <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-amber-900/30 to-orange-900/30 border border-amber-700/40">
               {/* Slides Container */}
