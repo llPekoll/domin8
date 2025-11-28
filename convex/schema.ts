@@ -190,6 +190,7 @@ export default defineSchema({
     // Identifiers
     lobbyId: v.number(), // Unique lobby ID from on-chain
     lobbyPda: v.string(), // Public key of the Lobby PDA (base58)
+    shareToken: v.string(), // 8-char unique token for sharing lobby URL (privacy-focused)
 
     // Players
     playerA: v.string(), // Player A's wallet address (base58)
@@ -199,6 +200,7 @@ export default defineSchema({
     amount: v.number(), // Bet amount per player (in lamports)
     status: v.number(), // 0 = created (waiting), 1 = awaiting vrf, 2 = resolved
     winner: v.optional(v.string()), // Winner's wallet address (base58, None until resolved)
+    isPrivate: v.optional(v.boolean()), // Private lobbies are only joinable via share link
 
     // Character & Map selection
     characterA: v.number(), // Player A's character/skin ID (0-255)
@@ -217,5 +219,6 @@ export default defineSchema({
     .index("by_player_a", ["playerA"]) // Query lobbies by Player A
     .index("by_player_b", ["playerB"]) // Query lobbies by Player B
     .index("by_status_and_created", ["status", "createdAt"]) // For pagination and stuck lobby detection
-    .index("by_lobbyId", ["lobbyId"]), // Query specific lobby by ID
+    .index("by_lobbyId", ["lobbyId"]) // Query specific lobby by ID
+    .index("by_shareToken", ["shareToken"]), // Fast lookup by share token for URL-based access
 });

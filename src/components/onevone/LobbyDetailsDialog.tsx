@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { EventBus } from "../../game/EventBus";
 import { logger } from "../../lib/logger";
 import { useAssets } from "../../contexts/AssetsContext";
+import { toast } from "sonner";
 import type { Character } from "../../types/character";
 import Phaser from "phaser";
 import { OneVOneBoot } from "../../game/scenes/OneVOneBoot";
@@ -14,11 +15,13 @@ interface LobbyData {
   _id: string;
   lobbyId: number;
   lobbyPda?: string;
+  shareToken: string;
   playerA: string;
   amount: number;
   characterA: number;
   mapId: number;
   status: 0 | 1 | 2;
+  isPrivate?: boolean;
 }
 
 interface LobbyDetailsDialogProps {
@@ -169,6 +172,17 @@ export function LobbyDetailsDialog({
     return (lamports / 1e9).toFixed(4);
   };
 
+  const handleCopyShareLink = useCallback(async () => {
+    if (!lobby) return;
+    const shareUrl = `${window.location.origin}/1v1?join=${lobby.shareToken}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Share link copied to clipboard!");
+    } catch {
+      toast.error("Failed to copy link");
+    }
+  }, [lobby]);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="bg-black border-2 border-indigo-500/30 text-white sm:max-w-3xl p-0 overflow-hidden">
@@ -177,7 +191,20 @@ export function LobbyDetailsDialog({
           <DialogTitle className="text-lg font-bold text-indigo-200 flex items-center justify-between">
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              {lobby.isPrivate && <span title="Private Lobby">🔒</span>}
               Lobby #{lobby.lobbyId}
+              {/* Share Button */}
+              <button
+                onClick={handleCopyShareLink}
+                className="ml-2 p-1 hover:bg-indigo-700/50 rounded transition-colors"
+                title="Copy share link"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-300 hover:text-white">
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                  <polyline points="16 6 12 2 8 6"/>
+                  <line x1="12" y1="2" x2="12" y2="15"/>
+                </svg>
+              </button>
             </span>
             <span className="text-yellow-400 font-mono">
               {formatAmount(lobby.amount)} SOL

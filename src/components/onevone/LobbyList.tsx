@@ -11,6 +11,7 @@ interface LobbyData {
   _id: string;
   lobbyId: number;
   lobbyPda: string;
+  shareToken: string;
   playerA: string;
   playerB?: string;
   amount: number;
@@ -19,6 +20,7 @@ interface LobbyData {
   characterA: number;
   characterB?: number;
   mapId: number;
+  isPrivate?: boolean;
 }
 
 interface LobbyListProps {
@@ -204,6 +206,17 @@ export function LobbyList({
   const formatAmount = (lamports: number) => {
     return (lamports / 1e9).toFixed(4);
   };
+
+  const handleCopyShareLink = useCallback(async (lobby: LobbyData, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareUrl = `${window.location.origin}/1v1?join=${lobby.shareToken}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Share link copied!");
+    } catch {
+      toast.error("Failed to copy link");
+    }
+  }, []);
 
   const handleCancelLobby = useCallback(
     async (lobby: LobbyData, e?: React.MouseEvent) => {
@@ -394,7 +407,10 @@ export function LobbyList({
               <div className="flex items-center gap-4">
                 {/* Lobby ID & Amount */}
                 <div className="min-w-[100px]">
-                  <p className="text-xs text-gray-400">Lobby #{lobby.lobbyId}</p>
+                  <p className="text-xs text-gray-400 flex items-center gap-1">
+                    {lobby.isPrivate && <span title="Private Lobby">🔒</span>}
+                    Lobby #{lobby.lobbyId}
+                  </p>
                   <p className="text-lg font-bold text-yellow-400">
                     {formatAmount(lobby.amount)} SOL
                   </p>
@@ -416,6 +432,19 @@ export function LobbyList({
                     </p>
                   )}
                 </div>
+
+                {/* Share Button */}
+                <button
+                  onClick={(e) => handleCopyShareLink(lobby, e)}
+                  className="p-2 hover:bg-indigo-700/50 rounded transition-colors"
+                  title="Copy share link"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-300 hover:text-white">
+                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                    <polyline points="16 6 12 2 8 6"/>
+                    <line x1="12" y1="2" x2="12" y2="15"/>
+                  </svg>
+                </button>
 
                 {/* Action Button */}
                 {activeTab === "open" ? (

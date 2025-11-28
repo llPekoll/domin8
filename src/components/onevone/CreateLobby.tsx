@@ -21,6 +21,7 @@ export function CreateLobby({
   const createLobbyAction = useAction(api.lobbies.createLobby);
 
   const [betAmount, setBetAmount] = useState<number>(DEFAULT_BET_AMOUNT_SOL);
+  const [isPrivate, setIsPrivate] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleAmountChange = useCallback(
@@ -111,6 +112,7 @@ export function CreateLobby({
         characterA: selectedCharacter.id,
         mapId: 0,
         transactionHash: signature,
+        isPrivate,
       });
 
       if (result.success) {
@@ -153,6 +155,7 @@ export function CreateLobby({
     selectedCharacter,
     wallet,
     betAmount,
+    isPrivate,
     createLobbyAction,
     onLobbyCreated,
   ]);
@@ -191,6 +194,21 @@ export function CreateLobby({
           disabled={isLoading}
         />
         <p className="text-xs text-gray-400 mt-1">Min: 0.01 SOL | Max: 100 SOL</p>
+      </div>
+
+      {/* Private Lobby Toggle */}
+      <div className="mb-4">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isPrivate}
+            onChange={(e) => setIsPrivate(e.target.checked)}
+            disabled={isLoading}
+            className="w-4 h-4 rounded border-indigo-500/30 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+          />
+          <span className="text-sm text-indigo-300">🔒 Private Lobby</span>
+        </label>
+        <p className="text-xs text-gray-500 mt-1 ml-6">Only joinable via share link</p>
       </div>
 
       {/* Info */}

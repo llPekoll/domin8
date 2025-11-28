@@ -37,6 +37,7 @@ const RPC_ENDPOINT =
 /**
  * Get all open lobbies (status = 0, waiting for second player)
  * Used by LobbyList component to display available lobbies
+ * Filters out private lobbies - those are only accessible via share link
  */
 export const getOpenLobbies = query({
   args: {},
@@ -46,7 +47,8 @@ export const getOpenLobbies = query({
       .withIndex("by_status", (q) => q.eq("status", 0))
       .collect();
 
-    return lobbies;
+    // Filter out private lobbies - they're only joinable via share link
+    return lobbies.filter((lobby) => !lobby.isPrivate);
   },
 });
 
@@ -62,6 +64,24 @@ export const getLobbyState = query({
     const lobby = await ctx.db
       .query("oneVOneLobbies")
       .withIndex("by_lobbyId", (q) => q.eq("lobbyId", args.lobbyId))
+      .first();
+
+    return lobby || null;
+  },
+});
+
+/**
+ * Get a specific lobby by share token
+ * Used for URL-based lobby access (privacy-focused share links)
+ */
+export const getLobbyByShareToken = query({
+  args: {
+    shareToken: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const lobby = await ctx.db
+      .query("oneVOneLobbies")
+      .withIndex("by_shareToken", (q) => q.eq("shareToken", args.shareToken))
       .first();
 
     return lobby || null;
@@ -197,6 +217,13 @@ export const getStuckLobbies = internalQuery({
  * - randomnessAccountPubkey: The on-chain Switchboard randomness account address
  *   This account will be used for deterministic randomness in the join_lobby instruction
  */
+/**
+ * Generate a unique 8-character share token for lobby URLs
+ */
+function generateShareToken(): string {
+  return crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+}
+
 export const createLobbyInDb = mutation({
   args: {
     lobbyId: v.number(),
@@ -205,6 +232,7 @@ export const createLobbyInDb = mutation({
     amount: v.number(),
     characterA: v.number(),
     mapId: v.number(),
+    isPrivate: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     // Check if lobby already exists to prevent duplicates
@@ -221,11 +249,13 @@ export const createLobbyInDb = mutation({
     const docId = await ctx.db.insert("oneVOneLobbies", {
       lobbyId: args.lobbyId,
       lobbyPda: args.lobbyPda,
+      shareToken: generateShareToken(),
       playerA: args.playerA,
       playerB: undefined,
       amount: args.amount,
       status: 0, // Created, waiting for Player B
       winner: undefined,
+      isPrivate: args.isPrivate || false,
       characterA: args.characterA,
       characterB: undefined,
       mapId: args.mapId,
@@ -302,6 +332,7 @@ export const _internalCreateLobby = internalMutation({
     amount: v.number(),
     characterA: v.number(),
     mapId: v.number(),
+    isPrivate: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     // Check if lobby already exists to prevent duplicates
@@ -318,11 +349,13 @@ export const _internalCreateLobby = internalMutation({
     const docId = await ctx.db.insert("oneVOneLobbies", {
       lobbyId: args.lobbyId,
       lobbyPda: args.lobbyPda,
+      shareToken: generateShareToken(),
       playerA: args.playerA,
       playerB: undefined,
       amount: args.amount,
       status: 0, // Created, waiting for Player B
       winner: undefined,
+      isPrivate: args.isPrivate || false,
       characterA: args.characterA,
       characterB: undefined,
       mapId: args.mapId,
@@ -475,6 +508,7 @@ export const createLobby = action({
     characterA: v.number(), // Character/skin ID (0-255)
     mapId: v.number(), // Map ID (0-255)
     transactionHash: v.string(), // Solana transaction hash (for verification)
+    isPrivate: v.optional(v.boolean()), // Private lobbies only joinable via share link
   },
   handler: async (
     ctx,
@@ -515,6 +549,7 @@ export const createLobby = action({
         amount: args.amount,
         characterA: args.characterA,
         mapId: args.mapId,
+        isPrivate: args.isPrivate,
       });
 
       return {
@@ -901,7 +936,7 @@ const _syncMissingLobby = async (
     //   `[1v1 Sync] Lobby ${lobbyId}: playerA=${playerA.toString().slice(0, 8)}..., amount=${amount}, char=${characterA}, map=${mapId}`
     // );
 
-    // Create the lobby in Convex
+    // Create the lobby in Convex (missing lobbies from sync are public by default)
     await ctx.runMutation(internal.lobbies._internalCreateLobby, {
       lobbyId,
       lobbyPda,
@@ -909,6 +944,7 @@ const _syncMissingLobby = async (
       amount,
       characterA,
       mapId,
+      isPrivate: false,
     });
 
     console.log(`[1v1 Sync] Successfully created missing lobby ${lobbyId}`);

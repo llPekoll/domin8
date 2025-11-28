@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Header } from "../components/Header";
 import { CharacterSelection2 } from "../components/CharacterSelection2";
 import { CreateLobby } from "../components/onevone/CreateLobby";
 import { LobbyList } from "../components/onevone/LobbyList";
 import { LobbyHistory } from "../components/onevone/LobbyHistory";
 import { OneVOneArenaModal } from "../components/onevone/OneVOneArenaModal";
+import { LobbyDetailsDialog } from "../components/onevone/LobbyDetailsDialog";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -18,6 +20,7 @@ interface LobbyData {
   _id: string;
   lobbyId: number;
   lobbyPda: string;
+  shareToken: string;
   playerA: string;
   playerB?: string;
   amount: number;
@@ -26,12 +29,14 @@ interface LobbyData {
   characterA: number;
   characterB?: number;
   mapId: number;
+  isPrivate?: boolean;
 }
 
 export function OneVOnePage() {
   const { connected, publicKey, wallet } = usePrivyWallet();
   const { characters } = useAssets();
   const createLobbyAction = useAction(api.lobbies.createLobby);
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // Sync characters to Phaser's global state for CharacterPreviewScene
   useEffect(() => {
@@ -49,8 +54,18 @@ export function OneVOnePage() {
   const [activeLobbyId, setActiveLobbyId] = useState<number | null>(null);
   const [isCreator, setIsCreator] = useState(false); // true if user created the lobby
   
+  // Shared lobby dialog state (opened via URL share link)
+  const [sharedLobbyDialogOpen, setSharedLobbyDialogOpen] = useState(false);
+  const shareToken = searchParams.get("join");
+  
   // Get open lobbies from Convex (real-time updates)
   const openLobbies = useQuery(api.lobbies.getOpenLobbies) || [];
+  
+  // Get lobby by share token (for URL-based access)
+  const sharedLobby = useQuery(
+    api.lobbies.getLobbyByShareToken,
+    shareToken ? { shareToken } : "skip"
+  );
   
   // Get completed lobbies for history
   const completedLobbies = useQuery(api.lobbies.getCompletedLobbies, { limit: 20 }) || [];
@@ -63,6 +78,28 @@ export function OneVOnePage() {
   
   // Only use the lobby state if modal is open
   const activeLobbyState = arenaModalOpen && activeLobbyId !== null ? lobbyStateQuery : null;
+
+  // Handle share link URL parameter - open lobby details dialog when navigating via share link
+  useEffect(() => {
+    if (shareToken && sharedLobby) {
+      if (sharedLobby.status === 0) {
+        // Lobby is open and available to join
+        logger.ui.info("[1v1] Opening shared lobby from URL", { shareToken, lobbyId: sharedLobby.lobbyId });
+        setSharedLobbyDialogOpen(true);
+      } else {
+        // Lobby is no longer available (already joined or resolved)
+        toast.error("This lobby is no longer available");
+        // Clear the URL parameter
+        setSearchParams({});
+      }
+    }
+  }, [shareToken, sharedLobby, setSearchParams]);
+
+  // Handle closing shared lobby dialog - clear URL parameter
+  const handleSharedLobbyDialogClose = useCallback(() => {
+    setSharedLobbyDialogOpen(false);
+    setSearchParams({});
+  }, [setSearchParams]);
 
   const handleCharacterSelected = useCallback((character: Character | null) => {
     setSelectedCharacter(character);
@@ -91,7 +128,10 @@ export function OneVOnePage() {
     setActiveLobbyId(lobbyId);
     setIsCreator(false);
     setArenaModalOpen(true);
-  }, []);
+    // Close shared lobby dialog and clear URL param if open
+    setSharedLobbyDialogOpen(false);
+    setSearchParams({});
+  }, [setSearchParams]);
 
   // Handle arena modal close
   const handleArenaClose = useCallback(() => {
@@ -209,7 +249,7 @@ export function OneVOnePage() {
           </div>
         ) : (
           <>
-            <div className="max-w-7xl mx-auto">
+            <div className="ml-18">
               <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
                 {/* Create Lobby Section */}
                 <div>
@@ -250,6 +290,17 @@ export function OneVOnePage() {
         isCreator={isCreator}
         onFightComplete={handleFightComplete}
         onDoubleDown={handleDoubleDown}
+      />
+
+      {/* Shared Lobby Dialog - Opens when navigating via share link */}
+      <LobbyDetailsDialog
+        isOpen={sharedLobbyDialogOpen && !!sharedLobby}
+        onClose={handleSharedLobbyDialogClose}
+        lobby={sharedLobby as LobbyData | null}
+        currentPlayerWallet={publicKey?.toString() || ""}
+        selectedCharacter={selectedCharacter}
+        onJoin={handleLobbyJoined}
+        onCancel={handleLobbyCancelled}
       />
     </div>
   );

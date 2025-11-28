@@ -15,6 +15,7 @@ interface LobbyData {
   _id: string;
   lobbyId: number;
   lobbyPda: string;
+  shareToken: string;
   playerA: string;
   playerB?: string;
   amount: number;
@@ -23,6 +24,7 @@ interface LobbyData {
   characterA: number;
   characterB?: number;
   mapId: number;
+  isPrivate?: boolean;
 }
 
 interface OneVOneArenaModalProps {
