@@ -3,6 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { EventBus } from "../../game/EventBus";
 import { logger } from "../../lib/logger";
 import { useAssets } from "../../contexts/AssetsContext";
+import { usePrivyWallet } from "../../hooks/usePrivyWallet";
+import { usePrivy } from "@privy-io/react-auth";
 import { toast } from "sonner";
 import type { Character } from "../../types/character";
 import Phaser from "phaser";
@@ -10,6 +12,7 @@ import { OneVOneBoot } from "../../game/scenes/OneVOneBoot";
 import { OneVOnePreloader } from "../../game/scenes/OneVOnePreloader";
 import { OneVOneScene } from "../../game/scenes/OneVOneScene";
 import { setCharactersData, setAllMapsData, STAGE_WIDTH, STAGE_HEIGHT } from "../../game/main";
+import { LogIn } from "lucide-react";
 
 interface LobbyData {
   _id: string;
@@ -30,7 +33,7 @@ interface LobbyDetailsDialogProps {
   lobby: LobbyData | null;
   currentPlayerWallet: string;
   selectedCharacter: Character | null;
-  onJoin: (lobbyId: number) => void;
+  onJoin: (lobbyId: number) => void | Promise<void>;
   onCancel: (lobbyId: number) => void;
 }
 
@@ -44,6 +47,8 @@ export function LobbyDetailsDialog({
   onCancel 
 }: LobbyDetailsDialogProps) {
   const { characters, maps } = useAssets();
+  const { connected } = usePrivyWallet();
+  const { login, ready } = usePrivy();
   const [gameReady, setGameReady] = useState(false);
   const [containerReady, setContainerReady] = useState(false);
   const sceneInitialized = useRef(false);
@@ -279,6 +284,21 @@ export function LobbyDetailsDialog({
                 className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-bold rounded-lg transition-colors"
               >
                 Cancel Lobby
+              </button>
+            </div>
+          ) : !connected ? (
+            /* User is not logged in - show connect wallet button */
+            <div>
+              <p className="text-xs text-yellow-400 text-center mb-2">
+                ⚠️ Connect your wallet to join this battle
+              </p>
+              <button
+                onClick={login}
+                disabled={!ready}
+                className="w-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2"
+              >
+                <LogIn className="h-4 w-4" />
+                Connect Wallet to Join
               </button>
             </div>
           ) : (

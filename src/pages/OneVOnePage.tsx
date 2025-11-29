@@ -36,7 +36,9 @@ export function OneVOnePage() {
   const { connected, publicKey, wallet } = usePrivyWallet();
   const { characters } = useAssets();
   const createLobbyAction = useAction(api.lobbies.createLobby);
+  const joinLobbyAction = useAction(api.lobbies.joinLobby);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [joiningSharedLobby, setJoiningSharedLobby] = useState(false);
   
   // Sync characters to Phaser's global state for CharacterPreviewScene
   useEffect(() => {
@@ -132,6 +134,120 @@ export function OneVOnePage() {
     setSharedLobbyDialogOpen(false);
     setSearchParams({});
   }, [setSearchParams]);
+
+  // Handle joining a shared lobby (from LobbyDetailsDialog opened via URL)
+  const handleJoinSharedLobby = useCallback(async (lobbyId: number) => {
+    if (!connected || !selectedCharacter || !wallet || !publicKey || !sharedLobby) {
+      toast.error("Please connect wallet and select a character");
+      return;
+    }
+
+    if (sharedLobby.playerA === publicKey.toString()) {
+      toast.error("You cannot join your own lobby");
+      return;
+    }
+
+    setJoiningSharedLobby(true);
+
+    try {
+      // Import utilities
+      const { getSharedConnection } = await import("../lib/sharedConnection");
+      const { buildJoinLobbyTransaction } = await import("../lib/solana-1v1-transactions");
+      const { PublicKey } = await import("@solana/web3.js");
+
+      const connection = getSharedConnection();
+      const currentWallet = publicKey.toString();
+
+      logger.ui.info("[1v1] Joining shared lobby", {
+        lobbyId: sharedLobby.lobbyId,
+        playerB: currentWallet,
+        character: selectedCharacter.id,
+      });
+
+      const lobbyPda = new PublicKey(sharedLobby.lobbyPda);
+      const transaction = await buildJoinLobbyTransaction(
+        publicKey,
+        sharedLobby.lobbyId,
+        selectedCharacter.id,
+        lobbyPda,
+        connection
+      );
+
+      logger.solana.debug("[1v1] Transaction ready for signing", {
+        type: transaction.constructor.name,
+      });
+
+      // Sign and send using Privy's signAndSendAllTransactions
+      logger.solana.info("[1v1] Attempting to sign transaction with Privy wallet...");
+      
+      const chainId = `solana:devnet` as `${string}:${string}`;
+      const serialized = Buffer.from(transaction.serialize());
+      
+      let signAndSendResult;
+      try {
+        signAndSendResult = await wallet.signAndSendAllTransactions([
+          {
+            chain: chainId,
+            transaction: serialized,
+          },
+        ]);
+      } catch (privyError: unknown) {
+        const errorMessage = privyError instanceof Error ? privyError.message : String(privyError);
+        logger.solana.error("[1v1] Privy wallet error:", { message: errorMessage });
+        throw new Error(`Privy wallet error: ${errorMessage}`);
+      }
+      
+      if (!signAndSendResult || signAndSendResult.length === 0) {
+        throw new Error("Failed to get signature from Privy wallet");
+      }
+      
+      const signatureBytes = signAndSendResult[0].signature;
+      if (!signatureBytes) {
+        throw new Error("No signature in Privy response");
+      }
+      
+      // Import bs58 for signature encoding
+      const { default: bs58 } = await import("bs58");
+      const signature = bs58.encode(signatureBytes);
+      
+      logger.solana.info("[1v1] Join transaction signed and sent", { signature });
+      toast.loading("Waiting for transaction confirmation...", { id: "join-tx-confirm" });
+      
+      const confirmation = await connection.confirmTransaction(signature, "confirmed");
+      
+      if (confirmation.value.err) {
+        throw new Error("Transaction failed: " + confirmation.value.err.toString());
+      }
+
+      toast.success("Transaction confirmed!", { id: "join-tx-confirm" });
+      logger.ui.info("[1v1] Join transaction confirmed on blockchain", { signature });
+
+      // Call Convex action to update lobby in database
+      const result = await joinLobbyAction({
+        playerBWallet: currentWallet,
+        lobbyId: sharedLobby.lobbyId,
+        characterB: selectedCharacter.id,
+        transactionHash: signature,
+      });
+
+      if (result.success) {
+        logger.ui.info("[1v1] Lobby joined successfully", { lobbyId: result.lobbyId });
+        toast.success("You joined the lobby! Starting fight...", { duration: 5000 });
+        
+        // Open the arena modal
+        handleLobbyJoined(result.lobbyId);
+      } else {
+        toast.error("Failed to update lobby in database");
+        logger.ui.error("[1v1] Convex action failed");
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.ui.error("[1v1] Failed to join shared lobby:", error);
+      toast.error("Failed to join lobby: " + errorMsg);
+    } finally {
+      setJoiningSharedLobby(false);
+    }
+  }, [connected, wallet, publicKey, selectedCharacter, sharedLobby, joinLobbyAction, handleLobbyJoined]);
 
   // Handle arena modal close
   const handleArenaClose = useCallback(() => {
@@ -299,7 +415,7 @@ export function OneVOnePage() {
         lobby={sharedLobby as LobbyData | null}
         currentPlayerWallet={publicKey?.toString() || ""}
         selectedCharacter={selectedCharacter}
-        onJoin={handleLobbyJoined}
+        onJoin={handleJoinSharedLobby}
         onCancel={handleLobbyCancelled}
       />
     </div>

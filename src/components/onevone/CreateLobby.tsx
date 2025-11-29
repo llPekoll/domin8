@@ -196,20 +196,30 @@ export function CreateLobby({
         <p className="text-xs text-gray-400 mt-1">Min: 0.01 SOL | Max: 100 SOL</p>
       </div>
 
-      {/* Private Lobby Toggle */}
-      <div className="mb-4">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={isPrivate}
-            onChange={(e) => setIsPrivate(e.target.checked)}
-            disabled={isLoading}
-            className="w-4 h-4 rounded border-indigo-500/30 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
-          />
-          <span className="text-sm text-indigo-300">🔒 Private Lobby</span>
-        </label>
-        <p className="text-xs text-gray-500 mt-1 ml-6">Only joinable via share link</p>
-      </div>
+        {/* Private Lobby Toggle */}
+        <div className="mb-4">
+        <label className="flex items-center justify-between cursor-pointer">
+          <button
+              type="button"
+              role="switch"
+              aria-checked={isPrivate}
+              onClick={() => setIsPrivate(!isPrivate)}
+              disabled={isLoading}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 ${
+                isPrivate ? 'bg-indigo-600' : 'bg-gray-600'
+              } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  isPrivate ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-indigo-300">🔒 Private Lobby</span>
+            </div>
+          </label>
+        </div>
 
       {/* Info */}
       <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded text-xs text-blue-200">
