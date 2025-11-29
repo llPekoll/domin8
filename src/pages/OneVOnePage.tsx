@@ -5,7 +5,6 @@ import { CharacterSelection2 } from "../components/CharacterSelection2";
 import { CreateLobby } from "../components/onevone/CreateLobby";
 import { LobbyList } from "../components/onevone/LobbyList";
 import { LobbyHistory } from "../components/onevone/LobbyHistory";
-import { OneVOneArenaModal } from "../components/onevone/OneVOneArenaModal";
 import { LobbyDetailsDialog } from "../components/onevone/LobbyDetailsDialog";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useQuery, useAction } from "convex/react";
@@ -54,7 +53,6 @@ export function OneVOnePage() {
   // Arena modal state
   const [arenaModalOpen, setArenaModalOpen] = useState(false);
   const [activeLobbyId, setActiveLobbyId] = useState<number | null>(null);
-  const [isCreator, setIsCreator] = useState(false); // true if user created the lobby
   
   // Shared lobby dialog state (opened via URL share link)
   const [sharedLobbyDialogOpen, setSharedLobbyDialogOpen] = useState(false);
@@ -118,7 +116,6 @@ export function OneVOnePage() {
   const handleLobbyCreated = useCallback((lobbyId: number) => {
     logger.ui.info("[1v1] Lobby created, opening arena modal", { lobbyId });
     setActiveLobbyId(lobbyId);
-    setIsCreator(true);
     setArenaModalOpen(true);
   }, []);
 
@@ -135,7 +132,6 @@ export function OneVOnePage() {
   const handleLobbyJoined = useCallback((lobbyId: number) => {
     logger.ui.info("[1v1] Joined lobby, opening arena modal", { lobbyId });
     setActiveLobbyId(lobbyId);
-    setIsCreator(false);
     setArenaModalOpen(true);
     // Close shared lobby dialog and clear URL param if open
     setSharedLobbyDialogOpen(false);
@@ -340,7 +336,6 @@ export function OneVOnePage() {
         toast.success(`Double Down successful! Lobby #${result.lobbyId} created.`, { id: toastId });
         // Open the new lobby in the arena
         setActiveLobbyId(result.lobbyId);
-        setIsCreator(true);
         // Modal stays open with new lobby
       } else {
         throw new Error("Failed to create lobby in database");
@@ -405,13 +400,15 @@ export function OneVOnePage() {
         )}
       </main>
 
-      {/* Arena Modal - Shows the Phaser game in a dialog */}
-      <OneVOneArenaModal
+      {/* Arena Modal - Shows the Phaser game in a dialog (uses LobbyDetailsDialog with real-time state) */}
+      <LobbyDetailsDialog
         isOpen={arenaModalOpen}
         onClose={handleArenaClose}
         lobby={activeLobbyState as LobbyData | null}
+        currentPlayerWallet={publicKey?.toString() || ""}
         selectedCharacter={selectedCharacter}
-        isCreator={isCreator}
+        onJoin={() => {}} // Not used for arena modal (already joined)
+        onCancel={handleLobbyCancelled}
         onFightComplete={handleFightComplete}
         onDoubleDown={handleDoubleDown}
       />
