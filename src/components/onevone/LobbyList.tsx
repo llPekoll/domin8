@@ -59,7 +59,7 @@ export function LobbyList({
 
   const handleJoinLobby = useCallback(
     async (lobby: LobbyData) => {
-      if (!connected || !selectedCharacter || !wallet) {
+      if (!connected || !selectedCharacter || !wallet || !publicKey) {
         toast.error("Please connect wallet and select a character");
         return;
       }
@@ -74,8 +74,7 @@ export function LobbyList({
       try {
         // Import utilities
         const { getSharedConnection } = await import("../../lib/sharedConnection");
-        const { buildJoinLobbyTransaction } = await import("../../lib/solana-1v1-transactions");
-        const { PublicKey } = await import("@solana/web3.js");
+        const { buildJoinLobbyTransaction, get1v1LobbyPDA } = await import("../../lib/solana-1v1-transactions");
 
         const connection = getSharedConnection();
 
@@ -85,9 +84,10 @@ export function LobbyList({
           character: selectedCharacter.id,
         });
 
-        const lobbyPda = new PublicKey(lobby.lobbyPda);
+        // Derive the lobby PDA from lobbyId (don't rely on database value which may be invalid)
+        const lobbyPda = get1v1LobbyPDA(lobby.lobbyId);
         const transaction = await buildJoinLobbyTransaction(
-          new PublicKey(currentPlayerWallet),
+          publicKey!, // Use the PublicKey from usePrivyWallet hook
           lobby.lobbyId,
           selectedCharacter.id,
           lobbyPda,
@@ -243,7 +243,7 @@ export function LobbyList({
           sendOptimizedTransaction,
           waitForConfirmationOptimized,
         } = await import("../../lib/solana-1v1-transactions-helius");
-        const { PublicKey } = await import("@solana/web3.js");
+        const { get1v1LobbyPDA } = await import("../../lib/solana-1v1-transactions");
 
         const connection = getSharedConnection();
 
@@ -252,8 +252,8 @@ export function LobbyList({
           playerA: publicKey.toString(),
         });
 
-        // Build optimized cancel transaction
-        const lobbyPda = new PublicKey(lobby.lobbyPda);
+        // Derive the lobby PDA from lobbyId (don't rely on database value which may be invalid)
+        const lobbyPda = get1v1LobbyPDA(lobby.lobbyId);
         const { transaction, metrics } = await buildCancelLobbyTransactionOptimized(
           publicKey,
           lobby.lobbyId,

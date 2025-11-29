@@ -921,7 +921,7 @@ const _syncMissingLobby = async (
         : onChainLobby.amount.toNumber();
     const characterA = onChainLobby.skinA;
     const mapId = onChainLobby.map;
-    const lobbyPda = onChainLobby.publicKey?.toString() || `lobby_${lobbyId}`;
+    const lobbyPda = onChainLobby.publicKey?.toString();
 
     // Validate required fields
     if (!playerA) {

@@ -136,7 +136,8 @@ export function OneVOnePage() {
   }, [setSearchParams]);
 
   // Handle joining a shared lobby (from LobbyDetailsDialog opened via URL)
-  const handleJoinSharedLobby = useCallback(async (lobbyId: number) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleJoinSharedLobby = useCallback(async (_lobbyId: number) => {
     if (!connected || !selectedCharacter || !wallet || !publicKey || !sharedLobby) {
       toast.error("Please connect wallet and select a character");
       return;
@@ -152,8 +153,7 @@ export function OneVOnePage() {
     try {
       // Import utilities
       const { getSharedConnection } = await import("../lib/sharedConnection");
-      const { buildJoinLobbyTransaction } = await import("../lib/solana-1v1-transactions");
-      const { PublicKey } = await import("@solana/web3.js");
+      const { buildJoinLobbyTransaction, get1v1LobbyPDA } = await import("../lib/solana-1v1-transactions");
 
       const connection = getSharedConnection();
       const currentWallet = publicKey.toString();
@@ -164,7 +164,8 @@ export function OneVOnePage() {
         character: selectedCharacter.id,
       });
 
-      const lobbyPda = new PublicKey(sharedLobby.lobbyPda);
+      // Derive the lobby PDA from lobbyId (don't rely on database value which may be invalid)
+      const lobbyPda = get1v1LobbyPDA(sharedLobby.lobbyId);
       const transaction = await buildJoinLobbyTransaction(
         publicKey,
         sharedLobby.lobbyId,
@@ -417,6 +418,7 @@ export function OneVOnePage() {
         selectedCharacter={selectedCharacter}
         onJoin={handleJoinSharedLobby}
         onCancel={handleLobbyCancelled}
+        isJoining={joiningSharedLobby}
       />
     </div>
   );

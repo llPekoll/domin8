@@ -35,6 +35,7 @@ interface LobbyDetailsDialogProps {
   selectedCharacter: Character | null;
   onJoin: (lobbyId: number) => void | Promise<void>;
   onCancel: (lobbyId: number) => void;
+  isJoining?: boolean;
 }
 
 export function LobbyDetailsDialog({ 
@@ -44,7 +45,8 @@ export function LobbyDetailsDialog({
   currentPlayerWallet,
   selectedCharacter,
   onJoin, 
-  onCancel 
+  onCancel,
+  isJoining = false,
 }: LobbyDetailsDialogProps) {
   const { characters, maps } = useAssets();
   const { connected } = usePrivyWallet();
@@ -310,10 +312,10 @@ export function LobbyDetailsDialog({
               )}
               <button
                 onClick={() => onJoin(lobby.lobbyId)}
-                disabled={!selectedCharacter}
+                disabled={!selectedCharacter || isJoining}
                 className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-lg shadow-indigo-900/20"
               >
-                Join Battle ({formatAmount(lobby.amount)} SOL)
+                {isJoining ? "Joining..." : `Join Battle (${formatAmount(lobby.amount)} SOL)`}
               </button>
             </div>
           )}

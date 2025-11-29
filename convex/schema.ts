@@ -189,7 +189,7 @@ export default defineSchema({
   oneVOneLobbies: defineTable({
     // Identifiers
     lobbyId: v.number(), // Unique lobby ID from on-chain
-    lobbyPda: v.string(), // Public key of the Lobby PDA (base58)
+    lobbyPda: v.optional(v.string()), // Public key of the Lobby PDA (base58)
     shareToken: v.string(), // 8-char unique token for sharing lobby URL (privacy-focused)
 
     // Players
