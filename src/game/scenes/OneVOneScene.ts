@@ -5,7 +5,7 @@ import { AnimationManager } from "../managers/AnimationManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
 import { logger } from "../../lib/logger";
-import { RESOLUTION_SCALE } from "../main";
+import { RESOLUTION_SCALE, charactersData } from "../main";
 
 /**
  * OneVOneScene - 1v1 Coinflip fight scene
@@ -152,7 +152,10 @@ export class OneVOneScene extends Scene {
    * This is called from React when a lobby is created or joined
    */
   public spawnSingleCharacter(data: SingleCharacterData) {
-    const characterKey = `character_${data.characterId}`;
+    // Look up character name from charactersData by ID
+    const characterData = charactersData.find((c: any) => c.id === data.characterId);
+    const characterName = characterData?.name || `character_${data.characterId}`;
+    const characterKey = characterName.toLowerCase().replace(/\s+/g, "-");
     
     // Prevent duplicate spawns
     if (this.spawnedCharacters.has(data.playerId)) {
@@ -160,7 +163,7 @@ export class OneVOneScene extends Scene {
       return;
     }
     
-    logger.game.info("[OneVOneScene] Spawning single character", data);
+    logger.game.info("[OneVOneScene] Spawning single character", { ...data, characterKey });
 
     // Calculate spawn position (left or right side of arena)
     const spawnIndex = data.position === "left" ? 0 : 1;
@@ -172,7 +175,7 @@ export class OneVOneScene extends Scene {
       displayName: data.displayName,
       character: {
         id: data.characterId,
-        name: `Character ${data.characterId}`,
+        name: characterName,
         key: characterKey,
       },
       spawnIndex: spawnIndex,
@@ -229,6 +232,15 @@ export class OneVOneScene extends Scene {
       // Legacy flow: spawn both characters now
       logger.game.debug("[OneVOneScene] No existing characters, spawning both");
       
+      // Look up character names from charactersData
+      const charDataA = charactersData.find((c: any) => c.id === data.characterA);
+      const charNameA = charDataA?.name || `character_${data.characterA}`;
+      const charKeyA = charNameA.toLowerCase().replace(/\s+/g, "-");
+      
+      const charDataB = charactersData.find((c: any) => c.id === data.characterB);
+      const charNameB = charDataB?.name || `character_${data.characterB}`;
+      const charKeyB = charNameB.toLowerCase().replace(/\s+/g, "-");
+      
       // Create participants for Player A
       const participantA = {
         _id: `${data.playerA}_1v1`,
@@ -236,8 +248,8 @@ export class OneVOneScene extends Scene {
         displayName: "Player A",
         character: {
           id: data.characterA,
-          name: `Character ${data.characterA}`,
-          key: `character_${data.characterA}`,
+          name: charNameA,
+          key: charKeyA,
         },
         spawnIndex: 0,
         isBot: false,
@@ -253,8 +265,8 @@ export class OneVOneScene extends Scene {
         displayName: "Player B",
         character: {
           id: data.characterB,
-          name: `Character ${data.characterB}`,
-          key: `character_${data.characterB}`,
+          name: charNameB,
+          key: charKeyB,
         },
         spawnIndex: 1,
         isBot: false,

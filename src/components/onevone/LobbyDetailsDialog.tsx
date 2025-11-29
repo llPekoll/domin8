@@ -195,7 +195,7 @@ export function LobbyDetailsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="bg-black border-2 border-indigo-500/30 text-white sm:max-w-3xl p-0 overflow-hidden">
+      <DialogContent className="bg-black border-2 border-indigo-500/30 text-white sm:max-w-3xl p-0 overflow-hidden gap-0">
         {/* Header */}
         <DialogHeader className="p-3 pr-12 bg-gradient-to-r from-indigo-900/90 to-purple-900/90 border-b border-indigo-500/30/50">
           <DialogTitle className="text-lg font-bold text-indigo-200 flex items-center justify-between">
