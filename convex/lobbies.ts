@@ -424,6 +424,7 @@ export const _internalSettleLobby = internalMutation({
   args: {
     lobbyId: v.number(),
     winner: v.string(),
+    settleTxHash: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const lobby = await ctx.db
@@ -435,11 +436,22 @@ export const _internalSettleLobby = internalMutation({
       throw new Error(`Lobby ${args.lobbyId} not found`);
     }
 
-    await ctx.db.patch(lobby._id, {
+    const updateData: {
+      winner: string;
+      status: number;
+      resolvedAt: number;
+      settleTxHash?: string;
+    } = {
       winner: args.winner,
       status: 3, // Resolved (new status flow: 0=created, 1=awaiting VRF, 2=VRF received, 3=resolved)
       resolvedAt: Date.now(),
-    });
+    };
+
+    if (args.settleTxHash) {
+      updateData.settleTxHash = args.settleTxHash;
+    }
+
+    await ctx.db.patch(lobby._id, updateData);
 
     return lobby._id;
   },
@@ -1148,10 +1160,29 @@ export const _crankSettleLobby = internalAction({
 
       console.log(`[1v1 Crank] settle_lobby succeeded for lobby ${args.lobbyId}: ${txSignature}`);
 
-      // After successful on-chain settlement, schedule a check to update Convex
-      await ctx.scheduler.runAfter(2000, internal.lobbies._checkAndSettleLobby, {
-        lobbyId: args.lobbyId,
-      });
+      // After successful on-chain settlement, fetch the winner from blockchain and update Convex
+      const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
+      const lobbyPda = queryClient.getLobbyPdaForId(args.lobbyId);
+      
+      // Wait a bit for the transaction to be confirmed
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const onChainLobby = await queryClient.getLobbyAccount(lobbyPda);
+      
+      if (onChainLobby && onChainLobby.status === 3 && onChainLobby.winner) {
+        // Update Convex with the winner and the settlement transaction hash
+        await ctx.runMutation(internal.lobbies._internalSettleLobby, {
+          lobbyId: args.lobbyId,
+          winner: onChainLobby.winner.toString(),
+          settleTxHash: txSignature,
+        });
+        console.log(`[1v1 Crank] Updated Convex with winner and settleTxHash for lobby ${args.lobbyId}`);
+      } else {
+        // Schedule a check to update Convex (fallback if winner not immediately available)
+        await ctx.scheduler.runAfter(2000, internal.lobbies._checkAndSettleLobby, {
+          lobbyId: args.lobbyId,
+        });
+      }
 
       return {
         lobbyId: args.lobbyId,

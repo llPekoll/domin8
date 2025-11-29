@@ -221,12 +221,12 @@ export function CreateLobby({
           </label>
         </div>
 
-      {/* Info */}
-      <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded text-xs text-blue-200">
-        <p>• Awaiting Player B to join</p>
-        <p>• 2% house fee on winnings</p>
-        <p>• Winner determined by VRF randomness</p>
-      </div>
+        {/* Info */}
+        <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded text-xs text-blue-200">
+          <p>Challenge another player to battle</p>
+          <p>Wait for second player to join, or share the lobby link</p>
+          <p>Winner takes all (minus 2% fee)</p>
+        </div>
 
       {/* Create Button */}
       <button

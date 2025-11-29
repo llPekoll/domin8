@@ -214,6 +214,9 @@ export default defineSchema({
     // Timestamps
     createdAt: v.number(), // When lobby was created (Unix timestamp)
     resolvedAt: v.optional(v.number()), // When lobby was resolved (Unix timestamp)
+
+    // Transaction hashes
+    settleTxHash: v.optional(v.string()), // Solana transaction hash for settlement (base58)
   })
     .index("by_status", ["status"]) // Query open lobbies (status = 0)
     .index("by_player_a", ["playerA"]) // Query lobbies by Player A

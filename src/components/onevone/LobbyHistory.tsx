@@ -16,6 +16,7 @@ interface LobbyData {
   mapId: number;
   createdAt?: number;
   resolvedAt?: number;
+  settleTxHash?: string;
 }
 
 interface LobbyHistoryProps {
@@ -130,6 +131,22 @@ export function LobbyHistory({ lobbies, maxLobbies = MAX_LOBBIES_DEFAULT }: Lobb
                 )}
                 <span className="text-gray-500 text-[14px] ml-auto">{formatTime(isResolved ? lobby.resolvedAt : lobby.createdAt)}</span>
               </div>
+
+              {/* Transaction hash link for resolved lobbies */}
+              {isResolved && lobby.settleTxHash && (
+                <div className="mt-1 flex items-center gap-1">
+                  <span className="text-gray-500 text-[10px]">Tx:</span>
+                  <a
+                    href={`https://explorer.solana.com/tx/${lobby.settleTxHash}?cluster=devnet`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-[10px] text-indigo-400 hover:text-indigo-300 hover:underline truncate max-w-[120px]"
+                    title={lobby.settleTxHash}
+                  >
+                    {lobby.settleTxHash.slice(0, 8)}...{lobby.settleTxHash.slice(-8)}
+                  </a>
+                </div>
+              )}
             </div>
           );
         })}
