@@ -163,15 +163,7 @@ export function LobbyDetailsDialog({
     }
   }, [isOpen, lobby, gameReady, isCreator, getOneVOneScene]);
 
-  // Get character name from characterA id
-  const characterName = characters?.find((c: Character) => c.id === lobby?.characterA)?.name || `Character #${lobby?.characterA}`;
-
-  if (!lobby) return null;
-
-  const formatAmount = (lamports: number) => {
-    return (lamports / 1e9).toFixed(4);
-  };
-
+  // Copy share link to clipboard
   const handleCopyShareLink = useCallback(async () => {
     if (!lobby) return;
     const shareUrl = `${window.location.origin}/1v1?join=${lobby.shareToken}`;
@@ -182,6 +174,17 @@ export function LobbyDetailsDialog({
       toast.error("Failed to copy link");
     }
   }, [lobby]);
+
+  // Get character name from characterA id
+  const characterName = characters?.find((c: Character) => c.id === lobby?.characterA)?.name || `Character #${lobby?.characterA}`;
+
+  // Helper function to format lamports to SOL
+  const formatAmount = (lamports: number) => {
+    return (lamports / 1e9).toFixed(4);
+  };
+
+  // Early return AFTER all hooks are called
+  if (!lobby) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
