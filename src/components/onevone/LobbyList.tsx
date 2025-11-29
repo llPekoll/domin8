@@ -1,11 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { usePrivyWallet } from "../../hooks/usePrivyWallet";
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { logger } from "../../lib/logger";
 import type { Character } from "../../types/character";
-import { LobbyDetailsDialog } from "./LobbyDetailsDialog";
 
 interface LobbyData {
   _id: string;
@@ -29,6 +28,7 @@ interface LobbyListProps {
   selectedCharacter: Character | null;
   onLobbyJoined?: (lobbyId: number) => void;
   onLobbyCancelled?: (lobbyId: number) => void;
+  onLobbySelected?: (lobbyId: number) => void; // New: parent handles displaying the dialog
 }
 
 export function LobbyList({
@@ -37,13 +37,13 @@ export function LobbyList({
   selectedCharacter,
   onLobbyJoined,
   onLobbyCancelled,
+  onLobbySelected,
 }: LobbyListProps) {
   const { connected, wallet, publicKey } = usePrivyWallet();
   const joinLobbyAction = useAction(api.lobbies.joinLobby);
   const cancelLobbyAction = useAction(api.lobbies.cancelLobby);
   const [joiningLobbies, setJoiningLobbies] = useState<Set<number>>(new Set());
   const [cancellingLobbies, setCancellingLobbies] = useState<Set<number>>(new Set());
-  const [selectedLobby, setSelectedLobby] = useState<LobbyData | null>(null);
   const [activeTab, setActiveTab] = useState<"open" | "my">("open");
   
   logger.solana.debug("Rendering LobbyList with lobbies:", lobbies);
@@ -56,6 +56,23 @@ export function LobbyList({
     (lobby) => lobby.playerA === currentPlayerWallet && lobby.status === 0
   );
   const displayedLobbies = activeTab === "open" ? openLobbies : myLobbies;
+
+  // Get unique playerA wallet addresses from open lobbies to fetch their display names
+  const playerAWallets = useMemo(() => {
+    return [...new Set(openLobbies.map((lobby) => lobby.playerA))];
+  }, [openLobbies]);
+
+  // Fetch player names for all playerA wallets
+  const playerNames = useQuery(
+    api.players.getPlayersByWallets,
+    playerAWallets.length > 0 ? { walletAddresses: playerAWallets } : "skip"
+  );
+
+  // Create a lookup map for quick access
+  const playerNameMap = useMemo(() => {
+    if (!playerNames) return new Map<string, string | null>();
+    return new Map(playerNames.map((p) => [p.walletAddress, p.displayName]));
+  }, [playerNames]);
 
   const handleJoinLobby = useCallback(
     async (lobby: LobbyData) => {
@@ -357,7 +374,6 @@ export function LobbyList({
   );
 
   return (
-    <>
     <div className="bg-gray-900 border-2 border-indigo-500/30 rounded-lg p-6">
       {/* Tab Navigation */}
       <div className="flex gap-2 mb-4">
@@ -406,7 +422,7 @@ export function LobbyList({
                   ? "bg-purple-900/30 border-2 border-purple-500/50 hover:bg-purple-900/50 hover:border-purple-500/70" 
                   : "bg-gray-800 border border-indigo-400/30 hover:bg-gray-700 hover:border-indigo-400/60"
               }`}
-              onClick={() => setSelectedLobby(lobby)}
+              onClick={() => onLobbySelected?.(lobby.lobbyId)}
             >
               <div className="flex items-center gap-4">
                 {/* Lobby ID & Amount */}
@@ -422,18 +438,15 @@ export function LobbyList({
 
                 {/* Character & Player Info */}
                 <div className="flex-1 flex items-center gap-3">
-                  <div className="px-2 py-1 bg-indigo-900/50 rounded text-xs">
-                    <span className="text-gray-400">Char:</span>{" "}
-                    <span className="text-indigo-300">#{lobby.characterA}</span>
-                  </div>
-                  <div className="px-2 py-1 bg-gray-700/50 rounded text-xs">
-                    <span className="text-gray-400">Map:</span>{" "}
-                    <span className="text-gray-300">#{lobby.mapId}</span>
-                  </div>
                   {activeTab === "open" && (
-                    <p className="text-xs text-gray-500 font-mono truncate max-w-[120px]">
-                      {lobby.playerA.slice(0, 4)}...{lobby.playerA.slice(-4)}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-indigo-300 font-medium">
+                        {playerNameMap.get(lobby.playerA) || "Anonymous"}
+                      </span>
+                      <span className="text-xs text-gray-500 font-mono">
+                        ({lobby.playerA.slice(0, 4)}...{lobby.playerA.slice(-4)})
+                      </span>
+                    </div>
                   )}
                 </div>
 
@@ -484,24 +497,5 @@ export function LobbyList({
         </div>
       )}
     </div>
-    
-    <LobbyDetailsDialog 
-        isOpen={!!selectedLobby}
-        onClose={() => setSelectedLobby(null)}
-        lobby={selectedLobby}
-        currentPlayerWallet={currentPlayerWallet}
-        selectedCharacter={selectedCharacter}
-        onJoin={(id) => {
-            const lobby = lobbies.find(l => l.lobbyId === id);
-            if (lobby) handleJoinLobby(lobby);
-            setSelectedLobby(null);
-        }}
-        onCancel={(id) => {
-            const lobby = lobbies.find(l => l.lobbyId === id);
-            if (lobby) handleCancelLobby(lobby);
-            setSelectedLobby(null);
-        }}
-    />
-    </>
   );
 }

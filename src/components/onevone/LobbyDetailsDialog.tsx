@@ -260,22 +260,36 @@ export function LobbyDetailsDialog({
         setArenaState("vrf-pending");
       } else if (lobby.status === 2 && lobby.winner) {
         // Resolved - start fight animation
-        setArenaState("fighting");
+        logger.game.info("[LobbyDetails] Lobby resolved, preparing fight animation", {
+          winner: lobby.winner,
+          gameReady,
+          sceneInitialized: sceneInitialized.current,
+        });
         
-        const scene = getOneVOneScene();
-        if (scene && typeof scene.startFightAnimation === "function") {
-          logger.game.info("[LobbyDetails] Starting fight animation", {
-            winner: lobby.winner,
-          });
-          scene.startFightAnimation({
-            lobbyId: lobby.lobbyId,
-            playerA: lobby.playerA,
-            playerB: lobby.playerB || "",
-            characterA: lobby.characterA,
-            characterB: lobby.characterB || 0,
-            winner: lobby.winner,
-            mapId: lobby.mapId,
-          });
+        // Only start fight if not already fighting or showing results
+        if (arenaState !== "fighting" && arenaState !== "results") {
+          setArenaState("fighting");
+          
+          // Delay slightly to ensure scene is ready
+          setTimeout(() => {
+            const scene = getOneVOneScene();
+            if (scene && typeof scene.startFightAnimation === "function") {
+              logger.game.info("[LobbyDetails] Starting fight animation", {
+                winner: lobby.winner,
+              });
+              scene.startFightAnimation({
+                lobbyId: lobby.lobbyId,
+                playerA: lobby.playerA,
+                playerB: lobby.playerB || "",
+                characterA: lobby.characterA,
+                characterB: lobby.characterB || 0,
+                winner: lobby.winner,
+                mapId: lobby.mapId,
+              });
+            } else {
+              logger.game.warn("[LobbyDetails] Scene not ready for fight animation");
+            }
+          }, 100);
         }
       }
     }
@@ -395,8 +409,8 @@ export function LobbyDetailsDialog({
 
   const statusDisplay = getStatusDisplay();
 
-  // Determine if close button should be shown
-  const showCloseButton = arenaState === "preview" || arenaState === "waiting" || arenaState === "results";
+  // Determine if close button should be shown (allow closing during preview, waiting, and results)
+  const showCloseButton = arenaState === "preview" || arenaState === "waiting" || arenaState === "results" || arenaState === "opponent-joining" || arenaState === "vrf-pending";
 
   // Early return AFTER all hooks are called
   if (!lobby) return null;
