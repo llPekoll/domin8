@@ -38,17 +38,28 @@ const RPC_ENDPOINT =
  * Get all open lobbies (status = 0, waiting for second player)
  * Used by LobbyList component to display available lobbies
  * Filters out private lobbies - those are only accessible via share link
+ * EXCEPT: Private lobbies created by currentPlayerWallet are always shown
  */
 export const getOpenLobbies = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    currentPlayerWallet: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
     const lobbies = await ctx.db
       .query("oneVOneLobbies")
       .withIndex("by_status", (q) => q.eq("status", 0))
       .collect();
 
     // Filter out private lobbies - they're only joinable via share link
-    return lobbies.filter((lobby) => !lobby.isPrivate);
+    // BUT always show private lobbies that the current player created
+    return lobbies.filter((lobby) => {
+      // Show all public lobbies
+      if (!lobby.isPrivate) return true;
+      // Show private lobbies created by the current player
+      if (args.currentPlayerWallet && lobby.playerA === args.currentPlayerWallet) return true;
+      // Hide other private lobbies
+      return false;
+    });
   },
 });
 
@@ -227,7 +238,7 @@ function generateShareToken(): string {
 export const createLobbyInDb = mutation({
   args: {
     lobbyId: v.number(),
-    lobbyPda: v.string(),
+    lobbyPda: v.optional(v.string()),
     playerA: v.string(),
     amount: v.number(),
     characterA: v.number(),
@@ -327,7 +338,7 @@ export const cancelLobbyInDb = mutation({
 export const _internalCreateLobby = internalMutation({
   args: {
     lobbyId: v.number(),
-    lobbyPda: v.string(),
+    lobbyPda: v.optional(v.string()),
     playerA: v.string(),
     amount: v.number(),
     characterA: v.number(),

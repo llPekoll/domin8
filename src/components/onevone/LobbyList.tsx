@@ -401,7 +401,11 @@ export function LobbyList({
           {displayedLobbies.map((lobby) => (
             <div 
               key={lobby._id} 
-              className="bg-gray-800 border border-indigo-400/30 rounded-lg p-3 cursor-pointer hover:bg-gray-700 hover:border-indigo-400/60 transition-colors"
+              className={`rounded-lg p-3 cursor-pointer transition-colors ${
+                lobby.isPrivate 
+                  ? "bg-purple-900/30 border-2 border-purple-500/50 hover:bg-purple-900/50 hover:border-purple-500/70" 
+                  : "bg-gray-800 border border-indigo-400/30 hover:bg-gray-700 hover:border-indigo-400/60"
+              }`}
               onClick={() => setSelectedLobby(lobby)}
             >
               <div className="flex items-center gap-4">
@@ -433,18 +437,20 @@ export function LobbyList({
                   )}
                 </div>
 
-                {/* Share Button */}
-                <button
-                  onClick={(e) => handleCopyShareLink(lobby, e)}
-                  className="p-2 hover:bg-indigo-700/50 rounded transition-colors"
-                  title="Copy share link"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-300 hover:text-white">
-                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
-                    <polyline points="16 6 12 2 8 6"/>
-                    <line x1="12" y1="2" x2="12" y2="15"/>
-                  </svg>
-                </button>
+                {/* Share Button - hide for private lobbies in Open tab (they were shared with us, shouldn't reshare) */}
+                {!(activeTab === "open" && lobby.isPrivate) && (
+                  <button
+                    onClick={(e) => handleCopyShareLink(lobby, e)}
+                    className="p-2 hover:bg-indigo-700/50 rounded transition-colors"
+                    title="Copy share link"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-300 hover:text-white">
+                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                      <polyline points="16 6 12 2 8 6"/>
+                      <line x1="12" y1="2" x2="12" y2="15"/>
+                    </svg>
+                  </button>
+                )}
 
                 {/* Action Button */}
                 {activeTab === "open" ? (

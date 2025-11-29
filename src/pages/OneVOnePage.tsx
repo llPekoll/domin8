@@ -60,8 +60,15 @@ export function OneVOnePage() {
   const [sharedLobbyDialogOpen, setSharedLobbyDialogOpen] = useState(false);
   const shareToken = searchParams.get("join");
   
+  // Get current player's wallet address as string (for query)
+  const currentPlayerWallet = publicKey?.toString();
+  
   // Get open lobbies from Convex (real-time updates)
-  const openLobbies = useQuery(api.lobbies.getOpenLobbies) || [];
+  // Pass current player wallet so they can see their own private lobbies
+  const openLobbies = useQuery(
+    api.lobbies.getOpenLobbies,
+    currentPlayerWallet ? { currentPlayerWallet } : {}
+  ) || [];
   
   // Get lobby by share token (for URL-based access)
   const sharedLobby = useQuery(
