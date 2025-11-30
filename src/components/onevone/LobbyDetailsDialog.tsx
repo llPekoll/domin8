@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { EventBus } from "../../game/EventBus";
 import { logger } from "../../lib/logger";
 import { useAssets } from "../../contexts/AssetsContext";
 import { usePrivyWallet } from "../../hooks/usePrivyWallet";
-import { usePlayerNames } from "../../contexts/PlayerNamesContext";
 import { usePrivy } from "@privy-io/react-auth";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import type { Character } from "../../types/character";
 import Phaser from "phaser";
@@ -61,15 +62,40 @@ export function LobbyDetailsDialog({
 }: LobbyDetailsDialogProps) {
   const { characters, maps } = useAssets();
   const { connected, publicKey } = usePrivyWallet();
-  const { playerNames } = usePlayerNames();
   const { login, ready } = usePrivy();
+
+  // Get unique wallet addresses from the lobby to fetch player names
+  const lobbyWallets = useMemo(() => {
+    if (!lobby) return [];
+    const wallets = [lobby.playerA];
+    if (lobby.playerB) wallets.push(lobby.playerB);
+    return wallets;
+  }, [lobby]);
+
+  // Fetch player names for lobby participants
+  const playerNames = useQuery(
+    api.players.getPlayersByWallets,
+    lobbyWallets.length > 0 ? { walletAddresses: lobbyWallets } : "skip"
+  );
+
+  // Create a lookup map for quick access
+  const playerNameMap = useMemo(() => {
+    if (!playerNames) return new Map<string, string | null>();
+    return new Map(playerNames.map((p: any) => [p.walletAddress, p.displayName]));
+  }, [playerNames]);
 
   // Helper to get display name for a wallet address
   const getDisplayName = useCallback((walletAddress: string, isCurrentUser: boolean) => {
     if (isCurrentUser) return "You";
-    const playerData = playerNames?.find((p: any) => p.walletAddress === walletAddress);
-    return playerData?.displayName || `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`;
-  }, [playerNames]);
+    // Look up player name from the map
+    const displayName = playerNameMap.get(walletAddress);
+    if (displayName) {
+      return displayName;
+    }
+    // Fallback to sliced wallet address
+    return `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`;
+  }, [playerNameMap]);
+
   const [gameReady, setGameReady] = useState(false);
   const [containerReady, setContainerReady] = useState(false);
   const [arenaState, setArenaState] = useState<ArenaState>("preview");
