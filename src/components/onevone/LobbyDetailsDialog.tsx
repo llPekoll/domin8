@@ -4,6 +4,7 @@ import { EventBus } from "../../game/EventBus";
 import { logger } from "../../lib/logger";
 import { useAssets } from "../../contexts/AssetsContext";
 import { usePrivyWallet } from "../../hooks/usePrivyWallet";
+import { usePlayerNames } from "../../contexts/PlayerNamesContext";
 import { usePrivy } from "@privy-io/react-auth";
 import { toast } from "sonner";
 import type { Character } from "../../types/character";
@@ -60,7 +61,15 @@ export function LobbyDetailsDialog({
 }: LobbyDetailsDialogProps) {
   const { characters, maps } = useAssets();
   const { connected, publicKey } = usePrivyWallet();
+  const { playerNames } = usePlayerNames();
   const { login, ready } = usePrivy();
+
+  // Helper to get display name for a wallet address
+  const getDisplayName = useCallback((walletAddress: string, isCurrentUser: boolean) => {
+    if (isCurrentUser) return "You";
+    const playerData = playerNames?.find((p: any) => p.walletAddress === walletAddress);
+    return playerData?.displayName || `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`;
+  }, [playerNames]);
   const [gameReady, setGameReady] = useState(false);
   const [containerReady, setContainerReady] = useState(false);
   const [arenaState, setArenaState] = useState<ArenaState>("preview");
@@ -183,7 +192,7 @@ export function LobbyDetailsDialog({
         playerId: lobby.playerA,
         characterId: lobby.characterA,
         position: "left",
-        displayName: isCreator ? "You" : "Opponent",
+        displayName: getDisplayName(lobby.playerA, isCreator),
       });
     }
 
@@ -199,7 +208,7 @@ export function LobbyDetailsDialog({
             playerId: lobby.playerB!,
             characterId: lobby.characterB!,
             position: "right",
-            displayName: !isCreator ? "You" : "Opponent",
+            displayName: getDisplayName(lobby.playerB!, !isCreator),
           });
         }
       }, 500);
@@ -248,7 +257,7 @@ export function LobbyDetailsDialog({
                 playerId: lobby.playerB,
                 characterId: lobby.characterB,
                 position: "right",
-                displayName: !isCreator ? "You" : "Opponent",
+                displayName: getDisplayName(lobby.playerB, !isCreator),
               });
             }
           }
@@ -535,21 +544,13 @@ export function LobbyDetailsDialog({
         {(arenaState === "preview" || arenaState === "waiting" || arenaState === "opponent-joining" || arenaState === "vrf-pending") && (
           <div className="p-4 bg-gray-900/95 border-t border-indigo-500/30/30">
             <div className="flex gap-3 mb-3">
-              <div className="flex-1 bg-black/50 p-2 rounded-lg border border-indigo-500/30/30">
+              <div className="bg-black/50 px-4 py-2 rounded-lg border border-indigo-500/30/30 text-center">
                 <p className="text-xs text-gray-400">Player A</p>
-                <p className="text-xs font-mono text-indigo-300 truncate">
-                  {lobby.playerA.slice(0, 4)}...{lobby.playerA.slice(-4)}
-                </p>
-              </div>
-              <div className="flex-1 bg-black/50 p-2 rounded-lg border border-indigo-500/30/30">
-                <p className="text-xs text-gray-400">Player B</p>
-                <p className="text-xs font-mono text-indigo-300 truncate">
-                  {lobby.playerB ? `${lobby.playerB.slice(0, 4)}...${lobby.playerB.slice(-4)}` : "Waiting..."}
-                </p>
+                <p className="text-sm font-semibold text-indigo-200">{getDisplayName(lobby.playerA, isCreator)}</p>
               </div>
               <div className="bg-black/50 px-4 py-2 rounded-lg border border-indigo-500/30/30 text-center">
-                <p className="text-xs text-gray-400">Character</p>
-                <p className="text-sm font-semibold text-indigo-200">{characterName}</p>
+                <p className="text-xs text-gray-400">Player B</p>
+                <p className="text-sm font-semibold text-indigo-200">{lobby.playerB ? getDisplayName(lobby.playerB, !isCreator) : "Waiting..."}</p>
               </div>
               <div className="bg-black/50 px-4 py-2 rounded-lg border border-indigo-500/30/30 text-center">
                 <p className="text-xs text-gray-400">Bet</p>
