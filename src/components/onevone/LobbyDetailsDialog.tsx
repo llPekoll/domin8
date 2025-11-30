@@ -26,7 +26,7 @@ interface LobbyData {
   characterA: number;
   characterB?: number;
   mapId: number;
-  status: 0 | 1 | 2; // 0 = Open, 1 = Awaiting VRF, 2 = Resolved
+  status: 0 | 1 | 2 | 3; // 0 = Open, 1 = Awaiting VRF, 2 = VRF Received, 3 = Resolved
   winner?: string;
   isPrivate?: boolean;
 }
@@ -77,6 +77,7 @@ export function LobbyDetailsDialog({
   const sceneInitialized = useRef(false);
   const previousLobbyStatus = useRef<number | null>(null);
   const playerBSpawned = useRef(false);
+  const fightStarted = useRef(false); // Track if fight animation has been triggered
   const modalGameContainerRef = useRef<HTMLDivElement>(null);
   const gameInstanceRef = useRef<Phaser.Game | null>(null);
 
@@ -168,6 +169,7 @@ export function LobbyDetailsDialog({
       sceneInitialized.current = false;
       previousLobbyStatus.current = null;
       playerBSpawned.current = false;
+      fightStarted.current = false;
       setArenaState("preview");
       setFightResult(null);
     }
@@ -214,6 +216,9 @@ export function LobbyDetailsDialog({
       }, 500);
     }
 
+    // Set initial previousLobbyStatus to track changes from this point
+    previousLobbyStatus.current = lobby.status;
+
     // Set initial arena state based on lobby status
     if (lobby.status === 0) {
       if (lobby.playerB) {
@@ -221,16 +226,49 @@ export function LobbyDetailsDialog({
       } else {
         setArenaState(isCreator ? "waiting" : "preview");
       }
-    } else if (lobby.status === 1) {
+    } else if (lobby.status === 1 || lobby.status === 2) {
+      // Status 1 = Awaiting VRF, Status 2 = VRF Received (both show as pending)
       setArenaState("vrf-pending");
-    } else if (lobby.status === 2) {
-      setArenaState("results");
+    } else if (lobby.status === 3 && lobby.winner) {
+      // Status 3 = Resolved - need to start fight animation after characters spawn
+      logger.game.info("[LobbyDetails] Lobby already resolved on open, scheduling fight animation", {
+        winner: lobby.winner,
+        hasPlayerB: !!lobby.playerB,
+      });
+      fightStarted.current = true;
+      setArenaState("fighting");
+      
+      // Delay fight animation to allow Player B character to spawn and land
+      // Player A spawns immediately, Player B spawns after 500ms, give extra time for landing animation
+      const fightDelay = lobby.playerB && lobby.characterB !== undefined ? 1500 : 500;
+      setTimeout(() => {
+        const scene = getOneVOneScene();
+        if (scene && typeof scene.startFightAnimation === "function") {
+          logger.game.info("[LobbyDetails] Starting fight animation (initial load)", {
+            winner: lobby.winner,
+          });
+          scene.startFightAnimation({
+            lobbyId: lobby.lobbyId,
+            playerA: lobby.playerA,
+            playerB: lobby.playerB || "",
+            characterA: lobby.characterA,
+            characterB: lobby.characterB || 0,
+            winner: lobby.winner!,
+            mapId: lobby.mapId,
+          });
+        } else {
+          logger.game.warn("[LobbyDetails] Scene not ready for initial fight animation");
+        }
+      }, fightDelay);
     }
-  }, [isOpen, lobby, gameReady, isCreator, getOneVOneScene]);
+  }, [isOpen, lobby, gameReady, isCreator, getOneVOneScene, getDisplayName]);
 
   // Watch for lobby state changes (real-time updates)
   useEffect(() => {
-    if (!isOpen || !lobby) return;
+    if (!isOpen || !lobby || !sceneInitialized.current) return;
+
+    // Skip if no previous status (initial load is handled by the spawn effect)
+    if (previousLobbyStatus.current === null) return;
 
     // Track status changes
     if (previousLobbyStatus.current !== lobby.status) {
@@ -238,6 +276,8 @@ export function LobbyDetailsDialog({
         from: previousLobbyStatus.current,
         to: lobby.status,
         lobbyId: lobby.lobbyId,
+        winner: lobby.winner,
+        hasPlayerB: !!lobby.playerB,
       });
       previousLobbyStatus.current = lobby.status;
 
@@ -248,7 +288,7 @@ export function LobbyDetailsDialog({
           setArenaState("opponent-joining");
           
           // If Player B just joined, spawn their character
-          if (lobby.characterB !== undefined && sceneInitialized.current && !playerBSpawned.current) {
+          if (lobby.characterB !== undefined && !playerBSpawned.current) {
             const scene = getOneVOneScene();
             if (scene && typeof scene.spawnSingleCharacter === "function") {
               logger.game.info("[LobbyDetails] Player B joined - spawning character");
@@ -264,26 +304,59 @@ export function LobbyDetailsDialog({
         } else {
           setArenaState(isCreator ? "waiting" : "preview");
         }
-      } else if (lobby.status === 1) {
-        // Awaiting VRF
+      } else if (lobby.status === 1 || lobby.status === 2) {
+        // Status 1 = Awaiting VRF, Status 2 = VRF Received - spawn Player B if not already spawned
+        if (lobby.playerB && lobby.characterB !== undefined && !playerBSpawned.current) {
+          const scene = getOneVOneScene();
+          if (scene && typeof scene.spawnSingleCharacter === "function") {
+            logger.game.info("[LobbyDetails] VRF pending/received - spawning Player B character");
+            playerBSpawned.current = true;
+            scene.spawnSingleCharacter({
+              playerId: lobby.playerB,
+              characterId: lobby.characterB,
+              position: "right",
+              displayName: getDisplayName(lobby.playerB, !isCreator),
+            });
+          }
+        }
         setArenaState("vrf-pending");
-      } else if (lobby.status === 2 && lobby.winner) {
-        // Resolved - start fight animation
-        logger.game.info("[LobbyDetails] Lobby resolved, preparing fight animation", {
+      } else if (lobby.status === 3 && lobby.winner) {
+        // Status 3 = Resolved - start fight animation immediately
+        logger.game.info("[LobbyDetails] Lobby resolved, starting fight animation", {
           winner: lobby.winner,
           gameReady,
           sceneInitialized: sceneInitialized.current,
+          playerBSpawned: playerBSpawned.current,
+          fightStarted: fightStarted.current,
         });
         
-        // Only start fight if not already fighting or showing results
-        if (arenaState !== "fighting" && arenaState !== "results") {
+        // Only start fight if not already started (use ref to avoid stale closure)
+        if (!fightStarted.current) {
+          fightStarted.current = true;
+          
+          // Ensure Player B is spawned before starting fight (shouldn't happen normally)
+          if (lobby.playerB && lobby.characterB !== undefined && !playerBSpawned.current) {
+            const scene = getOneVOneScene();
+            if (scene && typeof scene.spawnSingleCharacter === "function") {
+              logger.game.info("[LobbyDetails] Spawning Player B before fight (late spawn)");
+              playerBSpawned.current = true;
+              scene.spawnSingleCharacter({
+                playerId: lobby.playerB,
+                characterId: lobby.characterB,
+                position: "right",
+                displayName: getDisplayName(lobby.playerB, !isCreator),
+              });
+            }
+          }
+          
           setArenaState("fighting");
           
-          // Delay slightly to ensure scene is ready
-          setTimeout(() => {
+          // Start fight animation immediately (no artificial delay since characters should already be spawned)
+          // Use requestAnimationFrame to ensure React state update has propagated
+          requestAnimationFrame(() => {
             const scene = getOneVOneScene();
             if (scene && typeof scene.startFightAnimation === "function") {
-              logger.game.info("[LobbyDetails] Starting fight animation", {
+              logger.game.info("[LobbyDetails] Starting fight animation now", {
                 winner: lobby.winner,
               });
               scene.startFightAnimation({
@@ -298,11 +371,11 @@ export function LobbyDetailsDialog({
             } else {
               logger.game.warn("[LobbyDetails] Scene not ready for fight animation");
             }
-          }, 100);
+          });
         }
       }
     }
-  }, [isOpen, lobby, isCreator, getOneVOneScene]);
+  }, [isOpen, lobby, isCreator, getOneVOneScene, gameReady, getDisplayName]);
 
   // Listen for fight completion event from Phaser
   useEffect(() => {
@@ -612,25 +685,21 @@ export function LobbyDetailsDialog({
 
             {/* Waiting state actions for creator */}
             {arenaState === "waiting" && isCreator && (
-              <div className="text-center">
-                <p className="text-xs text-gray-500 mb-2">
-                  You can close this dialog and browse other lobbies while waiting.
-                </p>
-                <div className="flex gap-3 justify-center">
-                  <button
-                    onClick={onClose}
-                    className="text-sm text-indigo-400 hover:text-indigo-300 underline"
-                  >
-                    Browse Other Lobbies
-                  </button>
-                  <button
-                    onClick={() => onCancel(lobby.lobbyId)}
-                    className="text-sm text-red-400 hover:text-red-300 underline"
-                  >
-                    Cancel Lobby
-                  </button>
-                </div>
-              </div>
+              
+                <div className="flex gap-3">
+                    <button
+                      onClick={onClose}
+                      className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm font-semibold rounded-lg transition-colors"
+                    >
+                      Browse Other Lobbies
+                    </button>
+                    <button
+                      onClick={() => onCancel(lobby.lobbyId)}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-bold rounded-lg transition-colors"
+                    >
+                      Cancel Lobby
+                    </button>
+                  </div>
             )}
           </div>
         )}

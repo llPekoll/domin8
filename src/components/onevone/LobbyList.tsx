@@ -14,7 +14,7 @@ interface LobbyData {
   playerA: string;
   playerB?: string;
   amount: number;
-  status: 0 | 1 | 2;
+  status: 0 | 1 | 2 | 3; // 0 = Open, 1 = Awaiting VRF, 2 = VRF Received, 3 = Resolved
   winner?: string;
   characterA: number;
   characterB?: number;

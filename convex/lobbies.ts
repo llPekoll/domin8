@@ -406,9 +406,8 @@ export const _internalJoinLobby = internalMutation({
       status: 1, // Status 1 = Awaiting VRF
     });
 
-    // Schedule a job to settle this lobby after a delay
-    // VRF typically resolves within 5-10 seconds, so we check after that
-    await ctx.scheduler.runAfter(10000, internal.lobbies._checkAndSettleLobby, {
+    // Schedule a job to settle this lobby after a 1 sec delay
+    await ctx.scheduler.runAfter(1000, internal.lobbies._checkAndSettleLobby, {
       lobbyId: args.lobbyId,
     });
 
