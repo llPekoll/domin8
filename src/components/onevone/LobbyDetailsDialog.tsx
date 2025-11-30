@@ -418,7 +418,7 @@ export function LobbyDetailsDialog({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent 
-        className="bg-black border-2 border-indigo-500/30 text-white sm:max-w-4xl p-0 overflow-hidden gap-0"
+        className="bg-black border-2 border-indigo-500/30 text-white sm:max-w-4xl p-0 overflow-hidden !gap-0"
         showCloseButton={showCloseButton}
       >
         {/* Header */}
@@ -449,10 +449,11 @@ export function LobbyDetailsDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {/* Phaser Game Container */}
+        {/* Phaser Game Container - aspect ratio matches game dimensions (1188x540 = 11:5 ≈ 2.2:1) */}
         <div 
           ref={containerRefCallback}
-          className="relative w-full aspect-video bg-gray-900 flex items-center justify-center overflow-hidden [&>canvas]:max-w-full [&>canvas]:max-h-full [&>canvas]:object-contain"
+          className="relative w-full bg-gray-900 flex items-center justify-center overflow-hidden [&>canvas]:max-w-full [&>canvas]:max-h-full [&>canvas]:object-contain"
+          style={{ aspectRatio: '1188 / 540' }}
         >
           {/* Loading indicator while Phaser initializes */}
           {!gameReady && (
