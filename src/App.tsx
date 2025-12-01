@@ -16,6 +16,7 @@ import { EventBus } from "./game/EventBus";
 import { setActiveGameData, setCurrentUserWallet } from "./game/main";
 import type { Character } from "./types/character";
 import { useAutoCreatePlayer } from "./hooks/useAutoCreatePlayer";
+import { useGameCreatedWebhook } from "./hooks/useGameCreatedWebhook";
 import { ConnectWalletOverlay } from "./components/ConnectWalletOverlay";
 import { ConnectWalletMobile } from "./components/ConnectWalletMobile";
 
@@ -34,6 +35,9 @@ export default function App() {
 
   // Get current game state directly from blockchain (no Convex, <1s updates)
   const { activeGame: currentRoundState } = useActiveGame();
+
+  // Send webhook when game transitions from WAITING to OPEN (first bet placed)
+  useGameCreatedWebhook(currentRoundState);
 
   // ✅ Create a stable reference that only changes when meaningful data changes
   // This prevents infinite re-renders from object recreation

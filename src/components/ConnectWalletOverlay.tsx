@@ -4,9 +4,9 @@ import { usePrivy } from "@privy-io/react-auth";
 import { Button } from "~/components/ui/button";
 
 const carouselSlides = [
-  { image: "/carousel/1.png", caption: "Insert coin to play" },
-  { image: "/carousel/2.png", caption: "Wait for other players" },
-  { image: "/carousel/3.png", caption: "Win the game and take the prize" },
+  { image: "/carousel/1.gif", caption: "Insert coin to play" },
+  { image: "/carousel/2.gif", caption: "Wait for other players" },
+  { image: "/carousel/3.gif", caption: "Win the game and take the prize" },
 ];
 
 export function ConnectWalletOverlay() {
