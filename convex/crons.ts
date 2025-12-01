@@ -30,7 +30,7 @@ crons.interval("sync-blockchain-state", { seconds: 45 }, internal.syncService.sy
 crons.interval(
   "sync-1v1-stuck-lobbies",
   { seconds: 30 },
-  internal.lobbies.syncLobbyFromBlockchain
+  internal.lobbiesActions.syncLobbyFromBlockchain
 );
 
 /**
