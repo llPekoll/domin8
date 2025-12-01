@@ -537,7 +537,7 @@ export function LobbyDetailsDialog({
               {lobby.isPrivate && <span title="Private Lobby">🔒</span>}
               Lobby #{lobby.lobbyId}
               {/* Share Button - only show when not in fight/results */}
-              {(arenaState === "preview" || arenaState === "waiting") && (
+              {(arenaState === "preview" || arenaState === "waiting") && lobby.playerA == publicKey?.toString() && (
                 <button
                   onClick={handleCopyShareLink}
                   className="ml-2 p-1 hover:bg-indigo-700/50 rounded transition-colors"

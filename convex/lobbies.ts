@@ -741,7 +741,12 @@ export const _getOpenLobbiesForSync = internalQuery({
       .withIndex("by_status", (q) => q.eq("status", 2))
       .collect();
 
-    return [...status0, ...status1, ...status2];
+    const status3 = await ctx.db
+      .query("oneVOneLobbies")
+      .withIndex("by_status", (q) => q.eq("status", 3))
+      .collect();
+
+    return [...status0, ...status1, ...status2, ...status3];
   },
 });
 
@@ -1191,6 +1196,8 @@ export const _crankSettleLobby = internalAction({
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error(`[1v1 Crank] Failed to settle lobby ${args.lobbyId}:`, errorMsg);
+
+      
 
       // Retry after delay if it failed
       await ctx.scheduler.runAfter(10000, internal.lobbies._crankSettleLobby, {
