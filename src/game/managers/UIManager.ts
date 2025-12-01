@@ -2,6 +2,7 @@ import { Scene } from "phaser";
 import { GamePhase } from "./GlobalGameStateManager";
 import { EventBus } from "../EventBus";
 import { currentUserWallet } from "../main";
+import { SoundManager } from "./SoundManager";
 
 export class UIManager {
   private scene: Scene;
@@ -35,6 +36,9 @@ export class UIManager {
   // Insert Coin UI (waiting for first bet)
   private insertCoinText!: Phaser.GameObjects.Text;
   private insertCoinTween!: Phaser.Tweens.Tween;
+
+  // Track if countdown sound has been played for current game
+  private countdownSoundPlayed: boolean = false;
 
   constructor(scene: Scene, centerX: number) {
     this.scene = scene;
@@ -137,6 +141,9 @@ export class UIManager {
 
     // Clear cached data for next game
     this.cachedBetAmounts = [];
+
+    // Reset countdown sound flag for next game
+    this.countdownSoundPlayed = false;
   }
 
   private showWinnerUI() {
@@ -601,6 +608,12 @@ export class UIManager {
       // Pulse effect for last 5 seconds - scale text (not container) so it scales from center
       const scale = 1 + Math.sin(currentTime * 0.01) * 0.15;
       this.demoCountdownText.setScale(scale);
+
+      // Play countdown sound when hitting 5 seconds (only once per game)
+      if (!this.countdownSoundPlayed) {
+        this.countdownSoundPlayed = true;
+        SoundManager.playCountdown5Sec(this.scene);
+      }
     } else if (seconds <= 10) {
       this.demoCountdownText.setColor("#FFA500"); // Orange
       this.demoCountdownText.setScale(1);

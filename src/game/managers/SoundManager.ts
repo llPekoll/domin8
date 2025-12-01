@@ -186,6 +186,13 @@ export class SoundManager {
   }
 
   /**
+   * Play 5-second countdown sound (for final countdown)
+   */
+  static playCountdown5Sec(scene: Scene, baseVolume: number = 0.7) {
+    this.playSound(scene, "countdown-5sec", baseVolume);
+  }
+
+  /**
    * Set global volume (0.0 to 1.0)
    */
   static setGlobalVolume(volume: number) {

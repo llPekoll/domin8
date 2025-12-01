@@ -41,6 +41,7 @@ export class OneVOneScene extends Scene {
   private fightData: FightData | null = null;
   private fightStarted: boolean = false;
   private battleMusic: Phaser.Sound.BaseSound | null = null;
+  private fireSounds: Phaser.Sound.BaseSound | null = null;
   private audioUnlocked: boolean = false;
 
   // UI elements
@@ -382,6 +383,13 @@ export class OneVOneScene extends Scene {
 
         // Register with SoundManager
         SoundManager.setBattleMusic(this.battleMusic);
+
+        // Also play fire sounds alongside battle theme
+        if (this.cache.audio.exists("fire-sounds")) {
+          this.fireSounds = SoundManager.play(this, "fire-sounds", 0.15, {
+            loop: true,
+          });
+        }
       } catch (e) {
         logger.game.error("[OneVOneScene] Failed to start battle music:", e);
       }
@@ -396,6 +404,10 @@ export class OneVOneScene extends Scene {
       this.battleMusic.stop();
       this.battleMusic = null;
       SoundManager.setBattleMusic(null);
+    }
+    if (this.fireSounds) {
+      this.fireSounds.stop();
+      this.fireSounds = null;
     }
 
     // Clean up

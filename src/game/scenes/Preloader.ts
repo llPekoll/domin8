@@ -168,11 +168,13 @@ export class Preloader extends Scene {
 
     // Load sound effects
     this.load.audio("battle-theme", "sounds/battleThemeA.mp3");
+    this.load.audio("fire-sounds", "sounds/fire-sounds.mp3");
     this.load.audio("domin8-intro", "sounds/domin8-intro.mp3");
     this.load.audio("explosion-dust", "sounds/explosion-dust.wav");
     this.load.audio("victory", "sounds/victory2.mp3");
     this.load.audio("insert-coin", "sounds/insert-coin.mp3");
     this.load.audio("challenger", "sounds/challenger.mp3");
+    this.load.audio("countdown-5sec", "sounds/5-second-countdown.mp3");
 
     // Load impact sounds for character landing
     this.load.audio("impact-1", "sounds/impacts/sfx_sounds_impact1.wav");

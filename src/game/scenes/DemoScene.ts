@@ -56,6 +56,7 @@ export class DemoScene extends Scene {
   private countdownTimer?: Phaser.Time.TimerEvent;
 
   private battleMusic: Phaser.Sound.BaseSound | null = null;
+  private fireSounds: Phaser.Sound.BaseSound | null = null;
   private audioUnlocked: boolean = false;
   private introPlayed: boolean = false;
 
@@ -625,6 +626,13 @@ export class DemoScene extends Scene {
 
         // Register with SoundManager for centralized control
         SoundManager.setBattleMusic(this.battleMusic);
+
+        // Also play fire sounds alongside battle theme
+        if (this.cache.audio.exists("fire-sounds")) {
+          this.fireSounds = SoundManager.play(this, "fire-sounds", 0.15, {
+            loop: true,
+          });
+        }
       } catch (e) {
         logger.game.error("[DemoScene] Failed to start battle music:", e);
       }
@@ -759,6 +767,10 @@ export class DemoScene extends Scene {
       this.battleMusic.stop();
       this.battleMusic = null;
       SoundManager.setBattleMusic(null); // Unregister from SoundManager
+    }
+    if (this.fireSounds) {
+      this.fireSounds.stop();
+      this.fireSounds = null;
     }
     // Reset intro flag for next time scene is created
     this.introPlayed = false;
