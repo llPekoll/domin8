@@ -101,11 +101,25 @@ export function OneVOnePage() {
     }
   }, [shareToken, sharedLobby, setSearchParams]);
 
-  // Handle closing shared lobby dialog - clear URL parameter
+  // Reopen dialog after Privy login if we still have a shareToken
+  // This handles the case where dialog closes during Privy login flow
+  useEffect(() => {
+    if (connected && shareToken && sharedLobby && sharedLobby.status === 0 && !sharedLobbyDialogOpen) {
+      logger.ui.info("[1v1] Reopening shared lobby dialog after login", { shareToken, lobbyId: sharedLobby.lobbyId });
+      setSharedLobbyDialogOpen(true);
+    }
+  }, [connected, shareToken, sharedLobby, sharedLobbyDialogOpen]);
+
+  // Handle closing shared lobby dialog - only clear URL if user is connected (intentional close)
+  // If not connected, keep the URL so dialog can reopen after Privy login
   const handleSharedLobbyDialogClose = useCallback(() => {
     setSharedLobbyDialogOpen(false);
-    setSearchParams({});
-  }, [setSearchParams]);
+    // Only clear URL parameter if user is connected (intentional close)
+    // or if they're not connected and explicitly closing (not due to Privy modal)
+    if (connected) {
+      setSearchParams({});
+    }
+  }, [setSearchParams, connected]);
 
   const handleCharacterSelected = useCallback((character: Character | null) => {
     setSelectedCharacter(character);
