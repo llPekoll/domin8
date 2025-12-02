@@ -13,11 +13,15 @@ import { logger } from "~/lib/logger";
 export class SoundManager {
   private static globalVolume: number = 0.2;
   private static isMuted: boolean = false;
+  private static isMusicMuted: boolean = false;
+  private static isFireSoundsMuted: boolean = false;
+  private static isSfxMuted: boolean = false;
   private static isAudioUnlocked: boolean = false;
   private static initialized: boolean = false;
 
-  // Store active music reference for global control
+  // Store active music references for global control
   private static battleMusic: Phaser.Sound.BaseSound | null = null;
+  private static fireSounds: Phaser.Sound.BaseSound | null = null;
 
   /**
    * Initialize sound manager - load preferences from localStorage
@@ -35,6 +39,24 @@ export class SoundManager {
     const savedMute = localStorage.getItem("sound-muted");
     if (savedMute !== null) {
       this.isMuted = savedMute === "true";
+    }
+
+    // Load music mute preference
+    const savedMusicMute = localStorage.getItem("sound-music-muted");
+    if (savedMusicMute !== null) {
+      this.isMusicMuted = savedMusicMute === "true";
+    }
+
+    // Load fire sounds mute preference
+    const savedFireMute = localStorage.getItem("sound-fire-muted");
+    if (savedFireMute !== null) {
+      this.isFireSoundsMuted = savedFireMute === "true";
+    }
+
+    // Load SFX mute preference
+    const savedSfxMute = localStorage.getItem("sound-sfx-muted");
+    if (savedSfxMute !== null) {
+      this.isSfxMuted = savedSfxMute === "true";
     }
 
     this.initialized = true;
@@ -90,7 +112,8 @@ export class SoundManager {
       this.initialize();
     }
 
-    if (this.isMuted) {
+    // Check global mute and SFX mute
+    if (this.isMuted || this.isSfxMuted) {
       return;
     }
 
@@ -327,7 +350,7 @@ export class SoundManager {
     this.battleMusic = music;
 
     // Apply current mute state immediately
-    if (music && this.isMuted) {
+    if (music && (this.isMuted || this.isMusicMuted)) {
       music.pause();
     }
   }
@@ -337,5 +360,105 @@ export class SoundManager {
    */
   static getBattleMusic(): Phaser.Sound.BaseSound | null {
     return this.battleMusic;
+  }
+
+  /**
+   * Register fire sounds for global control
+   */
+  static setFireSounds(sounds: Phaser.Sound.BaseSound | null) {
+    this.fireSounds = sounds;
+
+    // Apply current mute state immediately
+    if (sounds && (this.isMuted || this.isFireSoundsMuted)) {
+      sounds.pause();
+    }
+  }
+
+  /**
+   * Get fire sounds reference
+   */
+  static getFireSounds(): Phaser.Sound.BaseSound | null {
+    return this.fireSounds;
+  }
+
+  // ============ Music Controls ============
+
+  /**
+   * Set music mute state
+   */
+  static setMusicMuted(muted: boolean) {
+    this.isMusicMuted = muted;
+    localStorage.setItem("sound-music-muted", muted.toString());
+
+    // Control battle music directly
+    if (this.battleMusic) {
+      if (muted || this.isMuted) {
+        this.battleMusic.pause();
+      } else {
+        this.battleMusic.resume();
+      }
+    }
+    logger.ui.debug(`[SoundManager] Music ${muted ? "muted" : "unmuted"}`);
+  }
+
+  /**
+   * Get music mute state
+   */
+  static isMusicMutedState(): boolean {
+    if (!this.initialized) {
+      this.initialize();
+    }
+    return this.isMusicMuted;
+  }
+
+  // ============ Fire Sounds Controls ============
+
+  /**
+   * Set fire sounds mute state
+   */
+  static setFireSoundsMuted(muted: boolean) {
+    this.isFireSoundsMuted = muted;
+    localStorage.setItem("sound-fire-muted", muted.toString());
+
+    // Control fire sounds directly
+    if (this.fireSounds) {
+      if (muted || this.isMuted) {
+        this.fireSounds.pause();
+      } else {
+        this.fireSounds.resume();
+      }
+    }
+    logger.ui.debug(`[SoundManager] Fire sounds ${muted ? "muted" : "unmuted"}`);
+  }
+
+  /**
+   * Get fire sounds mute state
+   */
+  static isFireSoundsMutedState(): boolean {
+    if (!this.initialized) {
+      this.initialize();
+    }
+    return this.isFireSoundsMuted;
+  }
+
+  // ============ SFX Controls ============
+
+  /**
+   * Set SFX mute state
+   */
+  static setSfxMuted(muted: boolean) {
+    this.isSfxMuted = muted;
+    localStorage.setItem("sound-sfx-muted", muted.toString());
+    logger.ui.debug(`[SoundManager] SFX ${muted ? "muted" : "unmuted"}`);
+  }
+
+  /**
+   * Get SFX mute state
+   */
+  static isSfxMutedState(): boolean {
+    if (!this.initialized) {
+      this.initialize();
+    }
+    return this.isSfxMuted;
   }
 }

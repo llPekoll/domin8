@@ -389,6 +389,8 @@ export class OneVOneScene extends Scene {
           this.fireSounds = SoundManager.play(this, "fire-sounds", 0.15, {
             loop: true,
           });
+          // Register with SoundManager for centralized control
+          SoundManager.setFireSounds(this.fireSounds);
         }
       } catch (e) {
         logger.game.error("[OneVOneScene] Failed to start battle music:", e);
@@ -408,6 +410,7 @@ export class OneVOneScene extends Scene {
     if (this.fireSounds) {
       this.fireSounds.stop();
       this.fireSounds = null;
+      SoundManager.setFireSounds(null);
     }
 
     // Clean up

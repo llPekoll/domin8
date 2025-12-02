@@ -632,6 +632,8 @@ export class DemoScene extends Scene {
           this.fireSounds = SoundManager.play(this, "fire-sounds", 0.15, {
             loop: true,
           });
+          // Register with SoundManager for centralized control
+          SoundManager.setFireSounds(this.fireSounds);
         }
       } catch (e) {
         logger.game.error("[DemoScene] Failed to start battle music:", e);
@@ -771,6 +773,7 @@ export class DemoScene extends Scene {
     if (this.fireSounds) {
       this.fireSounds.stop();
       this.fireSounds = null;
+      SoundManager.setFireSounds(null);
     }
     // Reset intro flag for next time scene is created
     this.introPlayed = false;
