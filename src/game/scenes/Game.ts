@@ -29,6 +29,11 @@ export class Game extends Scene {
   private currentMapId: number | null = null;
   private arenaMask: Phaser.Display.Masks.BitmapMask | null = null;
 
+  // Audio
+  private battleMusic: Phaser.Sound.BaseSound | null = null;
+  private fireSounds: Phaser.Sound.BaseSound | null = null;
+  private audioUnlocked: boolean = false;
+
   constructor() {
     super("Game");
   }
@@ -141,14 +146,115 @@ export class Game extends Scene {
     // Characters now spawn automatically via blockchain subscription (useActiveGame)
     // No need for separate event listener - updateGameState handles all spawning
 
-    // Play intro sound when real game starts
-    this.playIntroSound();
+    // Setup audio (music + fire sounds)
+    this.setupAudioUnlock();
+  }
+
+  /**
+   * Setup audio unlock handler for browser autoplay policy
+   */
+  private setupAudioUnlock() {
+    // Apply mute state from SoundManager
+    SoundManager.applyMuteToScene(this);
+
+    // Set up click handler to unlock audio on first interaction
+    const unlockHandler = async () => {
+      if (!this.audioUnlocked) {
+        this.audioUnlocked = true;
+
+        await SoundManager.unlockAudio(this).then(() => {
+          // Try to start music after unlocking
+          this.tryStartMusic();
+        });
+
+        // Remove the handler after first interaction
+        this.input.off("pointerdown", unlockHandler);
+      }
+    };
+
+    // Listen for any pointer/touch interaction
+    this.input.on("pointerdown", unlockHandler);
+
+    // Also try to start music immediately (will work if already unlocked)
+    this.tryStartMusic();
+  }
+
+  /**
+   * Try to start background music
+   */
+  private tryStartMusic() {
+    if (!this.battleMusic) {
+      try {
+        // Play intro sound first (only once per scene instance)
+        if (!this.introPlayed && this.cache.audio.exists("domin8-intro")) {
+          SoundManager.playSound(this, "domin8-intro", 0.5);
+          this.introPlayed = true;
+        }
+
+        // Check if audio file is loaded
+        if (!this.cache.audio.exists("battle-theme")) {
+          logger.game.error("[Game] battle-theme audio not loaded!");
+          return;
+        }
+
+        // Use SoundManager to play battle music (respects mute and volume)
+        this.battleMusic = SoundManager.play(this, "battle-theme", 0.2, {
+          loop: true,
+        });
+
+        // Register with SoundManager for centralized control
+        SoundManager.setBattleMusic(this.battleMusic);
+
+        // Also play fire sounds alongside battle theme
+        if (this.cache.audio.exists("fire-sounds")) {
+          this.fireSounds = SoundManager.play(this, "fire-sounds", 0.15, {
+            loop: true,
+          });
+          // Register with SoundManager for centralized control
+          SoundManager.setFireSounds(this.fireSounds);
+        }
+      } catch (e) {
+        logger.game.error("[Game] Failed to start battle music:", e);
+      }
+    }
   }
 
   /**
    * Set up event listeners from GlobalGameStateManager
    */
   private setupEventListeners() {
+    // Listen for sound settings changes from UI
+    EventBus.on("sound-settings-changed", (data: { type: string; muted: boolean }) => {
+      logger.game.debug("[Game] Sound settings changed:", data);
+
+      if (data.type === "master" || data.type === "music") {
+        // Music toggle - handle both starting and resuming
+        if (!data.muted) {
+          if (this.battleMusic) {
+            // Music exists but might be paused - resume it
+            this.battleMusic.resume();
+          } else {
+            // No music yet - create and play it
+            this.tryStartMusic();
+          }
+        }
+      }
+
+      if (data.type === "master" || data.type === "fire") {
+        // Fire sounds toggle - handle both starting and resuming
+        if (!data.muted) {
+          if (this.fireSounds) {
+            // Fire sounds exist but might be paused - resume
+            this.fireSounds.resume();
+          } else if (this.cache.audio.exists("fire-sounds")) {
+            // No fire sounds yet - create and play
+            this.fireSounds = SoundManager.play(this, "fire-sounds", 0.15, { loop: true });
+            SoundManager.setFireSounds(this.fireSounds);
+          }
+        }
+      }
+    });
+
     // Listen for battle phase start
     EventBus.on("start-battle-phase", () => {
       logger.game.debug("[Game] ⚔️ Battle phase triggered");
@@ -270,26 +376,6 @@ export class Game extends Scene {
     }
 
     logger.game.debug("[CLEANUP] Complete");
-  }
-
-  private playIntroSound() {
-    if (!this.introPlayed) {
-      try {
-        // Initialize SoundManager
-        SoundManager.initialize();
-
-        // Unlock audio on first interaction
-        void SoundManager.unlockAudio(this).then(() => {
-          // Play intro sound if it's loaded
-          if (this.cache.audio.exists("domin8-intro")) {
-            SoundManager.playSound(this, "domin8-intro", 0.5);
-            this.introPlayed = true;
-          }
-        });
-      } catch (e) {
-        logger.game.error("[Game] Failed to play intro sound:", e);
-      }
-    }
   }
 
   // Update game state from blockchain
@@ -526,6 +612,7 @@ export class Game extends Scene {
     EventBus.off("start-battle-phase");
     EventBus.off("start-celebration");
     EventBus.off("cleanup-game");
+    EventBus.off("sound-settings-changed");
 
     // Clean up UIManager
     if (this.uiManager) {
@@ -540,6 +627,18 @@ export class Game extends Scene {
     // Clear animations
     if (this.animationManager) {
       this.animationManager.clearCelebration();
+    }
+
+    // Clean up music
+    if (this.battleMusic) {
+      this.battleMusic.stop();
+      this.battleMusic = null;
+      SoundManager.setBattleMusic(null);
+    }
+    if (this.fireSounds) {
+      this.fireSounds.stop();
+      this.fireSounds = null;
+      SoundManager.setFireSounds(null);
     }
 
     this.tweens.killAll();

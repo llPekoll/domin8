@@ -3,7 +3,11 @@ import { useEffect, useState } from "react";
 import { EventBus } from "../game/EventBus";
 import { SoundManager } from "../game/managers/SoundManager";
 
-export function SoundControl() {
+interface SoundControlProps {
+  onSettingsClick?: () => void;
+}
+
+export function SoundControl({ onSettingsClick }: SoundControlProps) {
   const [volume, setVolume] = useState(() => {
     // Load volume preference from SoundManager
     SoundManager.initialize();
@@ -72,10 +76,14 @@ export function SoundControl() {
 
   return (
     <div className="flex items-center gap-2 px-2">
-      {/* Volume Icon */}
-      <div className="text-gray-300">
+      {/* Volume Icon - clickable to open settings */}
+      <button
+        onClick={onSettingsClick}
+        className={`text-gray-300 ${onSettingsClick ? 'hover:text-indigo-300 cursor-pointer' : ''}`}
+        title={onSettingsClick ? "Sound Settings" : undefined}
+      >
         {getVolumeIcon()}
-      </div>
+      </button>
 
       {/* Volume Slider */}
       <input

@@ -89,8 +89,16 @@ export class SoundManager {
         volume: finalVolume,
       });
 
+      // Determine if this sound should be muted based on type
+      let shouldMute = this.isMuted;
+      if (key === "battle-theme") {
+        shouldMute = shouldMute || this.isMusicMuted;
+      } else if (key === "fire-sounds") {
+        shouldMute = shouldMute || this.isFireSoundsMuted;
+      }
+
       // Only play if not muted
-      if (!this.isMuted) {
+      if (!shouldMute) {
         sound.play();
         logger.ui.debug(`[SoundManager] Playing "${key}" at volume ${finalVolume.toFixed(2)}`);
       } else {
@@ -210,9 +218,37 @@ export class SoundManager {
 
   /**
    * Play 5-second countdown sound (for final countdown)
+   * Plays the intro sound after countdown finishes
    */
   static playCountdown5Sec(scene: Scene, baseVolume: number = 0.7) {
-    this.playSound(scene, "countdown-5sec", baseVolume);
+    if (!this.initialized) {
+      this.initialize();
+    }
+
+    // Check global mute and SFX mute
+    if (this.isMuted || this.isSfxMuted) {
+      return;
+    }
+
+    const finalVolume = baseVolume * this.globalVolume;
+
+    try {
+      // Use scene.sound.add to get a reference we can attach events to
+      const countdownSound = scene.sound.add("countdown-5sec", { volume: finalVolume });
+
+      // Play intro sound when countdown finishes
+      countdownSound.once("complete", () => {
+        logger.ui.debug("[SoundManager] Countdown finished, playing intro sound");
+        this.playSound(scene, "domin8-intro", 0.5);
+      });
+
+      countdownSound.play();
+      logger.ui.debug(
+        `[SoundManager] Playing countdown-5sec at volume ${finalVolume.toFixed(2)}`
+      );
+    } catch (error) {
+      logger.ui.error(`[SoundManager] Failed to play countdown sound:`, error);
+    }
   }
 
   /**
@@ -252,11 +288,31 @@ export class SoundManager {
     if (this.battleMusic) {
       if (muted) {
         this.battleMusic.pause();
-      } else {
-        this.battleMusic.resume();
+      } else if (!this.isMusicMuted) {
+        // Only play if music isn't individually muted
+        if (!(this.battleMusic as any).isPlaying) {
+          this.battleMusic.play();
+        } else {
+          this.battleMusic.resume();
+        }
       }
-      logger.ui.debug(`[SoundManager] Sound ${muted ? "muted" : "unmuted"}`);
     }
+
+    // Control fire sounds directly
+    if (this.fireSounds) {
+      if (muted) {
+        this.fireSounds.pause();
+      } else if (!this.isFireSoundsMuted) {
+        // Only play if fire sounds aren't individually muted
+        if (!(this.fireSounds as any).isPlaying) {
+          this.fireSounds.play();
+        } else {
+          this.fireSounds.resume();
+        }
+      }
+    }
+
+    logger.ui.debug(`[SoundManager] Master ${muted ? "muted" : "unmuted"}`);
   }
 
   /**
@@ -395,7 +451,12 @@ export class SoundManager {
       if (muted || this.isMuted) {
         this.battleMusic.pause();
       } else {
-        this.battleMusic.resume();
+        // Use play() if not playing, resume() if paused
+        if (!(this.battleMusic as any).isPlaying) {
+          this.battleMusic.play();
+        } else {
+          this.battleMusic.resume();
+        }
       }
     }
     logger.ui.debug(`[SoundManager] Music ${muted ? "muted" : "unmuted"}`);
@@ -425,7 +486,12 @@ export class SoundManager {
       if (muted || this.isMuted) {
         this.fireSounds.pause();
       } else {
-        this.fireSounds.resume();
+        // Use play() if not playing, resume() if paused
+        if (!(this.fireSounds as any).isPlaying) {
+          this.fireSounds.play();
+        } else {
+          this.fireSounds.resume();
+        }
       }
     }
     logger.ui.debug(`[SoundManager] Fire sounds ${muted ? "muted" : "unmuted"}`);

@@ -2,39 +2,42 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Button } from "./ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "~/components/ui/dialog";
+import { Dialog, DialogContent } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { toast } from "sonner";
 import { User, Trophy, X, Volume2, Music, Flame, Zap } from "lucide-react";
 import { logger } from "../lib/logger";
 import { SoundManager } from "../game/managers/SoundManager";
+import { EventBus } from "../game/EventBus";
+
+type TabType = "profile" | "sound";
 
 interface ProfileDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentName?: string;
   walletAddress: string;
+  defaultTab?: TabType;
 }
-
-type TabType = "profile" | "sound";
 
 export function ProfileDialog({
   open,
   onOpenChange,
   currentName,
-  walletAddress
+  walletAddress,
+  defaultTab = "profile",
 }: ProfileDialogProps) {
   const [displayName, setDisplayName] = useState(currentName || "");
   const [isUpdating, setIsUpdating] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>("profile");
+  const [activeTab, setActiveTab] = useState<TabType>(defaultTab);
+
+  // Reset to default tab when dialog opens
+  useEffect(() => {
+    if (open) {
+      setActiveTab(defaultTab);
+    }
+  }, [open, defaultTab]);
 
   // Sound settings state
   const [allSoundsMuted, setAllSoundsMuted] = useState(false);
@@ -54,16 +57,10 @@ export function ProfileDialog({
   }, [open]);
 
   // Fetch player data
-  const playerData = useQuery(
-    api.players.getPlayer,
-    { walletAddress }
-  );
+  const playerData = useQuery(api.players.getPlayer, { walletAddress });
 
   // Fetch recent games
-  const recentGames = useQuery(
-    api.players.getRecentGames,
-    { walletAddress, limit: 10 }
-  );
+  const recentGames = useQuery(api.players.getRecentGames, { walletAddress, limit: 10 });
 
   const totalWins = playerData?.totalWins ?? 0;
   const totalGames = playerData?.totalGamesPlayed ?? 0;
@@ -91,7 +88,7 @@ export function ProfileDialog({
     try {
       await updateDisplayName({
         walletAddress,
-        displayName: displayName.trim()
+        displayName: displayName.trim(),
       });
       toast.success("Display name updated successfully!");
       onOpenChange(false);
@@ -105,7 +102,7 @@ export function ProfileDialog({
 
   const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp * 1000);
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   };
 
   const formatSol = (lamports: number) => {
@@ -117,18 +114,24 @@ export function ProfileDialog({
     const newValue = !allSoundsMuted;
     setAllSoundsMuted(newValue);
     SoundManager.setMuted(newValue);
+    // Emit event for game scene to react
+    EventBus.emit("sound-settings-changed", { type: "master", muted: newValue });
   };
 
   const handleMusicToggle = () => {
     const newValue = !musicMuted;
     setMusicMuted(newValue);
     SoundManager.setMusicMuted(newValue);
+    // Emit event for game scene to react (e.g., start music if unmuting and not playing)
+    EventBus.emit("sound-settings-changed", { type: "music", muted: newValue });
   };
 
   const handleFireSoundsToggle = () => {
     const newValue = !fireSoundsMuted;
     setFireSoundsMuted(newValue);
     SoundManager.setFireSoundsMuted(newValue);
+    // Emit event for game scene to react
+    EventBus.emit("sound-settings-changed", { type: "fire", muted: newValue });
   };
 
   const handleSfxToggle = () => {
@@ -139,7 +142,10 @@ export function ProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className="sm:max-w-[650px] p-0 bg-gradient-to-b from-indigo-950/98 to-slate-950/98 backdrop-blur-md border border-indigo-500/40 overflow-hidden">
+      <DialogContent
+        showCloseButton={false}
+        className="sm:max-w-[650px] p-0 bg-gradient-to-b from-indigo-950/98 to-slate-950/98 backdrop-blur-md border border-indigo-500/40 overflow-hidden"
+      >
         {/* Custom close button */}
         <button
           onClick={() => onOpenChange(false)}
@@ -152,7 +158,9 @@ export function ProfileDialog({
           {/* Sidebar Navigation */}
           <div className="w-[140px] bg-black/40 border-r border-indigo-500/30 py-4 flex flex-col">
             <div className="px-3 mb-4">
-              <h2 className="text-indigo-300 text-xs font-semibold uppercase tracking-wider">Settings</h2>
+              <h2 className="text-indigo-300 text-xs font-semibold uppercase tracking-wider">
+                Settings
+              </h2>
             </div>
 
             <button
@@ -229,9 +237,13 @@ export function ProfileDialog({
                     </div>
                     <div className="bg-black/30 rounded-md border border-indigo-500/40 max-h-[180px] overflow-y-auto">
                       {recentGames === undefined ? (
-                        <div className="text-center py-4 text-indigo-400/60 text-sm">Loading...</div>
+                        <div className="text-center py-4 text-indigo-400/60 text-sm">
+                          Loading...
+                        </div>
                       ) : recentGames.length === 0 ? (
-                        <div className="text-center py-4 text-indigo-400/60 text-sm">No games played yet</div>
+                        <div className="text-center py-4 text-indigo-400/60 text-sm">
+                          No games played yet
+                        </div>
                       ) : (
                         <div className="divide-y divide-indigo-500/20">
                           {recentGames.map((game) => (
@@ -242,11 +254,13 @@ export function ProfileDialog({
                               }`}
                             >
                               <div className="flex items-center gap-2">
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                                  game.isWinner
-                                    ? "bg-green-500/30 text-green-300"
-                                    : "bg-red-500/30 text-red-300"
-                                }`}>
+                                <span
+                                  className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                    game.isWinner
+                                      ? "bg-green-500/30 text-green-300"
+                                      : "bg-red-500/30 text-red-300"
+                                  }`}
+                                >
                                   {game.isWinner ? "WIN" : "LOSS"}
                                 </span>
                                 <span className="text-xs text-indigo-400">
@@ -254,11 +268,13 @@ export function ProfileDialog({
                                 </span>
                               </div>
                               <div className="flex items-center gap-2 text-xs">
-                                <span className="text-indigo-300">
-                                  {game.playerCount}p
-                                </span>
+                                <span className="text-indigo-300">{game.playerCount}p</span>
                                 <span className="text-indigo-100 font-semibold">
-                                  {game.isWinner ? "+" : "-"}{formatSol(game.isWinner ? game.prizeWon : game.playerBetAmount)} SOL
+                                  {game.isWinner ? "+" : "-"}
+                                  {formatSol(
+                                    game.isWinner ? game.prizeWon : game.playerBetAmount
+                                  )}{" "}
+                                  SOL
                                 </span>
                               </div>
                             </div>
@@ -297,23 +313,31 @@ export function ProfileDialog({
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Volume2 className={`w-6 h-6 ${allSoundsMuted ? "text-red-400" : "text-green-400"}`} />
+                    <Volume2
+                      className={`w-6 h-6 ${allSoundsMuted ? "text-red-400" : "text-green-400"}`}
+                    />
                     <div>
                       <p className="text-indigo-100 font-semibold">Master Volume</p>
                       <p className="text-indigo-400/70 text-xs">Toggle all audio on/off</p>
                     </div>
                   </div>
-                  <div className={`w-12 h-6 rounded-full transition-all ${
-                    allSoundsMuted ? "bg-red-600" : "bg-green-600"
-                  } relative`}>
-                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${
-                      allSoundsMuted ? "left-1" : "left-7"
-                    }`} />
+                  <div
+                    className={`w-12 h-6 rounded-full transition-all ${
+                      allSoundsMuted ? "bg-red-600" : "bg-green-600"
+                    } relative`}
+                  >
+                    <div
+                      className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${
+                        allSoundsMuted ? "left-1" : "left-7"
+                      }`}
+                    />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-indigo-400 text-xs font-semibold uppercase tracking-wider">Individual Controls</p>
+                  <p className="text-indigo-400 text-xs font-semibold uppercase tracking-wider">
+                    Individual Controls
+                  </p>
 
                   {/* Music Toggle */}
                   <div
@@ -325,18 +349,24 @@ export function ProfileDialog({
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <Music className={`w-5 h-5 ${musicMuted || allSoundsMuted ? "text-indigo-600" : "text-indigo-300"}`} />
+                      <Music
+                        className={`w-5 h-5 ${musicMuted || allSoundsMuted ? "text-indigo-600" : "text-indigo-300"}`}
+                      />
                       <div>
                         <p className="text-indigo-100 font-medium text-sm">Battle Music</p>
                         <p className="text-indigo-500 text-xs">Background theme</p>
                       </div>
                     </div>
-                    <div className={`w-10 h-5 rounded-full transition-all ${
-                      musicMuted || allSoundsMuted ? "bg-indigo-900" : "bg-indigo-500"
-                    } relative`}>
-                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
-                        musicMuted || allSoundsMuted ? "left-0.5" : "left-5"
-                      }`} />
+                    <div
+                      className={`w-10 h-5 rounded-full transition-all ${
+                        musicMuted || allSoundsMuted ? "bg-indigo-900" : "bg-indigo-500"
+                      } relative`}
+                    >
+                      <div
+                        className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
+                          musicMuted || allSoundsMuted ? "left-0.5" : "left-5"
+                        }`}
+                      />
                     </div>
                   </div>
 
@@ -350,18 +380,24 @@ export function ProfileDialog({
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <Flame className={`w-5 h-5 ${fireSoundsMuted || allSoundsMuted ? "text-indigo-600" : "text-orange-400"}`} />
+                      <Flame
+                        className={`w-5 h-5 ${fireSoundsMuted || allSoundsMuted ? "text-indigo-600" : "text-orange-400"}`}
+                      />
                       <div>
                         <p className="text-indigo-100 font-medium text-sm">Fire Ambience</p>
                         <p className="text-indigo-500 text-xs">Crackling fire sounds</p>
                       </div>
                     </div>
-                    <div className={`w-10 h-5 rounded-full transition-all ${
-                      fireSoundsMuted || allSoundsMuted ? "bg-indigo-900" : "bg-orange-500"
-                    } relative`}>
-                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
-                        fireSoundsMuted || allSoundsMuted ? "left-0.5" : "left-5"
-                      }`} />
+                    <div
+                      className={`w-10 h-5 rounded-full transition-all ${
+                        fireSoundsMuted || allSoundsMuted ? "bg-indigo-900" : "bg-orange-500"
+                      } relative`}
+                    >
+                      <div
+                        className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
+                          fireSoundsMuted || allSoundsMuted ? "left-0.5" : "left-5"
+                        }`}
+                      />
                     </div>
                   </div>
 
@@ -375,18 +411,24 @@ export function ProfileDialog({
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <Zap className={`w-5 h-5 ${sfxMuted || allSoundsMuted ? "text-indigo-600" : "text-yellow-400"}`} />
+                      <Zap
+                        className={`w-5 h-5 ${sfxMuted || allSoundsMuted ? "text-indigo-600" : "text-yellow-400"}`}
+                      />
                       <div>
                         <p className="text-indigo-100 font-medium text-sm">Sound Effects</p>
                         <p className="text-indigo-500 text-xs">Explosions, impacts, countdown</p>
                       </div>
                     </div>
-                    <div className={`w-10 h-5 rounded-full transition-all ${
-                      sfxMuted || allSoundsMuted ? "bg-indigo-900" : "bg-yellow-500"
-                    } relative`}>
-                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
-                        sfxMuted || allSoundsMuted ? "left-0.5" : "left-5"
-                      }`} />
+                    <div
+                      className={`w-10 h-5 rounded-full transition-all ${
+                        sfxMuted || allSoundsMuted ? "bg-indigo-900" : "bg-yellow-500"
+                      } relative`}
+                    >
+                      <div
+                        className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
+                          sfxMuted || allSoundsMuted ? "left-0.5" : "left-5"
+                        }`}
+                      />
                     </div>
                   </div>
                 </div>

@@ -23,6 +23,7 @@ export function Header() {
   const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
   const [showBalanceMenu, setShowBalanceMenu] = useState(false);
   const [hasAttemptedCreation, setHasAttemptedCreation] = useState(false);
+  const [profileDefaultTab, setProfileDefaultTab] = useState<"profile" | "sound">("profile");
   const balanceMenuRef = useRef<HTMLDivElement>(null);
 
   const createPlayer = useMutation(api.players.createPlayer);
@@ -112,9 +113,10 @@ export function Header() {
               {/* Right Side - User Controls */}
               <div className="flex items-center gap-4 flex-shrink-0">
                 {/* Sound Control */}
-                <div className="flex items-center">
-                  <SoundControl />
-                </div>
+                <SoundControl onSettingsClick={connected && publicKey ? () => {
+                  setProfileDefaultTab("sound");
+                  setShowProfileDialog(true);
+                } : undefined} />
 
                 {connected && (
                   <>
@@ -214,7 +216,10 @@ export function Header() {
 
                     {/* Profile Button */}
                     <button
-                      onClick={() => setShowProfileDialog(true)}
+                      onClick={() => {
+                        setProfileDefaultTab("profile");
+                        setShowProfileDialog(true);
+                      }}
                       className="flex items-center justify-center hover:bg-indigo-800/30 p-2 rounded-lg transition-all cursor-pointer group"
                       title="Edit Profile"
                     >
@@ -243,6 +248,7 @@ export function Header() {
           onOpenChange={setShowProfileDialog}
           currentName={playerData?.displayName}
           walletAddress={publicKey.toString()}
+          defaultTab={profileDefaultTab}
         />
       )}
 

@@ -582,6 +582,26 @@ export class DemoScene extends Scene {
     // Apply mute state from SoundManager
     SoundManager.applyMuteToScene(this);
 
+    // Listen for sound settings changes from UI
+    EventBus.on("sound-settings-changed", (data: { type: string; muted: boolean }) => {
+      logger.game.debug("[DemoScene] Sound settings changed:", data);
+
+      if (data.type === "master") {
+        if (!data.muted && !this.battleMusic) {
+          this.tryStartMusic();
+        }
+      } else if (data.type === "music") {
+        if (!data.muted && !this.battleMusic) {
+          this.tryStartMusic();
+        }
+      } else if (data.type === "fire") {
+        if (!data.muted && !this.fireSounds && this.cache.audio.exists("fire-sounds")) {
+          this.fireSounds = SoundManager.play(this, "fire-sounds", 0.15, { loop: true });
+          SoundManager.setFireSounds(this.fireSounds);
+        }
+      }
+    });
+
     // Set up click handler to unlock audio on first interaction
     const unlockHandler = async () => {
       if (!this.audioUnlocked) {
@@ -756,6 +776,7 @@ export class DemoScene extends Scene {
     EventBus.off("demo-mode-active");
     EventBus.off("game-phase-changed");
     EventBus.off("player-bet-placed");
+    EventBus.off("sound-settings-changed");
     this.events.off("transitioncomplete");
 
     // Stop demo mode when scene is shut down

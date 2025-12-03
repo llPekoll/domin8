@@ -50,7 +50,7 @@ export class MapCarousel extends Scene {
   private cardHeight: number = 100 * RESOLUTION_SCALE;
 
   // 3D Carousel parameters
-  private radiusX: number = 260 * RESOLUTION_SCALE; // Horizontal radius (ellipse width)
+  private radiusX: number = 150 * RESOLUTION_SCALE; // Horizontal radius (ellipse width)
   private radiusY: number = 15 * RESOLUTION_SCALE; // Reduced: less vertical movement (keeps centered)
   private perspectiveScale: number = 0.45; // How much cards shrink in back
   private baseScale: number = 0.85; // Base scale for front card (smaller overall)
