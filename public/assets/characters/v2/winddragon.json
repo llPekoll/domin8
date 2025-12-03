@@ -1,0 +1,115 @@
+{ "frames": [
+   {
+    "filename": "winddragon 0.aseprite",
+    "frame": { "x": 0, "y": 0, "w": 19, "h": 21 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 21, "y": 3, "w": 19, "h": 21 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "winddragon 1.aseprite",
+    "frame": { "x": 19, "y": 0, "w": 19, "h": 21 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 21, "y": 3, "w": 19, "h": 21 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "winddragon 2.aseprite",
+    "frame": { "x": 38, "y": 0, "w": 19, "h": 21 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 21, "y": 3, "w": 19, "h": 21 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "winddragon 3.aseprite",
+    "frame": { "x": 57, "y": 0, "w": 19, "h": 21 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 21, "y": 3, "w": 19, "h": 21 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "winddragon 4.aseprite",
+    "frame": { "x": 76, "y": 0, "w": 19, "h": 21 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 21, "y": 3, "w": 19, "h": 21 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "winddragon 5.aseprite",
+    "frame": { "x": 95, "y": 0, "w": 19, "h": 21 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 21, "y": 3, "w": 19, "h": 21 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "winddragon 6.aseprite",
+    "frame": { "x": 114, "y": 0, "w": 19, "h": 21 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 21, "y": 3, "w": 19, "h": 21 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "winddragon 7.aseprite",
+    "frame": { "x": 114, "y": 0, "w": 19, "h": 21 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 21, "y": 3, "w": 19, "h": 21 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "winddragon 8.aseprite",
+    "frame": { "x": 133, "y": 0, "w": 19, "h": 21 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 21, "y": 3, "w": 19, "h": 21 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "winddragon 9.aseprite",
+    "frame": { "x": 114, "y": 0, "w": 19, "h": 21 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 21, "y": 3, "w": 19, "h": 21 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "winddragon 10.aseprite",
+    "frame": { "x": 152, "y": 0, "w": 19, "h": 21 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 21, "y": 3, "w": 19, "h": 21 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3.15.2-arm64",
+  "image": "winddragon.png",
+  "format": "RGBA8888",
+  "size": { "w": 171, "h": 21 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "Idle", "from": 0, "to": 1, "direction": "pingpong", "color": "#000000ff" },
+   { "name": "Move", "from": 2, "to": 5, "direction": "forward", "color": "#000000ff" },
+   { "name": "land", "from": 6, "to": 10, "direction": "forward", "color": "#000000ff" }
+  ]
+ }
+}

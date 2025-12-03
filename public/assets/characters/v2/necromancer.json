@@ -1,0 +1,115 @@
+{ "frames": [
+   {
+    "filename": "necromancer 0.aseprite",
+    "frame": { "x": 0, "y": 0, "w": 17, "h": 19 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 23, "y": 5, "w": 17, "h": 19 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "necromancer 1.aseprite",
+    "frame": { "x": 17, "y": 0, "w": 17, "h": 19 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 23, "y": 5, "w": 17, "h": 19 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "necromancer 2.aseprite",
+    "frame": { "x": 34, "y": 0, "w": 17, "h": 19 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 23, "y": 5, "w": 17, "h": 19 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "necromancer 3.aseprite",
+    "frame": { "x": 51, "y": 0, "w": 17, "h": 19 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 23, "y": 5, "w": 17, "h": 19 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "necromancer 4.aseprite",
+    "frame": { "x": 68, "y": 0, "w": 17, "h": 19 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 23, "y": 5, "w": 17, "h": 19 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "necromancer 5.aseprite",
+    "frame": { "x": 85, "y": 0, "w": 17, "h": 19 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 23, "y": 5, "w": 17, "h": 19 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "necromancer 6.aseprite",
+    "frame": { "x": 102, "y": 0, "w": 17, "h": 19 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 23, "y": 5, "w": 17, "h": 19 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "necromancer 7.aseprite",
+    "frame": { "x": 102, "y": 0, "w": 17, "h": 19 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 23, "y": 5, "w": 17, "h": 19 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "necromancer 8.aseprite",
+    "frame": { "x": 119, "y": 0, "w": 17, "h": 19 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 23, "y": 5, "w": 17, "h": 19 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "necromancer 9.aseprite",
+    "frame": { "x": 102, "y": 0, "w": 17, "h": 19 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 23, "y": 5, "w": 17, "h": 19 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "necromancer 10.aseprite",
+    "frame": { "x": 136, "y": 0, "w": 17, "h": 19 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 23, "y": 5, "w": 17, "h": 19 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3.15.2-arm64",
+  "image": "necromancer.png",
+  "format": "RGBA8888",
+  "size": { "w": 153, "h": 19 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "Idle", "from": 0, "to": 1, "direction": "pingpong", "color": "#000000ff" },
+   { "name": "Move", "from": 2, "to": 5, "direction": "forward", "color": "#000000ff" },
+   { "name": "land", "from": 6, "to": 10, "direction": "forward", "color": "#000000ff" }
+  ]
+ }
+}

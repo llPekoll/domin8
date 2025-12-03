@@ -1,0 +1,115 @@
+{ "frames": [
+   {
+    "filename": "zombie0 0.aseprite",
+    "frame": { "x": 0, "y": 0, "w": 16, "h": 17 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 7, "w": 16, "h": 17 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "zombie0 1.aseprite",
+    "frame": { "x": 16, "y": 0, "w": 16, "h": 17 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 7, "w": 16, "h": 17 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "zombie0 2.aseprite",
+    "frame": { "x": 32, "y": 0, "w": 16, "h": 17 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 7, "w": 16, "h": 17 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "zombie0 3.aseprite",
+    "frame": { "x": 48, "y": 0, "w": 16, "h": 17 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 7, "w": 16, "h": 17 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "zombie0 4.aseprite",
+    "frame": { "x": 64, "y": 0, "w": 16, "h": 17 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 7, "w": 16, "h": 17 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "zombie0 5.aseprite",
+    "frame": { "x": 80, "y": 0, "w": 16, "h": 17 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 7, "w": 16, "h": 17 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "zombie0 6.aseprite",
+    "frame": { "x": 96, "y": 0, "w": 16, "h": 17 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 7, "w": 16, "h": 17 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "zombie0 7.aseprite",
+    "frame": { "x": 96, "y": 0, "w": 16, "h": 17 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 7, "w": 16, "h": 17 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "zombie0 8.aseprite",
+    "frame": { "x": 112, "y": 0, "w": 16, "h": 17 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 7, "w": 16, "h": 17 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "zombie0 9.aseprite",
+    "frame": { "x": 96, "y": 0, "w": 16, "h": 17 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 7, "w": 16, "h": 17 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   },
+   {
+    "filename": "zombie0 10.aseprite",
+    "frame": { "x": 128, "y": 0, "w": 16, "h": 17 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 7, "w": 16, "h": 17 },
+    "sourceSize": { "w": 64, "h": 64 },
+    "duration": 100
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3.15.2-arm64",
+  "image": "zombie0.png",
+  "format": "RGBA8888",
+  "size": { "w": 144, "h": 17 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "Idle", "from": 0, "to": 1, "direction": "pingpong", "color": "#000000ff" },
+   { "name": "Move", "from": 2, "to": 5, "direction": "forward", "color": "#000000ff" },
+   { "name": "land", "from": 6, "to": 10, "direction": "forward", "color": "#000000ff" }
+  ]
+ }
+}
