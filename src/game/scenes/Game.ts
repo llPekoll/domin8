@@ -6,7 +6,7 @@ import { UIManager } from "../managers/UIManager";
 import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
 import { logger } from "../../lib/logger";
-import { activeGameData, allMapsData, RESOLUTION_SCALE } from "../main";
+import { activeGameData, allMapsData, RESOLUTION_SCALE, playerAurasMap } from "../main";
 
 export class Game extends Scene {
   camera!: Phaser.Cameras.Scene2D.Camera;
@@ -24,6 +24,7 @@ export class Game extends Scene {
   private characters: any[] = [];
   private playerNames: Map<string, string> = new Map(); // wallet -> displayName
   private playerWins: Map<string, number> = new Map(); // wallet -> totalWins
+  private playerAuras: Map<string, string> = new Map(); // wallet -> auraKey (e.g., "B", "H", "M")
 
   // Arena mask
   private currentMapId: number | null = null;
@@ -43,16 +44,20 @@ export class Game extends Scene {
     this.characters = characters || [];
   }
 
-  // Set player names and stats mapping (wallet address -> display name, totalWins)
-  setPlayerNames(playerNames: Array<{ walletAddress: string; displayName: string | null; totalWins?: number }>) {
+  // Set player names and stats mapping (wallet address -> display name, totalWins, auraKey)
+  setPlayerNames(playerNames: Array<{ walletAddress: string; displayName: string | null; totalWins?: number; auraKey?: string | null }>) {
     this.playerNames.clear();
     this.playerWins.clear();
-    playerNames.forEach(({ walletAddress, displayName, totalWins }) => {
+    this.playerAuras.clear();
+    playerNames.forEach(({ walletAddress, displayName, totalWins, auraKey }) => {
       if (displayName) {
         this.playerNames.set(walletAddress, displayName);
       }
       if (totalWins !== undefined) {
         this.playerWins.set(walletAddress, totalWins);
+      }
+      if (auraKey) {
+        this.playerAuras.set(walletAddress, auraKey);
       }
     });
 
@@ -72,15 +77,23 @@ export class Game extends Scene {
     }
   }
 
-  // Update display names for all existing participants
+  // Update display names and auras for all existing participants
   private updateParticipantDisplayNames() {
     const participants = this.playerManager.getParticipants();
     participants.forEach((participant) => {
       if (participant.playerId) {
+        // Update display name
         const displayName = this.playerNames.get(participant.playerId);
         if (displayName && displayName !== participant.displayName) {
           participant.displayName = displayName;
           participant.nameText.setText(displayName);
+        }
+
+        // Update aura if player now has one equipped and participant doesn't have it yet
+        const auraKey = this.playerAuras.get(participant.playerId) || playerAurasMap.get(participant.playerId);
+        if (auraKey && !participant.auraKey) {
+          logger.game.debug(`[Game] Late-adding aura ${auraKey} to participant ${participant.id}`);
+          this.playerManager.addAuraToParticipant(participant.id, auraKey);
         }
       }
     });
@@ -463,6 +476,8 @@ export class Game extends Scene {
         const characterName = this.getSkinName(bet.skin);
         const characterKey = characterName.toLowerCase().replace(/\s+/g, "-");
         const participantName = this.getParticipantName(walletAddress);
+        // Get aura from global playerAurasMap (updated by PlayerNamesContext) or local cache
+        const auraKey = playerAurasMap.get(walletAddress) || this.playerAuras.get(walletAddress);
 
         const participant = {
           _id: participantId,
@@ -478,7 +493,14 @@ export class Game extends Scene {
           isBot: false,
           eliminated: false,
           colorHue: undefined,
+          auraKey, // Aura asset key for visual effect (shown after landing)
         };
+
+        logger.game.debug("[Game] Aura lookup for", walletAddress, ":", {
+          fromGlobal: playerAurasMap.get(walletAddress),
+          fromLocal: this.playerAuras.get(walletAddress),
+          used: auraKey,
+        });
 
         logger.game.debug("[Game] ✅ Spawning participant from blockchain:", participant);
         this.playerManager.addParticipant(participant);

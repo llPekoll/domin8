@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 
 /**
  * Generate a unique referral code for a user
@@ -174,6 +174,58 @@ export const updateReferralRevenue = mutation({
 
     return { updated: true };
   },
+});
+
+/**
+ * Update bet volume for a referred user (internal - called from backend actions)
+ */
+const updateReferralRevenueHandler = async (
+  ctx: any,
+  args: { userId: string; betAmount: number }
+) => {
+  // Check if this user was referred
+  const referral = await ctx.db
+    .query("referrals")
+    .withIndex("by_referred_user", (q: any) => q.eq("referredUserId", args.userId))
+    .unique();
+
+  if (!referral) {
+    return { updated: false }; // User wasn't referred, that's fine
+  }
+
+  // Update the referral's bet volume
+  await ctx.db.patch(referral._id, {
+    totalBetVolume: referral.totalBetVolume + args.betAmount,
+  });
+
+  // Update referrer's total revenue and rewards (1.5% of bet amount)
+  const referrerStats = await ctx.db
+    .query("referralStats")
+    .withIndex("by_wallet", (q: any) => q.eq("walletAddress", referral.referrerId))
+    .unique();
+
+  if (referrerStats) {
+    // Calculate 1.5% reward
+    const rewardAmount = Math.floor(args.betAmount * 0.015); // 1.5% in lamports
+
+    await ctx.db.patch(referrerStats._id, {
+      totalRevenue: referrerStats.totalRevenue + args.betAmount,
+      accumulatedRewards: (referrerStats.accumulatedRewards || 0) + rewardAmount,
+    });
+  }
+
+  return { updated: true };
+};
+
+/**
+ * Update bet volume for a referred user (internal mutation - called from backend actions)
+ */
+export const updateReferralRevenueInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    betAmount: v.number(),
+  },
+  handler: updateReferralRevenueHandler,
 });
 
 /**

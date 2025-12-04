@@ -211,6 +211,28 @@ export default defineSchema({
     .index("by_wallet", ["walletAddress"])
     .index("by_wallet_and_aura", ["walletAddress", "auraId"]),
 
+  /**
+   * Shop Purchases - Track all SOL purchase attempts and completions
+   * Used for double-spend prevention, purchase history, and debugging
+   */
+  shopPurchases: defineTable({
+    walletAddress: v.string(), // Buyer's wallet address
+    itemType: v.string(), // "aura" | "character" | future types
+    itemId: v.number(), // ID of the purchased item
+    amountLamports: v.number(), // Amount paid in lamports
+    status: v.string(), // "pending" | "tx_sent" | "tx_confirmed" | "completed" | "failed"
+    txSignature: v.optional(v.string()), // Solana transaction signature (if sent)
+    error: v.optional(v.string()), // Error message if failed
+    errorStep: v.optional(v.string()), // Where it failed: "build_tx" | "sign_tx" | "confirm_tx" | "record_purchase"
+    attemptedAt: v.number(), // Unix timestamp when purchase started
+    completedAt: v.optional(v.number()), // Unix timestamp when completed/failed
+  })
+    .index("by_signature", ["txSignature"])
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_and_type", ["walletAddress", "itemType"])
+    .index("by_status", ["status"])
+    .index("by_wallet_and_status", ["walletAddress", "status"]),
+
   // ============================================================================
   // 1V1 LOBBY TABLES
   // ============================================================================

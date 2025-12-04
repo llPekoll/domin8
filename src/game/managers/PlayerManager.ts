@@ -27,6 +27,11 @@ export interface GameParticipant {
   spawnIndex: number;
 }
 
+// Aura scale relative to character size (0.8 = 80% of character scale)
+const AURA_SCALE_MULTIPLIER = 0.8;
+// Aura Y offset multiplier (negative = up, relative to character scale)
+const AURA_Y_OFFSET = -20;
+
 export class PlayerManager {
   private scene: Scene;
   private participants: Map<string, GameParticipant> = new Map();
@@ -205,6 +210,13 @@ export class PlayerManager {
     let auraFrontSprite: Phaser.GameObjects.Sprite | undefined;
     const auraKey = participant.auraKey; // e.g., "B", "H", "M"
 
+    logger.game.debug(`[PlayerManager] Aura check for ${participantId}:`, {
+      auraKey,
+      textureExists: auraKey ? this.scene.textures.exists(`aura-${auraKey}`) : false,
+      backAnimExists: auraKey ? this.scene.anims.exists(`aura-${auraKey}-back`) : false,
+      frontAnimExists: auraKey ? this.scene.anims.exists(`aura-${auraKey}-front`) : false,
+    });
+
     if (auraKey && this.scene.textures.exists(`aura-${auraKey}`)) {
       // Create back aura sprite (renders behind character)
       auraBackSprite = this.scene.add.sprite(0, 0, `aura-${auraKey}`);
@@ -227,14 +239,13 @@ export class PlayerManager {
         auraFrontSprite.play(frontAnimKey);
       }
 
-      // Scale aura relative to character size (slightly larger)
-      const auraScale = scale * 1.5;
+      // Scale aura relative to character size
+      const auraScale = scale * AURA_SCALE_MULTIPLIER;
       auraBackSprite.setScale(auraScale);
       auraFrontSprite.setScale(auraScale);
 
-      // Position aura sprites at character's feet level (same Y offset as dust)
-      // Aura is centered on character, so offset Y to align with character center
-      const auraOffsetY = -30 * scale; // Move up to center on character body
+      // Position aura sprites centered on character body (above name)
+      const auraOffsetY = AURA_Y_OFFSET * scale;
       auraBackSprite.setY(auraOffsetY);
       auraFrontSprite.setY(auraOffsetY);
 
@@ -242,7 +253,9 @@ export class PlayerManager {
       auraBackSprite.setVisible(false);
       auraFrontSprite.setVisible(false);
 
-      logger.game.debug(`[PlayerManager] Created aura sprites for ${participantId} with key: ${auraKey}`);
+      logger.game.debug(
+        `[PlayerManager] Created aura sprites for ${participantId} with key: ${auraKey}`
+      );
     }
 
     // Scale dust sprites relative to character size (same as old dust-impact)
@@ -499,7 +512,7 @@ export class PlayerManager {
         });
 
         // Also scale aura sprites if present
-        const auraScale = newScale * 1.5;
+        const auraScale = newScale * AURA_SCALE_MULTIPLIER;
         if (gameParticipant.auraBackSprite) {
           this.scene.tweens.add({
             targets: gameParticipant.auraBackSprite,
@@ -546,6 +559,82 @@ export class PlayerManager {
       participant.container.destroy();
       this.participants.delete(participantId);
     }
+  }
+
+  /**
+   * Add aura to an existing participant (for late-loading aura data)
+   */
+  addAuraToParticipant(participantId: string, auraKey: string) {
+    const participant = this.participants.get(participantId);
+    if (!participant) {
+      logger.game.warn(`[PlayerManager] Cannot add aura - participant ${participantId} not found`);
+      return;
+    }
+
+    // Skip if participant already has this aura
+    if (participant.auraKey === auraKey) {
+      return;
+    }
+
+    // Skip if texture doesn't exist
+    if (!this.scene.textures.exists(`aura-${auraKey}`)) {
+      logger.game.warn(`[PlayerManager] Aura texture aura-${auraKey} not found`);
+      return;
+    }
+
+    logger.game.debug(`[PlayerManager] Adding aura ${auraKey} to participant ${participantId}`);
+
+    // Create back aura sprite
+    const auraBackSprite = this.scene.add.sprite(0, 0, `aura-${auraKey}`);
+    auraBackSprite.setOrigin(0.5, 0.5);
+    auraBackSprite.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+
+    // Create front aura sprite
+    const auraFrontSprite = this.scene.add.sprite(0, 0, `aura-${auraKey}`);
+    auraFrontSprite.setOrigin(0.5, 0.5);
+    auraFrontSprite.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+
+    // Play animations
+    const backAnimKey = `aura-${auraKey}-back`;
+    const frontAnimKey = `aura-${auraKey}-front`;
+
+    if (this.scene.anims.exists(backAnimKey)) {
+      auraBackSprite.play(backAnimKey);
+    }
+    if (this.scene.anims.exists(frontAnimKey)) {
+      auraFrontSprite.play(frontAnimKey);
+    }
+
+    // Scale aura relative to character size
+    const auraScale = participant.size * AURA_SCALE_MULTIPLIER;
+    auraBackSprite.setScale(auraScale);
+    auraFrontSprite.setScale(auraScale);
+
+    // Position aura sprites centered on character body (above name)
+    const auraOffsetY = AURA_Y_OFFSET * participant.size;
+    auraBackSprite.setY(auraOffsetY);
+    auraFrontSprite.setY(auraOffsetY);
+
+    // Add to container in correct order (before sprite and after dust)
+    // Find indices for proper layering
+    const container = participant.container;
+    const spriteIndex = container.list.indexOf(participant.sprite);
+
+    // Insert back aura before sprite (behind character)
+    container.addAt(auraBackSprite, spriteIndex);
+    // Insert front aura after sprite (in front of character, before name)
+    container.addAt(auraFrontSprite, spriteIndex + 2);
+
+    // Update participant
+    participant.auraBackSprite = auraBackSprite;
+    participant.auraFrontSprite = auraFrontSprite;
+    participant.auraKey = auraKey;
+
+    // Show aura immediately (since character already landed)
+    auraBackSprite.setVisible(true);
+    auraFrontSprite.setVisible(true);
+
+    logger.game.debug(`[PlayerManager] Aura ${auraKey} added to participant ${participantId}`);
   }
 
   moveParticipantsToCenter() {

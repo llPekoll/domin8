@@ -48,10 +48,21 @@ export const getPlayersByWallets = query({
           .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
           .first();
 
+        // Get equipped aura's assetKey if player has one equipped
+        let auraKey: string | null = null;
+        if (player?.equippedAuraId) {
+          const aura = await ctx.db
+            .query("auras")
+            .withIndex("by_aura_id", (q) => q.eq("id", player.equippedAuraId!))
+            .first();
+          auraKey = aura?.assetKey || null;
+        }
+
         return {
           walletAddress,
           displayName: player?.displayName || null,
           totalWins: player?.totalWins || 0,
+          auraKey,
         };
       })
     );

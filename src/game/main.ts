@@ -32,6 +32,10 @@ export let demoMapData: any = null;
 export let activeGameData: any = null;
 // Global storage for current user's wallet address
 export let currentUserWallet: string | null = null;
+// Global storage for all auras data
+export let aurasData: any[] = [];
+// Global storage for player aura mappings (walletAddress -> auraKey)
+export let playerAurasMap: Map<string, string> = new Map();
 
 // Flag to track if blockchain data has been loaded (or timed out)
 export let blockchainDataReady: boolean = false;
@@ -63,6 +67,22 @@ export const setBlockchainDataReady = (ready: boolean) => {
 
 export const setCurrentUserWallet = (wallet: string | null) => {
   currentUserWallet = wallet;
+};
+
+export const setAurasData = (auras: any[]) => {
+  aurasData = auras;
+};
+
+export const setPlayerAurasMap = (playerAuras: Map<string, string>) => {
+  playerAurasMap = playerAuras;
+};
+
+export const updatePlayerAura = (walletAddress: string, auraKey: string | null) => {
+  if (auraKey) {
+    playerAurasMap.set(walletAddress, auraKey);
+  } else {
+    playerAurasMap.delete(walletAddress);
+  }
 };
 
 const config: Phaser.Types.Core.GameConfig = {
