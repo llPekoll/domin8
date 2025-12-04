@@ -112,6 +112,7 @@ export default defineSchema({
     totalWins: v.number(),
     totalPoints: v.optional(v.number()), // Points earned from bets and prizes (1 point per 0.001 SOL)
     achievements: v.array(v.string()),
+    equippedAuraId: v.optional(v.number()), // Currently equipped aura ID (null = no aura)
   }).index("by_wallet", ["walletAddress"]),
 
   // ============================================================================
@@ -178,6 +179,37 @@ export default defineSchema({
     lastRefreshAt: v.number(), // Unix timestamp of last refresh
     refreshCount: v.number(), // Total refreshes (for analytics)
   }).index("by_wallet", ["walletAddress"]),
+
+  // ============================================================================
+  // AURA SYSTEM TABLES
+  // ============================================================================
+
+  /**
+   * Auras - Available aura effects that can be equipped on characters
+   * Players can unlock auras via points or SOL purchase
+   */
+  auras: defineTable({
+    id: v.number(), // 1, 2, 3...
+    name: v.string(), // "Blue Flame", "Holy Glow", "Magic Aura"
+    assetKey: v.string(), // "B", "H", "M" - matches asset file names
+    description: v.optional(v.string()),
+    rarity: v.string(), // "common" | "rare" | "legendary"
+    pointsCost: v.optional(v.number()), // Points required to unlock
+    purchasePrice: v.optional(v.number()), // Lamports to purchase (e.g., 0.1 SOL = 100_000_000)
+    isActive: v.boolean(),
+  }).index("by_aura_id", ["id"]),
+
+  /**
+   * Player Auras - Tracks which auras each player has unlocked
+   */
+  playerAuras: defineTable({
+    walletAddress: v.string(), // Player wallet
+    auraId: v.number(), // Aura ID
+    unlockedAt: v.number(), // Unix timestamp
+    unlockedBy: v.string(), // "points" | "purchase"
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_and_aura", ["walletAddress", "auraId"]),
 
   // ============================================================================
   // 1V1 LOBBY TABLES

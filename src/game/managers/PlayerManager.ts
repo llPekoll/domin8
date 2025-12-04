@@ -11,8 +11,11 @@ export interface GameParticipant {
   sprite: Phaser.GameObjects.Sprite;
   dustBackSprite?: Phaser.GameObjects.Sprite; // Dust animation behind character
   dustFrontSprite?: Phaser.GameObjects.Sprite; // Dust animation in front of character
+  auraBackSprite?: Phaser.GameObjects.Sprite; // Aura animation behind character
+  auraFrontSprite?: Phaser.GameObjects.Sprite; // Aura animation in front of character
   nameText: Phaser.GameObjects.Text;
   characterKey: string;
+  auraKey?: string; // Aura asset key (e.g., "B", "H", "M")
   displayName: string;
   betAmount: number;
   size: number;
@@ -197,6 +200,51 @@ export class PlayerManager {
       dustFrontSprite.play("dust-front");
     }
 
+    // Create aura sprites if participant has an equipped aura
+    let auraBackSprite: Phaser.GameObjects.Sprite | undefined;
+    let auraFrontSprite: Phaser.GameObjects.Sprite | undefined;
+    const auraKey = participant.auraKey; // e.g., "B", "H", "M"
+
+    if (auraKey && this.scene.textures.exists(`aura-${auraKey}`)) {
+      // Create back aura sprite (renders behind character)
+      auraBackSprite = this.scene.add.sprite(0, 0, `aura-${auraKey}`);
+      auraBackSprite.setOrigin(0.5, 0.5); // Center anchor for aura
+      auraBackSprite.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+
+      // Create front aura sprite (renders in front of character)
+      auraFrontSprite = this.scene.add.sprite(0, 0, `aura-${auraKey}`);
+      auraFrontSprite.setOrigin(0.5, 0.5); // Center anchor for aura
+      auraFrontSprite.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+
+      // Play aura animations
+      const backAnimKey = `aura-${auraKey}-back`;
+      const frontAnimKey = `aura-${auraKey}-front`;
+
+      if (this.scene.anims.exists(backAnimKey)) {
+        auraBackSprite.play(backAnimKey);
+      }
+      if (this.scene.anims.exists(frontAnimKey)) {
+        auraFrontSprite.play(frontAnimKey);
+      }
+
+      // Scale aura relative to character size (slightly larger)
+      const auraScale = scale * 1.5;
+      auraBackSprite.setScale(auraScale);
+      auraFrontSprite.setScale(auraScale);
+
+      // Position aura sprites at character's feet level (same Y offset as dust)
+      // Aura is centered on character, so offset Y to align with character center
+      const auraOffsetY = -30 * scale; // Move up to center on character body
+      auraBackSprite.setY(auraOffsetY);
+      auraFrontSprite.setY(auraOffsetY);
+
+      // Initially hide auras (show after landing)
+      auraBackSprite.setVisible(false);
+      auraFrontSprite.setVisible(false);
+
+      logger.game.debug(`[PlayerManager] Created aura sprites for ${participantId} with key: ${auraKey}`);
+    }
+
     // Scale dust sprites relative to character size (same as old dust-impact)
     const dustScale = scale * 0.2; // Scale dust relative to character size
     dustBackSprite.setScale(dustScale);
@@ -249,13 +297,17 @@ export class PlayerManager {
     nameText.setVisible(true);
 
     // Add sprites in correct order for layering (render order matters):
-    // 1. Back dust (behind character)
-    // 2. Character sprite (middle)
-    // 3. Front dust (in front of character)
-    // 4. Name text (always on top)
+    // 1. Aura back (behind everything)
+    // 2. Back dust (behind character)
+    // 3. Character sprite (middle)
+    // 4. Front dust (in front of character)
+    // 5. Aura front (in front of dust)
+    // 6. Name text (always on top)
+    if (auraBackSprite) container.add(auraBackSprite);
     container.add(dustBackSprite);
     container.add(sprite);
     container.add(dustFrontSprite);
+    if (auraFrontSprite) container.add(auraFrontSprite);
     container.add(nameText);
 
     // Consistent falling animation for all characters
@@ -301,19 +353,25 @@ export class PlayerManager {
         if (this.scene.anims.exists(landingAnimKey)) {
           sprite.play(landingAnimKey);
 
-          // After landing animation completes, switch to idle
+          // After landing animation completes, switch to idle and show aura
           sprite.once("animationcomplete", () => {
             const idleAnimKey = `${textureKey}-idle`;
             if (sprite && sprite.active && this.scene.anims.exists(idleAnimKey)) {
               sprite.play(idleAnimKey);
             }
+            // Show aura after landing
+            if (auraBackSprite) auraBackSprite.setVisible(true);
+            if (auraFrontSprite) auraFrontSprite.setVisible(true);
           });
         } else {
-          // If no landing animation, go straight to idle
+          // If no landing animation, go straight to idle and show aura
           const idleAnimKey = `${textureKey}-idle`;
           if (this.scene.anims.exists(idleAnimKey)) {
             sprite.play(idleAnimKey);
           }
+          // Show aura after landing
+          if (auraBackSprite) auraBackSprite.setVisible(true);
+          if (auraFrontSprite) auraFrontSprite.setVisible(true);
         }
       },
     });
@@ -324,8 +382,11 @@ export class PlayerManager {
       sprite,
       dustBackSprite,
       dustFrontSprite,
+      auraBackSprite,
+      auraFrontSprite,
       nameText,
       characterKey: textureKey,
+      auraKey: auraKey,
       displayName: participant.displayName,
       betAmount: participant.betAmount,
       size: scale,
@@ -436,6 +497,27 @@ export class PlayerManager {
           duration: 300,
           ease: "Power2",
         });
+
+        // Also scale aura sprites if present
+        const auraScale = newScale * 1.5;
+        if (gameParticipant.auraBackSprite) {
+          this.scene.tweens.add({
+            targets: gameParticipant.auraBackSprite,
+            scaleX: auraScale,
+            scaleY: auraScale,
+            duration: 300,
+            ease: "Power2",
+          });
+        }
+        if (gameParticipant.auraFrontSprite) {
+          this.scene.tweens.add({
+            targets: gameParticipant.auraFrontSprite,
+            scaleX: auraScale,
+            scaleY: auraScale,
+            duration: 300,
+            ease: "Power2",
+          });
+        }
       }
 
       // Update tint - simple logic

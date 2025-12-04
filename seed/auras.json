@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "name": "Magic Aura",
+    "assetKey": "M",
+    "description": "A mystical purple aura that swirls around the character",
+    "rarity": "common",
+    "pointsCost": 2000,
+    "purchasePrice": 20000000,
+    "isActive": true
+  },
+  {
+    "id": 2,
+    "name": "Blue Flame",
+    "assetKey": "B",
+    "description": "Intense blue flames that engulf the character",
+    "rarity": "rare",
+    "pointsCost": 5000,
+    "purchasePrice": 100000000,
+    "isActive": true
+  },
+  {
+    "id": 3,
+    "name": "Holy Glow",
+    "assetKey": "H",
+    "description": "A divine golden radiance that emanates from within",
+    "rarity": "legendary",
+    "pointsCost": 15000,
+    "purchasePrice": 250000000,
+    "isActive": true
+  }
+]
