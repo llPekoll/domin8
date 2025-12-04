@@ -148,6 +148,17 @@ export class Preloader extends Scene {
     this.load.atlas("dust", "dust_char.png", "dust_char.json");
     this.load.image("logo", "logo.webp");
 
+    // Load Aura assets (B, H, M)
+    const auraKeys = ["B", "H", "M"];
+    auraKeys.forEach((key) => {
+      this.load.atlas(
+        `aura-${key}`,
+        `auras/Aura-${key}-sheet.png`,
+        `auras/Aura-${key}-sheet.json`
+      );
+      logger.game.debug(`[Preloader] Loading aura atlas: aura-${key}`);
+    });
+
     // Load arena masks for each map
     this.load.image("mask_classic", "maps/classic/mask_classic.png");
     this.load.image("mask_secte", "maps/secte/mask_secte.png");
@@ -403,6 +414,38 @@ export class Preloader extends Scene {
         end: 40,
       }),
       frameRate: 24,
+    });
+
+    // Create aura animations (back and front layers)
+    const auraKeys = ["B", "H", "M"];
+    auraKeys.forEach((key) => {
+      // Back animation (frames 0-59, plays behind character)
+      this.anims.create({
+        key: `aura-${key}-back`,
+        frames: this.anims.generateFrameNames(`aura-${key}`, {
+          prefix: `Aura-${key} `,
+          suffix: ".png",
+          start: 0,
+          end: 59,
+        }),
+        frameRate: 12,
+        repeat: -1,
+      });
+
+      // Front animation (frames 60-119, plays in front of character)
+      this.anims.create({
+        key: `aura-${key}-front`,
+        frames: this.anims.generateFrameNames(`aura-${key}`, {
+          prefix: `Aura-${key} `,
+          suffix: ".png",
+          start: 60,
+          end: 119,
+        }),
+        frameRate: 12,
+        repeat: -1,
+      });
+
+      logger.game.debug(`[Preloader] Created aura animations: aura-${key}-back, aura-${key}-front`);
     });
 
     // ✅ Wait for blockchain data before deciding which scene to start

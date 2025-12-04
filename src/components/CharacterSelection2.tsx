@@ -5,9 +5,10 @@ import { useNFTCharacters } from "../hooks/useNFTCharacters";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 // import { BadgeCheck, Star, ChevronLeft, ChevronRight, Lock, Crown } from "lucide-react";
-import { ChevronLeft, ChevronRight, Lock, Crown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock, Crown, Sparkles } from "lucide-react";
 import { CharacterPreviewScene } from "./CharacterPreviewScene";
 import { NFTCharacterModal } from "./NFTCharacterModal";
+import { PlayerDialog } from "./PlayerDialog";
 import { useAssets } from "../contexts/AssetsContext";
 import type { Character } from "../types/character";
 
@@ -26,6 +27,9 @@ const CharacterSelection2 = memo(function CharacterSelection({
 
   // NFT character selection state
   const [showNFTModal, setShowNFTModal] = useState(false);
+
+  // Player dialog state (characters & auras)
+  const [showPlayerDialog, setShowPlayerDialog] = useState(false);
 
   // Get all available characters from assets context (shared across app)
 
@@ -166,6 +170,16 @@ const CharacterSelection2 = memo(function CharacterSelection({
             imageRendering: "pixelated",
           }}
         >
+          {/* Customize Button - Top Right */}
+          <button
+            onClick={() => setShowPlayerDialog(true)}
+            className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-1 bg-indigo-600/80 hover:bg-indigo-500 border border-indigo-400/50 rounded-md transition-all shadow-lg"
+            title="Customize character & auras"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-200" />
+            <span className="text-xs font-medium text-indigo-100">Customize</span>
+          </button>
+
           <div>
             {/* Character Preview - Center */}
             <div className="flex-1 flex flex-col items-center justify-start ">
@@ -281,6 +295,21 @@ const CharacterSelection2 = memo(function CharacterSelection({
         allExclusiveCharacters={(allExclusiveChars || []) as Character[]}
         onRefreshNFTs={refreshNFTStatus}
         isRefreshing={refreshing}
+      />
+
+      {/* Player Dialog (Characters & Auras) */}
+      <PlayerDialog
+        open={showPlayerDialog}
+        onOpenChange={setShowPlayerDialog}
+        defaultTab="characters"
+        onCharacterSelected={(character) => {
+          // Find the index of this character in availableCharacters and select it
+          const index = availableCharacters.findIndex((c) => c._id === character._id);
+          if (index !== -1) {
+            setCurrentCharacterIndex(index);
+          }
+          setShowPlayerDialog(false);
+        }}
       />
     </>
   );

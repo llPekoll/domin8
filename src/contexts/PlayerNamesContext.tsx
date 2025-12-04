@@ -4,6 +4,7 @@ import { api } from "../../convex/_generated/api";
 import { useActiveGame } from "../hooks/useActiveGame";
 import { logger } from "../lib/logger";
 import { EventBus } from "../game/EventBus";
+import { updatePlayerAura } from "../game/main";
 
 const PlayerNamesContext = createContext<any>(undefined);
 
@@ -39,6 +40,15 @@ export function PlayerNamesProvider({ children }: { children: ReactNode }) {
     if (!playerNames) return;
 
     logger.game.debug("[PlayerNamesContext] Broadcasting player names to Phaser:", playerNames.length);
+
+    // Update global playerAurasMap for Phaser access
+    playerNames.forEach((player: { walletAddress: string; auraKey?: string | null }) => {
+      if (player.auraKey) {
+        updatePlayerAura(player.walletAddress, player.auraKey);
+        logger.game.debug(`[PlayerNamesContext] Updated aura for ${player.walletAddress}: ${player.auraKey}`);
+      }
+    });
+
     EventBus.emit("player-names-update", playerNames);
   }, [playerNames]);
 

@@ -112,6 +112,7 @@ export default defineSchema({
     totalWins: v.number(),
     totalPoints: v.optional(v.number()), // Points earned from bets and prizes (1 point per 0.001 SOL)
     achievements: v.array(v.string()),
+    equippedAuraId: v.optional(v.number()), // Currently equipped aura ID (null = no aura)
   }).index("by_wallet", ["walletAddress"]),
 
   // ============================================================================
@@ -178,6 +179,59 @@ export default defineSchema({
     lastRefreshAt: v.number(), // Unix timestamp of last refresh
     refreshCount: v.number(), // Total refreshes (for analytics)
   }).index("by_wallet", ["walletAddress"]),
+
+  // ============================================================================
+  // AURA SYSTEM TABLES
+  // ============================================================================
+
+  /**
+   * Auras - Available aura effects that can be equipped on characters
+   * Players can unlock auras via points or SOL purchase
+   */
+  auras: defineTable({
+    id: v.number(), // 1, 2, 3...
+    name: v.string(), // "Blue Flame", "Holy Glow", "Magic Aura"
+    assetKey: v.string(), // "B", "H", "M" - matches asset file names
+    description: v.optional(v.string()),
+    rarity: v.string(), // "common" | "rare" | "legendary"
+    pointsCost: v.optional(v.number()), // Points required to unlock
+    purchasePrice: v.optional(v.number()), // Lamports to purchase (e.g., 0.1 SOL = 100_000_000)
+    isActive: v.boolean(),
+  }).index("by_aura_id", ["id"]),
+
+  /**
+   * Player Auras - Tracks which auras each player has unlocked
+   */
+  playerAuras: defineTable({
+    walletAddress: v.string(), // Player wallet
+    auraId: v.number(), // Aura ID
+    unlockedAt: v.number(), // Unix timestamp
+    unlockedBy: v.string(), // "points" | "purchase"
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_and_aura", ["walletAddress", "auraId"]),
+
+  /**
+   * Shop Purchases - Track all SOL purchase attempts and completions
+   * Used for double-spend prevention, purchase history, and debugging
+   */
+  shopPurchases: defineTable({
+    walletAddress: v.string(), // Buyer's wallet address
+    itemType: v.string(), // "aura" | "character" | future types
+    itemId: v.number(), // ID of the purchased item
+    amountLamports: v.number(), // Amount paid in lamports
+    status: v.string(), // "pending" | "tx_sent" | "tx_confirmed" | "completed" | "failed"
+    txSignature: v.optional(v.string()), // Solana transaction signature (if sent)
+    error: v.optional(v.string()), // Error message if failed
+    errorStep: v.optional(v.string()), // Where it failed: "build_tx" | "sign_tx" | "confirm_tx" | "record_purchase"
+    attemptedAt: v.number(), // Unix timestamp when purchase started
+    completedAt: v.optional(v.number()), // Unix timestamp when completed/failed
+  })
+    .index("by_signature", ["txSignature"])
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_and_type", ["walletAddress", "itemType"])
+    .index("by_status", ["status"])
+    .index("by_wallet_and_status", ["walletAddress", "status"]),
 
   // ============================================================================
   // 1V1 LOBBY TABLES
