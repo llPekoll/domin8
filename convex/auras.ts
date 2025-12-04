@@ -145,9 +145,7 @@ export const unlockWithPoints = mutation({
 
     const currentPoints = player.totalPoints ?? 0;
     if (currentPoints < aura.pointsCost) {
-      throw new Error(
-        `Not enough points. Need ${aura.pointsCost}, have ${currentPoints}`
-      );
+      throw new Error(`Not enough points. Need ${aura.pointsCost}, have ${currentPoints}`);
     }
 
     // 4. Deduct points from player
@@ -278,49 +276,5 @@ export const equipAura = mutation({
     });
 
     return { success: true, equippedAuraId: args.auraId ?? null };
-  },
-});
-
-/**
- * Seed auras from JSON (admin function)
- */
-export const seedAuras = mutation({
-  args: {
-    auras: v.array(
-      v.object({
-        id: v.number(),
-        name: v.string(),
-        assetKey: v.string(),
-        description: v.optional(v.string()),
-        rarity: v.string(),
-        pointsCost: v.optional(v.number()),
-        purchasePrice: v.optional(v.number()),
-        isActive: v.boolean(),
-      })
-    ),
-  },
-  handler: async (ctx, args) => {
-    let inserted = 0;
-    let updated = 0;
-
-    for (const auraData of args.auras) {
-      // Check if aura exists
-      const existing = await ctx.db
-        .query("auras")
-        .withIndex("by_aura_id", (q) => q.eq("id", auraData.id))
-        .first();
-
-      if (existing) {
-        // Update existing
-        await ctx.db.patch(existing._id, auraData);
-        updated++;
-      } else {
-        // Insert new
-        await ctx.db.insert("auras", auraData);
-        inserted++;
-      }
-    }
-
-    return { inserted, updated };
   },
 });
