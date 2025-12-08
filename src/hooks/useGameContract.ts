@@ -43,6 +43,7 @@ import { type Domin8Prgm } from "../../target/types/domin8_prgm";
 import Domin8PrgmIDL from "../../target/idl/domin8_prgm.json";
 import { logger } from "../lib/logger";
 import { getSharedConnection } from "~/lib/sharedConnection";
+import { getHeliusOptimizations } from "../lib/heliusOptimization";
 import { BetEntry } from "./useGameState";
 
 // Extract Program ID from IDL
@@ -375,12 +376,8 @@ export const useGameContract = () => {
         // Get recent blockhash
         const { blockhash } = await connection.getLatestBlockhash("confirmed");
 
-        // Build transaction with compute budget + FAST tip
-        const instructions = [
-          // Compute budget
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }),
-          // Bet instruction
+        // Core instructions (without compute budget - will be added after optimization)
+        const coreInstructions = [
           betInstruction,
           // FAST tip for Circular
           SystemProgram.transfer({
@@ -390,11 +387,31 @@ export const useGameContract = () => {
           }),
         ];
 
+        // HELIUS OPTIMIZATION: Simulate for exact compute units + get priority fee
+        const { optimizedCU, priorityFee } = await getHeliusOptimizations(
+          connection,
+          coreInstructions,
+          publicKey,
+          blockhash
+        );
+
+        logger.solana.debug("[placeBet] Helius optimizations", {
+          optimizedCU,
+          priorityFee,
+        });
+
+        // Build final optimized transaction with compute budget instructions FIRST
+        const optimizedInstructions = [
+          ComputeBudgetProgram.setComputeUnitLimit({ units: optimizedCU }),
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFee }),
+          ...coreInstructions,
+        ];
+
         // Create versioned transaction
         const message = new TransactionMessage({
           payerKey: publicKey,
           recentBlockhash: blockhash,
-          instructions,
+          instructions: optimizedInstructions,
         }).compileToV0Message();
 
         const transaction = new VersionedTransaction(message);

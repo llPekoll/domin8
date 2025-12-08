@@ -70,16 +70,38 @@ export default defineSchema({
 
   /**
    * Characters - Available character sprites for the game
+   * Supports 3 types: "free" (evolution), "lootbox", "nft"
    */
   characters: defineTable({
-    name: v.string(),
     id: v.number(),
-    assetPath: v.optional(v.string()), // Path to character spritesheet (e.g., "/characters/orc.png")
+    name: v.string(), // Internal name: "elf0", "bear", "orc"
+    displayName: v.optional(v.string()), // UI name: "Elf Apprentice", "Bear"
+    assetPath: v.optional(v.string()), // Path to character spritesheet (e.g., "/characters/v2/bear.png")
     description: v.optional(v.string()), // Character description
+
+    // Character acquisition type
+    characterType: v.optional(v.string()), // "free" | "lootbox" | "nft"
+
+    // Evolution system (only for free evolution characters)
+    evolutionLine: v.optional(v.string()), // "elf", "priest", "pumpkin", "skeleton", "zombie"
+    evolutionLevel: v.optional(v.number()), // 0, 1, 2
+    winsRequired: v.optional(v.number()), // 0, 20, 50
+
+    // NFT-gated (existing)
     nftCollection: v.optional(v.string()), // NFT collection program address for special/exclusive characters
     nftCollectionName: v.optional(v.string()), // Human-readable name of the NFT collection
+
+    // Rarity (for lootbox weighting and UI effects)
+    rarity: v.optional(v.string()), // "common" | "rare" | "legendary"
+
+    // Asset version (for animation format handling)
+    assetVersion: v.optional(v.string()), // "v1" = old format, "v2" = new 3-animation format
+
     isActive: v.boolean(),
-  }).index("by_active", ["isActive"]),
+  })
+    .index("by_active", ["isActive"])
+    .index("by_type", ["characterType"])
+    .index("by_evolution_line", ["evolutionLine"]),
 
   /**
    * Maps - Available game maps/arenas
@@ -232,6 +254,101 @@ export default defineSchema({
     .index("by_wallet_and_type", ["walletAddress", "itemType"])
     .index("by_status", ["status"])
     .index("by_wallet_and_status", ["walletAddress", "status"]),
+
+  // ============================================================================
+  // EVOLUTION SYSTEM TABLES
+  // ============================================================================
+
+  /**
+   * Player Evolution Progress - Tracks wins per evolution class
+   * Used to unlock evolution skins (20 wins = level 1, 50 wins = level 2)
+   */
+  playerEvolutionProgress: defineTable({
+    walletAddress: v.string(),
+    evolutionLine: v.string(), // "elf", "priest", "pumpkin", "skeleton", "zombie"
+    wins: v.number(), // Total wins with any skin in this evolution line
+    unlockedLevel: v.number(), // 0, 1, or 2
+    lastWinAt: v.optional(v.number()), // Unix timestamp of last win
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_and_line", ["walletAddress", "evolutionLine"]),
+
+  /**
+   * Player Characters - Tracks which lootbox characters each player owns
+   * Evolution characters are unlocked via playerEvolutionProgress
+   */
+  playerCharacters: defineTable({
+    walletAddress: v.string(),
+    characterId: v.number(),
+    unlockedAt: v.number(), // Unix timestamp
+    unlockedBy: v.string(), // "lootbox" | "purchase" | "default"
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_and_character", ["walletAddress", "characterId"]),
+
+  /**
+   * Player Favorites - Tracks which characters are favorited by each player
+   * Favorites appear at the top of character selection
+   */
+  playerFavorites: defineTable({
+    walletAddress: v.string(),
+    characterId: v.number(),
+    favoritedAt: v.number(), // Unix timestamp for ordering
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_and_character", ["walletAddress", "characterId"]),
+
+  // ============================================================================
+  // LOOTBOX SYSTEM TABLES
+  // ============================================================================
+
+  /**
+   * Lootbox Types - Definitions of available lootbox types
+   */
+  lootboxTypes: defineTable({
+    id: v.number(),
+    name: v.string(),
+    description: v.optional(v.string()),
+    price: v.number(), // Lamports (100_000_000 = 0.1 SOL)
+    assetKey: v.string(), // "lootBox" - for asset loading
+    isActive: v.boolean(),
+  }).index("by_lootbox_id", ["id"]),
+
+  /**
+   * Lootbox Drops - Items that can drop from each lootbox type
+   * Uses weighted random selection with shrinking pool (no duplicates)
+   */
+  lootboxDrops: defineTable({
+    lootboxTypeId: v.number(),
+    itemType: v.string(), // "aura" | "character"
+    itemId: v.number(),
+    weight: v.number(), // Drop weight (higher = more common)
+    rarity: v.string(), // "common" | "rare" | "legendary"
+  }).index("by_lootbox_type", ["lootboxTypeId"]),
+
+  /**
+   * Player Lootboxes - Unopened lootboxes in player inventory
+   */
+  playerLootboxes: defineTable({
+    walletAddress: v.string(),
+    lootboxTypeId: v.number(),
+    purchasedAt: v.number(), // Unix timestamp
+    txSignature: v.string(), // Purchase transaction signature
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_and_type", ["walletAddress", "lootboxTypeId"]),
+
+  /**
+   * Lootbox Openings - History of opened lootboxes
+   */
+  lootboxOpenings: defineTable({
+    walletAddress: v.string(),
+    lootboxTypeId: v.number(),
+    itemType: v.string(), // What type of item was received
+    itemId: v.number(), // Which item was received
+    rarity: v.string(), // Rarity of the item
+    openedAt: v.number(), // Unix timestamp
+  }).index("by_wallet", ["walletAddress"]),
 
   // ============================================================================
   // 1V1 LOBBY TABLES

@@ -24,6 +24,7 @@ import {
 } from "@solana/web3.js";
 import { getSharedConnection } from "../lib/sharedConnection";
 import { logger } from "../lib/logger";
+import { getHeliusOptimizations } from "../lib/heliusOptimization";
 
 export type ItemType = "aura" | "character";
 
@@ -97,11 +98,8 @@ export function useShopPurchase() {
         // Get recent blockhash
         const { blockhash } = await connection.getLatestBlockhash("confirmed");
 
-        // Build instructions
-        const instructions = [
-          // Compute budget
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 50_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }),
+        // Build core instructions (without compute budget - will be added after optimization)
+        const coreInstructions = [
           // SOL transfer to treasury
           SystemProgram.transfer({
             fromPubkey: publicKey,
@@ -116,11 +114,31 @@ export function useShopPurchase() {
           }),
         ];
 
-        // Create versioned transaction
+        // HELIUS OPTIMIZATION: Simulate for exact compute units + get priority fee
+        const { optimizedCU, priorityFee } = await getHeliusOptimizations(
+          connection,
+          coreInstructions,
+          publicKey,
+          blockhash
+        );
+
+        logger.solana.debug("[useShopPurchase] Helius optimization results", {
+          optimizedCU,
+          priorityFee,
+        });
+
+        // Build optimized instructions with dynamic compute budget
+        const optimizedInstructions = [
+          ComputeBudgetProgram.setComputeUnitLimit({ units: optimizedCU }),
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFee }),
+          ...coreInstructions,
+        ];
+
+        // Create versioned transaction with optimized instructions
         const message = new TransactionMessage({
           payerKey: publicKey,
           recentBlockhash: blockhash,
-          instructions,
+          instructions: optimizedInstructions,
         }).compileToV0Message();
 
         const transaction = new VersionedTransaction(message);

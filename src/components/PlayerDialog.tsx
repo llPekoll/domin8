@@ -107,8 +107,8 @@ export function PlayerDialog({
             </div>
           </div>
 
-          {/* Main Content Area */}
-          <div className="flex-1 p-6 overflow-y-auto">
+          {/* Main Content Area - Custom scrollbar */}
+          <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
             {activeTab === "characters" && (
               <CharacterSelector
                 selectedCharacterId={selectedCharacterId}

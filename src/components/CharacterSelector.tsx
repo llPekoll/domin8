@@ -1,8 +1,10 @@
-import { useCallback } from "react";
-import { Lock, Check, Crown } from "lucide-react";
+import { useCallback, useRef } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { ChevronLeft, ChevronRight, Heart, Package, Crown, Sparkles } from "lucide-react";
+import { api } from "../../convex/_generated/api";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
-import { useNFTCharacters } from "../hooks/useNFTCharacters";
-import { useAssets } from "../contexts/AssetsContext";
+import { CharacterCard } from "./CharacterCard";
+import { EvolutionCard } from "./EvolutionCard";
 import type { Character } from "../types/character";
 
 interface CharacterSelectorProps {
@@ -10,88 +12,219 @@ interface CharacterSelectorProps {
   onCharacterSelected: (character: Character) => void;
 }
 
+/**
+ * Character selector with horizontal scroll sections:
+ * - Favorites (if any)
+ * - Free Champions (evolution characters with star selectors)
+ * - Lootbox Champions
+ * - NFT Champions
+ */
 export function CharacterSelector({
   selectedCharacterId,
   onCharacterSelected,
 }: CharacterSelectorProps) {
-  const { walletAddress, externalWalletAddress } = usePrivyWallet();
-  const { characters: allCharacters } = useAssets();
-  const { unlockedCharacters } = useNFTCharacters(externalWalletAddress, walletAddress);
+  const { walletAddress } = usePrivyWallet();
 
-  // Check if a character is locked (NFT-gated but user doesn't own)
-  const isCharacterLocked = useCallback(
-    (character: Character) => {
-      if (!character.nftCollection) return false;
-      if (unlockedCharacters?.some((c) => c._id === character._id)) return false;
-      return true;
-    },
-    [unlockedCharacters]
+  // Get grouped characters with unlock status and favorites
+  const groupedData = useQuery(
+    api.characters.getCharactersGrouped,
+    walletAddress ? { walletAddress } : "skip"
   );
 
+  // Toggle favorite mutation
+  const toggleFavorite = useMutation(api.favorites.toggleFavorite);
+
+  // Handle favorite toggle
+  const handleToggleFavorite = useCallback(
+    async (characterId: number) => {
+      if (!walletAddress) return;
+      await toggleFavorite({ walletAddress, characterId });
+    },
+    [walletAddress, toggleFavorite]
+  );
+
+  if (!groupedData) {
+    return (
+      <div className="flex items-center justify-center h-40">
+        <div className="animate-pulse text-indigo-400">Loading characters...</div>
+      </div>
+    );
+  }
+
+  const { favorites, evolution, lootbox, nft } = groupedData;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 overflow-y-auto max-h-[450px] pr-2">
+      {/* Header */}
       <div>
         <h3 className="text-indigo-100 text-xl font-semibold mb-1">Select Character</h3>
         <p className="text-indigo-400/70 text-sm">Choose your fighter for battle</p>
       </div>
 
-      {/* Character Grid */}
-      <div className="grid grid-cols-4 gap-3">
-        {allCharacters?.map((character) => {
-          const isSelected = selectedCharacterId === character._id;
-          const isLocked = isCharacterLocked(character);
-          const isNFTCharacter = !!character.nftCollection;
+      {/* Favorites Section */}
+      {favorites.length > 0 && (
+        <CharacterSection
+          title="Favorites"
+          icon={<Heart className="w-4 h-4 text-red-400 fill-red-400" />}
+          count={favorites.length}
+        >
+          {favorites.map((char) => (
+            <CharacterCard
+              key={char._id}
+              character={char as Character & { isUnlocked?: boolean; isFavorite?: boolean }}
+              isSelected={selectedCharacterId === char._id}
+              onSelect={() => char.isUnlocked && onCharacterSelected(char as Character)}
+              onToggleFavorite={() => handleToggleFavorite(char.id)}
+              showStars={char.characterType === "free"}
+              size="md"
+            />
+          ))}
+        </CharacterSection>
+      )}
 
-          return (
-            <button
-              key={character._id}
-              onClick={() => !isLocked && onCharacterSelected(character)}
-              disabled={isLocked}
-              className={`relative p-2 rounded-lg border-2 transition-all ${
-                isSelected
-                  ? "border-indigo-400 bg-indigo-600/30"
-                  : isLocked
-                    ? "border-gray-600 bg-gray-900/50 opacity-50 cursor-not-allowed"
-                    : "border-indigo-500/30 bg-black/30 hover:border-indigo-400/60 hover:bg-indigo-900/20"
-              }`}
-            >
-              {/* Character Preview */}
-              <div className="w-full aspect-square flex items-center justify-center overflow-hidden">
-                <img
-                  src={`/assets/characters/${character.name}Splash.gif`}
-                  alt={character.name}
-                  className={`w-16 h-16 object-contain ${isLocked ? "grayscale" : ""}`}
-                  style={{ imageRendering: "pixelated" }}
-                />
-              </div>
+      {/* Free Champions (Evolution) Section - TFT Style */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-green-400" />
+          <h4 className="text-indigo-200 font-medium">Free Champions</h4>
+          <span className="text-indigo-500 text-xs">5 evolution lines</span>
+        </div>
 
-              {/* Character Name */}
-              <p className="text-xs text-center text-indigo-200 mt-1 truncate">{character.name}</p>
-
-              {/* NFT Badge - Crown for NFT chars (yellow if owned, gray if locked) */}
-              {isNFTCharacter && (
-                <div className="absolute top-1 right-1">
-                  <Crown className={`w-4 h-4 ${isLocked ? "text-gray-500" : "text-yellow-500"}`} />
-                </div>
-              )}
-
-              {/* Lock overlay for locked characters */}
-              {isLocked && (
-                <div className="absolute top-1 left-1">
-                  <Lock className="w-4 h-4 text-gray-400" />
-                </div>
-              )}
-
-              {/* Selected Check */}
-              {isSelected && !isLocked && (
-                <div className="absolute top-1 left-1 bg-indigo-500 rounded-full p-0.5">
-                  <Check className="w-3 h-3 text-white" />
-                </div>
-              )}
-            </button>
-          );
-        })}
+        <div className="grid grid-cols-3 gap-3">
+          {evolution.map((evoLine) => (
+            <EvolutionCard
+              key={evoLine.line}
+              characters={evoLine.characters as (Character & { isUnlocked?: boolean; isFavorite?: boolean })[]}
+              wins={evoLine.progress?.wins ?? 0}
+              unlockedLevel={evoLine.progress?.unlockedLevel ?? 0}
+              selectedCharacterId={selectedCharacterId}
+              onSelect={onCharacterSelected}
+              onToggleFavorite={handleToggleFavorite}
+            />
+          ))}
+        </div>
       </div>
+
+      {/* Lootbox Champions Section */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Package className="w-4 h-4 text-purple-400" />
+          <h4 className="text-indigo-200 font-medium">Lootbox Champions</h4>
+          <span className="text-indigo-500 text-xs">{lootbox.owned}/{lootbox.total} owned</span>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {lootbox.characters.map((char) => (
+            <CharacterCard
+              key={char._id}
+              character={char as Character & { isUnlocked?: boolean; isFavorite?: boolean }}
+              isSelected={selectedCharacterId === char._id}
+              onSelect={() => char.isUnlocked && onCharacterSelected(char as Character)}
+              onToggleFavorite={() => handleToggleFavorite(char.id)}
+              size="md"
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* NFT Champions Section */}
+      {nft.characters.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Crown className="w-4 h-4 text-yellow-400" />
+            <h4 className="text-indigo-200 font-medium">NFT Champions</h4>
+            <span className="text-indigo-500 text-xs">{nft.characters.filter((c) => c.isUnlocked).length}/{nft.characters.length} owned</span>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {nft.characters.map((char) => (
+              <CharacterCard
+                key={char._id}
+                character={char as Character & { isUnlocked?: boolean; isFavorite?: boolean }}
+                isSelected={selectedCharacterId === char._id}
+                onSelect={() => char.isUnlocked && onCharacterSelected(char as Character)}
+                onToggleFavorite={() => handleToggleFavorite(char.id)}
+                size="md"
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Section wrapper with title and horizontal scroll
+ */
+function CharacterSection({
+  title,
+  icon,
+  count,
+  total,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  count?: number;
+  total?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        {icon}
+        <h4 className="text-indigo-200 font-medium">{title}</h4>
+        {count !== undefined && (
+          <span className="text-indigo-500 text-xs">
+            {count}{total !== undefined ? `/${total}` : ""} owned
+          </span>
+        )}
+      </div>
+      <HorizontalScroll>{children}</HorizontalScroll>
+    </div>
+  );
+}
+
+/**
+ * Horizontal scrollable container with arrow buttons
+ */
+function HorizontalScroll({ children }: { children: React.ReactNode }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (direction: "left" | "right") => {
+    if (!scrollRef.current) return;
+    const scrollAmount = 200;
+    scrollRef.current.scrollBy({
+      left: direction === "left" ? -scrollAmount : scrollAmount,
+      behavior: "smooth",
+    });
+  };
+
+  return (
+    <div className="relative group">
+      {/* Left Arrow */}
+      <button
+        onClick={() => scroll("left")}
+        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-6 h-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity border border-indigo-500/30"
+      >
+        <ChevronLeft className="w-4 h-4 text-indigo-300" />
+      </button>
+
+      {/* Scrollable Container */}
+      <div
+        ref={scrollRef}
+        className="flex gap-3 overflow-x-auto scrollbar-hide px-1 py-1"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        {children}
+      </div>
+
+      {/* Right Arrow */}
+      <button
+        onClick={() => scroll("right")}
+        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-6 h-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity border border-indigo-500/30"
+      >
+        <ChevronRight className="w-4 h-4 text-indigo-300" />
+      </button>
     </div>
   );
 }

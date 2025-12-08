@@ -4,7 +4,6 @@
  */
 
 import { mutation, internalMutation, query } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
 // Item types that can be purchased

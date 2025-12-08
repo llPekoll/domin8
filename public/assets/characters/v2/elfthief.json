@@ -1,0 +1,116 @@
+{
+  "frames": [
+    {
+      "filename": "elfthief 0.aseprite",
+      "frame": { "x": 0, "y": 0, "w": 25, "h": 22 },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": { "x": 19, "y": 2, "w": 25, "h": 22 },
+      "sourceSize": { "w": 64, "h": 64 },
+      "duration": 100
+    },
+    {
+      "filename": "elfthief 1.aseprite",
+      "frame": { "x": 25, "y": 0, "w": 25, "h": 22 },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": { "x": 19, "y": 2, "w": 25, "h": 22 },
+      "sourceSize": { "w": 64, "h": 64 },
+      "duration": 100
+    },
+    {
+      "filename": "elfthief 2.aseprite",
+      "frame": { "x": 50, "y": 0, "w": 25, "h": 22 },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": { "x": 19, "y": 2, "w": 25, "h": 22 },
+      "sourceSize": { "w": 64, "h": 64 },
+      "duration": 100
+    },
+    {
+      "filename": "elfthief 3.aseprite",
+      "frame": { "x": 75, "y": 0, "w": 25, "h": 22 },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": { "x": 19, "y": 2, "w": 25, "h": 22 },
+      "sourceSize": { "w": 64, "h": 64 },
+      "duration": 100
+    },
+    {
+      "filename": "elfthief 4.aseprite",
+      "frame": { "x": 100, "y": 0, "w": 25, "h": 22 },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": { "x": 19, "y": 2, "w": 25, "h": 22 },
+      "sourceSize": { "w": 64, "h": 64 },
+      "duration": 100
+    },
+    {
+      "filename": "elfthief 5.aseprite",
+      "frame": { "x": 125, "y": 0, "w": 25, "h": 22 },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": { "x": 19, "y": 2, "w": 25, "h": 22 },
+      "sourceSize": { "w": 64, "h": 64 },
+      "duration": 100
+    },
+    {
+      "filename": "elfthief 6.aseprite",
+      "frame": { "x": 150, "y": 0, "w": 25, "h": 22 },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": { "x": 19, "y": 2, "w": 25, "h": 22 },
+      "sourceSize": { "w": 64, "h": 64 },
+      "duration": 100
+    },
+    {
+      "filename": "elfthief 7.aseprite",
+      "frame": { "x": 150, "y": 0, "w": 25, "h": 22 },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": { "x": 19, "y": 2, "w": 25, "h": 22 },
+      "sourceSize": { "w": 64, "h": 64 },
+      "duration": 100
+    },
+    {
+      "filename": "elfthief 8.aseprite",
+      "frame": { "x": 175, "y": 0, "w": 25, "h": 22 },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": { "x": 19, "y": 2, "w": 25, "h": 22 },
+      "sourceSize": { "w": 64, "h": 64 },
+      "duration": 100
+    },
+    {
+      "filename": "elfthief 9.aseprite",
+      "frame": { "x": 150, "y": 0, "w": 25, "h": 22 },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": { "x": 19, "y": 2, "w": 25, "h": 22 },
+      "sourceSize": { "w": 64, "h": 64 },
+      "duration": 100
+    },
+    {
+      "filename": "elfthief 10.aseprite",
+      "frame": { "x": 200, "y": 0, "w": 25, "h": 22 },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": { "x": 19, "y": 2, "w": 25, "h": 22 },
+      "sourceSize": { "w": 64, "h": 64 },
+      "duration": 100
+    }
+  ],
+  "meta": {
+    "app": "https://www.aseprite.org/",
+    "version": "1.3.15.2-arm64",
+    "image": "elfthief.png",
+    "format": "RGBA8888",
+    "size": { "w": 225, "h": 22 },
+    "scale": "1",
+    "frameTags": [
+      { "name": "Idle", "from": 0, "to": 1, "direction": "pingpong", "color": "#000000ff" },
+      { "name": "Move", "from": 2, "to": 5, "direction": "forward", "color": "#000000ff" },
+      { "name": "land", "from": 6, "to": 10, "direction": "forward", "color": "#000000ff" }
+    ]
+  }
+}

@@ -5,8 +5,8 @@
     "assetKey": "M",
     "description": "A mystical purple aura that swirls around the character",
     "rarity": "common",
-    "pointsCost": 2000,
-    "purchasePrice": 20000000,
+    "pointsCost": 20000,
+    "purchasePrice": 200000000,
     "isActive": true
   },
   {
@@ -15,8 +15,8 @@
     "assetKey": "B",
     "description": "Intense blue flames that engulf the character",
     "rarity": "rare",
-    "pointsCost": 5000,
-    "purchasePrice": 100000000,
+    "pointsCost": 50000,
+    "purchasePrice": 1000000000,
     "isActive": true
   },
   {
@@ -25,8 +25,8 @@
     "assetKey": "H",
     "description": "A divine golden radiance that emanates from within",
     "rarity": "legendary",
-    "pointsCost": 15000,
-    "purchasePrice": 250000000,
+    "pointsCost": 150000,
+    "purchasePrice": 2500000000,
     "isActive": true
   }
 ]
