@@ -1,0 +1,465 @@
+{ "frames": [
+   {
+    "filename": "monke 0.ase",
+    "frame": { "x": 0, "y": 0, "w": 31, "h": 36 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 22, "y": 12, "w": 31, "h": 36 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 1.ase",
+    "frame": { "x": 31, "y": 0, "w": 28, "h": 37 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 25, "y": 11, "w": 28, "h": 37 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 2.ase",
+    "frame": { "x": 59, "y": 0, "w": 29, "h": 37 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 25, "y": 11, "w": 29, "h": 37 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 3.ase",
+    "frame": { "x": 88, "y": 0, "w": 31, "h": 36 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 12, "w": 31, "h": 36 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 4.ase",
+    "frame": { "x": 119, "y": 0, "w": 33, "h": 35 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 22, "y": 13, "w": 33, "h": 35 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 5.ase",
+    "frame": { "x": 152, "y": 0, "w": 33, "h": 35 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 22, "y": 13, "w": 33, "h": 35 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 6.ase",
+    "frame": { "x": 185, "y": 0, "w": 33, "h": 36 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 22, "y": 12, "w": 33, "h": 36 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 7.ase",
+    "frame": { "x": 218, "y": 0, "w": 29, "h": 37 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 25, "y": 11, "w": 29, "h": 37 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 8.ase",
+    "frame": { "x": 0, "y": 37, "w": 28, "h": 37 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 25, "y": 11, "w": 28, "h": 37 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 9.ase",
+    "frame": { "x": 28, "y": 37, "w": 29, "h": 36 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 12, "w": 29, "h": 36 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 10.ase",
+    "frame": { "x": 57, "y": 37, "w": 31, "h": 35 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 22, "y": 13, "w": 31, "h": 35 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 11.ase",
+    "frame": { "x": 88, "y": 37, "w": 31, "h": 35 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 22, "y": 13, "w": 31, "h": 35 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 12.ase",
+    "frame": { "x": 119, "y": 37, "w": 32, "h": 34 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 23, "y": 14, "w": 32, "h": 34 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 13.ase",
+    "frame": { "x": 151, "y": 37, "w": 29, "h": 33 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 26, "y": 15, "w": 29, "h": 33 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 14.ase",
+    "frame": { "x": 180, "y": 37, "w": 28, "h": 34 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 26, "y": 14, "w": 28, "h": 34 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 15.ase",
+    "frame": { "x": 208, "y": 37, "w": 27, "h": 34 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 27, "y": 13, "w": 27, "h": 34 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 16.ase",
+    "frame": { "x": 0, "y": 74, "w": 31, "h": 33 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 15, "w": 31, "h": 33 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 17.ase",
+    "frame": { "x": 31, "y": 74, "w": 30, "h": 32 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 16, "w": 30, "h": 32 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 18.ase",
+    "frame": { "x": 0, "y": 0, "w": 31, "h": 36 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 22, "y": 12, "w": 31, "h": 36 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 19.ase",
+    "frame": { "x": 61, "y": 74, "w": 31, "h": 34 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 22, "y": 14, "w": 31, "h": 34 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 20.ase",
+    "frame": { "x": 92, "y": 74, "w": 30, "h": 33 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 22, "y": 15, "w": 30, "h": 33 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 21.ase",
+    "frame": { "x": 122, "y": 74, "w": 29, "h": 33 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 25, "y": 15, "w": 29, "h": 33 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 22.ase",
+    "frame": { "x": 151, "y": 74, "w": 23, "h": 41 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 30, "y": 4, "w": 23, "h": 41 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 23.ase",
+    "frame": { "x": 174, "y": 74, "w": 25, "h": 19 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 28, "y": 14, "w": 25, "h": 19 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 24.ase",
+    "frame": { "x": 199, "y": 74, "w": 26, "h": 25 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 27, "y": 9, "w": 26, "h": 25 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 25.ase",
+    "frame": { "x": 0, "y": 115, "w": 26, "h": 34 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 25, "y": 6, "w": 26, "h": 34 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 26.ase",
+    "frame": { "x": 26, "y": 115, "w": 31, "h": 33 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 21, "y": 15, "w": 31, "h": 33 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 27.ase",
+    "frame": { "x": 57, "y": 115, "w": 31, "h": 33 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 22, "y": 15, "w": 31, "h": 33 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 28.ase",
+    "frame": { "x": 88, "y": 115, "w": 23, "h": 39 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 29, "y": 7, "w": 23, "h": 39 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 29.ase",
+    "frame": { "x": 111, "y": 115, "w": 23, "h": 41 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 29, "y": 5, "w": 23, "h": 41 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 30.ase",
+    "frame": { "x": 134, "y": 115, "w": 22, "h": 40 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 29, "y": 0, "w": 22, "h": 40 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 31.ase",
+    "frame": { "x": 134, "y": 115, "w": 22, "h": 40 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 29, "y": 1, "w": 22, "h": 40 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 32.ase",
+    "frame": { "x": 156, "y": 115, "w": 22, "h": 36 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 29, "y": 8, "w": 22, "h": 36 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 33.ase",
+    "frame": { "x": 178, "y": 115, "w": 28, "h": 34 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 14, "w": 28, "h": 34 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 34.ase",
+    "frame": { "x": 0, "y": 156, "w": 26, "h": 38 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 27, "y": 3, "w": 26, "h": 38 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 35.ase",
+    "frame": { "x": 26, "y": 156, "w": 26, "h": 37 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 27, "y": 3, "w": 26, "h": 37 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 36.ase",
+    "frame": { "x": 52, "y": 156, "w": 30, "h": 36 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 25, "y": 3, "w": 30, "h": 36 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 37.ase",
+    "frame": { "x": 82, "y": 156, "w": 26, "h": 37 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 27, "y": 3, "w": 26, "h": 37 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 38.ase",
+    "frame": { "x": 0, "y": 156, "w": 26, "h": 38 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 27, "y": 3, "w": 26, "h": 38 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 39.ase",
+    "frame": { "x": 108, "y": 156, "w": 38, "h": 31 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 20, "y": 17, "w": 38, "h": 31 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 40.ase",
+    "frame": { "x": 146, "y": 156, "w": 47, "h": 32 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 15, "y": 16, "w": 47, "h": 32 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 41.ase",
+    "frame": { "x": 193, "y": 156, "w": 49, "h": 34 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 15, "y": 14, "w": 49, "h": 34 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 42.ase",
+    "frame": { "x": 0, "y": 0, "w": 31, "h": 36 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 22, "y": 12, "w": 31, "h": 36 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 43.ase",
+    "frame": { "x": 242, "y": 156, "w": 35, "h": 36 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 12, "w": 35, "h": 36 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 100
+   },
+   {
+    "filename": "monke 44.ase",
+    "frame": { "x": 0, "y": 194, "w": 37, "h": 40 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 26, "y": 8, "w": 37, "h": 40 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 45.ase",
+    "frame": { "x": 199, "y": 74, "w": 26, "h": 25 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 24, "y": 21, "w": 26, "h": 25 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 46.ase",
+    "frame": { "x": 37, "y": 194, "w": 26, "h": 32 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 21, "y": 16, "w": 26, "h": 32 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 47.ase",
+    "frame": { "x": 63, "y": 194, "w": 28, "h": 31 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 21, "y": 17, "w": 28, "h": 31 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   },
+   {
+    "filename": "monke 48.ase",
+    "frame": { "x": 92, "y": 74, "w": 30, "h": 33 },
+    "rotated": false,
+    "trimmed": true,
+    "spriteSourceSize": { "x": 22, "y": 15, "w": 30, "h": 33 },
+    "sourceSize": { "w": 80, "h": 60 },
+    "duration": 150
+   }
+ ],
+ "meta": {
+  "app": "https://www.aseprite.org/",
+  "version": "1.3.15.2-arm64",
+  "image": "monke.png",
+  "format": "RGBA8888",
+  "size": { "w": 277, "h": 234 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "idle", "from": 0, "to": 11, "direction": "forward", "color": "#000000ff" },
+   { "name": "run", "from": 12, "to": 17, "direction": "forward", "color": "#000000ff" },
+   { "name": "win", "from": 18, "to": 33, "direction": "forward", "color": "#000000ff" },
+   { "name": "falling", "from": 34, "to": 37, "direction": "forward", "color": "#000000ff" },
+   { "name": "landing", "from": 38, "to": 41, "direction": "forward", "color": "#000000ff" },
+   { "name": "poke", "from": 42, "to": 48, "direction": "forward", "color": "#000000ff" }
+  ],
+  "layers": [
+   { "name": "Flattened", "opacity": 255, "blendMode": "normal" }
+  ],
+  "slices": [
+  ]
+ }
+}
