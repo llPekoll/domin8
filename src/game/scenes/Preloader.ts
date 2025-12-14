@@ -9,22 +9,123 @@ export class Preloader extends Scene {
     super("Preloader");
   }
 
+  private loadingText!: Phaser.GameObjects.Text;
+  private percentText!: Phaser.GameObjects.Text;
+  private loadingBars: Phaser.GameObjects.Rectangle[] = [];
+  private monkeSprite!: Phaser.GameObjects.Sprite;
+
   init() {
-    //  A simple progress bar. This is the outline of the bar.
-    this.add.rectangle(512, 384, 468, 32).setStrokeStyle(1, 0xffffff);
+    // Reset state for scene restarts
+    this.loadingBars = [];
+    this.monkeSprite = undefined!;
 
-    //  This is the progress bar itself. It will increase in size from the left based on the % of progress.
-    const bar = this.add.rectangle(512 - 230, 384, 4, 28, 0xffffff);
+    const centerX = this.cameras.main.width / 2;
+    const centerY = this.cameras.main.height / 2;
 
-    //  Use the 'progress' event emitted by the LoaderPlugin to update the loading bar
+    // Create segmented loading bar (like the image)
+    const barCount = 100;
+    const barWidth = 8;
+    const barHeight = 24;
+    const barSpacing = 2;
+    const totalWidth = barCount * (barWidth + barSpacing);
+    const startX = centerX - totalWidth / 2;
+    const barY = centerY + 150;
+
+    // Create bar outline/background
+    this.add.rectangle(centerX, barY, totalWidth + 20, barHeight + 10)
+      .setStrokeStyle(2, 0xffffff)
+      .setFillStyle(0x000000, 0.5);
+
+    // Create individual bar segments
+    for (let i = 0; i < barCount; i++) {
+      const bar = this.add.rectangle(
+        startX + i * (barWidth + barSpacing) + barWidth / 2,
+        barY,
+        barWidth,
+        barHeight,
+        0x333333
+      );
+      this.loadingBars.push(bar);
+    }
+
+    // Add "Loading" and percentage on same line, aligned right below the bar
+    const rightEdge = centerX + totalWidth / 2;
+
+    this.loadingText = this.add.text(rightEdge - 80, barY + 50, "Loading", {
+      fontFamily: "jersey15",
+      fontSize: "36px",
+      color: "#ffffff",
+    }).setOrigin(1, 0.5); // Right-aligned
+
+    this.percentText = this.add.text(rightEdge, barY + 50, "0%", {
+      fontFamily: "jersey15",
+      fontSize: "36px",
+      color: "#ffffff",
+    }).setOrigin(1, 0.5); // Right-aligned
+
+    // Use the 'progress' event emitted by the LoaderPlugin to update the loading bar
     this.load.on("progress", (progress: number) => {
-      //  Update the progress bar (our bar is 464px wide, so 100% = 464px)
-      bar.width = 4 + 460 * progress;
+      // Update segmented bars
+      const filledBars = Math.floor(progress * this.loadingBars.length);
+      for (let i = 0; i < this.loadingBars.length; i++) {
+        if (i < filledBars) {
+          this.loadingBars[i].setFillStyle(0xffffff);
+        } else {
+          this.loadingBars[i].setFillStyle(0x333333);
+        }
+      }
+
+      // Update percentage text
+      this.percentText.setText(`${Math.floor(progress * 100)}%`);
     });
+
+    // Create monke immediately (assets loaded in Boot scene)
+    this.createMonkeAnimation();
+  }
+
+  private createMonkeAnimation() {
+    // Prevent creating multiple sprites
+    if (this.monkeSprite) return;
+
+    const centerX = this.cameras.main.width / 2;
+    const centerY = this.cameras.main.height / 2;
+    const barY = centerY + 150;
+
+    // Same bar dimensions as in init()
+    const barCount = 100;
+    const barWidth = 8;
+    const barSpacing = 2;
+    const totalWidth = barCount * (barWidth + barSpacing);
+    const leftEdge = centerX - totalWidth / 2;
+
+    // Check if atlas is loaded
+    if (!this.textures.exists("monke-loader")) return;
+
+    // Create win animation for monke loader
+    if (!this.anims.exists("monke-loader-win")) {
+      this.anims.create({
+        key: "monke-loader-win",
+        frames: this.anims.generateFrameNames("monke-loader", {
+          prefix: "monke ",
+          suffix: ".ase",
+          start: 18,
+          end: 33,
+        }),
+        frameRate: 10,
+        repeat: -1,
+      });
+    }
+
+    // Create the monke sprite on the LEFT, above the loading bar
+    this.monkeSprite = this.add.sprite(leftEdge + 80, barY - 120, "monke-loader");
+    this.monkeSprite.setScale(5);
+    this.monkeSprite.play("monke-loader-win");
   }
 
   preload() {
     this.load.setPath("assets");
+
+    // Note: monke-loader assets are loaded in Boot scene for instant display
 
     // Load custom fonts
     this.load.addFile(
