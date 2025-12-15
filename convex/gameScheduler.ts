@@ -350,7 +350,7 @@ export const executeEndGame = internalAction({
               ? updatedGame.bets[winningBetIndex]
               : null;
 
-          await ctx.runAction(internal.webhooks.notifyGameWinner, {
+          await ctx.runAction(internal.notifications.notifyGameWinner, {
             roundId,
             winnerWalletAddress: updatedGame.winner.toString(),
             betAmount: winnerBet?.amount || 0,

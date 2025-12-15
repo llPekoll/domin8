@@ -7,7 +7,7 @@ import { EventBus } from "./game/EventBus";
 import { setActiveGameData, setCurrentUserWallet } from "./game/main";
 import type { Character } from "./types/character";
 import { useAutoCreatePlayer } from "./hooks/useAutoCreatePlayer";
-import { useGameCreatedWebhook } from "./hooks/useGameCreatedWebhook";
+import { useGameCreatedNotification } from "./hooks/useGameCreatedNotification";
 import { DesktopLayout } from "./layouts/DesktopLayout";
 import { MobileLayout } from "./layouts/MobileLayout";
 import { MobileLandscapeLayout } from "./layouts/MobileLandscapeLayout";
@@ -83,8 +83,8 @@ export default function App() {
   // Get current game state directly from blockchain (no Convex, <1s updates)
   const { activeGame: currentRoundState } = useActiveGame();
 
-  // Send webhook when game transitions from WAITING to OPEN (first bet placed)
-  useGameCreatedWebhook(currentRoundState);
+  // Send notification when game transitions from WAITING to OPEN (first bet placed)
+  useGameCreatedNotification(currentRoundState);
 
   // ✅ Create a stable reference that only changes when meaningful data changes
   // This prevents infinite re-renders from object recreation
@@ -136,11 +136,6 @@ export default function App() {
     setActiveGameData(fullData);
     EventBus.emit("blockchain-state-update", fullData);
   }, [stableGameState]);
-
-  // Wait for user to connect with Privy before loading the UI
-  if (!connected) {
-    return null;
-  }
 
   // Shared props for all layouts
   const layoutProps = {

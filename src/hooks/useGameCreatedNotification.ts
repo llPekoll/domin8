@@ -1,21 +1,21 @@
 /**
- * Hook for sending game creation webhook when first bet is placed
+ * Hook for sending game creation notification when first bet is placed
  *
  * Detects when game status transitions from WAITING (2) to OPEN (0)
- * and sends a notification via Convex webhook.
+ * and sends a notification to Discord and Telegram.
  */
 import { useRef, useEffect } from "react";
 import { useAction, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { ActiveGameState } from "./useActiveGame";
 
-export function useGameCreatedWebhook(currentRoundState: ActiveGameState | null) {
+export function useGameCreatedNotification(currentRoundState: ActiveGameState | null) {
   // Track previous game status for detecting WAITING → OPEN transition
   const prevStatusRef = useRef<number | null>(null);
   const prevRoundIdRef = useRef<string | null>(null);
 
   // Webhook notification for game creation
-  const notifyGameCreated = useAction(api.webhooks.notifyGameCreated);
+  const notifyGameCreated = useAction(api.notifications.notifyGameCreated);
 
   // Get player data for the first bettor's display name
   const firstBettorWallet = currentRoundState?.wallets?.[0]?.toBase58() || null;
@@ -43,7 +43,7 @@ export function useGameCreatedWebhook(currentRoundState: ActiveGameState | null)
     const isSameRound = prevRoundId === currentRoundId;
 
     if (isStatusTransition && isSameRound && currentRoundId) {
-      console.log(`🎮 [useGameCreatedWebhook] Game started! Status transition WAITING → OPEN for round ${currentRoundId}`);
+      console.log(`🎮 [useGameCreatedNotification] Game started! Status transition WAITING → OPEN for round ${currentRoundId}`);
 
       // Get game data for webhook
       const startTimestamp = currentRoundState.startDate?.toNumber() || Math.floor(Date.now() / 1000);
@@ -67,10 +67,10 @@ export function useGameCreatedWebhook(currentRoundState: ActiveGameState | null)
         map: mapId,
       })
         .then((result) => {
-          console.log(`🎮 [useGameCreatedWebhook] Game creation webhook sent:`, result);
+          console.log(`🎮 [useGameCreatedNotification] Game creation webhook sent:`, result);
         })
         .catch((error) => {
-          console.error(`🎮 [useGameCreatedWebhook] Failed to send game creation webhook:`, error);
+          console.error(`🎮 [useGameCreatedNotification] Failed to send game creation webhook:`, error);
         });
     }
   }, [currentRoundState?.status, currentRoundState?.gameRound?.toString(), firstBettorWallet, firstBettorPlayer, notifyGameCreated]);

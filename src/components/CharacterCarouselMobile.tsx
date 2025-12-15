@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useQuery } from "convex/react";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useNFTCharacters } from "../hooks/useNFTCharacters";
-import { api } from "../../convex/_generated/api";
 import { ChevronLeft, ChevronRight, Lock, Crown } from "lucide-react";
 import { useAssets } from "../contexts/AssetsContext";
 import type { Character } from "../types/character";
@@ -52,16 +50,12 @@ export function CharacterCarouselMobile({ onCharacterSelected }: CharacterCarous
 
   const goToPrevious = useCallback(() => {
     if (availableCharacters.length === 0) return;
-    setCurrentCharacterIndex((prev) =>
-      prev === 0 ? availableCharacters.length - 1 : prev - 1
-    );
+    setCurrentCharacterIndex((prev) => (prev === 0 ? availableCharacters.length - 1 : prev - 1));
   }, [availableCharacters.length]);
 
   const goToNext = useCallback(() => {
     if (availableCharacters.length === 0) return;
-    setCurrentCharacterIndex((prev) =>
-      prev === availableCharacters.length - 1 ? 0 : prev + 1
-    );
+    setCurrentCharacterIndex((prev) => (prev === availableCharacters.length - 1 ? 0 : prev + 1));
   }, [availableCharacters.length]);
 
   const selectCharacter = (index: number) => {

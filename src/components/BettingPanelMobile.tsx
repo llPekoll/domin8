@@ -27,8 +27,7 @@ const BettingPanelMobile = memo(function BettingPanelMobile({
   selectedCharacter,
   onBetPlaced,
 }: BettingPanelMobileProps) {
-  const { connected, publicKey, solBalance, isLoadingBalance, externalWalletAddress } =
-    usePrivyWallet();
+  const { connected, publicKey, solBalance, externalWalletAddress } = usePrivyWallet();
   const { placeBet, validateBet } = useGameContract();
   const { handleAddFunds } = useFundWallet();
 
@@ -129,7 +128,7 @@ const BettingPanelMobile = memo(function BettingPanelMobile({
         return;
       }
 
-      const characterRequirements = allCharacters?.find((c) => c._id === selectedCharacter._id);
+      const characterRequirements = allCharacters?.find((c: { _id: string; nftCollection?: string }) => c._id === selectedCharacter._id);
       const requiresNFT =
         characterRequirements &&
         "nftCollection" in characterRequirements &&
@@ -150,12 +149,6 @@ const BettingPanelMobile = memo(function BettingPanelMobile({
           toast.error("NFT Not Found");
           return;
         }
-      }
-
-      let mapId = 0;
-      if (allMaps && allMaps.length > 0) {
-        const randomMap = allMaps[Math.floor(Math.random() * allMaps.length)];
-        mapId = randomMap.id ?? 0;
       }
 
       const betResult = await placeBet(amount, selectedCharacter.id, position);

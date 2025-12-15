@@ -1,5 +1,13 @@
 import { Scene } from "phaser";
-import { currentMapData, charactersData, allMapsData, demoMapData, activeGameData, blockchainDataReady, GAME_STATUS } from "../main";
+import {
+  currentMapData,
+  charactersData,
+  allMapsData,
+  demoMapData,
+  activeGameData,
+  blockchainDataReady,
+  GAME_STATUS,
+} from "../main";
 import { logger } from "../../lib/logger";
 import { loadBackgroundConfig } from "../config/backgrounds";
 import { EventBus } from "../EventBus";
@@ -9,7 +17,6 @@ export class Preloader extends Scene {
     super("Preloader");
   }
 
-  private loadingText!: Phaser.GameObjects.Text;
   private percentText!: Phaser.GameObjects.Text;
   private loadingBars: Phaser.GameObjects.Rectangle[] = [];
   private monkeSprite!: Phaser.GameObjects.Sprite;
@@ -32,7 +39,8 @@ export class Preloader extends Scene {
     const barY = centerY + 150;
 
     // Create bar outline/background
-    this.add.rectangle(centerX, barY, totalWidth + 20, barHeight + 10)
+    this.add
+      .rectangle(centerX, barY, totalWidth + 20, barHeight + 10)
       .setStrokeStyle(2, 0xffffff)
       .setFillStyle(0x000000, 0.5);
 
@@ -51,17 +59,13 @@ export class Preloader extends Scene {
     // Add "Loading" and percentage on same line, aligned right below the bar
     const rightEdge = centerX + totalWidth / 2;
 
-    this.loadingText = this.add.text(rightEdge - 80, barY + 50, "Loading", {
-      fontFamily: "jersey15",
-      fontSize: "36px",
-      color: "#ffffff",
-    }).setOrigin(1, 0.5); // Right-aligned
-
-    this.percentText = this.add.text(rightEdge, barY + 50, "0%", {
-      fontFamily: "jersey15",
-      fontSize: "36px",
-      color: "#ffffff",
-    }).setOrigin(1, 0.5); // Right-aligned
+    this.percentText = this.add
+      .text(rightEdge, barY + 50, "0%", {
+        fontFamily: "jersey15",
+        fontSize: "36px",
+        color: "#ffffff",
+      })
+      .setOrigin(1, 0.5); // Right-aligned
 
     // Use the 'progress' event emitted by the LoaderPlugin to update the loading bar
     this.load.on("progress", (progress: number) => {
@@ -528,20 +532,21 @@ export class Preloader extends Scene {
         // Blockchain loaded or timeout reached, make decision
         // Handle status as BN or number (blockchain returns BN)
         const rawStatus = activeGameData?.status;
-        const gameStatus = typeof rawStatus === 'object' && rawStatus?.toNumber
-          ? rawStatus.toNumber()
-          : rawStatus;
+        const gameStatus =
+          typeof rawStatus === "object" && rawStatus?.toNumber ? rawStatus.toNumber() : rawStatus;
 
         logger.game.debug("[Preloader] Starting scene decision:", {
           blockchainReady: blockchainDataReady,
           timedOut: elapsedTime >= maxWaitTime,
           rawStatus,
           gameStatus,
-          activeGameData: activeGameData ? {
-            status: gameStatus,
-            gameRound: activeGameData.gameRound?.toString?.() || activeGameData.gameRound,
-            betsCount: activeGameData.bets?.length,
-          } : null,
+          activeGameData: activeGameData
+            ? {
+                status: gameStatus,
+                gameRound: activeGameData.gameRound?.toString?.() || activeGameData.gameRound,
+                betsCount: activeGameData.bets?.length,
+              }
+            : null,
           elapsedMs: elapsedTime,
         });
 
