@@ -3,6 +3,7 @@ import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useNFTCharacters } from "../hooks/useNFTCharacters";
 import { ChevronLeft, ChevronRight, Lock, Crown } from "lucide-react";
 import { useAssets } from "../contexts/AssetsContext";
+import { SpriteAnimator } from "./SpriteAnimator";
 import type { Character } from "../types/character";
 
 interface CharacterCarouselMobileProps {
@@ -125,18 +126,16 @@ export function CharacterCarouselMobile({ onCharacterSelected }: CharacterCarous
                 key={character._id}
                 onClick={() => selectCharacter(index)}
                 className={`
-                  flex-shrink-0 relative w-14 h-14 rounded-lg border-2 transition-all overflow-hidden
+                  flex-shrink-0 relative w-14 h-14 rounded-lg border-2 transition-all overflow-hidden bg-black/30
                   ${isSelected ? "border-amber-400 ring-2 ring-amber-400/50" : "border-amber-600/30"}
                   ${isLocked ? "opacity-50 grayscale" : ""}
                 `}
               >
-                <img
-                  src={`/assets/characters/${character.name.toLowerCase()}.png`}
-                  alt={character.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = "/assets/characters/orc.png";
-                  }}
+                <SpriteAnimator
+                  name={character.name.toLowerCase()}
+                  animation="idle"
+                  size={56}
+                  scale={1.5}
                 />
 
                 {/* Lock overlay */}
