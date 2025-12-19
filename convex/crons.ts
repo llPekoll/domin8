@@ -73,4 +73,25 @@ crons.interval(
   internal.nftHolderScanner.scanAllCollectionHolders
 );
 
+/**
+ * BOT EXECUTOR - Automated betting for users with active bots
+ *
+ * Runs every 30 seconds to:
+ * 1. Get all active bots with session signers enabled
+ * 2. Check if a game is currently open for betting
+ * 3. Evaluate each bot's strategy and conditions (budget, stop-loss, schedule, etc.)
+ * 4. Place bets automatically via Privy session signers
+ *
+ * Note: Bots only place bets when:
+ * - Bot is active AND session signer is enabled
+ * - Game is OPEN (status = 0) with time remaining
+ * - Budget limits and strategy conditions are met
+ * - Bot hasn't already bet this round
+ */
+crons.interval(
+  "bot-executor",
+  { seconds: 15 },
+  internal.botExecutor.executeBots
+);
+
 export default crons;

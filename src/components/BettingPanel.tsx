@@ -13,6 +13,9 @@ import { useAssets } from "../contexts/AssetsContext";
 import type { Character } from "../types/character";
 import styles from "./ButtonShine.module.css";
 import { Plus, Wallet, Eraser } from "lucide-react";
+import { BotControlTab } from "./BotControlTab";
+import { BotDialog } from "./BotDialog";
+import { SocialLinks } from "./SocialLinks";
 
 // Betting limits
 const MIN_BET_AMOUNT = 0.001;
@@ -35,6 +38,7 @@ const BettingPanel = memo(function BettingPanel({
 
   const [betAmount, setBetAmount] = useState<string>(DEFAULT_BET_AMOUNT.toString());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [botDialogOpen, setBotDialogOpen] = useState(false);
 
   // Memoize wallet address to prevent unnecessary re-queries
   const walletAddress = useMemo(
@@ -520,22 +524,34 @@ const BettingPanel = memo(function BettingPanel({
 
   return (
     <div className="pt-2">
-      <span className="text-amber-400 ">Balance</span>
-
-      <div className="inline-flex items-center gap-1 pl-2">
-        {!isLoadingBalance && (
-          <img
-            src="/sol-logo.svg"
-            alt="SOL"
-            className="w-3 h-3"
-            style={{
-              filter:
-                "brightness(0) saturate(100%) invert(85%) sepia(23%) saturate(632%) hue-rotate(358deg) brightness(100%) contrast(92%)",
-            }}
-          />
-        )}
-        <span className="text-amber-300">{isLoadingBalance ? "..." : solBalance.toFixed(3)}</span>
+      {/* Balance, Social Links, and Bot Control */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-amber-400">Balance</span>
+          <div className="inline-flex items-center gap-1">
+            {!isLoadingBalance && (
+              <img
+                src="/sol-logo.svg"
+                alt="SOL"
+                className="w-3 h-3"
+                style={{
+                  filter:
+                    "brightness(0) saturate(100%) invert(85%) sepia(23%) saturate(632%) hue-rotate(358deg) brightness(100%) contrast(92%)",
+                }}
+              />
+            )}
+            <span className="text-amber-300">
+              {isLoadingBalance ? "..." : solBalance.toFixed(3)}
+            </span>
+          </div>
+        </div>
+        <SocialLinks />
+        <BotControlTab onClick={() => setBotDialogOpen(true)} />
       </div>
+
+      {/* Bot Dialog */}
+      <BotDialog open={botDialogOpen} onOpenChange={setBotDialogOpen} />
+
       <div className="flex items-center justify-between bg-gradient-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-xl shadow-2xl shadow-amber-900/50 min-w-[560px] px-2 py-2 space-x-1">
         <div className="relative w-1/5">
           <button

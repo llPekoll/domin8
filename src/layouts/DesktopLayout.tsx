@@ -3,7 +3,6 @@ import { IRefPhaserGame, PhaserGame } from "../PhaserGame";
 import { Header } from "../components/Header";
 import { CharacterSelection2 } from "../components/CharacterSelection2";
 import { BettingPanel } from "../components/BettingPanel";
-import { SocialLinks } from "../components/SocialLinks";
 import { MultiParticipantPanel } from "../components/MultiParticipantPanel";
 import { PotDisplayPanel } from "../components/PotDisplayPanel";
 import { WinnerShareOverlay } from "../components/WinnerShareOverlay";
@@ -48,7 +47,6 @@ export function DesktopLayout({
 
       {/* Betting Panel - Bottom Center */}
       <div className="fixed items-center bottom-4 left-1/2 -translate-x-1/2 z-50">
-        <SocialLinks />
         <BettingPanel selectedCharacter={selectedCharacter} />
       </div>
 

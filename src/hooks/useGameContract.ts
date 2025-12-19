@@ -453,11 +453,15 @@ async function confirmTransactionWithPolling(
   return false;
 }
 
-// Game status constants (matching smart contract)
+// Game status constants (matching smart contract constants.rs)
+// IMPORTANT: These values MUST match the Rust constants:
+// pub const GAME_STATUS_OPEN: u8 = 0;
+// pub const GAME_STATUS_CLOSED: u8 = 1;
+// pub const GAME_STATUS_WAITING: u8 = 2;
 export const GAME_STATUS = {
-  WAITING: 0, // Game created, no bets yet
-  OPEN: 1, // First bet placed, countdown started
-  CLOSED: 2, // Game ended, winner selected
+  OPEN: 0, // Game is open for betting (countdown running)
+  CLOSED: 1, // Game ended, winner selected
+  WAITING: 2, // Game created, no bets yet (waiting for first bet)
 } as const;
 
 // Type definitions
@@ -719,7 +723,7 @@ export const useGameContract = () => {
 
         // Can bet when game is OPEN (0) or WAITING (2)
         // Cannot bet when game is CLOSED (1)
-        if (gameStatus === 1) {
+        if (gameStatus === GAME_STATUS.CLOSED) {
           throw new Error("Game is closed. Please wait for the next game.");
         }
 
@@ -891,8 +895,7 @@ export const useGameContract = () => {
 
     // Can bet when game is OPEN (0) or WAITING (2)
     // Cannot bet when game is CLOSED (1)
-    if (gameStatus === 1) {
-      // GAME_STATUS_CLOSED = 1
+    if (gameStatus === GAME_STATUS.CLOSED) {
       return false;
     }
 

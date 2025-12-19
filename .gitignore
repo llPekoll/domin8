@@ -36,3 +36,7 @@ Cargo.lock
 
 test-ledger/
 docker-compose.yml
+
+# Privy bot signer keys
+private.pem
+public.pem

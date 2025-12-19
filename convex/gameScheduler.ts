@@ -622,6 +622,20 @@ export const executeSendPrize = internalAction({
           }
         }
 
+        // Update bot performance stats for this round
+        if (gameRound.winner) {
+          try {
+            await ctx.runAction(internal.botExecutor.updateBotResultsForRound, {
+              roundId,
+              winnerWallet: gameRound.winner.toString(),
+              prizeAmount: gameRound.winnerPrize,
+            });
+            console.log(`Round ${roundId}: Bot performance stats updated`);
+          } catch (botStatsError) {
+            console.error(`Round ${roundId}: Failed to update bot stats:`, botStatsError);
+          }
+        }
+
         // 4. Verify prize was sent and update database
         await new Promise((resolve) => setTimeout(resolve, 1000));
         const updatedGame = await solanaClient.getGameRound(roundId);

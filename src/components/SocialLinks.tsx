@@ -10,7 +10,7 @@ export function SocialLinks({ onShareWinner, shouldShowShareTooltip }: SocialLin
         href="https://discord.gg/PuKXcSqK"
         target="_blank"
         rel="noopener noreferrer"
-        className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg transition-colors"
+        className="mb-1 p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg transition-colors"
         aria-label="Discord"
       >
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -21,7 +21,7 @@ export function SocialLinks({ onShareWinner, shouldShowShareTooltip }: SocialLin
         href="https://t.me/+tKHqLbBMvI02NDQ8"
         target="_blank"
         rel="noopener noreferrer"
-        className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg transition-colors"
+        className="mb-1 p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg transition-colors"
         aria-label="Telegram"
       >
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -33,7 +33,7 @@ export function SocialLinks({ onShareWinner, shouldShowShareTooltip }: SocialLin
           href="https://x.com/domin8Arena"
           target="_blank"
           rel="noopener noreferrer"
-          className="p-2 bg-gray-800 hover:bg-gray-900 text-white rounded-full shadow-lg transition-colors block"
+          className="mb-1 p-2 bg-gray-800 hover:bg-gray-900 text-white rounded-full shadow-lg transition-colors block"
           aria-label="X (Twitter)"
           onClick={(e) => {
             if (shouldShowShareTooltip && onShareWinner) {

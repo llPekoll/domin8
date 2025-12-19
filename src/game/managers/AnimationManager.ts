@@ -688,6 +688,12 @@ export class AnimationManager {
   startBattlePhaseSequence(playerManager: any, onComplete?: () => void) {
     logger.game.debug("[AnimationManager] ⚔️ Starting battle phase sequence");
 
+    // Guard against destroyed scene
+    if (!this.scene || !this.scene.add) {
+      logger.game.warn("[AnimationManager] Scene destroyed, skipping battle phase sequence");
+      return;
+    }
+
     // Play fullscreen explosion animation at the start
     // Use native resolution center (game now renders at 396x180 and scales via Phaser.Scale.FIT)
     const fullscreenExplosion = this.scene.add.sprite(

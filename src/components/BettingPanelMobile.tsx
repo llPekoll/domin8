@@ -13,6 +13,8 @@ import { useAssets } from "../contexts/AssetsContext";
 import type { Character } from "../types/character";
 import styles from "./ButtonShine.module.css";
 import { Plus, Wallet } from "lucide-react";
+import { BotDialog } from "./BotDialog";
+import { BotControlTab } from "./BotControlTab";
 
 const MIN_BET_AMOUNT = 0.001;
 const MAX_BET_AMOUNT = 10;
@@ -33,6 +35,7 @@ const BettingPanelMobile = memo(function BettingPanelMobile({
 
   const [betAmount, setBetAmount] = useState<string>(DEFAULT_BET_AMOUNT.toString());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [botDialogOpen, setBotDialogOpen] = useState(false);
 
   const walletAddress = useMemo(
     () => (connected && publicKey ? publicKey.toString() : null),
@@ -128,7 +131,9 @@ const BettingPanelMobile = memo(function BettingPanelMobile({
         return;
       }
 
-      const characterRequirements = allCharacters?.find((c: { _id: string; nftCollection?: string }) => c._id === selectedCharacter._id);
+      const characterRequirements = allCharacters?.find(
+        (c: { _id: string; nftCollection?: string }) => c._id === selectedCharacter._id
+      );
       const requiresNFT =
         characterRequirements &&
         "nftCollection" in characterRequirements &&
@@ -227,83 +232,93 @@ const BettingPanelMobile = memo(function BettingPanelMobile({
   }
 
   return (
-    <div className="flex-shrink-0 bg-gradient-to-t from-amber-950 to-amber-900/90 border-t border-amber-600/30 p-3 space-y-2">
-      {/* Row 1: Input + Quick bet buttons */}
-      <div className="flex items-center gap-2">
-        {/* SOL Input */}
-        <div className="relative flex-1">
-          <img
-            src="/sol-logo.svg"
-            alt="SOL"
-            className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4"
-            style={{
-              filter:
-                "brightness(0) saturate(100%) invert(66%) sepia(89%) saturate(470%) hue-rotate(359deg) brightness(97%) contrast(89%)",
-            }}
-          />
-          <input
-            type="number"
-            value={betAmount}
-            onChange={(e) => setBetAmount(e.target.value)}
-            min={MIN_BET_AMOUNT}
-            max={MAX_BET_AMOUNT}
-            step={DEFAULT_BET_AMOUNT}
-            className="w-full pl-7 pr-2 py-2 bg-black/40 border border-amber-600/50 rounded-lg text-amber-100 text-center font-bold text-lg focus:outline-none focus:border-amber-500"
-          />
+    <>
+      {/* Bot Control Tab - positioned above the panel */}
+      <div className="flex justify-end px-3">
+        <BotControlTab onClick={() => setBotDialogOpen(true)} />
+      </div>
+
+      <div className="flex-shrink-0 bg-gradient-to-t from-amber-950 to-amber-900/90 border-t border-amber-600/30 p-3 space-y-2">
+        {/* Row 1: Input + Quick bet buttons */}
+        <div className="flex items-center gap-2">
+          {/* SOL Input */}
+          <div className="relative flex-1">
+            <img
+              src="/sol-logo.svg"
+              alt="SOL"
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4"
+              style={{
+                filter:
+                  "brightness(0) saturate(100%) invert(66%) sepia(89%) saturate(470%) hue-rotate(359deg) brightness(97%) contrast(89%)",
+              }}
+            />
+            <input
+              type="number"
+              value={betAmount}
+              onChange={(e) => setBetAmount(e.target.value)}
+              min={MIN_BET_AMOUNT}
+              max={MAX_BET_AMOUNT}
+              step={DEFAULT_BET_AMOUNT}
+              className="w-full pl-7 pr-2 py-2 bg-black/40 border border-amber-600/50 rounded-lg text-amber-100 text-center font-bold text-lg focus:outline-none focus:border-amber-500"
+            />
+          </div>
+
+          {/* Quick bet buttons */}
+          <button
+            onClick={() => handleIncrementBet(0.01)}
+            className="px-3 py-2 bg-amber-800/50 hover:bg-amber-700/60 border border-amber-600/50 rounded-lg text-amber-300 font-bold transition-colors"
+          >
+            +.01
+          </button>
+          <button
+            onClick={() => handleIncrementBet(0.1)}
+            className="px-3 py-2 bg-amber-800/50 hover:bg-amber-700/60 border border-amber-600/50 rounded-lg text-amber-300 font-bold transition-colors"
+          >
+            +.1
+          </button>
+          <button
+            onClick={() => handleIncrementBet(1)}
+            className="px-3 py-2 bg-amber-800/50 hover:bg-amber-700/60 border border-amber-600/50 rounded-lg text-amber-300 font-bold transition-colors"
+          >
+            +1
+          </button>
+          <button
+            onClick={() => setBetAmount(Math.min(solBalance! - 0.001, MAX_BET_AMOUNT).toFixed(3))}
+            className={`px-3 py-2 bg-gradient-to-b from-amber-500 to-amber-800 rounded-lg text-amber-100 font-bold transition-colors ${styles.shineButton}`}
+          >
+            MAX
+          </button>
         </div>
 
-        {/* Quick bet buttons */}
+        {/* Row 2: Place Bet button (full width) */}
         <button
-          onClick={() => handleIncrementBet(0.01)}
-          className="px-3 py-2 bg-amber-800/50 hover:bg-amber-700/60 border border-amber-600/50 rounded-lg text-amber-300 font-bold transition-colors"
+          onClick={() => void handlePlaceBet()}
+          disabled={isSubmitting || !canPlaceBet || !selectedCharacter}
+          className={`
+            w-full flex items-center justify-center gap-2 py-3
+            bg-gradient-to-b from-amber-500 to-amber-700
+            hover:from-amber-400 hover:to-amber-600
+            disabled:from-gray-600 disabled:to-gray-700
+            rounded-xl font-bold text-lg text-amber-100 uppercase tracking-wider
+            transition-all
+            disabled:opacity-50 disabled:cursor-not-allowed
+            ${styles.shineButton}
+          `}
         >
-          +.01
-        </button>
-        <button
-          onClick={() => handleIncrementBet(0.1)}
-          className="px-3 py-2 bg-amber-800/50 hover:bg-amber-700/60 border border-amber-600/50 rounded-lg text-amber-300 font-bold transition-colors"
-        >
-          +.1
-        </button>
-        <button
-          onClick={() => handleIncrementBet(1)}
-          className="px-3 py-2 bg-amber-800/50 hover:bg-amber-700/60 border border-amber-600/50 rounded-lg text-amber-300 font-bold transition-colors"
-        >
-          +1
-        </button>
-        <button
-          onClick={() => setBetAmount(Math.min(solBalance! - 0.001, MAX_BET_AMOUNT).toFixed(3))}
-          className={`px-3 py-2 bg-gradient-to-b from-amber-500 to-amber-800 rounded-lg text-amber-100 font-bold transition-colors ${styles.shineButton}`}
-        >
-          MAX
+          <img src="/assets/insert-coin.png" alt="Coin" className="h-6" />
+          {!selectedCharacter
+            ? "Select Character"
+            : isSubmitting
+              ? "Inserting..."
+              : !canPlaceBet
+                ? "Closed"
+                : "Insert Coin"}
         </button>
       </div>
 
-      {/* Row 2: Place Bet button (full width) */}
-      <button
-        onClick={() => void handlePlaceBet()}
-        disabled={isSubmitting || !canPlaceBet || !selectedCharacter}
-        className={`
-          w-full flex items-center justify-center gap-2 py-3
-          bg-gradient-to-b from-amber-500 to-amber-700
-          hover:from-amber-400 hover:to-amber-600
-          disabled:from-gray-600 disabled:to-gray-700
-          rounded-xl font-bold text-lg text-amber-100 uppercase tracking-wider
-          transition-all
-          disabled:opacity-50 disabled:cursor-not-allowed
-          ${styles.shineButton}
-        `}
-      >
-        <img src="/assets/insert-coin.png" alt="Coin" className="h-6" />
-        {!selectedCharacter
-          ? "Select Character"
-          : isSubmitting
-            ? "Inserting..."
-            : !canPlaceBet
-              ? "Closed"
-              : "Insert Coin"}
-      </button>
-    </div>
+      {/* Bot Dialog */}
+      <BotDialog open={botDialogOpen} onOpenChange={setBotDialogOpen} />
+    </>
   );
 });
 

@@ -304,6 +304,15 @@ export class UIManager {
     }
 
     console.log("[UIManager] 🪙 showInsertCoin() - Making INSERT COIN visible");
+
+    // Hide conflicting UI elements (VRF overlay, winner UI, countdown)
+    // This fixes race condition where updateGameState() calls showInsertCoin()
+    // before phase change event properly hides other elements
+    if (this.vrfOverlay) this.vrfOverlay.setVisible(false);
+    if (this.vrfContainer) this.vrfContainer.setVisible(false);
+    if (this.winnerContainer) this.winnerContainer.setVisible(false);
+    if (this.demoCountdownText) this.demoCountdownText.setVisible(false);
+
     this.insertCoinText.setVisible(true);
     this.insertCoinText.setAlpha(1);
 

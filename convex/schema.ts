@@ -218,4 +218,91 @@ export default defineSchema({
     .index("by_player_a", ["playerA"]) // Query lobbies by Player A
     .index("by_player_b", ["playerB"]) // Query lobbies by Player B
     .index("by_status_and_created", ["status", "createdAt"]), // For pagination and stuck lobby detection
+
+  // ============================================================================
+  // AUTO-BETTING BOT TABLES
+  // ============================================================================
+
+  /**
+   * Bot Purchases - Track which tiers each user has unlocked
+   * Users can own multiple bots (Rookie, Pro, Elite) simultaneously
+   * Each tier is a one-time purchase with its own configuration
+   */
+  botPurchases: defineTable({
+    walletAddress: v.string(), // User's wallet address
+    tier: v.string(), // "rookie" | "pro" | "elite"
+    purchasedAt: v.number(), // Unix timestamp of purchase
+    transactionSignature: v.string(), // Solana tx signature for purchase verification
+    purchaseAmount: v.number(), // Amount paid in lamports
+    isActiveBot: v.optional(v.boolean()), // Is this the currently active bot for this user
+  })
+    .index("by_wallet", ["walletAddress"]) // Query all bots owned by user
+    .index("by_wallet_and_tier", ["walletAddress", "tier"]), // Prevent duplicate tier purchases
+
+  /**
+   * Bot Configurations - User's bot settings and state
+   * Persists bot configuration and tracks spending/performance
+   */
+  botConfigurations: defineTable({
+    walletAddress: v.string(),
+    tier: v.string(), // "rookie" | "pro" | "elite"
+    isActive: v.boolean(), // Is the bot currently running
+
+    // Rookie settings (all tiers)
+    fixedBetAmount: v.optional(v.number()), // Fixed bet in lamports
+    selectedCharacter: v.optional(v.number()), // Character skin ID
+    budgetLimit: v.optional(v.number()), // Max spending limit in lamports
+    currentSpent: v.optional(v.number()), // Track spending against budget
+
+    // Pro settings (Pro + Elite tiers)
+    betMin: v.optional(v.number()), // Min bet in range (lamports)
+    betMax: v.optional(v.number()), // Max bet in range (lamports)
+    stopLoss: v.optional(v.number()), // Stop if losses reach X lamports
+    winStreakMultiplier: v.optional(v.number()), // Multiplier after wins (e.g., 1.5)
+    cooldownRounds: v.optional(v.number()), // Skip N rounds between bets
+    characterRotation: v.optional(v.array(v.number())), // List of character IDs to rotate
+
+    // Elite settings (Elite tier only)
+    takeProfit: v.optional(v.number()), // Auto-stop when up X lamports
+    martingaleEnabled: v.optional(v.boolean()), // Double bet after loss
+    antiMartingaleEnabled: v.optional(v.boolean()), // Double bet after win
+    scheduleStart: v.optional(v.number()), // Hour to start (0-23 UTC)
+    scheduleEnd: v.optional(v.number()), // Hour to end (0-23 UTC)
+    smartSizing: v.optional(v.boolean()), // Bet more when pot is small
+    smartSizingThreshold: v.optional(v.number()), // Pot threshold in lamports
+
+    // State tracking
+    consecutiveWins: v.optional(v.number()),
+    consecutiveLosses: v.optional(v.number()),
+    lastBetAmount: v.optional(v.number()),
+    roundsSkipped: v.optional(v.number()),
+    totalProfit: v.optional(v.number()), // Track P&L (can be negative)
+    totalBets: v.optional(v.number()), // Total bets placed
+    totalWins: v.optional(v.number()), // Total wins
+
+    // Session signer state
+    sessionSignerEnabled: v.optional(v.boolean()),
+    lastUpdated: v.number(),
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_and_tier", ["walletAddress", "tier"]) // Each tier has its own config
+    .index("by_active", ["isActive"]),
+
+  /**
+   * Bot Performance Stats - Historical tracking of bot bets
+   * Used for analytics and performance display
+   */
+  botPerformanceStats: defineTable({
+    walletAddress: v.string(),
+    roundId: v.number(),
+    betAmount: v.number(), // Bet amount in lamports
+    result: v.string(), // "win" | "loss" | "refund"
+    prizeAmount: v.optional(v.number()), // Prize won (if win)
+    profit: v.number(), // Can be negative for losses
+    timestamp: v.number(),
+    strategy: v.optional(v.string()), // Which strategy was used
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_and_round", ["walletAddress", "roundId"])
+    .index("by_timestamp", ["timestamp"]),
 });

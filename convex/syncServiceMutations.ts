@@ -164,3 +164,42 @@ export const getFinishedGamesNeedingPrize = internalQuery({
     }));
   },
 });
+
+/**
+ * Query to get the current (most recent) game state
+ * Used by bot executor to check if betting is open
+ */
+export const getCurrentGameState = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const { db } = ctx;
+
+    // Get the most recent game in "waiting" status (active game)
+    const activeGame = await db
+      .query("gameRoundStates")
+      .withIndex("by_status", (q) => q.eq("status", "waiting"))
+      .order("desc")
+      .first();
+
+    if (!activeGame) {
+      return null;
+    }
+
+    // Convert database status to blockchain status
+    // Database: "waiting" = betting open, "finished" = game ended
+    // Blockchain: OPEN=0, CLOSED=1, WAITING=2
+    const status = activeGame.status === "waiting" ? 0 : 1;
+
+    return {
+      roundId: activeGame.roundId,
+      status,
+      startTimestamp: activeGame.startTimestamp,
+      endTimestamp: activeGame.endTimestamp,
+      mapId: activeGame.mapId,
+      betCount: activeGame.betCount,
+      totalPot: activeGame.totalPot,
+      winner: activeGame.winner,
+      prizeSent: activeGame.prizeSent,
+    };
+  },
+});
