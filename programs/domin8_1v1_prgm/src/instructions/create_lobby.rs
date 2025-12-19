@@ -1,14 +1,13 @@
 use crate::*;
 use anchor_lang::prelude::*;
-use switchboard_on_demand::accounts::RandomnessAccountData;
+use anchor_lang::solana_program::keccak;
 
 /// Create a new 1v1 lobby (called by Player A)
 /// 
-/// This instruction follows the Switchboard Randomness pattern:
+/// This instruction follows the ORAO VRF pattern:
 /// 1. Player A creates and funds the lobby
-/// 2. A randomness account is passed in (caller must prepare this separately)
-/// 3. The randomness_account is stored in the lobby state
-/// 4. When Player B joins, the randomness will be revealed and used to determine winner
+/// 2. A force seed is generated for the future VRF request
+/// 3. When Player B joins, the VRF request will be made
 pub fn handler(
     ctx: Context<CreateLobby>,
     amount: u64,
@@ -32,12 +31,19 @@ pub fn handler(
     // Get the current lobby ID from config
     let lobby_id = config.lobby_count;
 
+    // Generate force seed for ORAO
+    let force = keccak::hashv(&[
+        lobby_id.to_le_bytes().as_ref(),
+        player_a.key().as_ref(),
+        clock.unix_timestamp.to_le_bytes().as_ref()
+    ]).0;
+
     // Initialize the lobby
     lobby.lobby_id = lobby_id;
     lobby.player_a = player_a.key();
     lobby.player_b = None;
     lobby.amount = amount;
-    lobby.randomness_account = ctx.accounts.randomness_account.key();
+    lobby.force = force;
     lobby.status = LOBBY_STATUS_CREATED;
     lobby.winner = None;
     lobby.created_at = clock.unix_timestamp;
@@ -68,7 +74,7 @@ pub fn handler(
     );
     msg!("Bet amount: {} lamports", amount);
     msg!("Skin A: {}, Position A: [{}, {}], Map: {}", skin_a, position_a[0], position_a[1], map);
-    msg!("Randomness Account: {}", ctx.accounts.randomness_account.key());
+    msg!("Force Seed: {:?}", force);
 
     Ok(())
 }
@@ -97,11 +103,6 @@ pub struct CreateLobby<'info> {
 
     #[account(mut)]
     pub player_a: Signer<'info>,
-
-    /// CHECK: Switchboard randomness account for this game
-    /// The caller (frontend) is responsible for creating this account
-    /// and passing the correct randomness account here
-    pub randomness_account: AccountInfo<'info>,
 
     pub system_program: Program<'info, System>,
 }

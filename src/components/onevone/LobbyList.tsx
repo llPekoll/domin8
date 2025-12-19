@@ -5,7 +5,22 @@ import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { logger } from "../../lib/logger";
 import type { Character } from "../../types/character";
-import type { LobbyData } from "../../types/lobby";
+import { LobbyDetailsDialog } from "./LobbyDetailsDialog";
+
+interface LobbyData {
+  _id: string;
+  lobbyId: number;
+  lobbyPda: string;
+  playerA: string;
+  playerB?: string;
+  amount: number;
+  status: 0 | 1 | 2;
+  winner?: string;
+  characterA: number;
+  characterB?: number;
+  mapId: number;
+  forceSeed?: string; // ORAO force seed
+}
 
 interface LobbyListProps {
   lobbies: LobbyData[];
@@ -23,6 +38,8 @@ export function LobbyList({
   const { connected, wallet } = usePrivyWallet();
   const joinLobbyAction = useAction(api.lobbies.joinLobby);
   const [joiningLobbies, setJoiningLobbies] = useState<Set<number>>(new Set());
+  const [selectedLobby, setSelectedLobby] = useState<LobbyData | null>(null);
+  
   logger.solana.debug("Rendering LobbyList with lobbies:", lobbies);
 
   const handleJoinLobby = useCallback(
@@ -42,11 +59,7 @@ export function LobbyList({
       try {
         // Import utilities
         const { getSharedConnection } = await import("../../lib/sharedConnection");
-        const {
-          buildJoinLobbyTransactionOptimized,
-          sendOptimizedTransaction,
-          waitForConfirmationOptimized,
-        } = await import("../../lib/solana-1v1-transactions-helius");
+        const { buildJoinLobbyTransaction } = await import("../../lib/solana-1v1-transactions");
         const { PublicKey } = await import("@solana/web3.js");
 
         const connection = getSharedConnection();
@@ -55,58 +68,77 @@ export function LobbyList({
           lobbyId: lobby.lobbyId,
           playerB: currentPlayerWallet,
           character: selectedCharacter.id,
+          forceSeed: lobby.forceSeed,
         });
 
-        // Build optimized join transaction with Helius best practices
+        if (!lobby.forceSeed) {
+            throw new Error("Lobby missing force seed");
+        }
+
         const lobbyPda = new PublicKey(lobby.lobbyPda);
-        const { transaction, metrics } = await buildJoinLobbyTransactionOptimized(
+        const transaction = await buildJoinLobbyTransaction(
           new PublicKey(currentPlayerWallet),
           lobby.lobbyId,
           selectedCharacter.id,
           lobbyPda,
+          lobby.forceSeed,
           connection
         );
 
-        // Store the block height for later validation
-        const { blockhash: _, lastValidBlockHeight } =
-          await connection.getLatestBlockhash("confirmed");
-
-        logger.ui.info("Transaction optimization metrics", {
-          computeUnits: metrics.optimizedCU,
-          priorityFee: metrics.priorityFee,
-          estimatedCost: (metrics.estimatedCost / 1e9).toFixed(6) + " SOL",
+        logger.solana.debug("Transaction ready for signing", {
+          type: transaction.constructor.name,
+          messageType: transaction.message.constructor.name,
+          messageLength: transaction.message.serialize().length,
+          keysCount: transaction.message.staticAccountKeys?.length,
+          instructionCount: transaction.message.compiledInstructions?.length,
         });
 
-        logger.ui.debug("Signing and sending optimized join transaction with Privy wallet");
-
-        // Send with Helius optimizations (retry logic, blockhash checking)
-        const network = import.meta.env.VITE_SOLANA_NETWORK || "mainnet-beta";
-        const signature = await sendOptimizedTransaction(
-          connection,
-          transaction,
-          new PublicKey(currentPlayerWallet),
-          wallet,
-          lastValidBlockHeight,
-          network
-        );
-
-        logger.ui.info("Optimized join transaction sent", {
-          signature: signature.slice(0, 8) + "...",
-          lobbyId: lobby.lobbyId,
+        // Sign and send using Privy's signAndSendAllTransactions
+        logger.solana.info("Attempting to sign transaction with Privy wallet...");
+        
+        const chainId = `solana:devnet` as `${string}:${string}`;
+        
+        // For VersionedTransaction, serialize the full transaction (not just the message)
+        // This includes the message and placeholder signatures
+        const serialized = Buffer.from(transaction.serialize());
+        
+        logger.solana.debug("Serialized transaction", {
+          serializedLength: serialized.length,
+          serializedHex: serialized.slice(0, 32).toString("hex"),
         });
+        
+        const signAndSendResult = await wallet.signAndSendAllTransactions([
+          {
+            chain: chainId,
+            transaction: serialized,
+          },
+        ]);
+        
+        logger.solana.debug("Sign and send result", {
+          resultCount: signAndSendResult?.length,
+          firstResult: signAndSendResult?.[0],
+        });
+        
+        if (!signAndSendResult || signAndSendResult.length === 0) {
+          throw new Error("Failed to get signature from Privy wallet");
+        }
+        
+        const signatureBytes = signAndSendResult[0].signature;
+        if (!signatureBytes) {
+          throw new Error("No signature in Privy response");
+        }
+        
+        // Import bs58 for signature encoding
+        const { default: bs58 } = await import("bs58");
+        const signature = bs58.encode(signatureBytes);
+        
+        logger.solana.info("Join transaction signed and sent", { signature });
         toast.loading("Waiting for transaction confirmation...", { id: "join-tx-confirm" });
-
-        // Wait for confirmation with Helius polling
-        const isConfirmed = await waitForConfirmationOptimized(
-          connection,
-          signature,
-          lastValidBlockHeight
-        );
-
-        if (!isConfirmed) {
-          toast.error("Transaction confirmation timeout", { id: "join-tx-confirm" });
-          logger.ui.error("Join transaction confirmation timed out", { signature });
-          return;
+        
+        const confirmation = await connection.confirmTransaction(signature, "confirmed");
+        
+        if (confirmation.value.err) {
+            throw new Error("Transaction failed: " + confirmation.value.err.toString());
         }
 
         toast.success("Transaction confirmed!", { id: "join-tx-confirm" });
@@ -125,7 +157,6 @@ export function LobbyList({
         if (result.success) {
           logger.ui.info("Lobby joined successfully", {
             lobbyId: result.lobbyId,
-            winner: result.winner,
           });
 
           toast.success("You joined the lobby! Starting fight...", {
@@ -141,17 +172,7 @@ export function LobbyList({
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         logger.ui.error("Failed to join lobby:", error);
-
-        // Provide user-friendly error messages
-        if (errorMsg.includes("User rejected")) {
-          toast.error("Transaction rejected by user");
-        } else if (errorMsg.includes("confirmation timeout")) {
-          toast.error("Transaction confirmation timed out. Please check your wallet.");
-        } else if (errorMsg.includes("insufficient funds")) {
-          toast.error("Insufficient SOL for transaction fee and bet amount");
-        } else {
-          toast.error("Failed to join lobby: " + errorMsg);
-        }
+        toast.error("Failed to join lobby: " + errorMsg);
       } finally {
         setJoiningLobbies((prev) => {
           const next = new Set(prev);
@@ -163,7 +184,6 @@ export function LobbyList({
     [connected, wallet, selectedCharacter, currentPlayerWallet, onLobbyJoined, joinLobbyAction]
   );
 
-  // Convert SOL from lamports for display
   const formatAmount = (lamports: number) => {
     return (lamports / 1e9).toFixed(4);
   };
@@ -181,12 +201,17 @@ export function LobbyList({
   }
 
   return (
+    <>
     <div className="bg-gray-900 border-2 border-indigo-500 rounded-lg p-6">
       <h2 className="text-xl font-bold text-indigo-200 mb-4">Open Lobbies ({lobbies.length})</h2>
 
       <div className="space-y-3">
         {lobbies.map((lobby) => (
-          <div key={lobby._id} className="bg-gray-800 border border-indigo-400/50 rounded-lg p-4">
+          <div 
+            key={lobby._id} 
+            className="bg-gray-800 border border-indigo-400/50 rounded-lg p-4 cursor-pointer hover:bg-gray-700 transition-colors"
+            onClick={() => setSelectedLobby(lobby)}
+          >
             <div className="flex items-center justify-between mb-3">
               <div className="flex-1">
                 <p className="text-sm text-indigo-400">Lobby #{lobby.lobbyId}</p>
@@ -201,7 +226,10 @@ export function LobbyList({
               </div>
 
               <button
-                onClick={() => handleJoinLobby(lobby)}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    handleJoinLobby(lobby);
+                }}
                 disabled={
                   joiningLobbies.has(lobby.lobbyId) ||
                   !connected ||
@@ -217,12 +245,24 @@ export function LobbyList({
             {/* Status Info */}
             <div className="flex gap-2 text-xs text-gray-400">
               <span className="px-2 py-1 bg-gray-700 rounded">
-                Status: {lobby.status === 0 ? "Waiting" : "Resolved"}
+                Status: {lobby.status === 0 ? "Waiting" : lobby.status === 2 ? "Awaiting VRF" : "Resolved"}
               </span>
             </div>
           </div>
         ))}
       </div>
     </div>
+    
+    <LobbyDetailsDialog 
+        isOpen={!!selectedLobby}
+        onClose={() => setSelectedLobby(null)}
+        lobby={selectedLobby}
+        onJoin={(id) => {
+            const lobby = lobbies.find(l => l.lobbyId === id);
+            if (lobby) handleJoinLobby(lobby);
+            setSelectedLobby(null);
+        }}
+    />
+    </>
   );
 }

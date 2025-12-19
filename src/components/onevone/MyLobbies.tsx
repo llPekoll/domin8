@@ -82,7 +82,7 @@ export function MyLobbies({
         logger.ui.debug("Signing and sending optimized cancel transaction with Privy wallet");
 
         // Send with Helius optimizations
-        const network = import.meta.env.VITE_SOLANA_NETWORK || "mainnet-beta";
+        const network = import.meta.env.VITE_SOLANA_NETWORK || "devnet";
         const signature = await sendOptimizedTransaction(
           connection,
           transaction,

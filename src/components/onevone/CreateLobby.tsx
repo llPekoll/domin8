@@ -101,7 +101,7 @@ export function CreateLobby({
         logger.ui.debug("Signing and sending optimized cancel transaction with Privy wallet");
 
         // Send with Helius optimizations
-        const network = import.meta.env.VITE_SOLANA_NETWORK || "mainnet-beta";
+        const network = import.meta.env.VITE_SOLANA_NETWORK || "devnet";
         const signature = await sendOptimizedTransaction(
           connection,
           transaction,
@@ -203,95 +203,82 @@ export function CreateLobby({
     try {
       // Import utilities
       const { getSharedConnection } = await import("../../lib/sharedConnection");
-      const {
-        buildCreateLobbyTransactionOptimized,
-        sendOptimizedTransaction,
-        waitForConfirmationOptimized,
-        deriveRandomnessAccountAddress,
-      } = await import("../../lib/solana-1v1-transactions-helius");
+      const { buildCreateLobbyTransaction } = await import("../../lib/solana-1v1-transactions");
+      const { Keypair } = await import("@solana/web3.js");
 
       const connection = getSharedConnection();
       const betAmountLamports = Math.floor(betAmount * 1e9); // Convert SOL to lamports
 
-      logger.ui.info("Building optimized create_lobby transaction", {
+      logger.ui.info("Starting lobby creation process", {
         playerA: publicKey.toString(),
         amount: betAmountLamports,
         character: selectedCharacter.id,
       });
 
-      // Generate a unique randomness account address for Switchboard
-      // In production, you'd coordinate with Switchboard to create/fund this account
-      const randomnessAccountAddress = await deriveRandomnessAccountAddress(
-        Date.now() // Use timestamp for uniqueness
-      );
+      // Generate a random 32-byte seed for ORAO VRF
+      const forceKeypair = Keypair.generate();
+      const forceSeed = forceKeypair.publicKey.toBase58(); // Use public key as a convenient 32-byte seed source
 
-      // Build optimized transaction with Helius best practices
-      const { transaction, metrics } = await buildCreateLobbyTransactionOptimized(
+      logger.solana.debug("Generated force seed for ORAO VRF", { forceSeed });
+
+      // Build create_lobby transaction
+      const transaction = await buildCreateLobbyTransaction(
         publicKey,
         betAmountLamports,
         selectedCharacter.id,
         0, // Default map ID
-        randomnessAccountAddress,
+        forceSeed,
         connection
       );
 
-      // Store the block height for later validation
-      const { blockhash: _, lastValidBlockHeight } =
-        await connection.getLatestBlockhash("confirmed");
+      // Serialize transaction for Privy (must be Uint8Array, not VersionedTransaction object)
+      const serializedTx = transaction.serialize();
 
-      logger.ui.info("Transaction optimization metrics", {
-        computeUnits: metrics.optimizedCU,
-        priorityFee: metrics.priorityFee,
-        estimatedCost: (metrics.estimatedCost / 1e9).toFixed(6) + " SOL",
+      // Sign and send via Privy
+      const txResult = await wallet.signAndSendTransaction({
+        transaction: serializedTx,
+        chain: "solana:mainnet",
       });
 
-      logger.ui.debug("Signing and sending optimized transaction with Privy wallet");
+      // Handle signature - could be string or Uint8Array
+      let signature: string;
+      if (typeof txResult.signature === "string") {
+        signature = txResult.signature;
+      } else if (txResult.signature instanceof Uint8Array) {
+        // Convert Uint8Array to base58
+        const bs58 = await import("bs58");
+        signature = bs58.default.encode(txResult.signature);
+      } else {
+        throw new Error("Invalid signature format from wallet");
+      }
 
-      // Send with Helius optimizations (retry logic, blockhash checking)
-      const network = import.meta.env.VITE_SOLANA_NETWORK || "mainnet-beta";
-      const signature = await sendOptimizedTransaction(
-        connection,
-        transaction,
-        publicKey,
-        wallet,
-        lastValidBlockHeight,
-        network
-      );
-
-      logger.ui.info("Optimized transaction sent", {
+      logger.solana.info("Transaction sent to blockchain", {
         signature: signature.slice(0, 8) + "...",
       });
+
       toast.loading("Waiting for transaction confirmation...", { id: "tx-confirm" });
 
-      // Wait for confirmation with Helius polling
-      const isConfirmed = await waitForConfirmationOptimized(
-        connection,
-        signature,
-        lastValidBlockHeight
-      );
-
-      if (!isConfirmed) {
-        toast.error("Transaction confirmation timeout", { id: "tx-confirm" });
-        logger.ui.error("Transaction confirmation timed out", { signature });
-        return;
+      const confirmation = await connection.confirmTransaction(signature, "confirmed");
+      
+      if (confirmation.value.err) {
+          throw new Error("Transaction failed: " + confirmation.value.err.toString());
       }
 
       toast.success("Transaction confirmed!", { id: "tx-confirm" });
-      logger.ui.info("Transaction confirmed on blockchain", { signature });
+      logger.solana.info("Transaction confirmed on blockchain", { signature });
 
       // Call Convex action to create lobby in database
-      logger.ui.debug("Calling Convex action to create lobby in database");
-
       const result = await createLobbyAction({
         playerAWallet: publicKey.toString(),
         amount: betAmountLamports,
         characterA: selectedCharacter.id,
         mapId: 0,
         transactionHash: signature,
+        forceSeed: forceSeed,
       });
 
       if (result.success) {
-        logger.ui.info("Lobby created successfully", {
+        logger.solana.info("Lobby created successfully", {
           lobbyId: result.lobbyId,
           lobbyPda: result.lobbyPda,
         });
@@ -304,26 +291,35 @@ export function CreateLobby({
         onLobbyCreated?.(result.lobbyId);
       } else {
         toast.error("Failed to create lobby in database");
-        logger.ui.error("Convex action failed");
+        logger.solana.error("Convex action failed");
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.ui.error("Failed to create lobby:", error);
-
-      // Provide user-friendly error messages
+      logger.solana.error("Failed to create lobby:", error);
+      // Provide user-friendly error messages with recovery guidance
       if (errorMsg.includes("User rejected")) {
         toast.error("Transaction rejected by user");
       } else if (errorMsg.includes("confirmation timeout")) {
         toast.error("Transaction confirmation timed out. Please check your wallet.");
-      } else if (errorMsg.includes("insufficient funds")) {
-        toast.error("Insufficient SOL for transaction fee and bet amount");
+      } else if (errorMsg.includes("Insufficient SOL")) {
+        toast.error(
+          `Insufficient SOL. Need: ~${(betAmount + 0.003).toFixed(4)} SOL (bet + fees)`
+        );
       } else {
         toast.error("Failed to create lobby: " + errorMsg);
       }
     } finally {
       setIsLoading(false);
     }
-  }, [connected, publicKey, wallet, selectedCharacter, betAmount, createLobbyAction, onLobbyCreated]);
+  }, [
+    connected,
+    publicKey,
+    selectedCharacter,
+    wallet,
+    betAmount,
+    createLobbyAction,
+    onLobbyCreated,
+  ]);
 
   if (!connected || !publicKey) {
     return (

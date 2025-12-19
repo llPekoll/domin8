@@ -21,10 +21,10 @@ pub enum Domin81v1Error {
     #[msg("Insufficient funds for bet")]
     InsufficientFunds,
 
-    #[msg("Switchboard randomness not yet resolved")]
+    #[msg("VRF randomness not yet resolved")]
     RandomnessNotResolved,
 
-    #[msg("Switchboard randomness already revealed for this slot")]
+    #[msg("VRF randomness already revealed for this slot")]
     RandomnessAlreadyRevealed,
 
     #[msg("Invalid bet amount")]
@@ -38,4 +38,16 @@ pub enum Domin81v1Error {
 
     #[msg("Fund distribution failed")]
     DistributionError,
+
+    #[msg("Randomness account is not owned by VRF program")]
+    InvalidRandomnessAccountOwner,
+
+    #[msg("Failed to parse VRF randomness account data")]
+    RandomnessAccountParseError,
+
+    #[msg("Randomness value conversion to winner failed")]
+    RandomnessConversionError,
+
+    #[msg("Randomness seed does not match lobby force seed")]
+    InvalidRandomnessSeed,
 }

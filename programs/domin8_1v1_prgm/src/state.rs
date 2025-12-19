@@ -2,7 +2,9 @@ use anchor_lang::prelude::*;
 
 /// Lobby status constants
 pub const LOBBY_STATUS_CREATED: u8 = 0;    // Waiting for second player
-pub const LOBBY_STATUS_RESOLVED: u8 = 1;   // Both players joined, winner determined, funds distributed
+pub const LOBBY_STATUS_AWAITING_VRF: u8 = 1; // Waiting for ORAO VRF fulfillment
+pub const LOBBY_STATUS_RESOLVED: u8 = 2;   // Both players joined, winner determined, funds distributed
+
 
 /// Global configuration account for the 1v1 program
 #[account]
@@ -24,8 +26,8 @@ pub struct Domin81v1Lobby {
     pub player_a: Pubkey,           // Player A's wallet
     pub player_b: Option<Pubkey>,   // Player B's wallet (None until joined)
     pub amount: u64,                // Bet amount per player (in lamports)
-    pub randomness_account: Pubkey, // Switchboard randomness account for this game
-    pub status: u8,                 // 0 = created, 1 = resolved
+    pub force: [u8; 32],            // Seed used for ORAO request
+    pub status: u8,                 // 0 = created, 1 = resolved, 2 = awaiting vrf
     pub winner: Option<Pubkey>,     // Winner's wallet (None until resolved)
     pub created_at: i64,            // Creation timestamp
     pub skin_a: u8,                 // Player A's character skin ID (0-255)

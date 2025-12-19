@@ -20,8 +20,9 @@ import {
   TransactionInstruction,
   ComputeBudgetProgram,
   SystemProgram,
+  Keypair,
 } from "@solana/web3.js";
-import { BN, Program, AnchorProvider } from "@coral-xyz/anchor";
+import { BN, Program, AnchorProvider, BorshAccountsCoder } from "@coral-xyz/anchor";
 import { Buffer } from "buffer";
 import type { Domin81v1Prgm } from "../../target/types/domin8_1v1_prgm";
 import IDL from "../../target/idl/domin8_1v1_prgm.json";
@@ -45,6 +46,15 @@ const HELIUS_POLL_INTERVAL_MS = 2_000; // 2 seconds
 const HELIUS_MAX_RETRIES = 3; // Retry up to 3 times
 const HELIUS_BLOCKHASH_VALIDITY_CHECK = true; // Check blockhash before retry
 
+// SWITCHBOARD RANDOMNESS CONSTANTS
+const SWITCHBOARD_PROGRAM_IDS = {
+  mainnet: new PublicKey("SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv"),
+  devnet: new PublicKey("Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2"),
+} as const;
+
+const SWITCHBOARD_RANDOMNESS_TIMEOUT_MS = 60_000; // 60 seconds for randomness to be revealed
+const SWITCHBOARD_RANDOMNESS_POLL_INTERVAL_MS = 2_000; // Poll every 2 seconds
+
 // Helper types
 interface OptimizationMetrics {
   simulatedCU: number;
@@ -65,47 +75,11 @@ function getConfigPDA(): [PublicKey, number] {
  */
 function getLobbyPDA(lobbyId: number): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [PDA_SEEDS_1V1.LOBBY, new BN(lobbyId).toBuffer("le", 8)],
+    [PDA_SEEDS_1V1.LOBBY, new BN(lobbyId).toArrayLike(Buffer, "le", 8)],
     PROGRAM_ID
   );
 }
 
-/**
- * Helper to derive a randomness account address for Switchboard
- * This creates a deterministic address based on the lobby ID and program
- * The frontend must ensure this account is created/funded on Switchboard before game creation
- * 
- * @param lobbyId - Lobby ID (or use a timestamp/random value if not available yet)
- * @returns PublicKey - Derived randomness account address
- */
-export async function deriveRandomnessAccountAddress(lobbyId: number | string): Promise<PublicKey> {
-  // Use findProgramAddressSync with a short seed to avoid "Max seed length exceeded" error
-  // Convert the ID to a buffer (max 32 bytes)
-  const seed = typeof lobbyId === "string" 
-    ? Buffer.from(lobbyId.substring(0, 31), "utf-8")  // Limit to 31 bytes for safety
-    : Buffer.alloc(8);
-  
-  if (typeof lobbyId === "number") {
-    seed.writeBigInt64LE(BigInt(lobbyId), 0);
-  }
-
-  try {
-    const [address] = PublicKey.findProgramAddressSync(
-      [Buffer.from("randomness"), seed],
-      PROGRAM_ID
-    );
-    return address;
-  } catch (error) {
-    logger.ui.warn("[Randomness] Failed to derive address, using fallback:", error);
-    // Fallback: return a deterministic PublicKey based on the input
-    const hash = Buffer.alloc(32);
-    const seedStr = String(lobbyId);
-    for (let i = 0; i < seedStr.length && i < 32; i++) {
-      hash[i] = seedStr.charCodeAt(i);
-    }
-    return new PublicKey(hash);
-  }
-}
 
 /**
  * HELIUS OPTIMIZATION: Simulate transaction to get exact compute units
@@ -113,18 +87,27 @@ export async function deriveRandomnessAccountAddress(lobbyId: number | string): 
  * @param instructions - Transaction instructions
  * @param payer - Fee payer
  * @param blockhash - Recent blockhash
+ * @param skipSimulation - If true, skip simulation and use conservative estimate (for external account dependencies)
  * @returns Optimized compute unit limit (with buffer)
  */
 async function simulateForComputeUnits(
   connection: Connection,
   instructions: TransactionInstruction[],
   payer: PublicKey,
-  blockhash: string
+  blockhash: string,
+  skipSimulation: boolean = false
 ): Promise<number> {
   try {
     logger.solana.debug("[Helius] Simulating transaction for compute units", {
       instructionCount: instructions.length,
+      skipSimulation,
     });
+
+    // Skip simulation if requested (e.g., for join_lobby with Switchboard randomness account)
+    if (skipSimulation) {
+      logger.solana.info("[Helius] Skipping simulation per request, using conservative estimate");
+      return 100_000; // Conservative estimate for operations with external account dependencies
+    }
 
     // Build test message with high CU limit for safety
     const testInstructions = [
@@ -147,6 +130,15 @@ async function simulateForComputeUnits(
     });
 
     if (simulation.value.err) {
+      // Check if this is an AccountNotFound error (common for external accounts like Switchboard randomness)
+      const errorStr = String(simulation.value.err);
+      if (errorStr.includes("AccountNotFound")) {
+        logger.solana.info("[Helius] AccountNotFound during simulation (likely external account dependency), using conservative fallback", {
+          error: simulation.value.err,
+        });
+        return 100_000; // Conservative estimate for operations with external account dependencies
+      }
+
       logger.solana.warn("[Helius] Simulation error, using fallback CU", {
         error: simulation.value.err,
         logs: simulation.value.logs,
@@ -261,7 +253,8 @@ async function getPriorityFeeForInstructions(
 async function buildOptimizedTransaction(
   connection: Connection,
   instructions: TransactionInstruction[],
-  payer: PublicKey
+  payer: PublicKey,
+  skipSimulation: boolean = false
 ): Promise<{
   transaction: VersionedTransaction;
   metrics: OptimizationMetrics;
@@ -270,6 +263,7 @@ async function buildOptimizedTransaction(
     logger.solana.debug("[Helius] Building optimized transaction", {
       instructionCount: instructions.length,
       payer: payer.toString(),
+      skipSimulation,
     });
 
     // HELIUS BEST PRACTICE #1: Get blockhash with confirmed commitment
@@ -282,11 +276,13 @@ async function buildOptimizedTransaction(
     });
 
     // HELIUS BEST PRACTICE #2: Simulate for compute units
+    // Skip if requested (e.g., for join_lobby with Switchboard randomness account)
     const optimizedCU = await simulateForComputeUnits(
       connection,
       instructions,
       payer,
-      blockhash
+      blockhash,
+      skipSimulation
     );
 
     // HELIUS BEST PRACTICE #3: Estimate priority fee
@@ -512,170 +508,6 @@ async function sendTransactionWithHeliusRetry(
   return signature;
 }
 
-/**
- * Build a create_lobby transaction with Helius optimization
- * 
- * @param playerA - Player A's public key
- * @param amount - Bet amount in lamports
- * @param characterA - Character ID (0-255)
- * @param mapId - Map ID (0-255)
- * @param randomnessAccount - Switchboard randomness account for this game
- * @param connection - Solana connection
- * @returns Promise<{ transaction: VersionedTransaction; metrics: OptimizationMetrics }>
- */
-export async function buildCreateLobbyTransactionOptimized(
-  playerA: PublicKey,
-  amount: number,
-  characterA: number,
-  mapId: number,
-  randomnessAccount: PublicKey,
-  connection: Connection
-): Promise<{ transaction: VersionedTransaction; metrics: OptimizationMetrics }> {
-  try {
-    logger.ui.debug("[CreateLobby] Building optimized transaction", {
-      playerA: playerA.toString(),
-      amount,
-      characterA,
-      mapId,
-      randomnessAccount: randomnessAccount.toString(),
-    });
-
-    // Get Config PDA
-    const [configPda] = getConfigPDA();
-
-    // Create a read-only provider for instruction building
-    const provider = new AnchorProvider(
-      connection,
-      {
-        publicKey: playerA,
-      } as any,
-      { commitment: "confirmed" }
-    );
-
-    const program = new Program<Domin81v1Prgm>(IDL as any, provider);
-
-    // Default position for simplicity: [0, 0]
-    const positionA = [0, 0] as [number, number];
-
-    logger.ui.debug("[CreateLobby] Building instruction with Switchboard randomness account");
-
-    // Build the create_lobby instruction
-    const createLobbyIx = await program.methods
-      .createLobby(new BN(amount), characterA, positionA, mapId)
-      .accounts({
-        config: configPda,
-        playerA,
-        randomnessAccount,
-        systemProgram: SystemProgram.programId,
-      } as any)
-      .instruction();
-
-    // Build optimized transaction with Helius best practices
-    const { transaction, metrics } = await buildOptimizedTransaction(
-      connection,
-      [createLobbyIx],
-      playerA
-    );
-
-    logger.ui.debug("[CreateLobby] Optimized transaction created", metrics);
-    return { transaction, metrics };
-  } catch (error) {
-    logger.ui.error("[CreateLobby] Failed to build optimized transaction:", error);
-    throw error;
-  }
-}
-
-/**
- * Build a join_lobby transaction with Helius optimization
- * 
- * @param playerB - Player B's public key
- * @param lobbyId - Lobby ID to join
- * @param characterB - Character ID (0-255)
- * @param lobbyPda - Lobby PDA address
- * @param connection - Solana connection
- * @returns Promise<{ transaction: VersionedTransaction; metrics: OptimizationMetrics }>
- */
-export async function buildJoinLobbyTransactionOptimized(
-  playerB: PublicKey,
-  lobbyId: number,
-  characterB: number,
-  lobbyPda: PublicKey,
-  connection: Connection
-): Promise<{ transaction: VersionedTransaction; metrics: OptimizationMetrics }> {
-  try {
-    logger.ui.debug("[JoinLobby] Building optimized transaction", {
-      playerB: playerB.toString(),
-      lobbyId,
-      characterB,
-      lobbyPda: lobbyPda.toString(),
-    });
-
-    // Get Config PDA
-    const [configPda] = getConfigPDA();
-
-    // Create a read-only provider for instruction building
-    const provider = new AnchorProvider(
-      connection,
-      {
-        publicKey: playerB,
-      } as any,
-      { commitment: "confirmed" }
-    );
-
-    const program = new Program<Domin81v1Prgm>(IDL as any, provider);
-
-    // Fetch lobby to get Player A and randomness account
-    const lobbyAccount = await program.account.domin81v1Lobby.fetch(lobbyPda);
-    const playerA = lobbyAccount.playerA;
-    const randomnessAccount = lobbyAccount.randomnessAccount;
-
-    // Default position for simplicity: [0, 0]
-    const positionB = [0, 0] as [number, number];
-
-    logger.ui.debug("[JoinLobby] Fetching treasury account for prize distribution");
-
-    // Get treasury address from config
-    let treasuryAddress: PublicKey;
-    try {
-      const configAccount = await program.account.domin81v1Config.fetch(configPda);
-      treasuryAddress = configAccount.treasury;
-      logger.ui.debug("[JoinLobby] Treasury address resolved", {
-        treasury: treasuryAddress.toString(),
-      });
-    } catch (error) {
-      logger.ui.error("[JoinLobby] Failed to fetch config account:", error);
-      throw new Error("Failed to fetch 1v1 config account");
-    }
-
-    // Build the join_lobby instruction
-    const joinLobbyIx = await program.methods
-      .joinLobby(new BN(lobbyAccount.amount), characterB, positionB)
-      .accounts({
-        config: configPda,
-        lobby: lobbyPda,
-        playerA,
-        playerB,
-        payer: playerB,
-        randomnessAccountData: randomnessAccount,
-        treasury: treasuryAddress,
-        systemProgram: SystemProgram.programId,
-      } as any)
-      .instruction();
-
-    // Build optimized transaction with Helius best practices
-    const { transaction, metrics } = await buildOptimizedTransaction(
-      connection,
-      [joinLobbyIx],
-      playerB
-    );
-
-    logger.ui.debug("[JoinLobby] Optimized transaction created", metrics);
-    return { transaction, metrics };
-  } catch (error) {
-    logger.ui.error("[JoinLobby] Failed to build optimized transaction:", error);
-    throw error;
-  }
-}
 
 /**
  * Build a cancel_lobby transaction with Helius optimization
@@ -694,7 +526,7 @@ export async function buildCancelLobbyTransactionOptimized(
   connection: Connection
 ): Promise<{ transaction: VersionedTransaction; metrics: OptimizationMetrics }> {
   try {
-    logger.ui.debug("[CancelLobby] Building optimized transaction", {
+    logger.solana.debug("[CancelLobby] Building optimized transaction", {
       playerA: playerA.toString(),
       lobbyId,
       lobbyPda: lobbyPda.toString(),
@@ -711,7 +543,7 @@ export async function buildCancelLobbyTransactionOptimized(
 
     const program = new Program<Domin81v1Prgm>(IDL as any, provider);
 
-    logger.ui.debug("[CancelLobby] Building cancel_lobby instruction");
+    logger.solana.debug("[CancelLobby] Building cancel_lobby instruction");
 
     // Build the cancel_lobby instruction
     const cancelLobbyIx = await program.methods
@@ -730,10 +562,10 @@ export async function buildCancelLobbyTransactionOptimized(
       playerA
     );
 
-    logger.ui.debug("[CancelLobby] Optimized transaction created", metrics);
+    logger.solana.debug("[CancelLobby] Optimized transaction created", metrics);
     return { transaction, metrics };
   } catch (error) {
-    logger.ui.error("[CancelLobby] Failed to build optimized transaction:", error);
+    logger.solana.error("[CancelLobby] Failed to build optimized transaction:", error);
     throw error;
   }
 }
@@ -754,7 +586,7 @@ export async function sendOptimizedTransaction(
   payer: PublicKey,
   privyWallet: any,
   lastValidBlockHeight: number,
-  network: string = "mainnet-beta"
+  network: string = "devnet"
 ): Promise<string> {
   return sendTransactionWithHeliusRetry(
     connection,
