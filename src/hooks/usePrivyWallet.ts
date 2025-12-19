@@ -49,39 +49,61 @@ export function usePrivyWallet() {
     ? externalWalletAccount.address
     : null;
 
-  // Fetch SOL balance from the Privy embedded wallet
+  // Fetch SOL balance from the Privy embedded wallet using WebSocket subscription
   useEffect(() => {
     if (!connected || !walletAddress) {
       setSolBalance(0);
       return;
     }
 
-    const fetchBalance = async () => {
+    const publicKey = new PublicKey(walletAddress);
+    const connection = getSharedConnection();
+    let subscriptionId: number | null = null;
+
+    // Initial balance fetch
+    const fetchInitialBalance = async () => {
       setIsLoadingBalance(true);
       try {
-        // Use shared connection instance
-        const connection = getSharedConnection();
-
-        // Fetch balance in lamports
-        const publicKey = new PublicKey(walletAddress);
         const balanceLamports = await connection.getBalance(publicKey);
-
-        // Convert lamports to SOL
         const balanceSOL = balanceLamports / LAMPORTS_PER_SOL;
         setSolBalance(balanceSOL);
+        logger.solana.debug("[usePrivyWallet] Initial balance fetched:", balanceSOL);
       } catch (error) {
-        logger.solana.error("Error fetching SOL balance:", error);
+        logger.solana.error("Error fetching initial SOL balance:", error);
         setSolBalance(0);
       } finally {
         setIsLoadingBalance(false);
       }
     };
 
-    void fetchBalance();
+    // Subscribe to account changes via WebSocket for real-time updates
+    const subscribeToBalance = async () => {
+      try {
+        subscriptionId = connection.onAccountChange(
+          publicKey,
+          (accountInfo) => {
+            const balanceSOL = accountInfo.lamports / LAMPORTS_PER_SOL;
+            setSolBalance(balanceSOL);
+            logger.solana.debug("[usePrivyWallet] Balance updated via WebSocket:", balanceSOL);
+          },
+          "confirmed"
+        );
+        logger.solana.debug("[usePrivyWallet] WebSocket subscription active, id:", subscriptionId);
+      } catch (error) {
+        logger.solana.error("Error subscribing to balance changes:", error);
+      }
+    };
 
-    // Refresh balance every 10 seconds while connected
-    const interval = setInterval(() => void fetchBalance(), 10000);
-    return () => clearInterval(interval);
+    void fetchInitialBalance();
+    void subscribeToBalance();
+
+    // Cleanup: unsubscribe when component unmounts or wallet changes
+    return () => {
+      if (subscriptionId !== null) {
+        connection.removeAccountChangeListener(subscriptionId);
+        logger.solana.debug("[usePrivyWallet] WebSocket subscription removed, id:", subscriptionId);
+      }
+    };
   }, [connected, walletAddress]);
 
   // Function to manually refresh balance (e.g., after a transaction)
