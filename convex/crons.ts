@@ -46,6 +46,12 @@ crons.interval(
   internal.syncService.checkAndEndOpenGames
 );
 
+
+crons.interval(
+  "sync-1v1-stuck-lobbies",
+  { seconds: 30 },
+  internal.lobbiesActions.syncLobbyFromBlockchain
+)
 /**
  * Scheduled jobs cleanup - removes old completed/failed jobs
  * Runs every 6 hours to clean up jobs older than 7 days

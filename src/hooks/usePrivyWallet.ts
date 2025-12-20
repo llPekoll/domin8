@@ -125,14 +125,14 @@ export function usePrivyWallet() {
    
   };
   // Debug: Log what we're returning
-  console.log('[DEBUG] usePrivyWallet returning:', {
-    connected,
-    walletAddress,
-    externalWalletAddress,
-    externalWalletAccountType,
-    ready,
-    linkedAccountsCount: user?.linkedAccounts?.length || 0
-  });
+  // console.log('[DEBUG] usePrivyWallet returning:', {
+  //   connected,
+  //   walletAddress,
+  //   externalWalletAddress,
+  //   externalWalletAccountType,
+  //   ready,
+  //   linkedAccountsCount: user?.linkedAccounts?.length || 0
+  // });
 
   return {
       connected,

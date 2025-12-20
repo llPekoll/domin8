@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-domin8_1V1_prg = "BfxF6nhu5hgerSHmyedJegPqexK2M7VVykiSGgoT2T7v"
+domin8_1V1_prg = "CSj9CvC2ZZscGJDHJu8fCxxkTiJifWPZWiQCugxJkAad"
 domin8_prgm = "92LhoG1EGxWpRovjrjJ2vA8amNTHFZSTFr1EHUYWjkky"
 
 [registry]

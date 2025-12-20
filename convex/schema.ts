@@ -190,7 +190,8 @@ export default defineSchema({
   oneVOneLobbies: defineTable({
     // Identifiers
     lobbyId: v.number(), // Unique lobby ID from on-chain
-    lobbyPda: v.string(), // Public key of the Lobby PDA (base58)
+    lobbyPda: v.optional(v.string()), // Public key of the Lobby PDA (base58)
+    shareToken: v.string(), // 8-char unique token for sharing lobby URL (privacy-focused)
 
     // Players
     playerA: v.string(), // Player A's wallet address (base58)
@@ -198,16 +199,14 @@ export default defineSchema({
 
     // Game state
     amount: v.number(), // Bet amount per player (in lamports)
-    status: v.number(), // 0 = created (waiting), 1 = resolved, 2 = awaiting vrf
+    status: v.number(), // 0 = created (waiting), 1 = awaiting vrf, 2 = resolved
     winner: v.optional(v.string()), // Winner's wallet address (base58, None until resolved)
+    isPrivate: v.optional(v.boolean()), // Private lobbies are only joinable via share link
 
     // Character & Map selection
     characterA: v.number(), // Player A's character/skin ID (0-255)
     characterB: v.optional(v.number()), // Player B's character/skin ID (0-255, None until joined)
     mapId: v.number(), // Map/background ID (0-255)
-
-    // ORAO VRF
-    forceSeed: v.optional(v.string()), // Hex string of the force seed used for ORAO request
 
     // Positioning (optional, for future expansion)
     positionA: v.optional(v.array(v.number())), // [x, y] spawn position for Player A
@@ -216,11 +215,18 @@ export default defineSchema({
     // Timestamps
     createdAt: v.number(), // When lobby was created (Unix timestamp)
     resolvedAt: v.optional(v.number()), // When lobby was resolved (Unix timestamp)
+
+    // Transaction hashes
+    settleTxHash: v.optional(v.string()), // Solana transaction hash for settlement (base58)
   })
     .index("by_status", ["status"]) // Query open lobbies (status = 0)
     .index("by_player_a", ["playerA"]) // Query lobbies by Player A
     .index("by_player_b", ["playerB"]) // Query lobbies by Player B
-    .index("by_status_and_created", ["status", "createdAt"]), // For pagination and stuck lobby detection
+    .index("by_status_and_created", ["status", "createdAt"]) // For pagination and stuck lobby detection
+    .index("by_lobbyId", ["lobbyId"]) // Query specific lobby by ID
+    .index("by_shareToken", ["shareToken"]), // Fast lookup by share token for URL-based access
+
+    
 
   // ============================================================================
   // AUTO-BETTING BOT TABLES
@@ -309,3 +315,4 @@ export default defineSchema({
     .index("by_wallet_and_round", ["walletAddress", "roundId"])
     .index("by_timestamp", ["timestamp"]),
 });
+    

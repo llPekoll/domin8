@@ -103,12 +103,12 @@ export function Header() {
                 >
                   1<span className="px-0.5">v</span>1
                 </Link>
-                <Link
+                {/*<Link
                   to="/referrals"
                   className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
                 >
                   Referrals
-                </Link>
+                </Link>*/}
               </div>
 
               {/* Right Side - User Controls */}
@@ -246,6 +246,7 @@ export function Header() {
             </div>
           </div>
         </div>
+                
       </header>
 
       {/* Render modals outside header */}

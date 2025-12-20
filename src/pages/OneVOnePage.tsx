@@ -1,96 +1,296 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Header } from "../components/Header";
 import { CharacterSelection2 } from "../components/CharacterSelection2";
 import { CreateLobby } from "../components/onevone/CreateLobby";
 import { LobbyList } from "../components/onevone/LobbyList";
 import { LobbyHistory } from "../components/onevone/LobbyHistory";
-import { OneVOneFightScene } from "../components/onevone/OneVOneFightScene";
+import { LobbyDetailsDialog } from "../components/onevone/LobbyDetailsDialog";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { logger } from "../lib/logger";
+import { useAssets } from "../contexts/AssetsContext";
+import { setCharactersData } from "../game/main";
 import type { Character } from "../types/character";
 
 interface LobbyData {
   _id: string;
   lobbyId: number;
   lobbyPda: string;
+  shareToken: string;
   playerA: string;
   playerB?: string;
   amount: number;
-  status: 0 | 1 | 2;
+  status: 0 | 1 | 2 | 3; // 0 = Open, 1 = Awaiting VRF, 2 = VRF Received, 3 = Resolved
   winner?: string;
   characterA: number;
   characterB?: number;
   mapId: number;
+  isPrivate?: boolean;
 }
 
 export function OneVOnePage() {
   const { connected, publicKey, wallet } = usePrivyWallet();
+  const { characters } = useAssets();
   const createLobbyAction = useAction(api.lobbies.createLobby);
+  const joinLobbyAction = useAction(api.lobbies.joinLobby);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Sync characters to Phaser's global state for CharacterPreviewScene
+  useEffect(() => {
+    if (characters && characters.length > 0) {
+      logger.game.debug('[OneVOnePage] Syncing characters to Phaser global state', { count: characters.length });
+      setCharactersData(characters);
+    }
+  }, [characters]);
   
   // Track selected character for 1v1 lobbies
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
-
-  // Track which lobby we're currently fighting in (null = list view, number = fighting)
-  const [fightingLobbyId, setFightingLobbyId] = useState<number | null>(null);
-  const [isArenaMinimized, setIsArenaMinimized] = useState(false);
+  
+  // Arena modal state
+  const [arenaModalOpen, setArenaModalOpen] = useState(false);
+  const [activeLobbyId, setActiveLobbyId] = useState<number | null>(null);
+  
+  // Shared lobby dialog state (opened via URL share link)
+  const [sharedLobbyDialogOpen, setSharedLobbyDialogOpen] = useState(false);
+  const [joiningLobby, setJoiningLobby] = useState(false); // Track if currently joining a lobby
+  const shareToken = searchParams.get("join");
+  
+  // Get current player's wallet address as string (for query)
+  const currentPlayerWallet = publicKey?.toString();
   
   // Get open lobbies from Convex (real-time updates)
-  const openLobbies = useQuery(api.lobbies.getOpenLobbies) || [];
+  // Pass current player wallet so they can see their own private lobbies
+  const openLobbies = useQuery(
+    api.lobbies.getOpenLobbies,
+    currentPlayerWallet ? { currentPlayerWallet } : {}
+  ) || [];
+  
+  // Get lobby by share token (for URL-based access)
+  const sharedLobby = useQuery(
+    api.lobbies.getLobbyByShareToken,
+    shareToken ? { shareToken } : "skip"
+  );
   
   // Get completed lobbies for history
   const completedLobbies = useQuery(api.lobbies.getCompletedLobbies, { limit: 20 }) || [];
   
-  // Get user's personal lobbies (for cancel functionality)
-  // Must always pass a value to useQuery - pass empty string as default
-  const userLobbies = useQuery(
-    api.lobbies.getPlayerLobbies,
-    publicKey ? { playerWallet: publicKey.toString() } : { playerWallet: "" }
-  );
-  
-  const userOpenLobbies = useMemo(() => {
-    if (!publicKey || !userLobbies?.asPlayerA) return [];
-    // Filter to only lobbies user created (as Player A) that are still open (status = 0)
-    return userLobbies.asPlayerA.filter((l: any) => l.status === 0);
-  }, [publicKey, userLobbies]);
-  
-  // Get specific lobby state when fighting (for real-time updates during fight)
-  // Must always call useQuery unconditionally - use fightingLobbyId || 0 as fallback
+  // Get specific lobby state when in arena (for real-time updates during fight)
   const lobbyStateQuery = useQuery(
     api.lobbies.getLobbyState, 
-    fightingLobbyId !== null ? { lobbyId: fightingLobbyId } : "skip"
+    activeLobbyId !== null ? { lobbyId: activeLobbyId } : "skip"
   );
   
-  // Only use the lobby state if we're actually fighting
-  const lobbyState = fightingLobbyId !== null ? lobbyStateQuery : null;
+  // Only use the lobby state if modal is open
+  const activeLobbyState = arenaModalOpen && activeLobbyId !== null ? lobbyStateQuery : null;
+
+  // Handle share link URL parameter - open lobby details dialog when navigating via share link
+  useEffect(() => {
+    if (shareToken && sharedLobby) {
+      if (sharedLobby.status === 0) {
+        // Lobby is open and available to join
+        logger.ui.info("[1v1] Opening shared lobby from URL", { shareToken, lobbyId: sharedLobby.lobbyId });
+        setSharedLobbyDialogOpen(true);
+      } else {
+        // Lobby is no longer available (already joined or resolved)
+        toast.error("This lobby is no longer available");
+        // Clear the URL parameter
+        setSearchParams({});
+      }
+    }
+  }, [shareToken, sharedLobby, setSearchParams]);
+
+  // Reopen dialog after Privy login if we still have a shareToken
+  // This handles the case where dialog closes during Privy login flow
+  useEffect(() => {
+    if (connected && shareToken && sharedLobby && sharedLobby.status === 0 && !sharedLobbyDialogOpen) {
+      logger.ui.info("[1v1] Reopening shared lobby dialog after login", { shareToken, lobbyId: sharedLobby.lobbyId });
+      setSharedLobbyDialogOpen(true);
+    }
+  }, [connected, shareToken, sharedLobby, sharedLobbyDialogOpen]);
+
+  // Handle closing shared lobby dialog - only clear URL if user is connected (intentional close)
+  // If not connected, keep the URL so dialog can reopen after Privy login
+  const handleSharedLobbyDialogClose = useCallback(() => {
+    setSharedLobbyDialogOpen(false);
+    // Only clear URL parameter if user is connected (intentional close)
+    // or if they're not connected and explicitly closing (not due to Privy modal)
+    if (connected) {
+      setSearchParams({});
+    }
+  }, [setSearchParams, connected]);
 
   const handleCharacterSelected = useCallback((character: Character | null) => {
     setSelectedCharacter(character);
   }, []);
 
+  // When user creates a lobby, open the arena modal
   const handleLobbyCreated = useCallback((lobbyId: number) => {
-    // After creating a lobby, stay on the list so they can see it
-    console.log("[1v1] Lobby created:", lobbyId);
+    logger.ui.info("[1v1] Lobby created, opening arena modal", { lobbyId });
+    setActiveLobbyId(lobbyId);
+    setArenaModalOpen(true);
   }, []);
 
   const handleLobbyCancelled = useCallback((lobbyId: number) => {
-    // Lobby was cancelled - the component will automatically refresh
-    console.log("[1v1] Lobby cancelled:", lobbyId);
+    // Lobby was cancelled - close modal if viewing this lobby
+    logger.ui.info("[1v1] Lobby cancelled", { lobbyId });
+    if (activeLobbyId === lobbyId) {
+      setArenaModalOpen(false);
+      setActiveLobbyId(null);
+    }
+  }, [activeLobbyId]);
+
+  // When user selects a lobby from the list (to preview or view their own)
+  const handleLobbySelected = useCallback((lobbyId: number) => {
+    logger.ui.info("[1v1] Lobby selected, opening dialog", { lobbyId });
+    setActiveLobbyId(lobbyId);
+    setArenaModalOpen(true);
   }, []);
 
+  // When user joins a lobby, keep the arena modal open (don't re-open)
   const handleLobbyJoined = useCallback((lobbyId: number) => {
-    // Player B joined, transition to fight view
-    setFightingLobbyId(lobbyId);
+    logger.ui.info("[1v1] Joined lobby", { lobbyId });
+    // If the modal is already showing this lobby, keep it open
+    // Otherwise, open the modal with the new lobby
+    if (activeLobbyId !== lobbyId) {
+      setActiveLobbyId(lobbyId);
+      setArenaModalOpen(true);
+    }
+    // Close shared lobby dialog and clear URL param if open
+    setSharedLobbyDialogOpen(false);
+    setSearchParams({});
+  }, [activeLobbyId, setSearchParams]);
+
+  // Generic handler for joining any lobby (from dialog)
+  const handleJoinLobbyFromDialog = useCallback(async (lobbyId: number) => {
+    // Find the lobby from activeLobbyState (real-time data) or sharedLobby
+    const lobbyToJoin = activeLobbyState || sharedLobby;
+    
+    if (!lobbyToJoin || lobbyToJoin.lobbyId !== lobbyId) {
+      toast.error("Lobby not found");
+      return;
+    }
+
+    if (!connected || !selectedCharacter || !wallet || !publicKey) {
+      toast.error("Please connect wallet and select a character");
+      return;
+    }
+
+    if (lobbyToJoin.playerA === publicKey.toString()) {
+      toast.error("You cannot join your own lobby");
+      return;
+    }
+
+    setJoiningLobby(true);
+
+    try {
+      // Import utilities
+      const { getSharedConnection } = await import("../lib/sharedConnection");
+      const { buildJoinLobbyTransaction, get1v1LobbyPDA } = await import("../lib/solana-1v1-transactions");
+
+      const connection = getSharedConnection();
+      const currentWallet = publicKey.toString();
+
+      logger.ui.info("[1v1] Joining lobby from dialog", {
+        lobbyId: lobbyToJoin.lobbyId,
+        playerB: currentWallet,
+        character: selectedCharacter.id,
+      });
+
+      // Derive the lobby PDA from lobbyId
+      const lobbyPda = get1v1LobbyPDA(lobbyToJoin.lobbyId);
+      const transaction = await buildJoinLobbyTransaction(
+        publicKey,
+        lobbyToJoin.lobbyId,
+        selectedCharacter.id,
+        lobbyPda,
+        connection
+      );
+
+      logger.solana.debug("[1v1] Transaction ready for signing");
+
+      // Sign and send using Privy's signAndSendAllTransactions
+      const chainId = `solana:devnet` as `${string}:${string}`;
+      const serialized = Buffer.from(transaction.serialize());
+      
+      let signAndSendResult;
+      try {
+        signAndSendResult = await wallet.signAndSendAllTransactions([
+          {
+            chain: chainId,
+            transaction: serialized,
+          },
+        ]);
+      } catch (privyError: unknown) {
+        const errorMessage = privyError instanceof Error ? privyError.message : String(privyError);
+        logger.solana.error("[1v1] Privy wallet error:", { message: errorMessage });
+        throw new Error(`Privy wallet error: ${errorMessage}`);
+      }
+      
+      if (!signAndSendResult || signAndSendResult.length === 0) {
+        throw new Error("Failed to get signature from Privy wallet");
+      }
+      
+      const signatureBytes = signAndSendResult[0].signature;
+      if (!signatureBytes) {
+        throw new Error("No signature in Privy response");
+      }
+      
+      const { default: bs58 } = await import("bs58");
+      const signature = bs58.encode(signatureBytes);
+      
+      logger.solana.info("[1v1] Join transaction signed and sent", { signature });
+      toast.loading("Waiting for transaction confirmation...", { id: "join-tx-confirm" });
+      
+      const confirmation = await connection.confirmTransaction(signature, "confirmed");
+      
+      if (confirmation.value.err) {
+        throw new Error("Transaction failed: " + confirmation.value.err.toString());
+      }
+
+      toast.success("Transaction confirmed!", { id: "join-tx-confirm" });
+
+      // Call Convex action to update lobby in database
+      const result = await joinLobbyAction({
+        playerBWallet: currentWallet,
+        lobbyId: lobbyToJoin.lobbyId,
+        characterB: selectedCharacter.id,
+        transactionHash: signature,
+      });
+
+      if (result.success) {
+        logger.ui.info("[1v1] Lobby joined successfully", { lobbyId: result.lobbyId });
+        toast.success("You joined the lobby! Starting fight...", { duration: 5000 });
+        
+        // Notify that lobby was joined (keeps dialog open with real-time updates)
+        handleLobbyJoined(result.lobbyId);
+      } else {
+        toast.error("Failed to update lobby in database");
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      logger.ui.error("[1v1] Failed to join lobby:", error);
+      toast.error("Failed to join lobby: " + errorMsg);
+    } finally {
+      setJoiningLobby(false);
+    }
+  }, [connected, wallet, publicKey, selectedCharacter, activeLobbyState, sharedLobby, joinLobbyAction, handleLobbyJoined]);
+
+  // Handle arena modal close
+  const handleArenaClose = useCallback(() => {
+    setArenaModalOpen(false);
+    // Keep activeLobbyId for a moment in case user wants to reopen
   }, []);
 
+  // Handle fight completion (from modal)
   const handleFightComplete = useCallback(() => {
-    // Fight finished, go back to list view
-    setFightingLobbyId(null);
-    setIsArenaMinimized(false);
+    logger.ui.info("[1v1] Fight complete");
+    setArenaModalOpen(false);
+    setActiveLobbyId(null);
   }, []);
 
+  // Double down handler for winner
   const handleDoubleDown = useCallback(async (amount: number) => {
     if (!connected || !publicKey || !selectedCharacter || !wallet) {
       toast.error("Please connect wallet and select a character");
@@ -104,27 +304,19 @@ export function OneVOnePage() {
       // Import utilities
       const { getSharedConnection } = await import("../lib/sharedConnection");
       const { buildCreateLobbyTransaction } = await import("../lib/solana-1v1-transactions");
-      const { Keypair } = await import("@solana/web3.js");
 
       const connection = getSharedConnection();
       
-      // Generate a random 32-byte seed for ORAO VRF
-      const forceKeypair = Keypair.generate();
-      const forceSeed = forceKeypair.publicKey.toBase58();
-
-      logger.solana.debug("Generated force seed for Double Down", { forceSeed });
-
       // Build create_lobby transaction
       const transaction = await buildCreateLobbyTransaction(
         publicKey,
         amount, // Amount is already in lamports
         selectedCharacter.id,
         0, // Default map ID
-        forceSeed,
         connection
       );
 
-      // Serialize transaction for Privy (must be Uint8Array, not VersionedTransaction object)
+      // Serialize transaction for Privy
       const serializedTx = transaction.serialize();
 
       // Sign and send via Privy
@@ -138,7 +330,6 @@ export function OneVOnePage() {
       if (typeof txResult.signature === "string") {
         signature = txResult.signature;
       } else if (txResult.signature instanceof Uint8Array) {
-        // Convert Uint8Array to base58
         const bs58 = await import("bs58");
         signature = bs58.default.encode(txResult.signature);
       } else {
@@ -163,15 +354,13 @@ export function OneVOnePage() {
         characterA: selectedCharacter.id,
         mapId: 0,
         transactionHash: signature,
-        forceSeed: forceSeed,
       });
 
       if (result.success) {
         toast.success(`Double Down successful! Lobby #${result.lobbyId} created.`, { id: toastId });
-        // Transition to the new lobby? Or just show it in the list?
-        // For now, let's just go back to list view (which happens automatically if we don't set fightingLobbyId)
-        // But maybe we want to auto-minimize the arena or something?
-        setFightingLobbyId(null); // Ensure we exit the previous fight view
+        // Open the new lobby in the arena
+        setActiveLobbyId(result.lobbyId);
+        // Modal stays open with new lobby
       } else {
         throw new Error("Failed to create lobby in database");
       }
@@ -182,30 +371,17 @@ export function OneVOnePage() {
     }
   }, [connected, publicKey, selectedCharacter, wallet, createLobbyAction]);
 
-  // Determine which view to show
-  const currentView = useMemo(() => {
-    if (!connected || !publicKey) {
-      return "not-connected";
-    }
-
-    if (fightingLobbyId !== null && lobbyState) {
-      return "fighting";
-    }
-
-    return "lobby-list";
-  }, [connected, publicKey, fightingLobbyId, lobbyState]);
-
   return (
-    <div className="min-h-screen w-full bg-black">
+    <div className="min-h-screen w-full bg-gray-950">
       <Header />
-
+      
       {/* Character Selection (fixed, always visible) */}
       <div className="fixed bottom-0 left-0 right-0 z-10">
         <CharacterSelection2 onCharacterSelected={handleCharacterSelected} />
       </div>
 
-      {/* Main Content Area */}
-      <main className="pt-16 pb-32 px-4 container mx-auto">
+      {/* Main Content Area - Always show lobby list */}
+      <main className="pt-16 pb-32 px-4 ">
         {!connected || !publicKey ? (
           // Not connected view
           <div className="flex items-center justify-center min-h-[60vh]">
@@ -216,66 +392,64 @@ export function OneVOnePage() {
           </div>
         ) : (
           <>
-            {/* Lobby list + create view (Show if not fighting OR if fighting but minimized) */}
-            {(currentView !== "fighting" || isArenaMinimized) && (
-              <div className="max-w-6xl mx-auto">
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                  {/* Create Lobby Section */}
-                  <div>
-                    <CreateLobby
-                      selectedCharacter={selectedCharacter}
-                      onLobbyCreated={handleLobbyCreated}
-                      userOpenLobbies={userOpenLobbies}
-                      onLobbyCancelled={handleLobbyCancelled}
-                    />
-                  </div>
+            <div className="ml-18">
+              <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
+                {/* Create Lobby Section */}
+                <div>
+                  <CreateLobby
+                    selectedCharacter={selectedCharacter}
+                    onLobbyCreated={handleLobbyCreated}
+                  />
+                </div>
 
-                  {/* Open Lobbies List */}
-                  <div className="lg:col-span-2">
-                    <LobbyList
-                      lobbies={openLobbies as LobbyData[]}
-                      currentPlayerWallet={publicKey?.toString() || ""}
-                      selectedCharacter={selectedCharacter}
-                      onLobbyJoined={handleLobbyJoined}
-                    />
+                {/* Open Lobbies List */}
+                <div className="lg:col-span-3">
+                  <LobbyList
+                    lobbies={openLobbies as LobbyData[]}
+                    currentPlayerWallet={publicKey?.toString() || ""}
+                    selectedCharacter={selectedCharacter}
+                    onLobbyJoined={handleLobbyJoined}
+                    onLobbyCancelled={handleLobbyCancelled}
+                    onLobbySelected={handleLobbySelected}
+                  />
                   </div>
-
+                  
                   {/* Lobby History */}
-                  <div>
-                    <LobbyHistory lobbies={completedLobbies as LobbyData[]} />
+                  <div className="lg:col-span-2">
+                    <LobbyHistory lobbies={completedLobbies as LobbyData[]} maxLobbies={50} />
                   </div>
                 </div>
               </div>
-            )}
-
-            {/* Fight view (Show if fighting) */}
-            {currentView === "fighting" && lobbyState && (
-              <div className={isArenaMinimized ? "fixed bottom-24 right-4 w-96 z-50 shadow-2xl transition-all duration-300" : "max-w-4xl mx-auto transition-all duration-300"}>
-                 <div className="bg-black border border-indigo-500 rounded-lg overflow-hidden">
-                     <div className="flex justify-between items-center p-2 bg-indigo-900/80 border-b border-indigo-500/50">
-                         <span className="text-sm font-bold text-indigo-300 flex items-center gap-2">
-                             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                             Lobby #{lobbyState.lobbyId}
-                         </span>
-                         <button 
-                             onClick={() => setIsArenaMinimized(!isArenaMinimized)}
-                             className="text-xs bg-indigo-800 hover:bg-indigo-700 text-white px-3 py-1 rounded border border-indigo-600 transition-colors"
-                         >
-                             {isArenaMinimized ? "Maximize Arena" : "Minimize"}
-                         </button>
-                     </div>
-                     <OneVOneFightScene
-                        lobby={lobbyState as LobbyData}
-                        onFightComplete={handleFightComplete}
-                        selectedCharacter={selectedCharacter}
-                        onDoubleDown={handleDoubleDown}
-                     />
-                 </div>
-              </div>
-            )}
+            
           </>
         )}
       </main>
+
+      {/* Arena Modal - Shows the Phaser game in a dialog (uses LobbyDetailsDialog with real-time state) */}
+      <LobbyDetailsDialog
+        isOpen={arenaModalOpen}
+        onClose={handleArenaClose}
+        lobby={activeLobbyState as LobbyData | null}
+        currentPlayerWallet={publicKey?.toString() || ""}
+        selectedCharacter={selectedCharacter}
+        onJoin={(lobbyId) => handleJoinLobbyFromDialog(lobbyId)}
+        onCancel={handleLobbyCancelled}
+        onFightComplete={handleFightComplete}
+        onDoubleDown={handleDoubleDown}
+        isJoining={joiningLobby}
+      />
+
+      {/* Shared Lobby Dialog - Opens when navigating via share link */}
+      <LobbyDetailsDialog
+        isOpen={sharedLobbyDialogOpen && !!sharedLobby}
+        onClose={handleSharedLobbyDialogClose}
+        lobby={sharedLobby as LobbyData | null}
+        currentPlayerWallet={publicKey?.toString() || ""}
+        selectedCharacter={selectedCharacter}
+        onJoin={(lobbyId) => handleJoinLobbyFromDialog(lobbyId)}
+        onCancel={handleLobbyCancelled}
+        isJoining={joiningLobby}
+      />
     </div>
   );
 }

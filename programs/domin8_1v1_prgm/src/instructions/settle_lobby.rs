@@ -1,64 +1,67 @@
 use anchor_lang::prelude::*;
 use crate::error::Domin81v1Error;
 use crate::state::*;
-use orao_solana_vrf::state::RandomnessAccountData;
-use orao_solana_vrf::RANDOMNESS_ACCOUNT_SEED;
-use orao_solana_vrf::ID as ORAO_VRF_ID;
 
-/// Settle a 1v1 lobby (called by anyone after VRF fulfillment)
-/// 
-/// This instruction:
-/// 1. Verifies ORAO has fulfilled the randomness request
-/// 2. Determines the winner
-/// 3. Distributes funds
-/// 4. Closes the lobby account
+/// Settle a lobby after VRF randomness has been received
+/// This instruction can be called by anyone once VRF callback has executed
+#[derive(Accounts)]
+pub struct SettleLobby<'info> {
+    #[account(mut)]
+    pub config: Account<'info, Domin81v1Config>,
+
+    #[account(
+        mut,
+        seeds = [b"domin8_1v1_lobby", lobby.lobby_id.to_le_bytes().as_ref()],
+        bump,
+    )]
+    pub lobby: Account<'info, Domin81v1Lobby>,
+
+    /// CHECK: Player A (Winner or Loser) - Must match lobby state
+    #[account(mut, address = lobby.player_a)]
+    pub player_a: AccountInfo<'info>,
+
+    /// CHECK: Player B (Winner or Loser) - Must match lobby state
+    #[account(mut, address = lobby.player_b.unwrap())]
+    pub player_b: AccountInfo<'info>,
+
+    /// CHECK: Treasury to receive house fee
+    #[account(mut, address = config.treasury)]
+    pub treasury: AccountInfo<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+/// Settle lobby handler - distributes funds based on stored randomness
 pub fn handler(ctx: Context<SettleLobby>) -> Result<()> {
     let lobby = &mut ctx.accounts.lobby;
     let config = &ctx.accounts.config;
-    let randomness_account_info = &ctx.accounts.randomness_account;
 
-    // Verify lobby is in AWAITING_VRF status
+    msg!("Settling Lobby {}", lobby.lobby_id);
+
+    // Safety check: Ensure lobby has received VRF randomness
     require_eq!(
         lobby.status,
-        LOBBY_STATUS_AWAITING_VRF,
+        LOBBY_STATUS_VRF_RECEIVED,
         Domin81v1Error::InvalidLobbyStatus
     );
 
-    // Verify randomness account PDA matches what we expect for this lobby's force seed
-    let (expected_pda, _) = Pubkey::find_program_address(
-        &[RANDOMNESS_ACCOUNT_SEED, &lobby.force],
-        &ORAO_VRF_ID
-    );
-    
-    require_eq!(
-        randomness_account_info.key(),
-        expected_pda,
-        Domin81v1Error::InvalidRandomnessSeed
-    );
+    // Get the stored randomness
+    let randomness = lobby.randomness.ok_or(Domin81v1Error::RandomnessNotAvailable)?;
 
-    // Deserialize randomness account using ORAO's helper
-    let mut data = &randomness_account_info.try_borrow_data()?[..];
-    let randomness_data = RandomnessAccountData::try_deserialize(&mut data)
-        .map_err(|_| Domin81v1Error::RandomnessAccountParseError)?;
+    // Determine winner using randomness
+    // Even number = Player A wins, Odd = Player B wins
+    let random_val = randomness[0]; 
+    let winner_is_player_a = random_val % 2 == 0;
 
-    // Check randomness fulfillment
-    let randomness_value = randomness_data.fulfilled_randomness().ok_or(Domin81v1Error::RandomnessNotResolved)?;
-
-    // Determine winner
-    // We use the first byte of the randomness. Even = Player A, Odd = Player B
-    let winner_is_player_a = randomness_value[0] % 2 == 0;
-    
     let winner = if winner_is_player_a {
         lobby.player_a
     } else {
         lobby.player_b.unwrap()
     };
 
-    // Calculate payouts
-    // Total pot is 2 * amount
+    // Calculate Payouts
     let total_pot = lobby.amount.checked_mul(2).ok_or(Domin81v1Error::DistributionError)?;
     
-    // Calculate house fee
     let house_fee = (total_pot as u128)
         .checked_mul(config.house_fee_bps as u128)
         .ok_or(Domin81v1Error::DistributionError)?
@@ -67,14 +70,16 @@ pub fn handler(ctx: Context<SettleLobby>) -> Result<()> {
 
     let prize = total_pot.checked_sub(house_fee).ok_or(Domin81v1Error::DistributionError)?;
 
-    // Distribute funds
-    // Transfer house fee to treasury
+    // Distribute Funds
+    // Note: The Lobby PDA is writable and owned by the program, so we can deduct lamports directly.
+    
+    // Pay House Fee
     if house_fee > 0 {
         **lobby.to_account_info().lamports.borrow_mut() -= house_fee;
         **ctx.accounts.treasury.lamports.borrow_mut() += house_fee;
     }
 
-    // Transfer prize to winner
+    // Pay Winner
     if prize > 0 {
         let winner_account = if winner == lobby.player_a {
             &ctx.accounts.player_a
@@ -85,52 +90,11 @@ pub fn handler(ctx: Context<SettleLobby>) -> Result<()> {
         **winner_account.lamports.borrow_mut() += prize;
     }
 
-    // Update state (even though we close it, it's good practice or if we decide not to close)
+    // Update State
     lobby.winner = Some(winner);
     lobby.status = LOBBY_STATUS_RESOLVED;
 
-    msg!("Lobby {} settled. Winner: {}", lobby.lobby_id, winner);
-    msg!("Randomness: {:?}", &randomness_value[0..8]); // Log first 8 bytes
+    msg!("Winner determined: {}. Prize: {}", winner, prize);
 
     Ok(())
-}
-
-#[derive(Accounts)]
-pub struct SettleLobby<'info> {
-    #[account(
-        mut,
-        seeds = [b"domin8_1v1_config"],
-        bump,
-    )]
-    pub config: Account<'info, Domin81v1Config>,
-
-    #[account(
-        mut,
-        seeds = [
-            b"domin8_1v1_lobby",
-            lobby.lobby_id.to_le_bytes().as_ref(),
-        ],
-        bump,
-        close = player_a // Refund rent to Player A (creator)
-    )]
-    pub lobby: Account<'info, Domin81v1Lobby>,
-
-    /// CHECK: ORAO Randomness account
-    /// We verify the seed matches the lobby's force seed manually in handler
-    pub randomness_account: UncheckedAccount<'info>,
-
-    /// CHECK: Player A (Winner or Loser)
-    #[account(mut, address = lobby.player_a)]
-    pub player_a: UncheckedAccount<'info>,
-
-    /// CHECK: Player B (Winner or Loser)
-    #[account(mut, address = lobby.player_b.unwrap())]
-    pub player_b: UncheckedAccount<'info>,
-
-    /// CHECK: Treasury
-    #[account(mut, address = config.treasury)]
-    pub treasury: UncheckedAccount<'info>,
-    
-    #[account(mut)]
-    pub signer: Signer<'info>,
 }
