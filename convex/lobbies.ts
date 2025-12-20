@@ -14,6 +14,7 @@ import {
   internalMutation,
   internalQuery,
   internalAction,
+  mutation,
 } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
@@ -24,7 +25,10 @@ import { Solana1v1Client } from "./lib/solana_1v1";
 // CONFIGURATION
 // ============================================================================
 
-const RPC_ENDPOINT = process.env.RPC_URL || process.env.VITE_SOLANA_RPC_URL || "https://devnet.helius-rpc.com/?api-key=0df32d0b-da4f-49b3-b154-deaceac254c0";
+const RPC_ENDPOINT =
+  process.env.RPC_URL ||
+  process.env.VITE_SOLANA_RPC_URL ||
+  "https://devnet.helius-rpc.com/?api-key=0df32d0b-da4f-49b3-b154-deaceac254c0";
 const CRANK_AUTHORITY_PRIVATE_KEY = process.env.CRANK_AUTHORITY_PRIVATE_KEY || "";
 
 // ============================================================================
@@ -102,7 +106,7 @@ export const getCompletedLobbies = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit || 50;
-    
+
     // Get all completed lobbies (status 1 = resolved, status 2 = awaiting VRF)
     const completedLobbies = await ctx.db
       .query("oneVOneLobbies")
@@ -161,7 +165,7 @@ export const getStuckLobbies = internalQuery({
 /**
  * Public mutation wrapper for creating lobbies
  * Used by the createLobby action
- * 
+ *
  * Now includes Switchboard randomness account tracking:
  * - randomnessAccountPubkey: The on-chain Switchboard randomness account address
  *   This account will be used for deterministic randomness in the join_lobby instruction
@@ -276,7 +280,6 @@ export const cancelLobbyInDb = mutation({
     return true;
   },
 });
-
 
 /**
  * Internal mutation to create a lobby in Convex
@@ -578,7 +581,10 @@ export const settleLobby = action({
     lobbyId: v.number(),
     transactionHash: v.string(),
   },
-  handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; winner: string; action: string }> => {
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ success: boolean; lobbyId: number; winner: string; action: string }> => {
     try {
       const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
 
@@ -595,7 +601,7 @@ export const settleLobby = action({
       // Extract winner from program logs
       // The Rust instruction logs: "Lobby {id} settled. Winner: {pubkey}"
       let winner: string | null = null;
-      
+
       if (tx.meta?.logMessages) {
         for (const log of tx.meta.logMessages) {
           // Match log format: "Program log: Lobby 16 settled. Winner: 5X5wJL7HhNzY2KP1eUhEBmVqAvi4Mk16o713Kb4HQ33Q"
@@ -763,7 +769,9 @@ const _findMissingLobbies = (blockchainCount: number, convexLobbies: any[]): num
   }
 
   if (missing.length > 0) {
-    console.log(`[1v1 Sync] Found ${missing.length} potential missing lobbies: ${missing.join(", ")}`);
+    console.log(
+      `[1v1 Sync] Found ${missing.length} potential missing lobbies: ${missing.join(", ")}`
+    );
   }
 
   return missing;
@@ -781,7 +789,7 @@ const _syncResolvedLobby = async (
   queryClient: any
 ): Promise<boolean> => {
   // Check if on-chain status has progressed beyond what we have in Convex
-  
+
   // Case 1: Lobby has been joined (status 0→1) on-chain but still shows as open in Convex
   if (onChainLobby.status === 1 && lobbyInConvex.status === 0) {
     console.log(
@@ -792,13 +800,15 @@ const _syncResolvedLobby = async (
     if (onChainLobby.playerB) {
       const playerB = onChainLobby.playerB.toString();
       const characterB = onChainLobby.skinB;
-      
+
       await ctx.runMutation(internal.lobbies._internalJoinLobby, {
         lobbyId: lobbyInConvex.lobbyId,
         playerB,
         characterB,
       });
-      console.log(`[1v1 Sync] Updated lobby ${lobbyInConvex.lobbyId} with Player B: ${playerB.slice(0, 8)}..., char: ${characterB}`);
+      console.log(
+        `[1v1 Sync] Updated lobby ${lobbyInConvex.lobbyId} with Player B: ${playerB.slice(0, 8)}..., char: ${characterB}`
+      );
       return true;
     }
   }
@@ -818,7 +828,9 @@ const _syncResolvedLobby = async (
   // Case 3: Lobby has been resolved (status 1→2 or 0→2) on-chain but still open in Convex
   if (onChainLobby.status === 2 && (lobbyInConvex.status === 0 || lobbyInConvex.status === 1)) {
     // Lobby has been resolved on-chain but we still have it as open
-    console.log(`[1v1 Sync] Syncing resolved lobby ${lobbyInConvex.lobbyId} to Convex (on-chain status: 2, Convex status: ${lobbyInConvex.status})`);
+    console.log(
+      `[1v1 Sync] Syncing resolved lobby ${lobbyInConvex.lobbyId} to Convex (on-chain status: 2, Convex status: ${lobbyInConvex.status})`
+    );
 
     // Safety check: Ensure winner exists before calling toString()
     if (!onChainLobby.winner) {
@@ -831,7 +843,9 @@ const _syncResolvedLobby = async (
     // Determine the winner
     const winner = onChainLobby.winner.toString();
 
-    console.log(`[1v1 Sync] Calling _internalSettleLobby for lobby ${lobbyInConvex.lobbyId} with winner ${winner.slice(0, 8)}...`);
+    console.log(
+      `[1v1 Sync] Calling _internalSettleLobby for lobby ${lobbyInConvex.lobbyId} with winner ${winner.slice(0, 8)}...`
+    );
 
     // Update Convex to mark as resolved (status 2)
     await ctx.runMutation(internal.lobbies._internalSettleLobby, {
@@ -844,7 +858,9 @@ const _syncResolvedLobby = async (
   }
 
   // Log when no sync is needed
-  console.log(`[1v1 Sync] Lobby ${lobbyInConvex.lobbyId}: No sync needed (on-chain status: ${onChainLobby.status}, Convex status: ${lobbyInConvex.status})`);
+  console.log(
+    `[1v1 Sync] Lobby ${lobbyInConvex.lobbyId}: No sync needed (on-chain status: ${onChainLobby.status}, Convex status: ${lobbyInConvex.status})`
+  );
   return false;
 };
 
@@ -919,12 +935,16 @@ const _syncOpenLobbies = async (
   let errors = 0;
 
   console.log(`[1v1 Sync] Checking ${openLobbies.length} open lobbies for state changes`);
-  console.log(`[1v1 Sync] Lobby details: ${JSON.stringify(openLobbies.map(l => ({ id: l.lobbyId, status: l.status })))}`);
+  console.log(
+    `[1v1 Sync] Lobby details: ${JSON.stringify(openLobbies.map((l) => ({ id: l.lobbyId, status: l.status })))}`
+  );
 
   for (const lobbyInConvex of openLobbies) {
     try {
-      console.log(`[1v1 Sync] Processing lobby ${lobbyInConvex.lobbyId} (Convex status: ${lobbyInConvex.status})`);
-      
+      console.log(
+        `[1v1 Sync] Processing lobby ${lobbyInConvex.lobbyId} (Convex status: ${lobbyInConvex.status})`
+      );
+
       // Fetch the lobby account from blockchain
       const lobbyPda = queryClient.getLobbyPdaForId(lobbyInConvex.lobbyId);
       const onChainLobby = await queryClient.getLobbyAccount(lobbyPda);
@@ -933,14 +953,18 @@ const _syncOpenLobbies = async (
         throw new Error("Lobby account not found on blockchain");
       }
 
-      console.log(`[1v1 Sync] Lobby ${lobbyInConvex.lobbyId} on-chain data: ${JSON.stringify({ status: onChainLobby.status, winner: onChainLobby.winner?.toString() || 'null', playerB: onChainLobby.playerB?.toString() || 'null' })}`);
+      console.log(
+        `[1v1 Sync] Lobby ${lobbyInConvex.lobbyId} on-chain data: ${JSON.stringify({ status: onChainLobby.status, winner: onChainLobby.winner?.toString() || "null", playerB: onChainLobby.playerB?.toString() || "null" })}`
+      );
 
       // Try to sync if resolved
       const wasSynced = await _syncResolvedLobby(ctx, lobbyInConvex, onChainLobby, queryClient);
       if (wasSynced) {
         synced++;
       } else {
-        console.log(`[1v1 Sync] Lobby ${lobbyInConvex.lobbyId} did not require sync (no state change detected)`);
+        console.log(
+          `[1v1 Sync] Lobby ${lobbyInConvex.lobbyId} did not require sync (no state change detected)`
+        );
       }
     } catch (error) {
       errors++;
@@ -998,10 +1022,7 @@ const _syncMissingLobbies = async (
       const errorMsg = error instanceof Error ? error.message : String(error);
       if (!errorMsg.includes("not found") && !errorMsg.includes("not exist")) {
         errors++;
-        console.error(
-          `[1v1 Sync] Error syncing missing lobby ${lobbyId}:`,
-          errorMsg
-        );
+        console.error(`[1v1 Sync] Error syncing missing lobby ${lobbyId}:`, errorMsg);
       } else {
         // "Not found" errors are expected for closed lobbies, log as info
         // console.log(
@@ -1050,7 +1071,10 @@ export const _checkAndSettleLobby = internalAction({
   args: {
     lobbyId: v.number(),
   },
-  handler: async (ctx, args): Promise<{
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
     lobbyId: number;
     settled: boolean;
     onChainStatus?: number;
@@ -1058,7 +1082,7 @@ export const _checkAndSettleLobby = internalAction({
   }> => {
     try {
       const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
-      
+
       // Get the lobby from Convex to verify it exists and is still at status 1
       const convexLobby = await ctx.runQuery(internal.lobbies._getLobbyById, {
         lobbyId: args.lobbyId,
@@ -1075,7 +1099,9 @@ export const _checkAndSettleLobby = internalAction({
 
       // If already settled, skip
       if (convexLobby.status !== 1) {
-        console.log(`[1v1 Scheduler] Lobby ${args.lobbyId} already at status ${convexLobby.status}, skipping`);
+        console.log(
+          `[1v1 Scheduler] Lobby ${args.lobbyId} already at status ${convexLobby.status}, skipping`
+        );
         return {
           lobbyId: args.lobbyId,
           settled: false,
@@ -1096,12 +1122,16 @@ export const _checkAndSettleLobby = internalAction({
         };
       }
 
-      console.log(`[1v1 Scheduler] Lobby ${args.lobbyId}: on-chain status = ${onChainLobby.status}`);
+      console.log(
+        `[1v1 Scheduler] Lobby ${args.lobbyId}: on-chain status = ${onChainLobby.status}`
+      );
 
       // If resolved on-chain, update Convex
       if (onChainLobby.status === 2 && onChainLobby.winner) {
-        console.log(`[1v1 Scheduler] Settling lobby ${args.lobbyId} with winner ${onChainLobby.winner.toString().slice(0, 8)}...`);
-        
+        console.log(
+          `[1v1 Scheduler] Settling lobby ${args.lobbyId} with winner ${onChainLobby.winner.toString().slice(0, 8)}...`
+        );
+
         await ctx.runMutation(internal.lobbies._internalSettleLobby, {
           lobbyId: args.lobbyId,
           winner: onChainLobby.winner.toString(),
@@ -1117,26 +1147,30 @@ export const _checkAndSettleLobby = internalAction({
 
       // Still pending on-chain (status 1) - call settle_lobby instruction directly
       if (onChainLobby.status === 1) {
-        console.log(`[1v1 Scheduler] Lobby ${args.lobbyId} at status 1 (AWAITING_VRF). Calling settle_lobby...`);
-        
+        console.log(
+          `[1v1 Scheduler] Lobby ${args.lobbyId} at status 1 (AWAITING_VRF). Calling settle_lobby...`
+        );
+
         try {
           // Use signing client to call settle_lobby instruction
           const crankClient = new Solana1v1Client(RPC_ENDPOINT, CRANK_AUTHORITY_PRIVATE_KEY);
-          
+
           const txSignature = await crankClient.settleLobby(args.lobbyId, onChainLobby.force);
           console.log(`[1v1 Scheduler] settle_lobby tx: ${txSignature}`);
-          
+
           // Wait for confirmation
           const confirmed = await crankClient.confirmTransaction(txSignature);
           if (confirmed) {
             console.log(`[1v1 Scheduler] ✅ settle_lobby confirmed for lobby ${args.lobbyId}`);
-            
+
             // Schedule a follow-up check to sync the winner
             await ctx.scheduler.runAfter(2000, internal.lobbies._checkAndSettleLobby, {
               lobbyId: args.lobbyId,
             });
           } else {
-            console.warn(`[1v1 Scheduler] ⚠️ settle_lobby confirmation failed for lobby ${args.lobbyId}`);
+            console.warn(
+              `[1v1 Scheduler] ⚠️ settle_lobby confirmation failed for lobby ${args.lobbyId}`
+            );
           }
         } catch (crankError) {
           console.error(
@@ -1153,7 +1187,7 @@ export const _checkAndSettleLobby = internalAction({
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error(`[1v1 Scheduler] Error checking lobby ${args.lobbyId}:`, errorMsg);
-      
+
       // Retry on error after delay
       console.log(`[1v1 Scheduler] Scheduling retry for lobby ${args.lobbyId} after error`);
       await ctx.scheduler.runAfter(5000, internal.lobbies._checkAndSettleLobby, {
@@ -1171,9 +1205,9 @@ export const _checkAndSettleLobby = internalAction({
 
 /**
  * // FIXME: add a CRON schedule in security ??
- * Crank action to settle pending lobbies 
+ * Crank action to settle pending lobbies
  * Runs periodically to call settle_lobby on all lobbies stuck at status 1 (AWAITING_VRF)
- * 
+ *
  * This action:
  * 1. Fetches all lobbies at status 1 from Convex
  * 2. For each lobby, checks if it's resolved on-chain (status 2)
@@ -1182,7 +1216,9 @@ export const _checkAndSettleLobby = internalAction({
  */
 export const settlePendingLobbies = internalAction({
   args: {},
-  handler: async (ctx): Promise<{
+  handler: async (
+    ctx
+  ): Promise<{
     checked: number;
     settled: number;
     errors: number;
@@ -1190,7 +1226,7 @@ export const settlePendingLobbies = internalAction({
   }> => {
     try {
       const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
-      
+
       // Get all lobbies at status 1 (AWAITING_VRF)
       const pendingLobbies = await ctx.runQuery(internal.lobbies._getPendingLobbiesForSettlement);
 
@@ -1202,7 +1238,7 @@ export const settlePendingLobbies = internalAction({
       for (const lobby of pendingLobbies) {
         try {
           console.log(`[1v1 Crank] Processing lobby ${lobby.lobbyId} for settlement`);
-          
+
           // Fetch the lobby account from blockchain to get its state
           const lobbyPda = queryClient.getLobbyPdaForId(lobby.lobbyId);
           const onChainLobby = await queryClient.getLobbyAccount(lobbyPda);
@@ -1214,8 +1250,10 @@ export const settlePendingLobbies = internalAction({
 
           // Check if already resolved on-chain (status 2)
           if (onChainLobby.status === 2) {
-            console.log(`[1v1 Crank] Lobby ${lobby.lobbyId} already resolved on-chain (status 2), updating Convex`);
-            
+            console.log(
+              `[1v1 Crank] Lobby ${lobby.lobbyId} already resolved on-chain (status 2), updating Convex`
+            );
+
             if (onChainLobby.winner) {
               await ctx.runMutation(internal.lobbies._internalSettleLobby, {
                 lobbyId: lobby.lobbyId,
@@ -1228,8 +1266,9 @@ export const settlePendingLobbies = internalAction({
           }
 
           // If still at status 1, we need an external service to call settle_lobby instruction
-          console.log(`[1v1 Crank] ALERT: Lobby ${lobby.lobbyId} is still at status 1 on-chain. External crank needed to call settle_lobby instruction.`);
-          
+          console.log(
+            `[1v1 Crank] ALERT: Lobby ${lobby.lobbyId} is still at status 1 on-chain. External crank needed to call settle_lobby instruction.`
+          );
         } catch (error) {
           errors++;
           console.error(

@@ -14,6 +14,7 @@ import { generateRandomName } from "../lib/nameGenerator";
 import { logger } from "../lib/logger";
 import { useFundWallet } from "../hooks/useFundWallet";
 import { Plus, ArrowUpRight, ChevronDown, User } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export function Header() {
   const { connected, publicKey, externalWalletAddress, solBalance, isLoadingBalance } =
@@ -90,33 +91,39 @@ export function Header() {
 
               {/* Center - Navigation Links */}
               <div className="flex-1 flex gap-6">
-                {/*<Link
+                <Link
                   to="/"
                   className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
                 >
                   Arena
-                </Link>*/}
-                {/*<Link
+                </Link>
+                <Link
                   to="/1v1"
                   className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
                 >
                   1<span className="px-0.5">v</span>1
-                </Link>*/}
-                {/*<Link
+                </Link>
+                <Link
                   to="/referrals"
                   className="text-indigo-200 hover:text-indigo-100 transition-colors text-sm font-semibold"
                 >
                   Referrals
-                </Link>*/}
+                </Link>
               </div>
 
               {/* Right Side - User Controls */}
               <div className="flex items-center gap-4 flex-shrink-0">
                 {/* Sound Control */}
-                <SoundControl onSettingsClick={connected && publicKey ? () => {
-                  setProfileDefaultTab("sound");
-                  setShowProfileDialog(true);
-                } : undefined} />
+                <SoundControl
+                  onSettingsClick={
+                    connected && publicKey
+                      ? () => {
+                          setProfileDefaultTab("sound");
+                          setShowProfileDialog(true);
+                        }
+                      : undefined
+                  }
+                />
 
                 {connected && (
                   <>
