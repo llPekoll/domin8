@@ -4,16 +4,20 @@ import { useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { logger } from "../../lib/logger";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { SpriteAnimator } from "../SpriteAnimator";
 import type { Character } from "../../types/character";
 
 interface CreateLobbyProps {
   selectedCharacter: Character | null;
+  characters: Character[];
+  onCharacterChange: (direction: "prev" | "next") => void;
   onLobbyCreated?: (lobbyId: number) => void;
 }
 
 const DEFAULT_BET_AMOUNT_SOL = 0.01;
 
-export function CreateLobby({ selectedCharacter, onLobbyCreated }: CreateLobbyProps) {
+export function CreateLobby({ selectedCharacter, characters, onCharacterChange, onLobbyCreated }: CreateLobbyProps) {
   const { connected, publicKey, wallet } = usePrivyWallet();
   const createLobbyAction = useAction(api.lobbies.createLobby);
 
@@ -157,16 +161,54 @@ export function CreateLobby({ selectedCharacter, onLobbyCreated }: CreateLobbyPr
   }
 
   return (
-    <div className=" p-4">
+    <div className="py-2">
       {/* CoinFlip-style Header Row */}
       <div className="flex flex-wrap items-center gap-4">
         {/* Title Section */}
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-black text-amber-100  tracking-wide">1v1 BATTLE</h1>
+          <h1 className="text-4xl font-black text-amber-100 tracking-wide">1V1 BATTLE</h1>
         </div>
 
         {/* Spacer */}
-        <div className="flex-1 hidden lg:block"></div>
+        <div className="flex-1 hidden md:block"></div>
+
+        {/* Inline Character Selector */}
+        <div className="flex items-center gap-1 bg-black/40 border border-amber-700/50 rounded-lg px-2 py-1">
+          <button
+            onClick={() => onCharacterChange("prev")}
+            disabled={isLoading || characters.length <= 1}
+            className="p-1 hover:bg-amber-700/30 rounded transition-colors disabled:opacity-50"
+          >
+            <ChevronLeft className="w-5 h-5 text-amber-300" />
+          </button>
+
+          <div className="flex items-center gap-2 w-[160px]">
+            {selectedCharacter && (
+              <>
+                <div className="w-10 flex-shrink-0 flex items-center justify-center">
+                  <SpriteAnimator
+                    name={selectedCharacter.name.toLowerCase()}
+                    animation="idle"
+                    size={40}
+                    scale={1.8}
+                  />
+                </div>
+                <span className="text-amber-100 font-bold text-sm uppercase tracking-wide truncate">{selectedCharacter.name}</span>
+              </>
+            )}
+            {!selectedCharacter && (
+              <span className="text-gray-400 text-sm">Select</span>
+            )}
+          </div>
+
+          <button
+            onClick={() => onCharacterChange("next")}
+            disabled={isLoading || characters.length <= 1}
+            className="p-1 hover:bg-amber-700/30 rounded transition-colors disabled:opacity-50"
+          >
+            <ChevronRight className="w-5 h-5 text-amber-300" />
+          </button>
+        </div>
 
         {/* Bet Amount Input with Increment Buttons */}
         <div className="flex items-center gap-2">
@@ -239,13 +281,6 @@ export function CreateLobby({ selectedCharacter, onLobbyCreated }: CreateLobbyPr
           {isLoading ? "Creating..." : "Create Game"}
         </button>
       </div>
-
-      {/* Character Selection Warning */}
-      {!selectedCharacter && (
-        <div className="mt-3 px-3 py-2 bg-amber-900/30 border border-amber-700/50 rounded-lg">
-          <p className="text-amber-300 text-sm text-center">Select a character to create a game</p>
-        </div>
-      )}
     </div>
   );
 }

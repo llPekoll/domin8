@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface SpriteFrame {
+  filename: string;
   frame: { x: number; y: number; w: number; h: number };
   duration: number;
 }
@@ -41,15 +42,18 @@ export function SpriteAnimator({
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const animationRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
+  const frameIndexRef = useRef<number>(0);
 
   const pngPath = `/assets/characters/${name}.png`;
   const jsonPath = `/assets/characters/${name}.json`;
 
   // Load metadata
   useEffect(() => {
+    let cancelled = false;
+
     const loadMetadata = async () => {
       if (metadataCache[name] !== undefined) {
-        setMetadata(metadataCache[name]);
+        if (!cancelled) setMetadata(metadataCache[name]);
         return;
       }
 
@@ -61,57 +65,67 @@ export function SpriteAnimator({
         }
         const data: SpriteMetadata = await response.json();
         metadataCache[name] = data;
-        setMetadata(data);
+        if (!cancelled) setMetadata(data);
       } catch {
         metadataCache[name] = null;
       }
     };
 
     loadMetadata();
+
+    return () => {
+      cancelled = true;
+    };
   }, [name, jsonPath]);
 
   // Get animation frame range
-  const frameTag = metadata?.meta.frameTags.find(
+  const frameTag = metadata?.meta?.frameTags?.find(
     (tag) => tag.name.toLowerCase() === animation.toLowerCase()
   );
   const startFrame = frameTag?.from ?? 0;
-  const endFrame = frameTag?.to ?? 0;
+  const endFrame = frameTag?.to ?? (metadata?.frames?.length ? metadata.frames.length - 1 : 0);
 
-  // Animate
+  // Animation loop
+  const animate = useCallback((timestamp: number) => {
+    if (!metadata?.frames) return;
+
+    if (!lastFrameTimeRef.current) {
+      lastFrameTimeRef.current = timestamp;
+    }
+
+    const currentFrame = metadata.frames[frameIndexRef.current];
+    const frameDuration = currentFrame?.duration || 150;
+
+    if (timestamp - lastFrameTimeRef.current >= frameDuration) {
+      const nextFrame = frameIndexRef.current + 1;
+      frameIndexRef.current = nextFrame > endFrame ? startFrame : nextFrame;
+      setCurrentFrameIndex(frameIndexRef.current);
+      lastFrameTimeRef.current = timestamp;
+    }
+
+    animationRef.current = requestAnimationFrame(animate);
+  }, [metadata, startFrame, endFrame]);
+
+  // Start animation
   useEffect(() => {
-    if (!metadata || startFrame === endFrame) return;
+    if (!metadata?.frames || metadata.frames.length === 0) return;
 
+    // Reset to start frame
+    frameIndexRef.current = startFrame;
     setCurrentFrameIndex(startFrame);
-
-    const animate = (timestamp: number) => {
-      if (!lastFrameTimeRef.current) {
-        lastFrameTimeRef.current = timestamp;
-      }
-
-      const currentFrame = metadata.frames[currentFrameIndex] || metadata.frames[startFrame];
-      const frameDuration = currentFrame?.duration || 150;
-
-      if (timestamp - lastFrameTimeRef.current >= frameDuration) {
-        setCurrentFrameIndex((prev) => {
-          const next = prev + 1;
-          return next > endFrame ? startFrame : next;
-        });
-        lastFrameTimeRef.current = timestamp;
-      }
-
-      animationRef.current = requestAnimationFrame(animate);
-    };
+    lastFrameTimeRef.current = 0;
 
     animationRef.current = requestAnimationFrame(animate);
 
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
       }
     };
-  }, [metadata, startFrame, endFrame, currentFrameIndex]);
+  }, [metadata, startFrame, animate]);
 
-  if (!metadata) {
+  if (!metadata?.frames) {
     return (
       <div
         className={`flex items-center justify-center ${className}`}
@@ -122,8 +136,8 @@ export function SpriteAnimator({
     );
   }
 
-  const frame = metadata.frames[currentFrameIndex] || metadata.frames[startFrame];
-  if (!frame) return null;
+  const frame = metadata.frames[currentFrameIndex];
+  if (!frame?.frame) return null;
 
   const { x, y, w, h } = frame.frame;
   const { w: sheetW, h: sheetH } = metadata.meta.size;
@@ -138,7 +152,7 @@ export function SpriteAnimator({
 
   return (
     <div
-      className={`flex items-center justify-center overflow-hidden ${className}`}
+      className={`flex items-end justify-center overflow-visible ${className}`}
       style={{ width: size, height: size }}
     >
       <div

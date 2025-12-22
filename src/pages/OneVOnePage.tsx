@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Header } from "../components/Header";
-import { CharacterSelection2 } from "../components/CharacterSelection2";
 import { CreateLobby } from "../components/onevone/CreateLobby";
 import { LobbyDetailsDialog } from "../components/onevone/LobbyDetailsDialog";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
@@ -12,6 +11,8 @@ import { logger } from "../lib/logger";
 import { useAssets } from "../contexts/AssetsContext";
 import { setCharactersData } from "../game/main";
 import type { Character } from "../types/character";
+
+type FilterType = "all" | "my_games" | "price_low" | "price_high" | "newest" | "oldest";
 
 interface LobbyData {
   _id: string;
@@ -47,6 +48,10 @@ export function OneVOnePage() {
 
   // Track selected character for 1v1 lobbies
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
+  const [characterIndex, setCharacterIndex] = useState(0);
+
+  // Filter state
+  const [activeFilter, setActiveFilter] = useState<FilterType>("all");
 
   // Arena modal state
   const [arenaModalOpen, setArenaModalOpen] = useState(false);
@@ -73,6 +78,59 @@ export function OneVOnePage() {
 
   // Get completed lobbies for history
   const completedLobbies = useQuery(api.lobbies.getCompletedLobbies, { limit: 20 }) || [];
+
+  // Filtered and sorted lobbies
+  const filteredOpenLobbies = useMemo(() => {
+    let filtered = [...openLobbies];
+
+    // Filter by my games
+    if (activeFilter === "my_games") {
+      filtered = filtered.filter(l => l.playerA === publicKey?.toString());
+    }
+
+    // Sort by price
+    if (activeFilter === "price_low") {
+      filtered.sort((a, b) => a.amount - b.amount);
+    } else if (activeFilter === "price_high") {
+      filtered.sort((a, b) => b.amount - a.amount);
+    }
+
+    // Sort by date (assuming lobbyId correlates with creation time)
+    if (activeFilter === "newest") {
+      filtered.sort((a, b) => b.lobbyId - a.lobbyId);
+    } else if (activeFilter === "oldest") {
+      filtered.sort((a, b) => a.lobbyId - b.lobbyId);
+    }
+
+    return filtered;
+  }, [openLobbies, activeFilter, publicKey]);
+
+  const filteredCompletedLobbies = useMemo(() => {
+    let filtered = [...completedLobbies];
+
+    // Filter by my games
+    if (activeFilter === "my_games") {
+      filtered = filtered.filter(l =>
+        l.playerA === publicKey?.toString() || l.playerB === publicKey?.toString()
+      );
+    }
+
+    // Sort by price
+    if (activeFilter === "price_low") {
+      filtered.sort((a, b) => a.amount - b.amount);
+    } else if (activeFilter === "price_high") {
+      filtered.sort((a, b) => b.amount - a.amount);
+    }
+
+    // Sort by date
+    if (activeFilter === "newest") {
+      filtered.sort((a, b) => b.lobbyId - a.lobbyId);
+    } else if (activeFilter === "oldest") {
+      filtered.sort((a, b) => a.lobbyId - b.lobbyId);
+    }
+
+    return filtered;
+  }, [completedLobbies, activeFilter, publicKey]);
 
   // Collect all unique wallet addresses from lobbies to fetch player names
   const allWalletAddresses = useMemo(() => {
@@ -175,9 +233,24 @@ export function OneVOnePage() {
     }
   }, [setSearchParams, connected]);
 
-  const handleCharacterSelected = useCallback((character: Character | null) => {
-    setSelectedCharacter(character);
-  }, []);
+  // Update selected character when index changes
+  useEffect(() => {
+    if (characters && characters.length > 0) {
+      const idx = characterIndex % characters.length;
+      setSelectedCharacter(characters[idx]);
+    }
+  }, [characters, characterIndex]);
+
+  const handleCharacterChange = useCallback((direction: "prev" | "next") => {
+    if (!characters || characters.length === 0) return;
+    setCharacterIndex(prev => {
+      if (direction === "prev") {
+        return prev === 0 ? characters.length - 1 : prev - 1;
+      } else {
+        return prev === characters.length - 1 ? 0 : prev + 1;
+      }
+    });
+  }, [characters]);
 
   // When user creates a lobby, open the arena modal
   const handleLobbyCreated = useCallback((lobbyId: number) => {
@@ -440,62 +513,85 @@ export function OneVOnePage() {
   );
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-b from-gray-950 via-gray-900 to-black">
+    <div className="min-h-screen w-full bg-gradient-to-b from-gray-950/90 via-gray-900/90 to-black/90">
       <Header />
 
-      {/* Character Selection (fixed, always visible) */}
-      <div className="fixed bottom-0 left-0 right-0 z-10">
-        <CharacterSelection2 onCharacterSelected={handleCharacterSelected} />
-      </div>
-
       {/* Main Content Area - Always show lobby list */}
-      <main className="pt-20 pb-32 px-6 max-w-7xl mx-auto">
-        {/* Header Section - Show Create Game only when connected */}
-        {connected && publicKey && (
-          <div className="mb-6">
-            <CreateLobby
-              selectedCharacter={selectedCharacter}
-              onLobbyCreated={handleLobbyCreated}
-            />
-          </div>
-        )}
-
-        {/* Not connected banner */}
-        {(!connected || !publicKey) && (
-          <div className="mb-6 p-4 bg-gradient-to-r from-amber-900/40 to-amber-950/40 border border-amber-700/50 rounded-xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-amber-200">1V1 BATTLE</h1>
-                <p className="text-amber-300/70 text-sm">
-                  Connect your wallet to create or join games
-                </p>
-              </div>
-              <div className="flex items-center gap-2 px-4 py-2 bg-amber-600/20 border border-amber-500/30 rounded-lg">
-                <span className="text-amber-400 text-sm">Payouts settled in SOL</span>
-                <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
-              </div>
-            </div>
-          </div>
-        )}
-
+      <main className="pt-20 pb-8 px-6">
         {/* Games List - Single column for both connected and not connected */}
         {connected && publicKey ? (
           <div className="max-w-4xl mx-auto space-y-4">
-            {/* Header */}
-            <div className="flex items-center gap-3">
+            {/* Header Section - Create Game */}
+            <CreateLobby
+              selectedCharacter={selectedCharacter}
+              characters={characters || []}
+              onCharacterChange={handleCharacterChange}
+              onLobbyCreated={handleLobbyCreated}
+            />
+            {/* Header with Filters */}
+            <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-xl font-bold text-amber-100">ALL GAMES</h2>
               <span className="text-amber-400 font-mono">
-                {openLobbies.length + completedLobbies.length}
+                {filteredOpenLobbies.length + filteredCompletedLobbies.length}
               </span>
               <span className="px-3 py-1 bg-amber-900/30 border border-amber-700/50 rounded-full text-amber-300 text-xs flex items-center gap-1">
                 <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
                 Payouts settled in SOL
               </span>
+
+              {/* Spacer */}
+              <div className="flex-1"></div>
+
+              {/* Filter Buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setActiveFilter("my_games")}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    activeFilter === "my_games"
+                      ? "bg-amber-600 text-white"
+                      : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                  }`}
+                >
+                  My Games
+                </button>
+                <button
+                  onClick={() => setActiveFilter(activeFilter === "price_low" ? "price_high" : "price_low")}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+                    activeFilter === "price_low" || activeFilter === "price_high"
+                      ? "bg-amber-600 text-white"
+                      : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                  }`}
+                >
+                  Price
+                  {activeFilter === "price_low" && <span>↑</span>}
+                  {activeFilter === "price_high" && <span>↓</span>}
+                </button>
+                <button
+                  onClick={() => setActiveFilter(activeFilter === "newest" ? "oldest" : "newest")}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+                    activeFilter === "newest" || activeFilter === "oldest"
+                      ? "bg-amber-600 text-white"
+                      : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                  }`}
+                >
+                  Date
+                  {activeFilter === "newest" && <span>↓</span>}
+                  {activeFilter === "oldest" && <span>↑</span>}
+                </button>
+                {activeFilter !== "all" && (
+                  <button
+                    onClick={() => setActiveFilter("all")}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="space-y-3">
               {/* My Open Lobbies First */}
-              {openLobbies
+              {filteredOpenLobbies
                 .filter((l) => l.playerA === publicKey.toString() && l.status === 0)
                 .map((lobby) => (
                   <div
@@ -592,7 +688,7 @@ export function OneVOnePage() {
                 ))}
 
               {/* Other Open Lobbies */}
-              {openLobbies
+              {filteredOpenLobbies
                 .filter((l) => l.playerA !== publicKey.toString() && l.status === 0)
                 .map((lobby) => (
                   <div
@@ -680,7 +776,7 @@ export function OneVOnePage() {
                 ))}
 
               {/* Completed Lobbies */}
-              {completedLobbies.slice(0, 20).map((lobby) => {
+              {filteredCompletedLobbies.slice(0, 20).map((lobby) => {
                 const isPlayerAWinner = lobby.winner === lobby.playerA;
                 const isPlayerBWinner = lobby.winner === lobby.playerB;
                 const isCurrentUserPlayerA = lobby.playerA === publicKey?.toString();
@@ -787,16 +883,36 @@ export function OneVOnePage() {
                 );
               })}
 
-              {openLobbies.length === 0 && completedLobbies.length === 0 && (
+              {filteredOpenLobbies.length === 0 && filteredCompletedLobbies.length === 0 && (
                 <div className="text-center py-12 bg-gray-900/50 rounded-xl border border-gray-700/30">
-                  <p className="text-gray-400">No games yet. Create one to get started!</p>
+                  <p className="text-gray-400">
+                    {activeFilter === "my_games"
+                      ? "You haven't created or joined any games yet."
+                      : "No games yet. Create one to get started!"}
+                  </p>
                 </div>
               )}
             </div>
           </div>
         ) : (
           /* Single column layout when not connected - show waiting games first, then resolved */
-          <div className="max-w-4xl mx-auto space-y-8">
+          <div className="max-w-4xl mx-auto space-y-6">
+            {/* Not connected banner */}
+            <div className="p-4 bg-gradient-to-r from-amber-900/40 to-amber-950/40 border border-amber-700/50 rounded-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-4xl font-black text-amber-200 tracking-wide">1V1 BATTLE</h1>
+                  <p className="text-amber-300/70 text-sm mt-1">
+                    Connect your wallet to create or join games
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-amber-600/20 border border-amber-500/30 rounded-lg">
+                  <span className="text-amber-400 text-sm">Payouts settled in SOL</span>
+                  <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+
             {/* Waiting Games (Open Lobbies) */}
             <div className="space-y-4">
               <div className="flex items-center gap-3">
