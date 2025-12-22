@@ -6,7 +6,7 @@ import { Dialog, DialogContent } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { toast } from "sonner";
-import { User, Trophy, X, Volume2, Music, Flame, Zap } from "lucide-react";
+import { User, Trophy, X, Volume2, Music, Flame, Zap, Swords } from "lucide-react";
 import { logger } from "../lib/logger";
 import { SoundManager } from "../game/managers/SoundManager";
 import { EventBus } from "../game/EventBus";
@@ -56,15 +56,25 @@ export function ProfileDialog({
     setSfxMuted(SoundManager.isSfxMutedState());
   }, [open]);
 
-  // Fetch player data
-  const playerData = useQuery(api.players.getPlayer, { walletAddress });
-
   // Fetch recent games
   const recentGames = useQuery(api.players.getRecentGames, { walletAddress, limit: 10 });
 
-  const totalWins = playerData?.totalWins ?? 0;
-  const totalGames = playerData?.totalGamesPlayed ?? 0;
-  const totalLosses = totalGames - totalWins;
+  // Fetch 1v1 lobby history
+  const playerLobbies = useQuery(api.lobbies.getPlayerLobbies, { playerWallet: walletAddress });
+
+  // Filter and sort 1v1 lobbies - only resolved ones (status 3), most recent first
+  const recent1v1Games = (playerLobbies?.all ?? [])
+    .filter((lobby) => lobby.status === 3 && lobby.winner)
+    .sort((a, b) => (b.resolvedAt ?? b.createdAt) - (a.resolvedAt ?? a.createdAt))
+    .slice(0, 20);
+
+  // Calculate 1v1 stats from displayed games
+  const total1v1Wins = recent1v1Games.filter((lobby) => lobby.winner === walletAddress).length;
+  const total1v1Losses = recent1v1Games.filter((lobby) => lobby.winner !== walletAddress).length;
+
+  // Calculate arena stats from displayed games (not stored playerData which includes refunds)
+  const totalWins = recentGames?.filter((g) => g.isWinner).length ?? 0;
+  const totalLosses = recentGames?.filter((g) => !g.isWinner).length ?? 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,6 +112,11 @@ export function ProfileDialog({
 
   const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp * 1000);
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  };
+
+  const formatTimestampMs = (timestamp: number) => {
+    const date = new Date(timestamp);
     return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   };
 
@@ -279,6 +294,82 @@ export function ProfileDialog({
                               </div>
                             </div>
                           ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 1v1 Battles History */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-indigo-100 text-lg font-semibold flex items-center gap-2">
+                        <Swords className="w-4 h-4 text-amber-400" />
+                        1v1 Battles
+                      </Label>
+                      <div className="flex items-center gap-3 text-sm">
+                        <div className="flex items-center gap-1">
+                          <Trophy className="w-4 h-4 text-green-400" />
+                          <span className="text-green-300 font-bold">{total1v1Wins}</span>
+                          <span className="text-indigo-400">W</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-red-300 font-bold">{total1v1Losses}</span>
+                          <span className="text-indigo-400">L</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-black/30 rounded-md border border-amber-500/40 max-h-[180px] overflow-y-auto">
+                      {playerLobbies === undefined ? (
+                        <div className="text-center py-4 text-indigo-400/60 text-sm">
+                          Loading...
+                        </div>
+                      ) : recent1v1Games.length === 0 ? (
+                        <div className="text-center py-4 text-indigo-400/60 text-sm">
+                          No 1v1 battles yet
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-amber-500/20">
+                          {recent1v1Games.map((lobby) => {
+                            const isWinner = lobby.winner === walletAddress;
+                            const opponent =
+                              lobby.playerA === walletAddress ? lobby.playerB : lobby.playerA;
+                            return (
+                              <div
+                                key={lobby.lobbyId}
+                                className={`px-3 py-2 flex items-center justify-between ${
+                                  isWinner ? "bg-green-900/20" : ""
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                      isWinner
+                                        ? "bg-green-500/30 text-green-300"
+                                        : "bg-red-500/30 text-red-300"
+                                    }`}
+                                  >
+                                    {isWinner ? "WIN" : "LOSS"}
+                                  </span>
+                                  <span className="text-xs text-indigo-400">
+                                    {formatTimestampMs(lobby.resolvedAt ?? lobby.createdAt)}
+                                  </span>
+                                  <span className="text-xs text-indigo-500 truncate max-w-[80px]">
+                                    vs {opponent ? `${opponent.slice(0, 4)}...` : "?"}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs">
+                                  <span
+                                    className={`font-semibold ${
+                                      isWinner ? "text-green-300" : "text-red-300"
+                                    }`}
+                                  >
+                                    {isWinner ? "+" : "-"}
+                                    {formatSol(lobby.amount * (isWinner ? 2 * 0.98 : 1))} SOL
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>

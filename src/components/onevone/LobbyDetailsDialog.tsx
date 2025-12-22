@@ -88,7 +88,7 @@ export function LobbyDetailsDialog({
   // Sync local index when dialog opens or selectedCharacter changes
   useEffect(() => {
     if (isOpen && selectedCharacter && characters && characters.length > 0) {
-      const idx = characters.findIndex(c => c._id === selectedCharacter._id);
+      const idx = characters.findIndex((c: Character) => c._id === selectedCharacter._id);
       if (idx >= 0) {
         setLocalCharacterIndex(idx);
       }

@@ -501,9 +501,12 @@ export const getRecentGames = query({
       .order("desc")
       .collect();
 
-    // Filter games where this player participated
+    // Filter games where this player participated (exclude single-player refunds)
     const playerGames = finishedGames
-      .filter((game) => game.wallets?.includes(args.walletAddress))
+      .filter((game) =>
+        game.wallets?.includes(args.walletAddress) &&
+        (game.wallets?.length ?? 0) > 1
+      )
       .slice(0, limit);
 
     // Map to a simpler format
