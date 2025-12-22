@@ -1,6 +1,6 @@
 /**
  * Solana 1v1 Lobby Transaction Builder with Helius Optimization
- * 
+ *
  * Utilities for building, signing, and sending optimized 1v1 lobby transactions
  * Integrates Helius best practices:
  * - Blockhash caching and validation
@@ -8,7 +8,7 @@
  * - Priority fee estimation
  * - Robust polling with exponential backoff
  * - Atomic sign+send via Privy
- * 
+ *
  * Uses Switchboard Randomness for verifiable, on-chain random number generation
  */
 
@@ -20,9 +20,8 @@ import {
   TransactionInstruction,
   ComputeBudgetProgram,
   SystemProgram,
-  Keypair,
 } from "@solana/web3.js";
-import { BN, Program, AnchorProvider, BorshAccountsCoder } from "@coral-xyz/anchor";
+import { BN, Program, AnchorProvider } from "@coral-xyz/anchor";
 import { Buffer } from "buffer";
 import type { Domin81v1Prgm } from "../../target/types/domin8_1v1_prgm";
 import IDL from "../../target/idl/domin8_1v1_prgm.json";
@@ -45,15 +44,6 @@ const HELIUS_POLL_TIMEOUT_MS = 30_000; // 30 seconds
 const HELIUS_POLL_INTERVAL_MS = 2_000; // 2 seconds
 const HELIUS_MAX_RETRIES = 3; // Retry up to 3 times
 const HELIUS_BLOCKHASH_VALIDITY_CHECK = true; // Check blockhash before retry
-
-// SWITCHBOARD RANDOMNESS CONSTANTS
-const SWITCHBOARD_PROGRAM_IDS = {
-  mainnet: new PublicKey("SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv"),
-  devnet: new PublicKey("Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2"),
-} as const;
-
-const SWITCHBOARD_RANDOMNESS_TIMEOUT_MS = 60_000; // 60 seconds for randomness to be revealed
-const SWITCHBOARD_RANDOMNESS_POLL_INTERVAL_MS = 2_000; // Poll every 2 seconds
 
 // Helper types
 interface OptimizationMetrics {
@@ -79,7 +69,6 @@ function getLobbyPDA(lobbyId: number): [PublicKey, number] {
     PROGRAM_ID
   );
 }
-
 
 /**
  * HELIUS OPTIMIZATION: Simulate transaction to get exact compute units
@@ -133,9 +122,12 @@ async function simulateForComputeUnits(
       // Check if this is an AccountNotFound error (common for external accounts like Switchboard randomness)
       const errorStr = String(simulation.value.err);
       if (errorStr.includes("AccountNotFound")) {
-        logger.solana.info("[Helius] AccountNotFound during simulation (likely external account dependency), using conservative fallback", {
-          error: simulation.value.err,
-        });
+        logger.solana.info(
+          "[Helius] AccountNotFound during simulation (likely external account dependency), using conservative fallback",
+          {
+            error: simulation.value.err,
+          }
+        );
         return 100_000; // Conservative estimate for operations with external account dependencies
       }
 
@@ -222,9 +214,7 @@ async function getPriorityFeeForInstructions(
 
     if (data.result?.priorityFeeEstimate) {
       // Apply safety buffer (20% additional)
-      const estimatedFee = Math.ceil(
-        data.result.priorityFeeEstimate * HELIUS_PRIORITY_FEE_BUFFER
-      );
+      const estimatedFee = Math.ceil(data.result.priorityFeeEstimate * HELIUS_PRIORITY_FEE_BUFFER);
       logger.solana.debug("[Helius] Priority fee estimated", {
         base: data.result.priorityFeeEstimate,
         withBuffer: estimatedFee,
@@ -267,8 +257,7 @@ async function buildOptimizedTransaction(
     });
 
     // HELIUS BEST PRACTICE #1: Get blockhash with confirmed commitment
-    const { blockhash, lastValidBlockHeight } =
-      await connection.getLatestBlockhash("confirmed");
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
 
     logger.solana.debug("[Helius] Got blockhash", {
       blockhash: blockhash.slice(0, 8) + "...",
@@ -400,10 +389,7 @@ async function confirmTransactionWithPolling(
         }
       }
     } catch (error) {
-      logger.solana.warn(
-        "[Helius] Status check error (attempt " + pollCount + "):",
-        error
-      );
+      logger.solana.warn("[Helius] Status check error (attempt " + pollCount + "):", error);
     }
 
     await new Promise((resolve) => setTimeout(resolve, interval));
@@ -508,11 +494,10 @@ async function sendTransactionWithHeliusRetry(
   return signature;
 }
 
-
 /**
  * Build a cancel_lobby transaction with Helius optimization
  * Allows Player A to cancel their lobby if no one has joined yet
- * 
+ *
  * @param playerA - Player A's public key
  * @param lobbyId - Lobby ID to cancel
  * @param lobbyPda - Lobby PDA address

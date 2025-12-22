@@ -8,12 +8,7 @@
  * - Cron runs every 30 seconds as a backup to catch missed updates
  */
 
-import {
-  query,
-  action,
-  internalMutation,
-  internalQuery,
-} from "./_generated/server";
+import { query, action, internalMutation, internalQuery, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Solana1v1QueryClient } from "./lib/solana_1v1";
@@ -117,7 +112,7 @@ export const getPlayerLobbies = query({
       .collect();
 
     // Combine all lobbies and deduplicate by lobbyId, keeping the highest status
-    const allLobbiesMap = new Map<number, typeof lobbiesAsPlayerA[0]>();
+    const allLobbiesMap = new Map<number, (typeof lobbiesAsPlayerA)[0]>();
     for (const lobby of [...lobbiesAsPlayerA, ...lobbiesAsPlayerB]) {
       const existing = allLobbiesMap.get(lobby.lobbyId);
       // Keep the lobby with the higher status
@@ -142,7 +137,7 @@ export const getPlayerLobbies = query({
  * Also includes lobbies awaiting settlement (status 1, 2)
  * Used to display lobby history in the UI
  * Ordered by most recent first
- * 
+ *
  * Status flow:
  * 0 = Created (waiting for Player B)
  * 1 = Awaiting VRF (Player B joined)
@@ -151,11 +146,11 @@ export const getPlayerLobbies = query({
  */
 export const getCompletedLobbies = query({
   args: {
-    limit: v.optional(v.number()), // Default: 50
+    limit: v.optional(v.number()), // Default: 20
   },
   handler: async (ctx, args) => {
-    const limit = args.limit || 50;
-    
+    const limit = args.limit || 20;
+
     // Get all resolved lobbies (status 3)
     const completedLobbies = await ctx.db
       .query("oneVOneLobbies")
@@ -167,7 +162,7 @@ export const getCompletedLobbies = query({
       .query("oneVOneLobbies")
       .withIndex("by_status", (q) => q.eq("status", 1))
       .collect();
-    
+
     const vrfReceivedLobbies = await ctx.db
       .query("oneVOneLobbies")
       .withIndex("by_status", (q) => q.eq("status", 2))
@@ -303,8 +298,6 @@ export const joinLobbyInDb = mutation({
     return lobby._id;
   },
 });
-
-
 
 /**
  * Public mutation wrapper for canceling lobbies
@@ -600,10 +593,7 @@ export const joinLobby = action({
     characterB: v.number(), // Character/skin ID (0-255)
     transactionHash: v.string(), // Solana transaction hash (for verification)
   },
-  handler: async (
-    ctx,
-    args
-  ): Promise<{ success: boolean; lobbyId: number; action: string }> => {
+  handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; action: string }> => {
     try {
       const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
 
@@ -630,7 +620,7 @@ export const joinLobby = action({
       // Status 1 = Awaiting VRF (Player B joined, VRF requested)
       // Status 2 = VRF Received (randomness stored, ready for settlement)
       // Status 3 = Resolved (winner determined, funds distributed)
-      
+
       // After join_lobby, status should be 1 (Awaiting VRF)
       // VRF callback will set it to 2, then settle_lobby sets it to 3
       if (lobbyAccount.status === 0) {
@@ -657,7 +647,6 @@ export const joinLobby = action({
     }
   },
 });
-
 
 /**
  * Cancel a lobby (Player A refunds)
@@ -711,7 +700,7 @@ export const cancelLobby = action({
 /**
  * Internal query helper to get all open lobbies for sync
  * Used by syncLobbyFromBlockchain to fetch lobbies that may need syncing
- * 
+ *
  * Status flow:
  * 0 = Created (waiting for Player B)
  * 1 = Awaiting VRF (Player B joined)

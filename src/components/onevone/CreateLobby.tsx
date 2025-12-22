@@ -13,10 +13,7 @@ interface CreateLobbyProps {
 
 const DEFAULT_BET_AMOUNT_SOL = 0.01;
 
-export function CreateLobby({
-  selectedCharacter,
-  onLobbyCreated,
-}: CreateLobbyProps) {
+export function CreateLobby({ selectedCharacter, onLobbyCreated }: CreateLobbyProps) {
   const { connected, publicKey, wallet } = usePrivyWallet();
   const createLobbyAction = useAction(api.lobbies.createLobby);
 
@@ -24,15 +21,12 @@ export function CreateLobby({
   const [isPrivate, setIsPrivate] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleAmountChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = parseFloat(e.target.value) || 0;
-      if (value >= 0 && value <= 100) {
-        setBetAmount(value);
-      }
-    },
-    []
-  );
+  const handleAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseFloat(e.target.value) || 0;
+    if (value >= 0 && value <= 100) {
+      setBetAmount(value);
+    }
+  }, []);
 
   const handleCreateLobby = useCallback(async () => {
     if (!connected || !publicKey || !selectedCharacter || !wallet) {
@@ -97,9 +91,9 @@ export function CreateLobby({
       toast.loading("Waiting for transaction confirmation...", { id: "tx-confirm" });
 
       const confirmation = await connection.confirmTransaction(signature, "confirmed");
-      
+
       if (confirmation.value.err) {
-          throw new Error("Transaction failed: " + confirmation.value.err.toString());
+        throw new Error("Transaction failed: " + confirmation.value.err.toString());
       }
 
       toast.success("Transaction confirmed!", { id: "tx-confirm" });
@@ -140,9 +134,7 @@ export function CreateLobby({
       } else if (errorMsg.includes("confirmation timeout")) {
         toast.error("Transaction confirmation timed out. Please check your wallet.");
       } else if (errorMsg.includes("Insufficient SOL")) {
-        toast.error(
-          `Insufficient SOL. Need: ~${(betAmount + 0.003).toFixed(4)} SOL (bet + fees)`
-        );
+        toast.error(`Insufficient SOL. Need: ~${(betAmount + 0.003).toFixed(4)} SOL (bet + fees)`);
       } else {
         toast.error("Failed to create lobby: " + errorMsg);
       }
@@ -161,81 +153,99 @@ export function CreateLobby({
   ]);
 
   if (!connected || !publicKey) {
-    return (
-      <div className="p-4 bg-red-900/20 border border-red-500 rounded text-red-200 text-sm">
-        Connect wallet to create lobbies
-      </div>
-    );
+    return null;
   }
 
   return (
-    <div className="bg-gray-900 border-1 border-indigo-500/30 rounded-lg p-6">
-      <h2 className="text-xl font-bold text-indigo-200 mb-4">Create Lobby</h2>
+    <div className=" p-4">
+      {/* CoinFlip-style Header Row */}
+      <div className="flex flex-wrap items-center gap-4">
+        {/* Title Section */}
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-black text-amber-100  tracking-wide">1v1 BATTLE</h1>
+        </div>
 
-      {/* Selected Character Display
-      <div className="mb-4 p-3 bg-gray-800 border border-indigo-400/50 rounded">
-        <p className="text-xs text-indigo-400 mb-1">Your Character</p>
-        <p className="text-indigo-200 font-semibold">
-          {selectedCharacter ? selectedCharacter.name : "No character selected"}
-        </p>
-      </div> */}
+        {/* Spacer */}
+        <div className="flex-1 hidden lg:block"></div>
 
-      {/* Bet Amount Input */}
-      <div className="mb-4">
-        <label className="block text-sm text-indigo-300 mb-2">Bet Amount (SOL)</label>
-        <input
-          type="number"
-          value={betAmount}
-          onChange={handleAmountChange}
-          min="0"
-          max="100"
-          step="0.01"
-          className="w-full px-3 py-2 bg-gray-800 border border-indigo-500/30/30 rounded text-indigo-200 focus:border-indigo-400 focus:outline-none"
-          disabled={isLoading}
-        />
-        <p className="text-xs text-gray-400 mt-1">Min: 0.01 SOL | Max: 100 SOL</p>
+        {/* Bet Amount Input with Increment Buttons */}
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <img
+              src="/sol-logo.svg"
+              alt="SOL"
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+              style={{
+                filter:
+                  "brightness(0) saturate(100%) invert(66%) sepia(89%) saturate(470%) hue-rotate(359deg) brightness(97%) contrast(89%)",
+              }}
+            />
+            <input
+              type="number"
+              value={betAmount}
+              onChange={handleAmountChange}
+              min="0.01"
+              max="100"
+              step="0.01"
+              className="w-32 px-3 py-2 pl-9 bg-black/30 border border-amber-700/50 rounded-lg text-amber-100 placeholder-amber-600 text-center font-bold focus:outline-none focus:border-amber-500"
+              disabled={isLoading}
+              placeholder="0.01"
+            />
+          </div>
+
+          <button
+            onClick={() => setBetAmount((prev) => Math.min(prev + 0.1, 100))}
+            disabled={isLoading}
+            className="px-3 py-2 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded-lg text-amber-300 font-bold transition-colors disabled:opacity-50"
+          >
+            +0.1
+          </button>
+          <button
+            onClick={() => setBetAmount((prev) => Math.min(prev + 1, 100))}
+            disabled={isLoading}
+            className="px-3 py-2 bg-amber-800/30 hover:bg-amber-700/40 border border-amber-600/50 rounded-lg text-amber-300 font-bold transition-colors disabled:opacity-50"
+          >
+            +1
+          </button>
+        </div>
+
+        {/* Private Toggle */}
+        <label className="flex items-center gap-2 cursor-pointer">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isPrivate}
+            onClick={() => setIsPrivate(!isPrivate)}
+            disabled={isLoading}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-gray-900 ${
+              isPrivate ? "bg-amber-600" : "bg-gray-600"
+            } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                isPrivate ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+          <span className="text-sm text-amber-300 font-medium">Private</span>
+        </label>
+
+        {/* Create Game Button */}
+        <button
+          onClick={handleCreateLobby}
+          disabled={isLoading || !selectedCharacter || betAmount <= 0}
+          className="px-6 py-2 bg-gradient-to-b from-amber-500 to-amber-700 hover:to-amber-800 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-amber-100 font-bold rounded-lg uppercase tracking-wider transition-all shadow-lg"
+        >
+          {isLoading ? "Creating..." : "Create Game"}
+        </button>
       </div>
 
-        {/* Private Lobby Toggle */}
-        <div className="mb-4">
-        <label className="flex items-center justify-between cursor-pointer">
-          <button
-              type="button"
-              role="switch"
-              aria-checked={isPrivate}
-              onClick={() => setIsPrivate(!isPrivate)}
-              disabled={isLoading}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 ${
-                isPrivate ? 'bg-indigo-600' : 'bg-gray-600'
-              } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  isPrivate ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-indigo-300">🔒 Private Lobby</span>
-            </div>
-          </label>
+      {/* Character Selection Warning */}
+      {!selectedCharacter && (
+        <div className="mt-3 px-3 py-2 bg-amber-900/30 border border-amber-700/50 rounded-lg">
+          <p className="text-amber-300 text-sm text-center">Select a character to create a game</p>
         </div>
-
-        {/* Info */}
-        <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded text-xs text-blue-200">
-          <p>Challenge another player to battle</p>
-          <p>Wait for second player to join, or share the lobby link</p>
-          <p>Winner takes all (minus 2% fee)</p>
-        </div>
-
-      {/* Create Button */}
-      <button
-        onClick={handleCreateLobby}
-        disabled={isLoading || !selectedCharacter || betAmount <= 0}
-        className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold rounded transition-colors"
-      >
-        {isLoading ? "Creating..." : "Create Lobby"}
-      </button>
+      )}
     </div>
   );
 }

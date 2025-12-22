@@ -573,7 +573,7 @@ export class PlayerManager {
 
       // Position container so feet align with throne anchor
       // Need to ADD offset to move container down to account for sprite's internal offset
-      const targetThroneY = this.centerY + 120;
+      const targetThroneY = this.centerY + 230;
       const containerY = targetThroneY + spriteOffset;
 
       this.scene.tweens.add({

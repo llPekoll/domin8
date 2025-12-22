@@ -36,59 +36,31 @@ export function LobbyHistory({ lobbies, maxLobbies = MAX_LOBBIES_DEFAULT }: Lobb
     return (lamports / 1e9).toFixed(3);
   };
 
-  const formatTime = (timestamp: number | undefined) => {
-    if (!timestamp) return "--:--";
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   const formatWallet = (wallet: string | undefined) => {
     if (!wallet) return "---";
     return wallet.slice(0, 4) + "..." + wallet.slice(-4);
   };
 
-  const getStatusBadge = (status: number) => {
-    switch (status) {
-      case 0:
-        return { text: "Open", color: "bg-blue-500/20 text-blue-300 border-blue-500/50" };
-      case 1:
-        return { text: "VRF...", color: "bg-yellow-500/20 text-yellow-300 border-yellow-500/50" };
-      case 2:
-        return { text: "VRF ✓", color: "bg-orange-500/20 text-orange-300 border-orange-500/50" };
-      case 3:
-        return { text: "Done", color: "bg-green-500/20 text-green-300 border-green-500/50" };
-      default:
-        return { text: "?", color: "bg-gray-500/20 text-gray-300 border-gray-500/50" };
-    }
-  };
-
   if (displayedLobbies.length === 0) {
     return (
-      <div className="lobby-history-sidebar">
-        <div className="lobby-history-header">
-          <h2 className="text-sm font-bold text-indigo-200">History</h2>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-gray-500 text-xs">No history yet</p>
+      <div className="space-y-4">
+        <h2 className="text-xl font-bold text-amber-100">RECENT BATTLES</h2>
+        <div className="text-center py-12 bg-gradient-to-b from-amber-900/20 to-amber-950/20 rounded-xl border border-amber-700/30">
+          <p className="text-amber-400/60 text-sm">No battles yet</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="lobby-history-sidebar">
-      <div className="lobby-history-header">
-        <h2 className="text-sm font-bold text-indigo-200">
-          History <span className="text-indigo-400/60">({displayedLobbies.length}{lobbies.length > maxLobbies ? `/${lobbies.length}` : ""})</span>
-        </h2>
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <h2 className="text-xl font-bold text-amber-100">RECENT BATTLES</h2>
+        <span className="text-amber-400 font-mono">({displayedLobbies.length})</span>
       </div>
 
-      <div className="lobby-history-content lobby-history-scroll">
+      <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-700/50 scrollbar-track-gray-950/20">
         {displayedLobbies.map((lobby) => {
-          const statusBadge = getStatusBadge(lobby.status);
           const isResolved = lobby.status === 3;
           const isPlayerAWinner = lobby.winner === lobby.playerA;
           const isPlayerBWinner = lobby.winner === lobby.playerB;
@@ -96,57 +68,100 @@ export function LobbyHistory({ lobbies, maxLobbies = MAX_LOBBIES_DEFAULT }: Lobb
           return (
             <div
               key={lobby._id}
-              className="lobby-history-card"
+              className="bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 rounded-xl p-4 hover:border-gray-600/50 transition-colors"
             >
-              {/* Header: ID + Status + Amount */}
-              <div className="lobby-history-card-header">
-                <div className="flex items-center gap-2">
-                  <span className="text-indigo-300 font-bold text-xs">#{lobby.lobbyId}</span>
-                  <span className={`lobby-status-badge ${statusBadge.color}`}>
-                    {statusBadge.text}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-indigo-300 font-semibold">{formatAmount(lobby.amount)}</span>
-                  <span className="text-gray-500">SOL</span>
-                </div>
-              </div>
-
-              {/* Players row */}
-              <div className="lobby-history-players">
-                <span className="text-gray-500 text-[14px]">A:</span>
-                <span className={`font-mono text-[11px] ${isPlayerAWinner ? 'text-yellow-300 font-bold' : 'text-indigo-300'}`}>
-                  {formatWallet(lobby.playerA)}
-                  {isPlayerAWinner && ' 👑'}
-                </span>
-                <span className="text-gray-600 text-[14px] mx-1">vs</span>
-                <span className="text-gray-500 text-[14px]">B:</span>
-                {lobby.playerB ? (
-                  <span className={`font-mono text-[11px] ${isPlayerBWinner ? 'text-yellow-300 font-bold' : 'text-indigo-300'}`}>
-                    {formatWallet(lobby.playerB)}
-                    {isPlayerBWinner && ' 👑'}
-                  </span>
-                ) : (
-                  <span className="text-gray-600 italic text-[11px]">---</span>
-                )}
-                <span className="text-gray-500 text-[14px] ml-auto">{formatTime(isResolved ? lobby.resolvedAt : lobby.createdAt)}</span>
-              </div>
-
-              {/* Transaction hash link for resolved lobbies */}
-              {isResolved && lobby.settleTxHash && (
-                <div className="mt-1 flex items-center gap-1">
-                  <span className="text-gray-500 text-[10px]">Tx:</span>
-                  <a
-                    href={`https://explorer.solana.com/tx/${lobby.settleTxHash}?cluster=devnet`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono text-[10px] text-indigo-400 hover:text-indigo-300 hover:underline truncate max-w-[120px]"
-                    title={lobby.settleTxHash}
+              <div className="flex items-center justify-between">
+                {/* Player A */}
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="relative">
+                    <div
+                      className={`w-10 h-10 rounded-full border-2 flex items-center justify-center overflow-hidden ${
+                        isPlayerAWinner
+                          ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
+                          : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                      }`}
+                    >
+                      <span className="text-white font-bold">
+                        {lobby.playerA.slice(0, 1).toUpperCase()}
+                      </span>
+                    </div>
+                    {isPlayerAWinner && <div className="absolute -top-1 -right-1 text-xs">👑</div>}
+                  </div>
+                  <p
+                    className={`font-semibold text-sm ${isPlayerAWinner ? "text-amber-300" : "text-gray-400"}`}
                   >
-                    {lobby.settleTxHash.slice(0, 8)}...{lobby.settleTxHash.slice(-8)}
-                  </a>
+                    {formatWallet(lobby.playerA)}
+                  </p>
                 </div>
-              )}
+
+                {/* VS Icon */}
+                <div className="px-3">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    className="text-gray-600"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M6 3l6 6M18 3l-6 6M6 21l6-6M18 21l-6-6" />
+                  </svg>
+                </div>
+
+                {/* Player B */}
+                <div className="flex items-center gap-3 flex-1 justify-end">
+                  <p
+                    className={`font-semibold text-sm ${isPlayerBWinner ? "text-amber-300" : "text-gray-400"}`}
+                  >
+                    {lobby.playerB ? formatWallet(lobby.playerB) : "---"}
+                  </p>
+                  <div className="relative">
+                    <div
+                      className={`w-10 h-10 rounded-full border-2 flex items-center justify-center overflow-hidden ${
+                        isPlayerBWinner
+                          ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
+                          : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                      }`}
+                    >
+                      <span className="text-white font-bold">
+                        {lobby.playerB ? lobby.playerB.slice(0, 1).toUpperCase() : "?"}
+                      </span>
+                    </div>
+                    {isPlayerBWinner && <div className="absolute -top-1 -right-1 text-xs">👑</div>}
+                  </div>
+                </div>
+
+                {/* Amount & Winner */}
+                <div className="flex items-center gap-2 ml-4">
+                  <div className="flex items-center gap-1 bg-gray-800/80 px-2 py-1 rounded-lg">
+                    <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
+                    <span className="text-white font-bold text-sm">
+                      {formatAmount(lobby.amount)}
+                    </span>
+                  </div>
+                  {isResolved && (
+                    <div className="flex items-center gap-1.5 px-3 py-1 bg-gray-800/80 rounded-lg">
+                      <div
+                        className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                          isPlayerAWinner || isPlayerBWinner
+                            ? "bg-gradient-to-br from-amber-500 to-amber-700"
+                            : "bg-gray-700"
+                        }`}
+                      >
+                        <span className="text-white text-[10px] font-bold">
+                          {isPlayerAWinner
+                            ? lobby.playerA.slice(0, 1).toUpperCase()
+                            : isPlayerBWinner
+                              ? lobby.playerB?.slice(0, 1).toUpperCase()
+                              : "?"}
+                        </span>
+                      </div>
+                      <span className="text-gray-300 font-medium text-sm">Winner</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           );
         })}

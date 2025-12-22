@@ -30,6 +30,7 @@ interface LobbyData {
   status: 0 | 1 | 2 | 3; // 0 = Open, 1 = Awaiting VRF, 2 = VRF Received, 3 = Resolved
   winner?: string;
   isPrivate?: boolean;
+  settleTxHash?: string; // Transaction hash for prize settlement
 }
 
 interface LobbyDetailsDialogProps {
@@ -39,23 +40,27 @@ interface LobbyDetailsDialogProps {
   currentPlayerWallet: string;
   selectedCharacter: Character | null;
   onJoin: (lobbyId: number) => void | Promise<void>;
-  onCancel: (lobbyId: number) => void;
   isJoining?: boolean;
   // Props for arena functionality (fight sequence)
   onFightComplete?: () => void;
   onDoubleDown?: (amount: number) => void;
 }
 
-type ArenaState = "preview" | "waiting" | "opponent-joining" | "vrf-pending" | "fighting" | "results";
+type ArenaState =
+  | "preview"
+  | "waiting"
+  | "opponent-joining"
+  | "vrf-pending"
+  | "fighting"
+  | "results";
 
-export function LobbyDetailsDialog({ 
-  isOpen, 
-  onClose, 
-  lobby, 
+export function LobbyDetailsDialog({
+  isOpen,
+  onClose,
+  lobby,
   currentPlayerWallet,
   selectedCharacter,
-  onJoin, 
-  onCancel,
+  onJoin,
   isJoining = false,
   onFightComplete,
   onDoubleDown,
@@ -85,21 +90,26 @@ export function LobbyDetailsDialog({
   }, [playerNames]);
 
   // Helper to get display name for a wallet address
-  const getDisplayName = useCallback((walletAddress: string, isCurrentUser: boolean) => {
-    if (isCurrentUser) return "You";
-    // Look up player name from the map
-    const displayName = playerNameMap.get(walletAddress);
-    if (displayName) {
-      return displayName;
-    }
-    // Fallback to sliced wallet address
-    return `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`;
-  }, [playerNameMap]);
+  const getDisplayName = useCallback(
+    (walletAddress: string, isCurrentUser: boolean) => {
+      if (isCurrentUser) return "You";
+      // Look up player name from the map
+      const displayName = playerNameMap.get(walletAddress);
+      if (displayName) {
+        return displayName;
+      }
+      // Fallback to sliced wallet address
+      return `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`;
+    },
+    [playerNameMap]
+  );
 
   const [gameReady, setGameReady] = useState(false);
   const [containerReady, setContainerReady] = useState(false);
   const [arenaState, setArenaState] = useState<ArenaState>("preview");
-  const [fightResult, setFightResult] = useState<{ winner: string; isUserWinner: boolean } | null>(null);
+  const [fightResult, setFightResult] = useState<{ winner: string; isUserWinner: boolean } | null>(
+    null
+  );
   const sceneInitialized = useRef(false);
   const previousLobbyStatus = useRef<number | null>(null);
   const playerBSpawned = useRef(false);
@@ -129,8 +139,9 @@ export function LobbyDetailsDialog({
 
   // Create dedicated Phaser game instance for modal
   useEffect(() => {
-    if (!isOpen || !containerReady || !modalGameContainerRef.current || !characters || !maps) return;
-    
+    if (!isOpen || !containerReady || !modalGameContainerRef.current || !characters || !maps)
+      return;
+
     // Don't create if already exists
     if (gameInstanceRef.current) return;
 
@@ -257,13 +268,16 @@ export function LobbyDetailsDialog({
       setArenaState("vrf-pending");
     } else if (lobby.status === 3 && lobby.winner) {
       // Status 3 = Resolved - need to start fight animation after characters spawn
-      logger.game.info("[LobbyDetails] Lobby already resolved on open, scheduling fight animation", {
-        winner: lobby.winner,
-        hasPlayerB: !!lobby.playerB,
-      });
+      logger.game.info(
+        "[LobbyDetails] Lobby already resolved on open, scheduling fight animation",
+        {
+          winner: lobby.winner,
+          hasPlayerB: !!lobby.playerB,
+        }
+      );
       fightStarted.current = true;
       setArenaState("fighting");
-      
+
       // Delay fight animation to allow Player B character to spawn and land
       // Player A spawns immediately, Player B spawns after 500ms, give extra time for landing animation
       const fightDelay = lobby.playerB && lobby.characterB !== undefined ? 1500 : 500;
@@ -312,7 +326,7 @@ export function LobbyDetailsDialog({
         // Open - waiting for opponent
         if (lobby.playerB) {
           setArenaState("opponent-joining");
-          
+
           // If Player B just joined, spawn their character
           if (lobby.characterB !== undefined && !playerBSpawned.current) {
             const scene = getOneVOneScene();
@@ -355,11 +369,11 @@ export function LobbyDetailsDialog({
           playerBSpawned: playerBSpawned.current,
           fightStarted: fightStarted.current,
         });
-        
+
         // Only start fight if not already started (use ref to avoid stale closure)
         if (!fightStarted.current) {
           fightStarted.current = true;
-          
+
           // Ensure Player B is spawned before starting fight (shouldn't happen normally)
           if (lobby.playerB && lobby.characterB !== undefined && !playerBSpawned.current) {
             const scene = getOneVOneScene();
@@ -374,9 +388,9 @@ export function LobbyDetailsDialog({
               });
             }
           }
-          
+
           setArenaState("fighting");
-          
+
           // Start fight animation immediately (no artificial delay since characters should already be spawned)
           // Use requestAnimationFrame to ensure React state update has propagated
           requestAnimationFrame(() => {
@@ -403,13 +417,13 @@ export function LobbyDetailsDialog({
     }
   }, [isOpen, lobby, isCreator, getOneVOneScene, gameReady, getDisplayName]);
 
-  // Listen for fight completion event from Phaser
+  // Listen for results ready event (shows buttons immediately)
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleFightComplete = () => {
-      logger.game.info("[LobbyDetails] Fight animation complete");
-      
+    const handleResultsReady = () => {
+      logger.game.info("[LobbyDetails] Results ready, showing buttons");
+
       if (lobby?.winner && publicKey) {
         const isUserWinner = lobby.winner === publicKey.toString();
         setFightResult({
@@ -417,8 +431,26 @@ export function LobbyDetailsDialog({
           isUserWinner,
         });
         setArenaState("results");
+      }
+    };
 
-        // If user lost, auto-close after delay
+    EventBus.on("1v1-results-ready", handleResultsReady);
+
+    return () => {
+      EventBus.off("1v1-results-ready", handleResultsReady);
+    };
+  }, [isOpen, lobby, publicKey]);
+
+  // Listen for fight completion event from Phaser (for auto-close on loss)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleFightComplete = () => {
+      logger.game.info("[LobbyDetails] Fight animation complete");
+
+      // If user lost, auto-close after delay
+      if (lobby?.winner && publicKey) {
+        const isUserWinner = lobby.winner === publicKey.toString();
         if (!isUserWinner) {
           setTimeout(() => {
             onFightComplete?.();
@@ -446,9 +478,6 @@ export function LobbyDetailsDialog({
       toast.error("Failed to copy link");
     }
   }, [lobby]);
-
-  // Get character name from characterA id
-  const characterName = characters?.find((c: Character) => c.id === lobby?.characterA)?.name || `Character #${lobby?.characterA}`;
 
   // Helper function to format lamports to SOL
   const formatAmount = (lamports: number) => {
@@ -518,50 +547,68 @@ export function LobbyDetailsDialog({
   const statusDisplay = getStatusDisplay();
 
   // Determine if close button should be shown (allow closing during preview, waiting, and results)
-  const showCloseButton = arenaState === "preview" || arenaState === "waiting" || arenaState === "results" || arenaState === "opponent-joining" || arenaState === "vrf-pending";
+  const showCloseButton =
+    arenaState === "preview" ||
+    arenaState === "waiting" ||
+    arenaState === "results" ||
+    arenaState === "opponent-joining" ||
+    arenaState === "vrf-pending";
 
   // Early return AFTER all hooks are called
   if (!lobby) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent 
-        className="bg-black border-2 border-indigo-500/30 text-white sm:max-w-4xl p-0 overflow-hidden !gap-0"
+      <DialogContent
+        className="bg-black border-2 border-amber-700/50 text-white sm:max-w-4xl p-0 overflow-hidden !gap-0"
         showCloseButton={showCloseButton}
       >
         {/* Header */}
-        <DialogHeader className="p-3 pr-12 bg-gradient-to-r from-indigo-900/90 to-purple-900/90 border-b border-indigo-500/30/50">
-          <DialogTitle className="text-lg font-bold text-indigo-200 flex items-center justify-between">
+        <DialogHeader className="p-3 pr-12 bg-gradient-to-r from-amber-900/90 to-amber-950/90 border-b border-amber-700/50">
+          <DialogTitle className="text-lg font-bold text-amber-200 flex items-center justify-between">
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
               {lobby.isPrivate && <span title="Private Lobby">🔒</span>}
-              Lobby #{lobby.lobbyId}
+              Battle #{lobby.lobbyId}
               {/* Share Button - only show when not in fight/results */}
-              {(arenaState === "preview" || arenaState === "waiting") && lobby.playerA == publicKey?.toString() && (
-                <button
-                  onClick={handleCopyShareLink}
-                  className="ml-2 p-1 hover:bg-indigo-700/50 rounded transition-colors"
-                  title="Copy share link"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-300 hover:text-white">
-                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
-                    <polyline points="16 6 12 2 8 6"/>
-                    <line x1="12" y1="2" x2="12" y2="15"/>
-                  </svg>
-                </button>
-              )}
+              {(arenaState === "preview" || arenaState === "waiting") &&
+                lobby.playerA == publicKey?.toString() && (
+                  <button
+                    onClick={handleCopyShareLink}
+                    className="ml-2 p-1 hover:bg-amber-700/50 rounded transition-colors"
+                    title="Copy share link"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="text-amber-300 hover:text-white"
+                    >
+                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                      <polyline points="16 6 12 2 8 6" />
+                      <line x1="12" y1="2" x2="12" y2="15" />
+                    </svg>
+                  </button>
+                )}
             </span>
-            <span className="text-yellow-400 font-mono">
-              {formatAmount(lobby.amount)} SOL
+            <span className="text-amber-400 font-mono flex items-center gap-1">
+              <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
+              {formatAmount(lobby.amount)}
             </span>
           </DialogTitle>
         </DialogHeader>
 
         {/* Phaser Game Container - aspect ratio matches game dimensions (1188x540 = 11:5 ≈ 2.2:1) */}
-        <div 
+        <div
           ref={containerRefCallback}
           className="relative w-full bg-gray-900 flex items-center justify-center overflow-hidden [&>canvas]:max-w-full [&>canvas]:max-h-full [&>canvas]:object-contain"
-          style={{ aspectRatio: '1188 / 540' }}
+          style={{ aspectRatio: "1188 / 540" }}
         >
           {/* Loading indicator while Phaser initializes */}
           {!gameReady && (
@@ -570,121 +617,143 @@ export function LobbyDetailsDialog({
               <p className="text-gray-400 text-sm">Loading arena...</p>
             </div>
           )}
-          
+
           {/* Status Banner - Small overlay at top */}
           {gameReady && arenaState !== "fighting" && arenaState !== "results" && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-              <div className="text-center bg-black/70 px-6 py-3 rounded-lg border border-indigo-500/30/50">
+              <div className="text-center bg-black/70 px-6 py-3 rounded-lg border border-amber-700/50">
                 <div className="flex items-center gap-3">
                   {statusDisplay.showSpinner && (
-                    <div className="animate-spin w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full"></div>
+                    <div className="animate-spin w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full"></div>
                   )}
                   <div>
-                    <h2 className="text-lg font-bold text-white">{statusDisplay.title}</h2>
-                    <p className="text-gray-300 text-sm">{statusDisplay.subtitle}</p>
+                    <h2 className="text-lg font-bold text-amber-100">{statusDisplay.title}</h2>
+                    <p className="text-amber-300/80 text-sm">{statusDisplay.subtitle}</p>
                   </div>
                 </div>
               </div>
             </div>
           )}
-
-          {/* Fight Banner */}
-          {arenaState === "fighting" && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-              <h2 className="text-4xl font-black text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)] animate-pulse">
-                {statusDisplay.title}
-              </h2>
-            </div>
-          )}
         </div>
 
-        {/* Results Actions (only show when fight is complete) */}
-        {arenaState === "results" && fightResult && (
-          <div className="p-6 bg-gray-900/95 border-t border-indigo-500/30/50">
-            <div className="text-center mb-4">
-              <h2
-                className={`text-3xl font-black mb-2 ${
-                  fightResult.isUserWinner
-                    ? "text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]"
-                    : "text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]"
-                }`}
+        {/* Footer for spectator mode (resolved lobbies) or during fighting */}
+        {(arenaState === "fighting" || (arenaState === "results" && lobby.status === 3)) && (
+          <div className="p-4 bg-gradient-to-b from-amber-900/50 to-amber-950/50 border-t border-amber-700/50">
+            <div className="text-center flex flex-col items-center gap-2">
+              <button
+                onClick={onClose}
+                className="px-6 py-2 bg-amber-900/30 hover:bg-amber-800/40 border border-amber-700/40 text-amber-300 rounded transition-colors"
               >
-                {statusDisplay.title}
-              </h2>
-              <p className="text-gray-300">{statusDisplay.subtitle}</p>
+                Back to Lobby List
+              </button>
+              {lobby.settleTxHash && (
+                <a
+                  href={`https://solscan.io/tx/${lobby.settleTxHash}${import.meta.env.VITE_SOLANA_NETWORK === "devnet" ? "?cluster=devnet" : ""}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-amber-400/60 hover:text-amber-300 underline"
+                >
+                  View settlement transaction ↗
+                </a>
+              )}
             </div>
+          </div>
+        )}
 
+        {/* Results Actions for live games (not resolved/spectator) */}
+        {arenaState === "results" && fightResult && lobby.status !== 3 && (
+          <div className="p-4 bg-gradient-to-b from-amber-900/50 to-amber-950/50 border-t border-amber-700/50">
             {fightResult.isUserWinner ? (
-              <div className="space-y-3 max-w-sm mx-auto">
+              <div className="flex flex-col items-center gap-2 max-w-sm mx-auto">
                 {onDoubleDown && (
                   <button
                     onClick={handleDoubleDownClick}
-                    className="w-full py-3 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white font-bold rounded-lg transform hover:scale-105 transition-all shadow-lg"
+                    className="w-full py-3 bg-gradient-to-b from-amber-500 to-amber-700 hover:to-amber-800 text-amber-100 font-bold rounded-lg transform hover:scale-105 transition-all shadow-lg"
                   >
                     DOUBLE DOWN! (Bet {formatAmount(prizeAmount)} SOL)
                   </button>
                 )}
                 <button
                   onClick={handleCollectAndLeave}
-                  className="w-full py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 font-semibold rounded-lg transition-colors"
+                  className="px-6 py-1.5 text-sm bg-amber-900/30 hover:bg-amber-800/40 border border-amber-700/40 text-amber-300/80 rounded transition-colors"
                 >
                   Collect & Leave
                 </button>
+                {lobby.settleTxHash && (
+                  <a
+                    href={`https://solscan.io/tx/${lobby.settleTxHash}${import.meta.env.VITE_SOLANA_NETWORK === "devnet" ? "?cluster=devnet" : ""}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-amber-400/60 hover:text-amber-300 underline"
+                  >
+                    View settlement transaction ↗
+                  </a>
+                )}
               </div>
             ) : (
-              <div className="text-center">
-                <p className="text-gray-400 text-sm mb-4">Returning to lobby list...</p>
+              <div className="text-center flex flex-col items-center gap-2">
+                <button
+                  onClick={onClose}
+                  className="px-6 py-2 bg-amber-900/30 hover:bg-amber-800/40 border border-amber-700/40 text-amber-300 rounded transition-colors"
+                >
+                  Back to Lobby List
+                </button>
+                {lobby.settleTxHash && (
+                  <a
+                    href={`https://solscan.io/tx/${lobby.settleTxHash}${import.meta.env.VITE_SOLANA_NETWORK === "devnet" ? "?cluster=devnet" : ""}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-amber-400/60 hover:text-amber-300 underline"
+                  >
+                    View settlement transaction ↗
+                  </a>
+                )}
               </div>
             )}
           </div>
         )}
 
         {/* Lobby Info Footer - Show during preview/waiting/pending states */}
-        {(arenaState === "preview" || arenaState === "waiting" || arenaState === "opponent-joining" || arenaState === "vrf-pending") && (
-          <div className="p-4 bg-gray-900/95 border-t border-indigo-500/30/30">
+        {(arenaState === "preview" ||
+          arenaState === "waiting" ||
+          arenaState === "opponent-joining" ||
+          arenaState === "vrf-pending") && (
+          <div className="p-4 bg-gradient-to-b from-amber-900/50 to-amber-950/50 border-t border-amber-700/30">
             <div className="flex gap-3 mb-3">
-              <div className="bg-black/50 px-4 py-2 rounded-lg border border-indigo-500/30/30 text-center">
-                <p className="text-xs text-gray-400">Player A</p>
-                <p className="text-sm font-semibold text-indigo-200">{getDisplayName(lobby.playerA, isCreator)}</p>
+              <div className="bg-black/50 px-4 py-2 rounded-lg border border-amber-700/50 text-center flex-1">
+                <p className="text-xs text-amber-400/70">Player A</p>
+                <p className="text-sm font-semibold text-amber-200">
+                  {getDisplayName(lobby.playerA, isCreator)}
+                </p>
               </div>
-              <div className="bg-black/50 px-4 py-2 rounded-lg border border-indigo-500/30/30 text-center">
-                <p className="text-xs text-gray-400">Player B</p>
-                <p className="text-sm font-semibold text-indigo-200">{lobby.playerB ? getDisplayName(lobby.playerB, !isCreator) : "Waiting..."}</p>
+              <div className="bg-black/50 px-4 py-2 rounded-lg border border-amber-700/50 text-center flex-1">
+                <p className="text-xs text-amber-400/70">Player B</p>
+                <p className="text-sm font-semibold text-amber-200">
+                  {lobby.playerB ? getDisplayName(lobby.playerB, !isCreator) : "Waiting..."}
+                </p>
               </div>
-              <div className="bg-black/50 px-4 py-2 rounded-lg border border-indigo-500/30/30 text-center">
-                <p className="text-xs text-gray-400">Bet</p>
-                <p className="text-sm font-bold text-yellow-400">{formatAmount(lobby.amount)} SOL</p>
+              <div className="bg-black/50 px-4 py-2 rounded-lg border border-amber-700/50 text-center flex-1">
+                <p className="text-xs text-amber-400/70">Bet</p>
+                <div className="flex items-center gap-1 justify-center">
+                  <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
+                  <p className="text-sm font-bold text-amber-300">{formatAmount(lobby.amount)}</p>
+                </div>
               </div>
             </div>
 
             {/* Action Buttons - Only show during preview state */}
             {arenaState === "preview" && (
               <>
-                {isCreator ? (
-                  <div className="flex gap-3">
-                    <button
-                      onClick={onClose}
-                      className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm font-semibold rounded-lg transition-colors"
-                    >
-                      Browse Other Lobbies
-                    </button>
-                    <button
-                      onClick={() => onCancel(lobby.lobbyId)}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-bold rounded-lg transition-colors"
-                    >
-                      Cancel Lobby
-                    </button>
-                  </div>
-                ) : !connected ? (
+                {isCreator ? null : !connected ? (
                   /* User is not logged in - show connect wallet button */
                   <div>
-                    <p className="text-xs text-yellow-400 text-center mb-2">
-                      ⚠️ Connect your wallet to join this battle
+                    <p className="text-xs text-amber-400 text-center mb-2">
+                      Connect your wallet to join this battle
                     </p>
                     <button
                       onClick={login}
                       disabled={!ready}
-                      className="w-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2"
+                      className="w-full bg-gradient-to-b from-amber-500 to-amber-700 hover:to-amber-800 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-amber-100 font-bold py-2 px-4 rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
                     >
                       <LogIn className="h-4 w-4" />
                       Connect Wallet to Join
@@ -693,39 +762,20 @@ export function LobbyDetailsDialog({
                 ) : (
                   <div>
                     {!selectedCharacter && (
-                      <p className="text-xs text-yellow-400 text-center mb-2">
-                        ⚠️ Select a character before joining
+                      <p className="text-xs text-amber-400 text-center mb-2">
+                        Select a character before joining
                       </p>
                     )}
                     <button
                       onClick={() => onJoin(lobby.lobbyId)}
                       disabled={!selectedCharacter || isJoining}
-                      className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-lg shadow-indigo-900/20"
+                      className="w-full bg-gradient-to-b from-amber-500 to-amber-700 hover:to-amber-800 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-amber-100 font-bold py-2 px-4 rounded-lg transition-colors shadow-lg"
                     >
                       {isJoining ? "Joining..." : `Join Battle (${formatAmount(lobby.amount)} SOL)`}
                     </button>
                   </div>
                 )}
               </>
-            )}
-
-            {/* Waiting state actions for creator */}
-            {arenaState === "waiting" && isCreator && (
-              
-                <div className="flex gap-3">
-                    <button
-                      onClick={onClose}
-                      className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm font-semibold rounded-lg transition-colors"
-                    >
-                      Browse Other Lobbies
-                    </button>
-                    <button
-                      onClick={() => onCancel(lobby.lobbyId)}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-bold rounded-lg transition-colors"
-                    >
-                      Cancel Lobby
-                    </button>
-                  </div>
             )}
           </div>
         )}
