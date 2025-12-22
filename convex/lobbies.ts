@@ -322,6 +322,45 @@ export const cancelLobbyInDb = mutation({
 });
 
 /**
+ * Helper function to credit points to a player
+ * 1 point per 0.001 SOL (1,000,000 lamports)
+ */
+async function creditPlayerPoints(
+  ctx: { db: any },
+  walletAddress: string,
+  amountInLamports: number
+) {
+  // Calculate points: 1 point per 0.001 SOL (1,000,000 lamports)
+  const pointsToAdd = Math.floor(amountInLamports / 1_000_000);
+
+  if (pointsToAdd <= 0) return;
+
+  // Find existing player
+  const player = await ctx.db
+    .query("players")
+    .withIndex("by_wallet", (q: any) => q.eq("walletAddress", walletAddress))
+    .first();
+
+  if (player) {
+    // Update existing player's points
+    await ctx.db.patch(player._id, {
+      totalPoints: (player.totalPoints || 0) + pointsToAdd,
+      lastActive: Date.now(),
+    });
+  } else {
+    // Create new player record with points
+    await ctx.db.insert("players", {
+      walletAddress,
+      lastActive: Date.now(),
+      totalGamesPlayed: 0,
+      totalWins: 0,
+      totalPoints: pointsToAdd,
+      achievements: [],
+    });
+  }
+}
+
+/**
  * Internal mutation to create a lobby in Convex
  * Called by createLobby action after transaction confirmation
  */
@@ -364,6 +403,9 @@ export const _internalCreateLobby = internalMutation({
       resolvedAt: undefined,
     });
 
+    // Credit points to Player A for their bet
+    await creditPlayerPoints(ctx, args.playerA, args.amount);
+
     return docId;
   },
 });
@@ -395,6 +437,9 @@ export const _internalJoinLobby = internalMutation({
       characterB: args.characterB,
       status: 1, // Status 1 = Awaiting VRF
     });
+
+    // Credit points to Player B for their bet (same amount as the lobby)
+    await creditPlayerPoints(ctx, args.playerB, lobby.amount);
 
     // Schedule a job to settle this lobby after a 100 ms delay
     await ctx.scheduler.runAfter(100, internal.lobbiesActions._checkAndSettleLobby, {
@@ -441,6 +486,42 @@ export const _internalSettleLobby = internalMutation({
     }
 
     await ctx.db.patch(lobby._id, updateData);
+
+    // Credit the winner with points for the total pot (both players' bets)
+    const totalPot = lobby.amount * 2;
+    await creditPlayerPoints(ctx, args.winner, totalPot);
+
+    // Update player stats (totalGamesPlayed and totalWins)
+    const loser = lobby.playerA === args.winner ? lobby.playerB : lobby.playerA;
+
+    // Update winner stats
+    const winnerPlayer = await ctx.db
+      .query("players")
+      .withIndex("by_wallet", (q: any) => q.eq("walletAddress", args.winner))
+      .first();
+
+    if (winnerPlayer) {
+      await ctx.db.patch(winnerPlayer._id, {
+        totalGamesPlayed: (winnerPlayer.totalGamesPlayed || 0) + 1,
+        totalWins: (winnerPlayer.totalWins || 0) + 1,
+        lastActive: Date.now(),
+      });
+    }
+
+    // Update loser stats
+    if (loser) {
+      const loserPlayer = await ctx.db
+        .query("players")
+        .withIndex("by_wallet", (q: any) => q.eq("walletAddress", loser))
+        .first();
+
+      if (loserPlayer) {
+        await ctx.db.patch(loserPlayer._id, {
+          totalGamesPlayed: (loserPlayer.totalGamesPlayed || 0) + 1,
+          lastActive: Date.now(),
+        });
+      }
+    }
 
     return lobby._id;
   },

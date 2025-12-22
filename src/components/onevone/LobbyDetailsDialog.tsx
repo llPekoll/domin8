@@ -14,7 +14,8 @@ import { OneVOneBoot } from "../../game/scenes/OneVOneBoot";
 import { OneVOnePreloader } from "../../game/scenes/OneVOnePreloader";
 import { OneVOneScene } from "../../game/scenes/OneVOneScene";
 import { setCharactersData, setAllMapsData, STAGE_WIDTH, STAGE_HEIGHT } from "../../game/main";
-import { LogIn } from "lucide-react";
+import { LogIn, ChevronLeft, ChevronRight } from "lucide-react";
+import { SpriteAnimator } from "../SpriteAnimator";
 
 interface LobbyData {
   _id: string;
@@ -39,7 +40,7 @@ interface LobbyDetailsDialogProps {
   lobby: LobbyData | null;
   currentPlayerWallet: string;
   selectedCharacter: Character | null;
-  onJoin: (lobbyId: number) => void | Promise<void>;
+  onJoin: (lobbyId: number, character?: Character) => void | Promise<void>;
   isJoining?: boolean;
   // Props for arena functionality (fight sequence)
   onFightComplete?: () => void;
@@ -66,8 +67,44 @@ export function LobbyDetailsDialog({
   onDoubleDown,
 }: LobbyDetailsDialogProps) {
   const { characters, maps } = useAssets();
-  const { connected, publicKey } = usePrivyWallet();
+  const { connected, publicKey, solBalance } = usePrivyWallet();
   const { login, ready } = usePrivy();
+
+  // Check if user has enough balance to join (amount is in lamports)
+  const hasEnoughBalance = lobby ? solBalance >= lobby.amount / 1e9 : false;
+
+  // Local character selection state for joining via shared link
+  const [localCharacterIndex, setLocalCharacterIndex] = useState(0);
+
+  // Always use local character index for selection in dialog
+  const localSelectedCharacter = useMemo(() => {
+    if (characters && characters.length > 0) {
+      const safeIndex = localCharacterIndex % characters.length;
+      return characters[safeIndex >= 0 ? safeIndex : 0];
+    }
+    return null;
+  }, [characters, localCharacterIndex]);
+
+  // Sync local index when dialog opens or selectedCharacter changes
+  useEffect(() => {
+    if (isOpen && selectedCharacter && characters && characters.length > 0) {
+      const idx = characters.findIndex(c => c._id === selectedCharacter._id);
+      if (idx >= 0) {
+        setLocalCharacterIndex(idx);
+      }
+    }
+  }, [isOpen, selectedCharacter, characters]);
+
+  const handleCharacterChange = useCallback((direction: "prev" | "next") => {
+    if (!characters || characters.length === 0) return;
+    setLocalCharacterIndex(prev => {
+      if (direction === "prev") {
+        return prev === 0 ? characters.length - 1 : prev - 1;
+      } else {
+        return prev === characters.length - 1 ? 0 : prev + 1;
+      }
+    });
+  }, [characters]);
 
   // Get unique wallet addresses from the lobby to fetch player names
   const lobbyWallets = useMemo(() => {
@@ -107,6 +144,7 @@ export function LobbyDetailsDialog({
   const [gameReady, setGameReady] = useState(false);
   const [containerReady, setContainerReady] = useState(false);
   const [arenaState, setArenaState] = useState<ArenaState>("preview");
+
   const [fightResult, setFightResult] = useState<{ winner: string; isUserWinner: boolean } | null>(
     null
   );
@@ -195,20 +233,27 @@ export function LobbyDetailsDialog({
     };
   }, [isOpen, containerReady, characters, maps]);
 
-  // Cleanup game instance when modal closes
+  // Reset state when modal opens or closes
   useEffect(() => {
-    if (!isOpen && gameInstanceRef.current) {
-      logger.game.info("[LobbyDetails] Destroying Phaser game instance");
-      gameInstanceRef.current.destroy(true);
-      gameInstanceRef.current = null;
-      setGameReady(false);
-      setContainerReady(false);
+    if (isOpen) {
+      // Reset to fresh state when opening
+      setArenaState("preview");
+      setFightResult(null);
       sceneInitialized.current = false;
       previousLobbyStatus.current = null;
       playerBSpawned.current = false;
       fightStarted.current = false;
-      setArenaState("preview");
-      setFightResult(null);
+    } else {
+      // Cleanup when closing
+      setGameReady(false);
+      setContainerReady(false);
+
+      // Cleanup game instance if it exists
+      if (gameInstanceRef.current) {
+        logger.game.info("[LobbyDetails] Destroying Phaser game instance");
+        gameInstanceRef.current.destroy(true);
+        gameInstanceRef.current = null;
+      }
     }
   }, [isOpen]);
 
@@ -481,7 +526,7 @@ export function LobbyDetailsDialog({
 
   // Helper function to format lamports to SOL
   const formatAmount = (lamports: number) => {
-    return (lamports / 1e9).toFixed(4);
+    return (lamports / 1e9).toFixed(3);
   };
 
   const prizeAmount = lobby ? lobby.amount * 2 * 0.98 : 0;
@@ -760,15 +805,59 @@ export function LobbyDetailsDialog({
                     </button>
                   </div>
                 ) : (
-                  <div>
-                    {!selectedCharacter && (
-                      <p className="text-xs text-amber-400 text-center mb-2">
-                        Select a character before joining
+                  <div className="space-y-3">
+                    {/* Character Selector */}
+                    <div className="flex items-center justify-center gap-3">
+                      <span className="text-xs text-amber-400">Your Fighter:</span>
+                      <div className="flex items-center gap-1 bg-black/40 border border-amber-700/50 rounded-lg px-2 py-1">
+                        <button
+                          onClick={() => handleCharacterChange("prev")}
+                          disabled={!characters || characters.length <= 1}
+                          className="p-1 hover:bg-amber-700/30 rounded transition-colors disabled:opacity-50"
+                        >
+                          <ChevronLeft className="w-4 h-4 text-amber-300" />
+                        </button>
+
+                        <div className="flex items-center gap-2 w-[120px] justify-center">
+                          {localSelectedCharacter && (
+                            <>
+                              <div className="w-8 flex-shrink-0 flex items-center justify-center">
+                                <SpriteAnimator
+                                  name={localSelectedCharacter.name.toLowerCase()}
+                                  animation="idle"
+                                  size={32}
+                                  scale={1.5}
+                                />
+                              </div>
+                              <span className="text-amber-100 font-bold text-xs uppercase truncate">
+                                {localSelectedCharacter.name}
+                              </span>
+                            </>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => handleCharacterChange("next")}
+                          disabled={!characters || characters.length <= 1}
+                          className="p-1 hover:bg-amber-700/30 rounded transition-colors disabled:opacity-50"
+                        >
+                          <ChevronRight className="w-4 h-4 text-amber-300" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {!hasEnoughBalance && (
+                      <p className="text-xs text-red-400 text-center mb-2">
+                        Insufficient balance. You need {formatAmount(lobby.amount)} SOL
                       </p>
                     )}
                     <button
-                      onClick={() => onJoin(lobby.lobbyId)}
-                      disabled={!selectedCharacter || isJoining}
+                      onClick={() => {
+                        if (localSelectedCharacter) {
+                          onJoin(lobby.lobbyId, localSelectedCharacter);
+                        }
+                      }}
+                      disabled={!localSelectedCharacter || isJoining || !hasEnoughBalance}
                       className="w-full bg-gradient-to-b from-amber-500 to-amber-700 hover:to-amber-800 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-amber-100 font-bold py-2 px-4 rounded-lg transition-colors shadow-lg"
                     >
                       {isJoining ? "Joining..." : `Join Battle (${formatAmount(lobby.amount)} SOL)`}

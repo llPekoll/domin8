@@ -217,7 +217,7 @@ export function LobbyList({
   );
 
   const formatAmount = (lamports: number) => {
-    return (lamports / 1e9).toFixed(4);
+    return (lamports / 1e9).toFixed(3);
   };
 
   const handleCopyShareLink = useCallback(async (lobby: LobbyData, e: React.MouseEvent) => {

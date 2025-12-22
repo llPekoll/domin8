@@ -169,8 +169,11 @@ export function CreateLobby({ selectedCharacter, characters, onCharacterChange, 
           <h1 className="text-4xl font-black text-amber-100 tracking-wide">1V1 BATTLE</h1>
         </div>
 
-        {/* Spacer */}
-        <div className="flex-1 hidden md:block"></div>
+        {/* Spacer - pushes controls to the right */}
+        <div className="flex-1"></div>
+
+        {/* Controls Row - stays together */}
+        <div className="flex flex-wrap items-center gap-4">
 
         {/* Inline Character Selector */}
         <div className="flex items-center gap-1 bg-black/40 border border-amber-700/50 rounded-lg px-2 py-1">
@@ -226,12 +229,12 @@ export function CreateLobby({ selectedCharacter, characters, onCharacterChange, 
               type="number"
               value={betAmount}
               onChange={handleAmountChange}
-              min="0.01"
+              min="0.001"
               max="100"
-              step="0.01"
+              step="0.001"
               className="w-32 px-3 py-2 pl-9 bg-black/30 border border-amber-700/50 rounded-lg text-amber-100 placeholder-amber-600 text-center font-bold focus:outline-none focus:border-amber-500"
               disabled={isLoading}
-              placeholder="0.01"
+              placeholder="0.001"
             />
           </div>
 
@@ -280,6 +283,7 @@ export function CreateLobby({ selectedCharacter, characters, onCharacterChange, 
         >
           {isLoading ? "Creating..." : "Create Game"}
         </button>
+        </div>
       </div>
     </div>
   );

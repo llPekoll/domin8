@@ -226,6 +226,7 @@ export function OneVOnePage() {
   // If not connected, keep the URL so dialog can reopen after Privy login
   const handleSharedLobbyDialogClose = useCallback(() => {
     setSharedLobbyDialogOpen(false);
+    setJoiningLobby(false); // Reset joining state
     // Only clear URL parameter if user is connected (intentional close)
     // or if they're not connected and explicitly closing (not due to Privy modal)
     if (connected) {
@@ -285,16 +286,19 @@ export function OneVOnePage() {
 
   // Generic handler for joining any lobby (from dialog)
   const handleJoinLobbyFromDialog = useCallback(
-    async (lobbyId: number) => {
+    async (lobbyId: number, characterFromDialog?: Character) => {
       // Find the lobby from activeLobbyState (real-time data) or sharedLobby
       const lobbyToJoin = activeLobbyState || sharedLobby;
+
+      // Use character passed from dialog, or fall back to parent state
+      const characterToUse = characterFromDialog || selectedCharacter;
 
       if (!lobbyToJoin || lobbyToJoin.lobbyId !== lobbyId) {
         toast.error("Lobby not found");
         return;
       }
 
-      if (!connected || !selectedCharacter || !wallet || !publicKey) {
+      if (!connected || !characterToUse || !wallet || !publicKey) {
         toast.error("Please connect wallet and select a character");
         return;
       }
@@ -319,7 +323,7 @@ export function OneVOnePage() {
         logger.ui.info("[1v1] Joining lobby from dialog", {
           lobbyId: lobbyToJoin.lobbyId,
           playerB: currentWallet,
-          character: selectedCharacter.id,
+          character: characterToUse.id,
         });
 
         // Derive the lobby PDA from lobbyId
@@ -327,7 +331,7 @@ export function OneVOnePage() {
         const transaction = await buildJoinLobbyTransaction(
           publicKey,
           lobbyToJoin.lobbyId,
-          selectedCharacter.id,
+          characterToUse.id,
           lobbyPda,
           connection
         );
@@ -380,7 +384,7 @@ export function OneVOnePage() {
         const result = await joinLobbyAction({
           playerBWallet: currentWallet,
           lobbyId: lobbyToJoin.lobbyId,
-          characterB: selectedCharacter.id,
+          characterB: characterToUse.id,
           transactionHash: signature,
         });
 
@@ -416,6 +420,7 @@ export function OneVOnePage() {
   // Handle arena modal close
   const handleArenaClose = useCallback(() => {
     setArenaModalOpen(false);
+    setJoiningLobby(false); // Reset joining state
     // Keep activeLobbyId for a moment in case user wants to reopen
   }, []);
 
@@ -637,7 +642,7 @@ export function OneVOnePage() {
                         <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
                           <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
                           <span className="text-white font-bold">
-                            {(lobby.amount / 1e9).toFixed(4)}
+                            {(lobby.amount / 1e9).toFixed(3)}
                           </span>
                         </div>
                         {lobby.isPrivate && (
@@ -738,7 +743,7 @@ export function OneVOnePage() {
                         <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
                           <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
                           <span className="text-white font-bold">
-                            {(lobby.amount / 1e9).toFixed(4)}
+                            {(lobby.amount / 1e9).toFixed(3)}
                           </span>
                         </div>
                         {lobby.isPrivate && (
@@ -749,10 +754,9 @@ export function OneVOnePage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleLobbyJoined(lobby.lobbyId);
+                            handleLobbySelected(lobby.lobbyId);
                           }}
-                          disabled={!selectedCharacter}
-                          className="px-6 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all"
+                          className="px-6 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white font-semibold rounded-lg transition-all"
                         >
                           Join
                         </button>
@@ -853,7 +857,7 @@ export function OneVOnePage() {
                         <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
                           <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
                           <span className="text-white font-bold">
-                            {(lobby.amount / 1e9).toFixed(4)}
+                            {(lobby.amount / 1e9).toFixed(3)}
                           </span>
                         </div>
                         <button
@@ -1152,7 +1156,7 @@ export function OneVOnePage() {
         lobby={activeLobbyState as LobbyData | null}
         currentPlayerWallet={publicKey?.toString() || ""}
         selectedCharacter={selectedCharacter}
-        onJoin={(lobbyId) => void handleJoinLobbyFromDialog(lobbyId)}
+        onJoin={(lobbyId, character) => void handleJoinLobbyFromDialog(lobbyId, character)}
         onFightComplete={handleFightComplete}
         onDoubleDown={(amount) => void handleDoubleDown(amount)}
         isJoining={joiningLobby}
@@ -1165,7 +1169,7 @@ export function OneVOnePage() {
         lobby={sharedLobby as LobbyData | null}
         currentPlayerWallet={publicKey?.toString() || ""}
         selectedCharacter={selectedCharacter}
-        onJoin={(lobbyId) => handleJoinLobbyFromDialog(lobbyId)}
+        onJoin={(lobbyId, character) => handleJoinLobbyFromDialog(lobbyId, character)}
         isJoining={joiningLobby}
       />
     </div>
