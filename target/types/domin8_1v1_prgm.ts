@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/domin8_1v1_prgm.json`.
  */
 export type Domin81v1Prgm = {
-  "address": "CSj9CvC2ZZscGJDHJu8fCxxkTiJifWPZWiQCugxJkAad",
+  "address": "Fgz78yXMJGd9w8ofKopffHZ8VqHN1Ao9YmqYnXCbA8r1",
   "metadata": {
     "name": "domin81v1Prgm",
     "version": "0.1.0",
@@ -13,38 +13,6 @@ export type Domin81v1Prgm = {
     "description": "Created with Anchor"
   },
   "instructions": [
-    {
-      "name": "cancelLobby",
-      "docs": [
-        "Cancel a 1v1 lobby (Player A refunds if status = created)"
-      ],
-      "discriminator": [
-        241,
-        47,
-        118,
-        95,
-        81,
-        67,
-        137,
-        13
-      ],
-      "accounts": [
-        {
-          "name": "lobby",
-          "writable": true
-        },
-        {
-          "name": "playerA",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
     {
       "name": "createLobby",
       "docs": [
@@ -143,15 +111,6 @@ export type Domin81v1Prgm = {
         {
           "name": "skinA",
           "type": "u8"
-        },
-        {
-          "name": "positionA",
-          "type": {
-            "array": [
-              "u16",
-              2
-            ]
-          }
         },
         {
           "name": "map",
@@ -356,17 +315,111 @@ export type Domin81v1Prgm = {
         {
           "name": "skinB",
           "type": "u8"
-        },
-        {
-          "name": "positionB",
-          "type": {
-            "array": [
-              "u16",
-              2
-            ]
-          }
         }
       ]
+    },
+    {
+      "name": "rescueLobby",
+      "docs": [
+        "Rescue a stuck lobby (admin only)",
+        "Can be called by admin to refund both players if VRF times out"
+      ],
+      "discriminator": [
+        29,
+        229,
+        164,
+        212,
+        220,
+        108,
+        203,
+        29
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  49,
+                  118,
+                  49,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "lobby",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  49,
+                  118,
+                  49,
+                  95,
+                  108,
+                  111,
+                  98,
+                  98,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lobby.lobby_id",
+                "account": "domin81v1Lobby"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "docs": [
+            "Admin must match the config admin"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "playerA",
+          "writable": true
+        },
+        {
+          "name": "playerB",
+          "writable": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "settleLobby",
@@ -387,7 +440,33 @@ export type Domin81v1Prgm = {
       "accounts": [
         {
           "name": "config",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  49,
+                  118,
+                  49,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "lobby",
@@ -556,53 +635,73 @@ export type Domin81v1Prgm = {
     },
     {
       "code": 6002,
-      "name": "unauthorizedCancellation",
-      "msg": "Unauthorized: only player A can cancel"
-    },
-    {
-      "code": 6003,
       "name": "unauthorizedJoin",
       "msg": "Unauthorized: only player B can join"
     },
     {
-      "code": 6004,
+      "code": 6003,
       "name": "alreadyJoined",
       "msg": "Lobby is already joined by a second player"
     },
     {
-      "code": 6005,
+      "code": 6004,
       "name": "insufficientFunds",
       "msg": "Insufficient funds for bet"
     },
     {
-      "code": 6006,
+      "code": 6005,
       "name": "invalidBetAmount",
       "msg": "Invalid bet amount"
     },
     {
-      "code": 6007,
+      "code": 6006,
       "name": "invalidHouseFee",
       "msg": "House fee configuration error"
     },
     {
-      "code": 6008,
+      "code": 6007,
       "name": "winnerDeterminationError",
       "msg": "Unable to determine winner from randomness"
     },
     {
-      "code": 6009,
+      "code": 6008,
       "name": "distributionError",
       "msg": "Fund distribution failed"
     },
     {
-      "code": 6010,
+      "code": 6009,
       "name": "randomnessConversionError",
       "msg": "Randomness value conversion to winner failed"
     },
     {
-      "code": 6011,
+      "code": 6010,
       "name": "randomnessNotAvailable",
       "msg": "Randomness not yet available - VRF callback has not been executed"
+    },
+    {
+      "code": 6011,
+      "name": "selfPlayNotAllowed",
+      "msg": "Self-play not allowed: Player A cannot join their own lobby"
+    },
+    {
+      "code": 6012,
+      "name": "betBelowMinimum",
+      "msg": "Bet amount is below minimum required"
+    },
+    {
+      "code": 6013,
+      "name": "lobbyExpired",
+      "msg": "Lobby has expired and can be rescued"
+    },
+    {
+      "code": 6014,
+      "name": "lobbyNotExpired",
+      "msg": "Lobby has not expired yet"
+    },
+    {
+      "code": 6015,
+      "name": "unauthorizedAdmin",
+      "msg": "Unauthorized: only admin can perform this action"
     }
   ],
   "types": [
@@ -690,26 +789,6 @@ export type Domin81v1Prgm = {
             "name": "skinB",
             "type": {
               "option": "u8"
-            }
-          },
-          {
-            "name": "positionA",
-            "type": {
-              "array": [
-                "u16",
-                2
-              ]
-            }
-          },
-          {
-            "name": "positionB",
-            "type": {
-              "option": {
-                "array": [
-                  "u16",
-                  2
-                ]
-              }
             }
           },
           {

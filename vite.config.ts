@@ -15,7 +15,11 @@ export default defineConfig({
       protocolImports: true,
     }),
     VitePWA({
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
       registerType: "prompt",
+      injectRegister: false,
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],
       manifest: {
         name: "Domin8",
@@ -43,9 +47,13 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
+      injectManifest: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
+      },
+      devOptions: {
+        enabled: true,
+        type: "module",
       },
     }),
   ],

@@ -172,8 +172,25 @@ export class OneVOneScene extends Scene {
    * Characters are spawned face-to-face on left and right sides of the arena
    */
   public spawnSingleCharacter(data: SingleCharacterData) {
+    // Debug: Log what we receive and what we find
+    console.log("[1v1 Debug] OneVOneScene.spawnSingleCharacter - received:", {
+      playerId: data.playerId,
+      characterId: data.characterId,
+      position: data.position,
+    });
+    console.log("[1v1 Debug] charactersData available:", charactersData.map((c: any) => ({
+      id: c.id,
+      name: c.name,
+    })));
+
     // Look up character name from charactersData by ID
     const characterData = charactersData.find((c: any) => c.id === data.characterId);
+
+    console.log("[1v1 Debug] Character lookup result:", {
+      searchedId: data.characterId,
+      foundCharacter: characterData ? { id: characterData.id, name: characterData.name } : null,
+    });
+
     const characterName = characterData?.name || `character_${data.characterId}`;
     const characterKey = characterName.toLowerCase().replace(/\s+/g, "-");
 

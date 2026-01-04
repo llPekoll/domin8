@@ -9,7 +9,7 @@ interface LobbyData {
   playerA: string;
   playerB?: string;
   amount: number;
-  status: 0 | 1 | 2 | 3; // 0=Created, 1=Awaiting VRF, 2=VRF Received, 3=Resolved
+  status: 0 | 1 | 2 | 3; // 0=Open, 1=Awaiting VRF, 2=Ready, 3=Resolved
   winner?: string;
   characterA: number;
   characterB?: number;

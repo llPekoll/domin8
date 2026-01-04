@@ -123,15 +123,13 @@ export class Solana1v1QueryClient {
 
           // Parse the lobby account data manually
           // Account structure from state.rs (Rust's Anchor serialization):
-          // discriminator(8) + lobby_id(8) + player_a(32) + player_b(33) + amount(8) + randomness_account(32) + 
-          // status(1) + winner(33) + created_at(8) + skin_a(1) + skin_b(2) + 
-          // position_a(4) + position_b(5) + map(1) = 176 bytes total
+          // discriminator(8) + lobby_id(8) + player_a(32) + player_b(33) + amount(8) + force(32) +
+          // status(1) + winner(33) + created_at(8) + skin_a(1) + skin_b(2) + map(1) + randomness(33)
           const data = accountInfo.data;
-          
-          // console.log(`[QueryClient] Raw account data length: ${data.length} bytes`);
-          
-          if (data.length < 176) {
-            throw new Error(`Lobby account data too short: ${data.length} bytes, expected 176`);
+
+          // Minimum size with all Options as None
+          if (data.length < 103) {
+            throw new Error(`Lobby account data too short: ${data.length} bytes, expected at least 103`);
           }
 
           let offset = 8; // Skip discriminator
@@ -183,27 +181,17 @@ export class Solana1v1QueryClient {
             offset += 1;
           }
 
-          const positionA: [number, number] = [
-            data.readUInt16LE(offset),
-            data.readUInt16LE(offset + 2),
-          ];
-          offset += 4;
-
-          // position_b: Option<[u16; 2]> - 1 byte discriminant + 4 bytes ONLY if Some
-          const positionBOption = data[offset];
-          offset += 1;
-          let positionB: [number, number] | null = null;
-          if (positionBOption === 1) {
-            positionB = [
-              data.readUInt16LE(offset),
-              data.readUInt16LE(offset + 2),
-            ];
-            offset += 4;
-          }
-
           const map = data[offset];
-          // console.log(`[QueryClient] offset=${offset}, map=${map}`);
-          // console.log(`[QueryClient] Final offset: ${offset + 1}, total length: ${data.length}`);
+          offset += 1;
+
+          // randomness: Option<[u8; 32]> - 1 byte discriminant + 32 bytes ONLY if Some
+          const randomnessOption = data[offset];
+          offset += 1;
+          let randomness: string | null = null;
+          if (randomnessOption === 1) {
+            randomness = data.slice(offset, offset + 32).toString('hex');
+            offset += 32;
+          }
 
           return {
             lobbyId: { toNumber: () => lobbyId },
@@ -216,9 +204,8 @@ export class Solana1v1QueryClient {
             createdAt: { toNumber: () => createdAt },
             skinA,
             skinB,
-            positionA,
-            positionB,
             map,
+            randomness,
           };
         }
       }
@@ -404,14 +391,14 @@ export class Solana1v1Client {
         } catch (e2) {
           console.warn("[1v1Client] Anchor fetch failed for lobby, using raw account fetch");
           const accountInfo = await this.connection.getAccountInfo(lobbyPda);
-          
+
           if (!accountInfo || !accountInfo.data) {
             throw new Error("Lobby account not found or empty");
           }
 
           const data = accountInfo.data;
-          if (data.length < 176) {
-            throw new Error(`Lobby account data too short: ${data.length} bytes, expected 176`);
+          if (data.length < 103) {
+            throw new Error(`Lobby account data too short: ${data.length} bytes, expected at least 103`);
           }
 
           let offset = 8;
@@ -458,24 +445,17 @@ export class Solana1v1Client {
             offset += 1;
           }
 
-          const positionA: [number, number] = [
-            data.readUInt16LE(offset),
-            data.readUInt16LE(offset + 2),
-          ];
-          offset += 4;
-
-          const positionBOption = data[offset];
-          offset += 1;
-          let positionB: [number, number] | null = null;
-          if (positionBOption === 1) {
-            positionB = [
-              data.readUInt16LE(offset),
-              data.readUInt16LE(offset + 2),
-            ];
-            offset += 4;
-          }
-
           const map = data[offset];
+          offset += 1;
+
+          // randomness: Option<[u8; 32]>
+          const randomnessOption = data[offset];
+          offset += 1;
+          let randomness: string | null = null;
+          if (randomnessOption === 1) {
+            randomness = data.slice(offset, offset + 32).toString('hex');
+            offset += 32;
+          }
 
           return {
             lobbyId: { toNumber: () => lobbyId },
@@ -488,9 +468,8 @@ export class Solana1v1Client {
             createdAt: { toNumber: () => createdAt },
             skinA,
             skinB,
-            positionA,
-            positionB,
             map,
+            randomness,
           };
         }
       }
@@ -562,12 +541,14 @@ export class Solana1v1Client {
 
   /**
    * Call settle_lobby instruction on-chain
-   * 
+   *
    * With the new VRF flow, settle_lobby is a permissionless crank instruction
    * that can be called by anyone after VRF callback has stored randomness.
    * It reads randomness from the lobby account and distributes funds.
+   *
+   * Returns txSignature, winner, and prize (all parsed from logs since PDA closes after settlement)
    */
-  async settleLobby(lobbyId: number): Promise<string> {
+  async settleLobby(lobbyId: number): Promise<{ txSignature: string; winner: string | null; prize: number | null }> {
     try {
       console.log(`[1v1 Crank] Calling settle_lobby for lobby ${lobbyId}...`);
 
@@ -582,9 +563,9 @@ export class Solana1v1Client {
         throw new Error("Lobby not found on-chain");
       }
 
-      // Verify lobby is at status 2 (VRF_RECEIVED)
+      // Verify lobby is at status 2 (READY)
       if (lobbyAccount.status !== 2) {
-        throw new Error(`Lobby status is ${lobbyAccount.status}, expected 2 (VRF_RECEIVED)`);
+        throw new Error(`Lobby status is ${lobbyAccount.status}, expected 2 (READY)`);
       }
 
       const playerA = new PublicKey(lobbyAccount.playerA);
@@ -628,16 +609,65 @@ export class Solana1v1Client {
 
       const txSignature = await this.connection.sendTransaction(txn);
       console.log(`[1v1 Crank] settle_lobby tx: ${txSignature}`);
-      
-      // Wait for confirmation
+
+      // Wait for confirmation and get transaction details
       await this.connection.confirmTransaction({
         signature: txSignature,
         blockhash: latestBlockhash.blockhash,
         lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
       });
-      
+
       console.log(`[1v1 Crank] settle_lobby confirmed for lobby ${lobbyId}`);
-      return txSignature;
+
+      // Parse winner and prize from transaction logs
+      // The Rust program logs: "Winner determined: {pubkey}. Prize: {amount}"
+      let winner: string | null = null;
+      let prize: number | null = null;
+      try {
+        // Wait for RPC to index the transaction (mainnet can be slower than devnet)
+        let txDetails = null;
+        for (let attempt = 1; attempt <= 5; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s between attempts
+          txDetails = await this.connection.getTransaction(txSignature, {
+            commitment: 'confirmed',
+            maxSupportedTransactionVersion: 0,
+          });
+          if (txDetails?.meta?.logMessages) {
+            console.log(`[1v1 Crank] Got transaction logs on attempt ${attempt}`);
+            break;
+          }
+          console.log(`[1v1 Crank] Transaction logs not available yet, attempt ${attempt}/5`);
+        }
+
+        if (txDetails?.meta?.logMessages) {
+          // Log all messages for debugging
+          console.log(`[1v1 Crank] Transaction logs (${txDetails.meta.logMessages.length} messages):`);
+          txDetails.meta.logMessages.forEach((log, i) => {
+            console.log(`[1v1 Crank]   [${i}] ${log}`);
+          });
+
+          for (const log of txDetails.meta.logMessages) {
+            // Match: "Winner determined: <pubkey>. Prize: <amount>"
+            const match = log.match(/Winner determined: ([A-Za-z0-9]{32,44})\. Prize: (\d+)/);
+            if (match && match[1] && match[2]) {
+              winner = match[1];
+              prize = parseInt(match[2], 10);
+              console.log(`[1v1 Crank] Parsed from logs - winner: ${winner}, prize: ${prize} lamports`);
+              break;
+            }
+          }
+
+          if (!winner) {
+            console.warn(`[1v1 Crank] Could not find winner pattern in logs. Looking for "Winner determined: <pubkey>. Prize: <amount>"`);
+          }
+        } else {
+          console.warn(`[1v1 Crank] No log messages in transaction response. txDetails exists: ${!!txDetails}, meta exists: ${!!txDetails?.meta}`);
+        }
+      } catch (logError) {
+        console.warn(`[1v1 Crank] Error fetching/parsing transaction logs:`, logError);
+      }
+
+      return { txSignature, winner, prize };
     } catch (error) {
       throw new Error(
         `Failed to settle lobby: ${error instanceof Error ? error.message : String(error)}`

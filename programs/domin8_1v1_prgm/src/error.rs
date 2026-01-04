@@ -9,9 +9,6 @@ pub enum Domin81v1Error {
     #[msg("Lobby is not in the correct status")]
     InvalidLobbyStatus,
 
-    #[msg("Unauthorized: only player A can cancel")]
-    UnauthorizedCancellation,
-
     #[msg("Unauthorized: only player B can join")]
     UnauthorizedJoin,
 
@@ -38,4 +35,19 @@ pub enum Domin81v1Error {
 
     #[msg("Randomness not yet available - VRF callback has not been executed")]
     RandomnessNotAvailable,
+
+    #[msg("Self-play not allowed: Player A cannot join their own lobby")]
+    SelfPlayNotAllowed,
+
+    #[msg("Bet amount is below minimum required")]
+    BetBelowMinimum,
+
+    #[msg("Lobby has expired and can be rescued")]
+    LobbyExpired,
+
+    #[msg("Lobby has not expired yet")]
+    LobbyNotExpired,
+
+    #[msg("Unauthorized: only admin can perform this action")]
+    UnauthorizedAdmin,
 }

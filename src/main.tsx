@@ -10,6 +10,10 @@ import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
 import { AssetsProvider } from "./contexts/AssetsContext";
 import { PlayerNamesProvider } from "./contexts/PlayerNamesContext";
 import { Analytics } from "@vercel/analytics/react";
+import { configureStatusBar } from "./utils/statusBar";
+
+// Configure native status bar (Android/iOS)
+configureStatusBar();
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
 

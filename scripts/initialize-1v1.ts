@@ -8,7 +8,9 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const IDL = JSON.parse(readFileSync(join(__dirname, "../target/idl/domin8_1v1_prgm.json"), "utf-8"));
+const IDL = JSON.parse(
+  readFileSync(join(__dirname, "../target/idl/domin8_1v1_prgm.json"), "utf-8")
+);
 
 /**
  * Script to initialize the Domin8 1v1 program
@@ -73,7 +75,7 @@ async function main() {
   }
 
   // Use the wallet's public key as treasury
-  const treasuryWallet = new PublicKey("53Xu7YeFmAZ7yYrq1ZknvSrXDbEqVBAeXSbpu5vrgbaT");
+  const treasuryWallet = new PublicKey("FChwsKVeuDjgToaP5HHrk9u4oz1QiPbnJH1zzpbMKuHB");
 
   console.log("💰 Configuration:");
   console.log(`  Treasury: ${treasuryWallet.toString()}`);
@@ -85,9 +87,7 @@ async function main() {
 
   try {
     const txSignature = await program.methods
-      .initializeConfig(
-        new BN(HOUSE_FEE_BPS)
-      )
+      .initializeConfig(new BN(HOUSE_FEE_BPS))
       .accounts({
         config: configPDA,
         admin: provider.wallet.publicKey,
@@ -101,27 +101,28 @@ async function main() {
     console.log(`  Explorer: https://explorer.solana.com/tx/${txSignature}?cluster=devnet`);
     console.log("");
 
-    // Fetch and display the configuration (normal errors here)
-    const gameConfig = await program.account.domin81v1Config.fetch(configPDA);
+    // Fetch and display the configuration
+    try {
+      const gameConfig = await (program.account as any)["domin81v1Config"].fetch(configPDA);
 
-    console.log("📋 1v1 Game Configuration:");
-    console.log(`  Admin: ${gameConfig.admin.toString()}`);
-    console.log(`  Treasury: ${gameConfig.treasury.toString()}`);
-    console.log(
-      `  House Fee: ${gameConfig.houseFeeBps.toString()} basis points (${gameConfig.houseFeeBps / 100}%)`
-    );
-    console.log(`  Lobby Count: ${gameConfig.lobbyCount.toString()}`);
-    console.log("");
+      console.log("📋 1v1 Game Configuration:");
+      console.log(`  Admin: ${gameConfig.admin.toString()}`);
+      console.log(`  Treasury: ${gameConfig.treasury.toString()}`);
+      console.log(
+        `  House Fee: ${gameConfig.houseFeeBps.toString()} basis points (${gameConfig.houseFeeBps / 100}%)`
+      );
+      console.log(`  Lobby Count: ${gameConfig.lobbyCount.toString()}`);
+      console.log("");
+    } catch (e) {
+      console.log("📋 Config created (fetch skipped due to IDL mismatch)");
+      console.log("");
+    }
 
     console.log("🎉 Initialization complete! Your 1v1 game is ready.");
     console.log("");
     console.log("Next steps:");
-    console.log(
-      "  1. Player A calls create_lobby(amount, skin_a, position_a, map)"
-    );
-    console.log(
-      "  2. Player B calls join_lobby(amount, skin_b, position_b) on the same lobby"
-    );
+    console.log("  1. Player A calls create_lobby(amount, skin_a,  map)");
+    console.log("  2. Player B calls join_lobby(amount, skin_b ) on the same lobby");
     console.log("  3. Winner is determined and funds are distributed");
   } catch (error: any) {
     console.error("❌ Initialization failed:");

@@ -22,12 +22,14 @@ interface LobbyData {
   playerA: string;
   playerB?: string;
   amount: number;
-  status: 0 | 1 | 2 | 3; // 0 = Open, 1 = Awaiting VRF, 2 = VRF Received, 3 = Resolved
+  status: 0 | 1 | 2 | 3; // 0 = Open, 1 = Awaiting VRF, 2 = Ready, 3 = Resolved
   winner?: string;
   characterA: number;
   characterB?: number;
   mapId: number;
   isPrivate?: boolean;
+  prizeAmount?: number; // Actual prize won in lamports
+  winStreak?: number; // Win streak for double-down
 }
 
 export function OneVOnePage() {
@@ -69,6 +71,19 @@ export function OneVOnePage() {
   // Pass current player wallet so they can see their own private lobbies
   const openLobbies =
     useQuery(api.lobbies.getOpenLobbies, currentPlayerWallet ? { currentPlayerWallet } : {}) || [];
+
+  // Debug: Log lobby data including characterA
+  useEffect(() => {
+    if (openLobbies.length > 0) {
+      console.log("[1v1 Debug] Open lobbies from Convex:", openLobbies.map(l => ({
+        lobbyId: l.lobbyId,
+        characterA: l.characterA,
+        characterB: l.characterB,
+        playerA: l.playerA?.slice(0, 8) + "...",
+        status: l.status,
+      })));
+    }
+  }, [openLobbies]);
 
   // Get lobby by share token (for URL-based access)
   const sharedLobby = useQuery(
@@ -238,7 +253,17 @@ export function OneVOnePage() {
   useEffect(() => {
     if (characters && characters.length > 0) {
       const idx = characterIndex % characters.length;
-      setSelectedCharacter(characters[idx]);
+      const char = characters[idx];
+
+      // Debug: Log character selection
+      console.log("[1v1 Debug] Character selection updated:", {
+        characterIndex: idx,
+        selectedCharacterId: char.id,
+        selectedCharacterName: char.name,
+        allCharacterIds: characters.map((c: any) => c.id),
+      });
+
+      setSelectedCharacter(char);
     }
   }, [characters, characterIndex]);
 
@@ -433,13 +458,13 @@ export function OneVOnePage() {
 
   // Double down handler for winner
   const handleDoubleDown = useCallback(
-    async (amount: number) => {
+    async (amount: number, winStreak: number = 1) => {
       if (!connected || !publicKey || !selectedCharacter || !wallet) {
         toast.error("Please connect wallet and select a character");
         return;
       }
 
-      logger.ui.info("Double Down requested", { amount });
+      logger.ui.info("Double Down requested", { amount, winStreak });
       const toastId = toast.loading("Processing Double Down...");
 
       try {
@@ -489,13 +514,14 @@ export function OneVOnePage() {
 
         logger.solana.info("Double Down confirmed", { signature });
 
-        // Call Convex action to create lobby
+        // Call Convex action to create lobby (with win streak for double-down)
         const result = await createLobbyAction({
           playerAWallet: publicKey.toString(),
           amount: amount,
           characterA: selectedCharacter.id,
           mapId: 0,
           transactionHash: signature,
+          winStreak: winStreak, // Carry over win streak
         });
 
         if (result.success) {
@@ -522,7 +548,7 @@ export function OneVOnePage() {
       <Header />
 
       {/* Main Content Area - Always show lobby list */}
-      <main className="pt-20 pb-8 px-6">
+      <main className="pt-20 pb-8 px-3 md:px-6">
         {/* Games List - Single column for both connected and not connected */}
         {connected && publicKey ? (
           <div className="max-w-4xl mx-auto space-y-4">
@@ -534,24 +560,27 @@ export function OneVOnePage() {
               onLobbyCreated={handleLobbyCreated}
             />
             {/* Header with Filters */}
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-xl font-bold text-amber-100">ALL GAMES</h2>
-              <span className="text-amber-400 font-mono">
-                {filteredOpenLobbies.length + filteredCompletedLobbies.length}
-              </span>
-              <span className="px-3 py-1 bg-amber-900/30 border border-amber-700/50 rounded-full text-amber-300 text-xs flex items-center gap-1">
-                <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
-                Payouts settled in SOL
-              </span>
-
-              {/* Spacer */}
-              <div className="flex-1"></div>
-
-              {/* Filter Buttons */}
+            <div className="flex flex-col md:flex-row md:items-center gap-3">
+              {/* Title Row */}
               <div className="flex items-center gap-2">
+                <h2 className="text-lg md:text-xl font-bold text-amber-100">ALL GAMES</h2>
+                <span className="text-amber-400 font-mono text-sm">
+                  {filteredOpenLobbies.length + filteredCompletedLobbies.length}
+                </span>
+                <span className="hidden md:flex px-3 py-1 bg-amber-900/30 border border-amber-700/50 rounded-full text-amber-300 text-xs items-center gap-1">
+                  <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
+                  Payouts settled in SOL
+                </span>
+              </div>
+
+              {/* Spacer - only on desktop */}
+              <div className="hidden md:block flex-1"></div>
+
+              {/* Filter Buttons - horizontal scroll on mobile */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
                 <button
                   onClick={() => setActiveFilter("my_games")}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors whitespace-nowrap ${
                     activeFilter === "my_games"
                       ? "bg-amber-600 text-white"
                       : "bg-gray-800 text-gray-300 hover:bg-gray-700"
@@ -561,7 +590,7 @@ export function OneVOnePage() {
                 </button>
                 <button
                   onClick={() => setActiveFilter(activeFilter === "price_low" ? "price_high" : "price_low")}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+                  className={`px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap ${
                     activeFilter === "price_low" || activeFilter === "price_high"
                       ? "bg-amber-600 text-white"
                       : "bg-gray-800 text-gray-300 hover:bg-gray-700"
@@ -573,7 +602,7 @@ export function OneVOnePage() {
                 </button>
                 <button
                   onClick={() => setActiveFilter(activeFilter === "newest" ? "oldest" : "newest")}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+                  className={`px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap ${
                     activeFilter === "newest" || activeFilter === "oldest"
                       ? "bg-amber-600 text-white"
                       : "bg-gray-800 text-gray-300 hover:bg-gray-700"
@@ -586,7 +615,7 @@ export function OneVOnePage() {
                 {activeFilter !== "all" && (
                   <button
                     onClick={() => setActiveFilter("all")}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+                    className="px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors whitespace-nowrap"
                   >
                     Clear
                   </button>
@@ -601,15 +630,49 @@ export function OneVOnePage() {
                 .map((lobby) => (
                   <div
                     key={lobby._id}
-                    className={`rounded-xl p-4 cursor-pointer transition-all ${
+                    className={`rounded-xl p-3 md:p-4 cursor-pointer transition-all ${
                       lobby.isPrivate
                         ? "bg-gradient-to-r from-purple-900/40 to-purple-950/40 border border-purple-500/30 hover:border-purple-400/50"
                         : "bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 hover:border-amber-600/50"
                     }`}
                     onClick={() => handleLobbySelected(lobby.lobbyId)}
                   >
-                    <div className="flex items-center justify-between">
-                      {/* Player A (You) */}
+                    {/* Mobile Layout */}
+                    <div className="flex md:hidden items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 border-2 border-amber-400 flex items-center justify-center flex-shrink-0">
+                          <span className="text-white font-bold text-sm">Y</span>
+                        </div>
+                        <span className="text-white font-semibold text-sm truncate">You</span>
+                        <span className="text-gray-500">⚔️</span>
+                        <span className="text-gray-500 text-sm italic">Waiting...</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-1 bg-gray-800/80 px-2 py-1 rounded-lg">
+                          <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
+                          <span className="text-white font-bold text-sm">{(lobby.amount / 1e9).toFixed(3)}</span>
+                        </div>
+                        {lobby.isPrivate && <span className="text-purple-300 text-xs">🔒</span>}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const shareUrl = `${window.location.origin}/1v1?join=${lobby.shareToken}`;
+                            navigator.clipboard.writeText(shareUrl);
+                            toast.success("Share link copied!");
+                          }}
+                          className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
+                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                            <polyline points="16 6 12 2 8 6" />
+                            <line x1="12" y1="2" x2="12" y2="15" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Desktop Layout */}
+                    <div className="hidden md:flex items-center justify-between">
                       <div className="flex items-center gap-3 flex-1">
                         <div className="relative">
                           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 border-2 border-amber-400 flex items-center justify-center">
@@ -621,34 +684,20 @@ export function OneVOnePage() {
                         </div>
                         <p className="text-white font-semibold">You</p>
                       </div>
-
-                      {/* VS Icon */}
-                      <div className="px-4">
-                        <span className="text-2xl">⚔️</span>
-                      </div>
-
-                      {/* Waiting */}
+                      <div className="px-4"><span className="text-2xl">⚔️</span></div>
                       <div className="flex items-center gap-3 flex-1 justify-end">
                         <p className="text-gray-500 font-semibold italic">Waiting...</p>
-                        <div className="relative">
-                          <div className="w-12 h-12 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center">
-                            <span className="text-gray-500 text-2xl">?</span>
-                          </div>
+                        <div className="w-12 h-12 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center">
+                          <span className="text-gray-500 text-2xl">?</span>
                         </div>
                       </div>
-
-                      {/* Amount & Actions */}
                       <div className="flex items-center gap-3 ml-6">
                         <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
                           <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
-                          <span className="text-white font-bold">
-                            {(lobby.amount / 1e9).toFixed(3)}
-                          </span>
+                          <span className="text-white font-bold">{(lobby.amount / 1e9).toFixed(3)}</span>
                         </div>
                         {lobby.isPrivate && (
-                          <span className="px-2 py-1 bg-purple-600/40 border border-purple-500/50 rounded text-purple-200 text-xs">
-                            🔒
-                          </span>
+                          <span className="px-2 py-1 bg-purple-600/40 border border-purple-500/50 rounded text-purple-200 text-xs">🔒</span>
                         )}
                         <button
                           onClick={(e) => {
@@ -659,30 +708,14 @@ export function OneVOnePage() {
                           }}
                           className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
                         >
-                          <svg
-                            width="18"
-                            height="18"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            className="text-gray-400"
-                          >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
                             <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
                             <polyline points="16 6 12 2 8 6" />
                             <line x1="12" y1="2" x2="12" y2="15" />
                           </svg>
                         </button>
                         <button className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
-                          <svg
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            className="text-gray-400"
-                          >
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
                             <circle cx="12" cy="12" r="3" />
                             <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
                           </svg>
@@ -698,15 +731,46 @@ export function OneVOnePage() {
                 .map((lobby) => (
                   <div
                     key={lobby._id}
-                    className={`rounded-xl p-4 cursor-pointer transition-all ${
+                    className={`rounded-xl p-3 md:p-4 cursor-pointer transition-all ${
                       lobby.isPrivate
                         ? "bg-gradient-to-r from-purple-900/40 to-purple-950/40 border border-purple-500/30 hover:border-purple-400/50"
                         : "bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 hover:border-amber-600/50"
                     }`}
                     onClick={() => handleLobbySelected(lobby.lobbyId)}
                   >
-                    <div className="flex items-center justify-between">
-                      {/* Player A */}
+                    {/* Mobile Layout */}
+                    <div className="flex md:hidden items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 border-2 border-amber-500/50 flex items-center justify-center flex-shrink-0">
+                          <span className="text-white font-bold text-sm">
+                            {getPlayerDisplayName(lobby.playerA).slice(0, 1).toUpperCase()}
+                          </span>
+                        </div>
+                        <span className="text-white font-semibold text-sm truncate max-w-[80px]">
+                          {getPlayerDisplayName(lobby.playerA)}
+                        </span>
+                        <span className="text-gray-500">⚔️</span>
+                        <span className="text-gray-500 text-sm">?</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-1 bg-gray-800/80 px-2 py-1 rounded-lg">
+                          <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
+                          <span className="text-white font-bold text-sm">{(lobby.amount / 1e9).toFixed(3)}</span>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleLobbySelected(lobby.lobbyId);
+                          }}
+                          className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold text-sm rounded-lg"
+                        >
+                          Join
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Desktop Layout */}
+                    <div className="hidden md:flex items-center justify-between">
                       <div className="flex items-center gap-3 flex-1">
                         <div className="relative">
                           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 border-2 border-amber-500/50 flex items-center justify-center">
@@ -718,38 +782,22 @@ export function OneVOnePage() {
                             {lobby.characterA || 1}
                           </div>
                         </div>
-                        <p className="text-white font-semibold">
-                          {getPlayerDisplayName(lobby.playerA)}
-                        </p>
+                        <p className="text-white font-semibold">{getPlayerDisplayName(lobby.playerA)}</p>
                       </div>
-
-                      {/* VS Icon */}
-                      <div className="px-4">
-                        <span className="text-2xl">⚔️</span>
-                      </div>
-
-                      {/* Waiting */}
+                      <div className="px-4"><span className="text-2xl">⚔️</span></div>
                       <div className="flex items-center gap-3 flex-1 justify-end">
                         <p className="text-gray-500 font-semibold italic">Waiting...</p>
-                        <div className="relative">
-                          <div className="w-12 h-12 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center">
-                            <span className="text-gray-500 text-2xl">?</span>
-                          </div>
+                        <div className="w-12 h-12 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center">
+                          <span className="text-gray-500 text-2xl">?</span>
                         </div>
                       </div>
-
-                      {/* Amount & Actions */}
                       <div className="flex items-center gap-3 ml-6">
                         <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
                           <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
-                          <span className="text-white font-bold">
-                            {(lobby.amount / 1e9).toFixed(3)}
-                          </span>
+                          <span className="text-white font-bold">{(lobby.amount / 1e9).toFixed(3)}</span>
                         </div>
                         {lobby.isPrivate && (
-                          <span className="px-2 py-1 bg-purple-600/40 border border-purple-500/50 rounded text-purple-200 text-xs">
-                            🔒
-                          </span>
+                          <span className="px-2 py-1 bg-purple-600/40 border border-purple-500/50 rounded text-purple-200 text-xs">🔒</span>
                         )}
                         <button
                           onClick={(e) => {
@@ -761,15 +809,7 @@ export function OneVOnePage() {
                           Join
                         </button>
                         <button className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
-                          <svg
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            className="text-gray-400"
-                          >
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
                             <circle cx="12" cy="12" r="3" />
                             <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
                           </svg>
@@ -793,90 +833,108 @@ export function OneVOnePage() {
                 return (
                   <div
                     key={lobby._id}
-                    className="bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 rounded-xl p-4 hover:border-amber-600/50 transition-colors cursor-pointer"
+                    className="bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 rounded-xl p-3 md:p-4 hover:border-amber-600/50 transition-colors cursor-pointer"
                     onClick={() => handleLobbySelected(lobby.lobbyId)}
                   >
-                    <div className="flex items-center justify-between">
-                      {/* Player A */}
+                    {/* Mobile Layout */}
+                    <div className="flex md:hidden items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="relative flex-shrink-0">
+                          <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
+                            isPlayerAWinner
+                              ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
+                              : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                          }`}>
+                            <span className="text-white font-bold text-sm">{playerAName.slice(0, 1).toUpperCase()}</span>
+                          </div>
+                          {isPlayerAWinner && <span className="absolute -top-1 -right-1 text-xs">👑</span>}
+                        </div>
+                        <span className={`text-sm truncate max-w-[60px] ${isPlayerAWinner ? "text-amber-300" : "text-gray-400"}`}>
+                          {playerAName}
+                        </span>
+                        {/* Win streak badge - show when Player A wins and has at least 2 consecutive wins */}
+                        {isPlayerAWinner && (lobby.winStreak ?? 0) >= 1 && (
+                          <span className="px-1.5 py-0.5 bg-gradient-to-r from-orange-600 to-red-600 rounded text-[10px] text-white font-bold whitespace-nowrap">
+                            🔥 {(lobby.winStreak ?? 0) + 1} streak
+                          </span>
+                        )}
+                        <span className="text-gray-500 opacity-60">⚔️</span>
+                        <span className={`text-sm truncate max-w-[60px] ${isPlayerBWinner ? "text-amber-300" : "text-gray-400"}`}>
+                          {playerBName ?? "---"}
+                        </span>
+                        <div className="relative flex-shrink-0">
+                          <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
+                            isPlayerBWinner
+                              ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
+                              : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                          }`}>
+                            <span className="text-white font-bold text-sm">{playerBName ? playerBName.slice(0, 1).toUpperCase() : "?"}</span>
+                          </div>
+                          {isPlayerBWinner && <span className="absolute -top-1 -right-1 text-xs">👑</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-1 bg-gray-800/80 px-2 py-1 rounded-lg">
+                          <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
+                          <span className="text-white font-bold text-sm">{(lobby.amount / 1e9).toFixed(3)}</span>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleLobbySelected(lobby.lobbyId); }}
+                          className="p-1.5 bg-gray-800 hover:bg-amber-700/50 rounded-lg"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
+                            <circle cx="12" cy="12" r="3" />
+                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Desktop Layout */}
+                    <div className="hidden md:flex items-center justify-between">
                       <div className="flex items-center gap-3 flex-1">
                         <div className="relative">
-                          <div
-                            className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${
-                              isPlayerAWinner
-                                ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
-                                : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
-                            }`}
-                          >
-                            <span className="text-white font-bold text-lg">
-                              {playerAName.slice(0, 1).toUpperCase()}
-                            </span>
+                          <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${
+                            isPlayerAWinner
+                              ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
+                              : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                          }`}>
+                            <span className="text-white font-bold text-lg">{playerAName.slice(0, 1).toUpperCase()}</span>
                           </div>
-                          {isPlayerAWinner && (
-                            <div className="absolute -top-1 -right-1 text-sm">👑</div>
-                          )}
+                          {isPlayerAWinner && <div className="absolute -top-1 -right-1 text-sm">👑</div>}
                         </div>
-                        <p
-                          className={`font-semibold ${isPlayerAWinner ? "text-amber-300" : "text-gray-400"}`}
-                        >
-                          {playerAName}
-                        </p>
+                        <p className={`font-semibold ${isPlayerAWinner ? "text-amber-300" : "text-gray-400"}`}>{playerAName}</p>
+                        {/* Win streak badge - show when Player A wins and has at least 2 consecutive wins */}
+                        {isPlayerAWinner && (lobby.winStreak ?? 0) >= 1 && (
+                          <span className="px-2 py-1 bg-gradient-to-r from-orange-600 to-red-600 rounded text-xs text-white font-bold">
+                            🔥 {(lobby.winStreak ?? 0) + 1} Win Streak
+                          </span>
+                        )}
                       </div>
-
-                      {/* VS Icon */}
-                      <div className="px-4">
-                        <span className="text-2xl opacity-60">⚔️</span>
-                      </div>
-
-                      {/* Player B */}
+                      <div className="px-4"><span className="text-2xl opacity-60">⚔️</span></div>
                       <div className="flex items-center gap-3 flex-1 justify-end">
-                        <p
-                          className={`font-semibold ${isPlayerBWinner ? "text-amber-300" : "text-gray-400"}`}
-                        >
-                          {playerBName ?? "---"}
-                        </p>
+                        <p className={`font-semibold ${isPlayerBWinner ? "text-amber-300" : "text-gray-400"}`}>{playerBName ?? "---"}</p>
                         <div className="relative">
-                          <div
-                            className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${
-                              isPlayerBWinner
-                                ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
-                                : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
-                            }`}
-                          >
-                            <span className="text-white font-bold text-lg">
-                              {playerBName ? playerBName.slice(0, 1).toUpperCase() : "?"}
-                            </span>
+                          <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${
+                            isPlayerBWinner
+                              ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
+                              : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                          }`}>
+                            <span className="text-white font-bold text-lg">{playerBName ? playerBName.slice(0, 1).toUpperCase() : "?"}</span>
                           </div>
-                          {isPlayerBWinner && (
-                            <div className="absolute -top-1 -right-1 text-sm">👑</div>
-                          )}
+                          {isPlayerBWinner && <div className="absolute -top-1 -right-1 text-sm">👑</div>}
                         </div>
                       </div>
-
-                      {/* Amount & View */}
                       <div className="flex items-center gap-3 ml-6">
                         <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
                           <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
-                          <span className="text-white font-bold">
-                            {(lobby.amount / 1e9).toFixed(3)}
-                          </span>
+                          <span className="text-white font-bold">{(lobby.amount / 1e9).toFixed(3)}</span>
                         </div>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleLobbySelected(lobby.lobbyId);
-                          }}
+                          onClick={(e) => { e.stopPropagation(); handleLobbySelected(lobby.lobbyId); }}
                           className="p-2 bg-gray-800 hover:bg-amber-700/50 rounded-lg transition-colors"
-                          title="View battle"
                         >
-                          <svg
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            className="text-gray-400 hover:text-amber-300"
-                          >
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400 hover:text-amber-300">
                             <circle cx="12" cy="12" r="3" />
                             <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
                           </svg>
@@ -900,17 +958,17 @@ export function OneVOnePage() {
           </div>
         ) : (
           /* Single column layout when not connected - show waiting games first, then resolved */
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
             {/* Not connected banner */}
-            <div className="p-4 bg-gradient-to-r from-amber-900/40 to-amber-950/40 border border-amber-700/50 rounded-xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-4xl font-black text-amber-200 tracking-wide">1V1 BATTLE</h1>
-                  <p className="text-amber-300/70 text-sm mt-1">
+            <div className="p-3 md:p-4 bg-gradient-to-r from-amber-900/40 to-amber-950/40 border border-amber-700/50 rounded-xl">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                <div className="text-center md:text-left">
+                  <h1 className="text-2xl md:text-4xl font-black text-amber-200 tracking-wide">1V1 BATTLE</h1>
+                  <p className="text-amber-300/70 text-xs md:text-sm mt-1">
                     Connect your wallet to create or join games
                   </p>
                 </div>
-                <div className="flex items-center gap-2 px-4 py-2 bg-amber-600/20 border border-amber-500/30 rounded-lg">
+                <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-amber-600/20 border border-amber-500/30 rounded-lg">
                   <span className="text-amber-400 text-sm">Payouts settled in SOL</span>
                   <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
                 </div>
@@ -918,14 +976,14 @@ export function OneVOnePage() {
             </div>
 
             {/* Waiting Games (Open Lobbies) */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <h2 className="text-xl font-bold text-amber-100">ALL GAMES</h2>
-                <span className="text-amber-400 font-mono">
+            <div className="space-y-3 md:space-y-4">
+              <div className="flex items-center gap-2 md:gap-3">
+                <h2 className="text-lg md:text-xl font-bold text-amber-100">ALL GAMES</h2>
+                <span className="text-amber-400 font-mono text-sm">
                   {openLobbies.filter((l) => l.status === 0 && !l.isPrivate).length +
                     completedLobbies.length}
                 </span>
-                <span className="px-3 py-1 bg-amber-900/30 border border-amber-700/50 rounded-full text-amber-300 text-xs flex items-center gap-1">
+                <span className="hidden md:flex px-3 py-1 bg-amber-900/30 border border-amber-700/50 rounded-full text-amber-300 text-xs items-center gap-1">
                   <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
                   Payouts settled in SOL
                 </span>
@@ -940,67 +998,59 @@ export function OneVOnePage() {
                     return (
                       <div
                         key={lobby._id}
-                        className="bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 rounded-xl p-4 hover:border-amber-600/50 transition-colors"
+                        className="bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 rounded-xl p-3 md:p-4 hover:border-amber-600/50 transition-colors"
                       >
-                        <div className="flex items-center justify-between">
-                          {/* Player A */}
+                        {/* Mobile Layout */}
+                        <div className="flex md:hidden items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 border-2 border-amber-500/50 flex items-center justify-center flex-shrink-0">
+                              <span className="text-white font-bold text-sm">{playerAName.slice(0, 1).toUpperCase()}</span>
+                            </div>
+                            <span className="text-white font-semibold text-sm truncate max-w-[80px]">{playerAName}</span>
+                            <span className="text-gray-500">⚔️</span>
+                            <span className="text-gray-500 text-sm">?</span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="flex items-center gap-1 bg-gray-800/80 px-2 py-1 rounded-lg">
+                              <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
+                              <span className="text-white font-bold text-sm">{(lobby.amount / 1e9).toFixed(3)}</span>
+                            </div>
+                            <button className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold text-sm rounded-lg">
+                              Join
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Desktop Layout */}
+                        <div className="hidden md:flex items-center justify-between">
                           <div className="flex items-center gap-3 flex-1">
                             <div className="relative">
                               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 border-2 border-amber-500/50 flex items-center justify-center overflow-hidden">
-                                <span className="text-white font-bold text-lg">
-                                  {playerAName.slice(0, 1).toUpperCase()}
-                                </span>
+                                <span className="text-white font-bold text-lg">{playerAName.slice(0, 1).toUpperCase()}</span>
                               </div>
                               <div className="absolute -bottom-1 -right-1 bg-amber-600 text-[10px] text-white font-bold px-1.5 py-0.5 rounded-full border border-amber-400">
                                 {lobby.characterA || 1}
                               </div>
                             </div>
-                            <div>
-                              <p className="text-white font-semibold">{playerAName}</p>
-                            </div>
+                            <p className="text-white font-semibold">{playerAName}</p>
                           </div>
-
-                          {/* VS Icon */}
-                          <div className="flex items-center gap-4 px-4">
-                            <span className="text-2xl">⚔️</span>
-                          </div>
-
-                          {/* Player B (Waiting) */}
+                          <div className="px-4"><span className="text-2xl">⚔️</span></div>
                           <div className="flex items-center gap-3 flex-1 justify-end">
-                            <div>
-                              <p className="text-gray-500 font-semibold italic">Waiting...</p>
-                            </div>
-                            <div className="relative">
-                              <div className="w-12 h-12 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center">
-                                <span className="text-gray-500 text-2xl">?</span>
-                              </div>
-                              <div className="absolute -bottom-1 -right-1 bg-gray-700 text-[10px] text-gray-400 font-bold px-1.5 py-0.5 rounded-full border border-gray-600">
-                                ?
-                              </div>
+                            <p className="text-gray-500 font-semibold italic">Waiting...</p>
+                            <div className="w-12 h-12 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center">
+                              <span className="text-gray-500 text-2xl">?</span>
                             </div>
                           </div>
-
-                          {/* Amount & Actions */}
                           <div className="flex items-center gap-3 ml-6">
                             <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
                               <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
-                              <span className="text-white font-bold">
-                                {(lobby.amount / 1e9).toFixed(3)}
-                              </span>
+                              <span className="text-white font-bold">{(lobby.amount / 1e9).toFixed(3)}</span>
                             </div>
                             <button className="px-6 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white font-semibold rounded-lg transition-all">
                               Join
                             </button>
                             <button className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
-                              <svg
-                                width="20"
-                                height="20"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                className="text-gray-400"
-                              >
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
                                 <circle cx="12" cy="12" r="3" />
                                 <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
                               </svg>
@@ -1025,108 +1075,120 @@ export function OneVOnePage() {
                   return (
                     <div
                       key={lobby._id}
-                      className="bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 rounded-xl p-4 hover:border-amber-600/50 transition-colors cursor-pointer"
+                      className="bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 rounded-xl p-3 md:p-4 hover:border-amber-600/50 transition-colors cursor-pointer"
                       onClick={() => handleLobbySelected(lobby.lobbyId)}
                     >
-                      <div className="flex items-center justify-between">
-                        {/* Player A */}
+                      {/* Mobile Layout */}
+                      <div className="flex md:hidden items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="relative flex-shrink-0">
+                            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
+                              isPlayerAWinner
+                                ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
+                                : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                            }`}>
+                              <span className="text-white font-bold text-sm">{playerAName.slice(0, 1).toUpperCase()}</span>
+                            </div>
+                            {isPlayerAWinner && <span className="absolute -top-1 -right-1 text-xs">👑</span>}
+                          </div>
+                          <span className={`text-sm truncate max-w-[60px] ${isPlayerAWinner ? "text-amber-300" : "text-gray-400"}`}>
+                            {playerAName}
+                          </span>
+                          {/* Win streak badge - show when Player A wins and has at least 2 consecutive wins */}
+                          {isPlayerAWinner && (lobby.winStreak ?? 0) >= 1 && (
+                            <span className="px-1.5 py-0.5 bg-gradient-to-r from-orange-600 to-red-600 rounded text-[10px] text-white font-bold whitespace-nowrap">
+                              🔥 {(lobby.winStreak ?? 0) + 1} streak
+                            </span>
+                          )}
+                          <span className="text-gray-500 opacity-60">⚔️</span>
+                          <span className={`text-sm truncate max-w-[60px] ${isPlayerBWinner ? "text-amber-300" : "text-gray-400"}`}>
+                            {playerBName ?? "---"}
+                          </span>
+                          <div className="relative flex-shrink-0">
+                            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
+                              isPlayerBWinner
+                                ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
+                                : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                            }`}>
+                              <span className="text-white font-bold text-sm">{playerBName ? playerBName.slice(0, 1).toUpperCase() : "?"}</span>
+                            </div>
+                            {isPlayerBWinner && <span className="absolute -top-1 -right-1 text-xs">👑</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex items-center gap-1 bg-gray-800/80 px-2 py-1 rounded-lg">
+                            <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
+                            <span className="text-white font-bold text-sm">{(lobby.amount / 1e9).toFixed(3)}</span>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleLobbySelected(lobby.lobbyId); }}
+                            className="p-1.5 bg-gray-800 hover:bg-amber-700/50 rounded-lg"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
+                              <circle cx="12" cy="12" r="3" />
+                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Desktop Layout */}
+                      <div className="hidden md:flex items-center justify-between">
                         <div className="flex items-center gap-3 flex-1">
                           <div className="relative">
-                            <div
-                              className={`w-12 h-12 rounded-full border-2 flex items-center justify-center overflow-hidden ${
-                                isPlayerAWinner
-                                  ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
-                                  : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
-                              }`}
-                            >
-                              <span className="text-white font-bold text-lg">
-                                {playerAName.slice(0, 1).toUpperCase()}
-                              </span>
+                            <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center overflow-hidden ${
+                              isPlayerAWinner
+                                ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
+                                : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                            }`}>
+                              <span className="text-white font-bold text-lg">{playerAName.slice(0, 1).toUpperCase()}</span>
                             </div>
-                            <div
-                              className={`absolute -bottom-1 -right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${
-                                isPlayerAWinner
-                                  ? "bg-amber-600 text-white border-amber-400"
-                                  : "bg-gray-700 text-gray-300 border-gray-600"
-                              }`}
-                            >
+                            <div className={`absolute -bottom-1 -right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${
+                              isPlayerAWinner ? "bg-amber-600 text-white border-amber-400" : "bg-gray-700 text-gray-300 border-gray-600"
+                            }`}>
                               {lobby.characterA || 1}
                             </div>
+                            {isPlayerAWinner && <div className="absolute -top-1 -right-1 text-sm">👑</div>}
                           </div>
-                          <div>
-                            <p
-                              className={`font-semibold ${isPlayerAWinner ? "text-amber-300" : "text-gray-400"}`}
-                            >
-                              {playerAName}
-                            </p>
-                          </div>
+                          <p className={`font-semibold ${isPlayerAWinner ? "text-amber-300" : "text-gray-400"}`}>{playerAName}</p>
+                          {/* Win streak badge - show when Player A wins and has at least 2 consecutive wins */}
+                          {isPlayerAWinner && (lobby.winStreak ?? 0) >= 1 && (
+                            <span className="px-2 py-1 bg-gradient-to-r from-orange-600 to-red-600 rounded text-xs text-white font-bold">
+                              🔥 {(lobby.winStreak ?? 0) + 1} Win Streak
+                            </span>
+                          )}
                         </div>
-
-                        {/* VS Icon */}
-                        <div className="flex items-center gap-4 px-4">
-                          <span className="text-2xl opacity-60">⚔️</span>
-                        </div>
-
-                        {/* Player B */}
+                        <div className="px-4"><span className="text-2xl opacity-60">⚔️</span></div>
                         <div className="flex items-center gap-3 flex-1 justify-end">
-                          <div>
-                            <p
-                              className={`font-semibold ${isPlayerBWinner ? "text-amber-300" : "text-gray-400"}`}
-                            >
-                              {playerBName ?? "---"}
-                            </p>
-                          </div>
+                          <p className={`font-semibold ${isPlayerBWinner ? "text-amber-300" : "text-gray-400"}`}>{playerBName ?? "---"}</p>
                           <div className="relative">
-                            <div
-                              className={`w-12 h-12 rounded-full border-2 flex items-center justify-center overflow-hidden ${
-                                isPlayerBWinner
-                                  ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
-                                  : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
-                              }`}
-                            >
-                              <span className="text-white font-bold text-lg">
-                                {playerBName ? playerBName.slice(0, 1).toUpperCase() : "?"}
-                              </span>
+                            <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center overflow-hidden ${
+                              isPlayerBWinner
+                                ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
+                                : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                            }`}>
+                              <span className="text-white font-bold text-lg">{playerBName ? playerBName.slice(0, 1).toUpperCase() : "?"}</span>
                             </div>
                             {lobby.playerB && (
-                              <div
-                                className={`absolute -bottom-1 -right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${
-                                  isPlayerBWinner
-                                    ? "bg-amber-600 text-white border-amber-400"
-                                    : "bg-gray-700 text-gray-300 border-gray-600"
-                                }`}
-                              >
+                              <div className={`absolute -bottom-1 -right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${
+                                isPlayerBWinner ? "bg-amber-600 text-white border-amber-400" : "bg-gray-700 text-gray-300 border-gray-600"
+                              }`}>
                                 {lobby.characterB || 1}
                               </div>
                             )}
+                            {isPlayerBWinner && <div className="absolute -top-1 -left-1 text-sm">👑</div>}
                           </div>
                         </div>
-
-                        {/* Amount & View */}
                         <div className="flex items-center gap-3 ml-6">
                           <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
                             <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
-                            <span className="text-white font-bold">
-                              {(lobby.amount / 1e9).toFixed(3)}
-                            </span>
+                            <span className="text-white font-bold">{(lobby.amount / 1e9).toFixed(3)}</span>
                           </div>
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleLobbySelected(lobby.lobbyId);
-                            }}
+                            onClick={(e) => { e.stopPropagation(); handleLobbySelected(lobby.lobbyId); }}
                             className="p-2 bg-gray-800 hover:bg-amber-700/50 rounded-lg transition-colors"
-                            title="View battle"
                           >
-                            <svg
-                              width="20"
-                              height="20"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              className="text-gray-400 hover:text-amber-300"
-                            >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400 hover:text-amber-300">
                               <circle cx="12" cy="12" r="3" />
                               <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
                             </svg>
@@ -1158,7 +1220,7 @@ export function OneVOnePage() {
         selectedCharacter={selectedCharacter}
         onJoin={(lobbyId, character) => void handleJoinLobbyFromDialog(lobbyId, character)}
         onFightComplete={handleFightComplete}
-        onDoubleDown={(amount) => void handleDoubleDown(amount)}
+        onDoubleDown={(amount, winStreak) => void handleDoubleDown(amount, winStreak)}
         isJoining={joiningLobby}
       />
 

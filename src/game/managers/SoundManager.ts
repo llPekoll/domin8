@@ -527,4 +527,50 @@ export class SoundManager {
     }
     return this.isSfxMuted;
   }
+
+  // ============ App Lifecycle Controls ============
+
+  private static wasMusicPlayingBeforePause: boolean = false;
+  private static wereFireSoundsPlayingBeforePause: boolean = false;
+
+  /**
+   * Pause all sounds (call when app goes to background)
+   */
+  static pauseAll() {
+    logger.ui.debug("[SoundManager] Pausing all sounds (app backgrounded)");
+
+    // Remember current state
+    this.wasMusicPlayingBeforePause = this.battleMusic ? (this.battleMusic as any).isPlaying : false;
+    this.wereFireSoundsPlayingBeforePause = this.fireSounds ? (this.fireSounds as any).isPlaying : false;
+
+    // Pause battle music
+    if (this.battleMusic && (this.battleMusic as any).isPlaying) {
+      this.battleMusic.pause();
+    }
+
+    // Pause fire sounds
+    if (this.fireSounds && (this.fireSounds as any).isPlaying) {
+      this.fireSounds.pause();
+    }
+  }
+
+  /**
+   * Resume sounds (call when app comes to foreground)
+   */
+  static resumeAll() {
+    logger.ui.debug("[SoundManager] Resuming sounds (app foregrounded)");
+
+    // Only resume if not muted and was playing before
+    if (!this.isMuted && !this.isMusicMuted && this.wasMusicPlayingBeforePause) {
+      if (this.battleMusic) {
+        this.battleMusic.resume();
+      }
+    }
+
+    if (!this.isMuted && !this.isFireSoundsMuted && this.wereFireSoundsPlayingBeforePause) {
+      if (this.fireSounds) {
+        this.fireSounds.resume();
+      }
+    }
+  }
 }

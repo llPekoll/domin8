@@ -3,13 +3,13 @@ use crate::error::Domin81v1Error;
 use crate::state::*;
 
 /// Initialize the global configuration account
-/// 
+///
 /// Only callable by the admin (you'll pass this as a signer)
 pub fn handler(
     ctx: Context<InitializeConfig>,
     house_fee_bps: u16,
 ) -> Result<()> {
-    require!(house_fee_bps <= 10000, Domin81v1Error::InvalidHouseFee); // Max 100%
+    require!(house_fee_bps <= MAX_HOUSE_FEE_BPS, Domin81v1Error::InvalidHouseFee); // Max 5%
 
     let config = &mut ctx.accounts.config;
     config.admin = ctx.accounts.admin.key();

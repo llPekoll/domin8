@@ -47,7 +47,7 @@ pub fn handler(ctx: Context<VrfCallback>, randomness: [u8; 32]) -> Result<()> {
     lobby.randomness = Some(randomness);
     
     // Update status to indicate VRF is received and ready for settlement
-    lobby.status = LOBBY_STATUS_VRF_RECEIVED;
+    lobby.status = LOBBY_STATUS_READY;
 
     msg!("VRF callback executed! Randomness stored for Lobby {}", lobby.lobby_id);
     msg!("Randomness (first 8 bytes): {:?}", &randomness[0..8]);

@@ -1,18 +1,24 @@
 use anchor_lang::prelude::*;
 use crate::error::Domin81v1Error;
 use crate::state::*;
+use crate::utils::Utils;
 
 /// Settle a lobby after VRF randomness has been received
 /// This instruction can be called by anyone once VRF callback has executed
 #[derive(Accounts)]
 pub struct SettleLobby<'info> {
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [b"domin8_1v1_config"],
+        bump,
+    )]
     pub config: Account<'info, Domin81v1Config>,
 
     #[account(
         mut,
         seeds = [b"domin8_1v1_lobby", lobby.lobby_id.to_le_bytes().as_ref()],
         bump,
+        close = player_a,  // Close account and return rent to player_a
     )]
     pub lobby: Account<'info, Domin81v1Lobby>,
 
@@ -41,17 +47,16 @@ pub fn handler(ctx: Context<SettleLobby>) -> Result<()> {
     // Safety check: Ensure lobby has received VRF randomness
     require_eq!(
         lobby.status,
-        LOBBY_STATUS_VRF_RECEIVED,
+        LOBBY_STATUS_READY,
         Domin81v1Error::InvalidLobbyStatus
     );
 
     // Get the stored randomness
     let randomness = lobby.randomness.ok_or(Domin81v1Error::RandomnessNotAvailable)?;
 
-    // Determine winner using randomness
-    // Even number = Player A wins, Odd = Player B wins
-    let random_val = randomness[0]; 
-    let winner_is_player_a = random_val % 2 == 0;
+    // Determine winner using full randomness (uses first 8 bytes as u64)
+    // Even = Player A wins, Odd = Player B wins
+    let winner_is_player_a = Utils::determine_winner_from_randomness(&randomness)?;
 
     let winner = if winner_is_player_a {
         lobby.player_a
@@ -90,9 +95,8 @@ pub fn handler(ctx: Context<SettleLobby>) -> Result<()> {
         **winner_account.lamports.borrow_mut() += prize;
     }
 
-    // Update State
+    // Store winner (PDA closes immediately after via `close = player_a`)
     lobby.winner = Some(winner);
-    lobby.status = LOBBY_STATUS_RESOLVED;
 
     msg!("Winner determined: {}. Prize: {}", winner, prize);
 

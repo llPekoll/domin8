@@ -21,9 +21,20 @@
     "anchor:test:skip": "dotenv -e .env.local -- bash -c 'anchor test --skip-build --skip-deploy --provider.wallet ${ANCHOR_WALLET}'",
     "anchor:build": "dotenv -e .env.local -- bash -c 'anchor build'",
     "anchor:deploy": "dotenv -e .env.local -- bash -c 'anchor deploy --provider.wallet ${ANCHOR_WALLET} --program-name domin8_prgm --program-id ${ANCHOR_PROGRAM_ID}'",
-    "anchor:localnet": "anchor localnet"
+    "anchor:localnet": "anchor localnet",
+    "cap:sync": "npx cap sync",
+    "cap:build": "bun run build && npx cap sync",
+    "cap:android": "npx cap open android",
+    "cap:run:android": "npx cap run android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/browser": "^8.0.0",
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/haptics": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0",
     "@coral-xyz/anchor": "0.31.1",
     "@metaplex-foundation/js": "^0.20.1",
     "@metaplex-foundation/mpl-token-metadata": "^3.4.0",
@@ -57,7 +68,8 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "tweetnacl": "^1.0.3",
-    "vite-plugin-pwa": "^1.2.0"
+    "vite-plugin-pwa": "^1.2.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
@@ -66,6 +78,7 @@
     "@types/node": "^24.5.0",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
+    "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "^4.3.4",
     "chai": "^6.2.0",
     "cross-env": "^10.1.0",

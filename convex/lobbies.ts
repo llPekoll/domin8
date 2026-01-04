@@ -12,16 +12,7 @@ import { query, action, internalMutation, internalQuery, mutation } from "./_gen
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Solana1v1QueryClient } from "./lib/solana_1v1";
-
-// ============================================================================
-// CONFIGURATION
-// ============================================================================
-
-const RPC_ENDPOINT =
-  process.env.RPC_URL ||
-  process.env.VITE_SOLANA_RPC_URL ||
-  "https://devnet.helius-rpc.com/?api-key=0df32d0b-da4f-49b3-b154-deaceac254c0";
-
+const RPC_ENDPOINT = process.env.SOLANA_RPC_ENDPOINT;
 // ============================================================================
 // QUERIES
 // ============================================================================
@@ -94,7 +85,7 @@ export const getLobbyByShareToken = query({
 /**
  * Get lobbies created or modified by a specific player
  * Returns lobbies grouped by status in descending order (3, 2, 1, 0)
- * Status: 0=Created, 1=Awaiting VRF, 2=VRF Received, 3=Resolved
+ * Status: 0=Open (waiting for Player B), 1=Awaiting VRF, 2=Ready (VRF received), 3=Resolved (Convex only)
  */
 export const getPlayerLobbies = query({
   args: {
@@ -139,10 +130,10 @@ export const getPlayerLobbies = query({
  * Ordered by most recent first
  *
  * Status flow:
- * 0 = Created (waiting for Player B)
- * 1 = Awaiting VRF (Player B joined)
- * 2 = VRF Received (ready for settlement)
- * 3 = Resolved (winner determined)
+ * 0 = Open (waiting for Player B)
+ * 1 = Awaiting VRF (Player B joined, VRF requested)
+ * 2 = Ready (VRF received, ready for settlement) - on-chain PDA closes after this
+ * 3 = Resolved (Convex only - for history tracking)
  */
 export const getCompletedLobbies = query({
   args: {
@@ -236,6 +227,7 @@ export const createLobbyInDb = mutation({
     characterA: v.number(),
     mapId: v.number(),
     isPrivate: v.optional(v.boolean()),
+    winStreak: v.optional(v.number()), // For double-down: carry over win streak
   },
   handler: async (ctx, args) => {
     // Check if lobby already exists to prevent duplicates
@@ -256,7 +248,7 @@ export const createLobbyInDb = mutation({
       playerA: args.playerA,
       playerB: undefined,
       amount: args.amount,
-      status: 0, // Created, waiting for Player B
+      status: 0, // Open, waiting for Player B
       winner: undefined,
       isPrivate: args.isPrivate || false,
       characterA: args.characterA,
@@ -264,6 +256,7 @@ export const createLobbyInDb = mutation({
       mapId: args.mapId,
       createdAt: Date.now(),
       resolvedAt: undefined,
+      winStreak: args.winStreak, // Track consecutive double-down wins
     });
     return docId;
   },
@@ -373,6 +366,7 @@ export const _internalCreateLobby = internalMutation({
     characterA: v.number(),
     mapId: v.number(),
     isPrivate: v.optional(v.boolean()),
+    winStreak: v.optional(v.number()), // For double-down: carry over win streak
   },
   handler: async (ctx, args) => {
     // Check if lobby already exists to prevent duplicates
@@ -393,7 +387,7 @@ export const _internalCreateLobby = internalMutation({
       playerA: args.playerA,
       playerB: undefined,
       amount: args.amount,
-      status: 0, // Created, waiting for Player B
+      status: 0, // Open, waiting for Player B
       winner: undefined,
       isPrivate: args.isPrivate || false,
       characterA: args.characterA,
@@ -401,6 +395,7 @@ export const _internalCreateLobby = internalMutation({
       mapId: args.mapId,
       createdAt: Date.now(),
       resolvedAt: undefined,
+      winStreak: args.winStreak, // Track consecutive double-down wins
     });
 
     // Credit points to Player A for their bet
@@ -459,6 +454,7 @@ export const _internalSettleLobby = internalMutation({
     lobbyId: v.number(),
     winner: v.string(),
     settleTxHash: v.optional(v.string()),
+    prizeAmount: v.optional(v.number()), // Actual prize in lamports (from tx logs)
   },
   handler: async (ctx, args) => {
     const lobby = await ctx.db
@@ -475,14 +471,19 @@ export const _internalSettleLobby = internalMutation({
       status: number;
       resolvedAt: number;
       settleTxHash?: string;
+      prizeAmount?: number;
     } = {
       winner: args.winner,
-      status: 3, // Resolved (new status flow: 0=created, 1=awaiting VRF, 2=VRF received, 3=resolved)
+      status: 3, // Resolved (Convex only: 0=open, 1=awaiting VRF, 2=ready, 3=resolved)
       resolvedAt: Date.now(),
     };
 
     if (args.settleTxHash) {
       updateData.settleTxHash = args.settleTxHash;
+    }
+
+    if (args.prizeAmount) {
+      updateData.prizeAmount = args.prizeAmount;
     }
 
     await ctx.db.patch(lobby._id, updateData);
@@ -602,13 +603,14 @@ export const createLobby = action({
     mapId: v.number(), // Map ID (0-255)
     transactionHash: v.string(), // Solana transaction hash (for verification)
     isPrivate: v.optional(v.boolean()), // Private lobbies only joinable via share link
+    winStreak: v.optional(v.number()), // For double-down: carry over win streak
   },
   handler: async (
     ctx,
     args
   ): Promise<{ success: boolean; lobbyId: number; lobbyPda: string; action: string }> => {
     try {
-      const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
+      const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT!);
 
       // Get the transaction from blockchain to confirm
       const connection = queryClient.getConnection();
@@ -643,6 +645,7 @@ export const createLobby = action({
         characterA: args.characterA,
         mapId: args.mapId,
         isPrivate: args.isPrivate,
+        winStreak: args.winStreak,
       });
 
       return {
@@ -676,7 +679,7 @@ export const joinLobby = action({
   },
   handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; action: string }> => {
     try {
-      const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
+      const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT!);
 
       // Verify transaction
       const connection = queryClient.getConnection();
@@ -696,11 +699,11 @@ export const joinLobby = action({
         throw new Error("Lobby not found");
       }
 
-      // With new VRF flow:
-      // Status 0 = Created (waiting for Player B)
+      // Status flow:
+      // Status 0 = Open (waiting for Player B)
       // Status 1 = Awaiting VRF (Player B joined, VRF requested)
-      // Status 2 = VRF Received (randomness stored, ready for settlement)
-      // Status 3 = Resolved (winner determined, funds distributed)
+      // Status 2 = Ready (VRF received, ready for settlement) - on-chain PDA closes after this
+      // Status 3 = Resolved (Convex only - for history tracking)
 
       // After join_lobby, status should be 1 (Awaiting VRF)
       // VRF callback will set it to 2, then settle_lobby sets it to 3
@@ -744,7 +747,7 @@ export const cancelLobby = action({
   },
   handler: async (ctx, args): Promise<{ success: boolean; lobbyId: number; action: string }> => {
     try {
-      const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT);
+      const queryClient = new Solana1v1QueryClient(RPC_ENDPOINT!);
 
       // Verify transaction
       const connection = queryClient.getConnection();
@@ -783,10 +786,10 @@ export const cancelLobby = action({
  * Used by syncLobbyFromBlockchain to fetch lobbies that may need syncing
  *
  * Status flow:
- * 0 = Created (waiting for Player B)
- * 1 = Awaiting VRF (Player B joined)
- * 2 = VRF Received (ready for settlement)
- * 3 = Resolved (winner determined)
+ * 0 = Open (waiting for Player B)
+ * 1 = Awaiting VRF (Player B joined, VRF requested)
+ * 2 = Ready (VRF received) - on-chain PDA closes after settlement
+ * 3 = Resolved (Convex only - for history tracking)
  */
 export const _getOpenLobbiesForSync = internalQuery({
   args: {},

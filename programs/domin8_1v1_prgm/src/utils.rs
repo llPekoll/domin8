@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use crate::error::Domin81v1Error;
 
 /// Utility functions for the domin8_1v1 program
 pub struct Utils;

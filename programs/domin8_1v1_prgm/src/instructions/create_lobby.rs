@@ -1,9 +1,8 @@
 use crate::*;
-use anchor_lang::prelude::*;
 use anchor_lang::solana_program::keccak;
 
 /// Create a new 1v1 lobby (called by Player A)
-/// 
+///
 /// This instruction follows the ORAO VRF pattern:
 /// 1. Player A creates and funds the lobby
 /// 2. A force seed is generated for the future VRF request
@@ -12,10 +11,9 @@ pub fn handler(
     ctx: Context<CreateLobby>,
     amount: u64,
     skin_a: u8,
-    position_a: [u16; 2],
     map: u8,
 ) -> Result<()> {
-    require!(amount > 0, Domin81v1Error::InvalidBetAmount);
+    require!(amount >= MIN_BET_AMOUNT, Domin81v1Error::BetBelowMinimum);
 
     let config = &mut ctx.accounts.config;
     let lobby = &mut ctx.accounts.lobby;
@@ -44,13 +42,11 @@ pub fn handler(
     lobby.player_b = None;
     lobby.amount = amount;
     lobby.force = force;
-    lobby.status = LOBBY_STATUS_CREATED;
+    lobby.status = LOBBY_STATUS_OPEN;
     lobby.winner = None;
     lobby.created_at = clock.unix_timestamp;
     lobby.skin_a = skin_a;
     lobby.skin_b = None;
-    lobby.position_a = position_a;
-    lobby.position_b = None;
     lobby.map = map;
     lobby.randomness = None;
 
@@ -74,14 +70,14 @@ pub fn handler(
         player_a.key()
     );
     msg!("Bet amount: {} lamports", amount);
-    msg!("Skin A: {}, Position A: [{}, {}], Map: {}", skin_a, position_a[0], position_a[1], map);
+    msg!("Skin A: {}, Map: {}", skin_a, map);
     msg!("Force Seed: {:?}", force);
 
     Ok(())
 }
 
 #[derive(Accounts)]
-#[instruction(amount: u64, skin_a: u8, position_a: [u16; 2], map: u8)]
+#[instruction(amount: u64, skin_a: u8, map: u8)]
 pub struct CreateLobby<'info> {
     #[account(
         mut,

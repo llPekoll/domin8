@@ -10,7 +10,7 @@ pub use state::*;
 pub use instructions::*;
 pub use utils::*;
 
-declare_id!("CSj9CvC2ZZscGJDHJu8fCxxkTiJifWPZWiQCugxJkAad"); // TODO: Generate actual program ID
+declare_id!("Fgz78yXMJGd9w8ofKopffHZ8VqHN1Ao9YmqYnXCbA8r1");
 
 #[program]
 pub mod domin8_1v1_prgm {
@@ -29,10 +29,9 @@ pub mod domin8_1v1_prgm {
         ctx: Context<CreateLobby>,
         amount: u64,
         skin_a: u8,
-        position_a: [u16; 2],
         map: u8,
     ) -> Result<()> {
-        instructions::create_lobby::handler(ctx, amount, skin_a, position_a, map)
+        instructions::create_lobby::handler(ctx, amount, skin_a, map)
     }
 
     /// Join an existing 1v1 lobby (Player B joins, funds it, resolves game)
@@ -40,16 +39,8 @@ pub mod domin8_1v1_prgm {
         ctx: Context<JoinLobby>,
         amount: u64,
         skin_b: u8,
-        position_b: [u16; 2],
     ) -> Result<()> {
-        instructions::join_lobby::handler(ctx, amount, skin_b, position_b)
-    }
-
-    /// Cancel a 1v1 lobby (Player A refunds if status = created)
-    pub fn cancel_lobby(
-        ctx: Context<CancelLobby>,
-    ) -> Result<()> {
-        instructions::cancel_lobby::handler(ctx)
+        instructions::join_lobby::handler(ctx, amount, skin_b)
     }
 
     /// VRF callback - called automatically by MagicBlock VRF
@@ -67,5 +58,13 @@ pub mod domin8_1v1_prgm {
         ctx: Context<SettleLobby>,
     ) -> Result<()> {
         instructions::settle_lobby::handler(ctx)
+    }
+
+    /// Rescue a stuck lobby (admin only)
+    /// Can be called by admin to refund both players if VRF times out
+    pub fn rescue_lobby(
+        ctx: Context<RescueLobby>,
+    ) -> Result<()> {
+        instructions::rescue_lobby::handler(ctx)
     }
 }

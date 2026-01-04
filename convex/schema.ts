@@ -208,16 +208,18 @@ export default defineSchema({
     characterB: v.optional(v.number()), // Player B's character/skin ID (0-255, None until joined)
     mapId: v.number(), // Map/background ID (0-255)
 
-    // Positioning (optional, for future expansion)
-    positionA: v.optional(v.array(v.number())), // [x, y] spawn position for Player A
-    positionB: v.optional(v.array(v.number())), // [x, y] spawn position for Player B
-
     // Timestamps
     createdAt: v.number(), // When lobby was created (Unix timestamp)
     resolvedAt: v.optional(v.number()), // When lobby was resolved (Unix timestamp)
 
     // Transaction hashes
     settleTxHash: v.optional(v.string()), // Solana transaction hash for settlement (base58)
+
+    // Prize (parsed from on-chain settlement)
+    prizeAmount: v.optional(v.number()), // Actual prize won in lamports (from tx logs)
+
+    // Win streak (for consecutive double-down wins)
+    winStreak: v.optional(v.number()), // Current streak count (increments on double-down win)
   })
     .index("by_status", ["status"]) // Query open lobbies (status = 0)
     .index("by_player_a", ["playerA"]) // Query lobbies by Player A
@@ -314,5 +316,27 @@ export default defineSchema({
     .index("by_wallet", ["walletAddress"])
     .index("by_wallet_and_round", ["walletAddress", "roundId"])
     .index("by_timestamp", ["timestamp"]),
+
+  // ============================================================================
+  // PWA PUSH NOTIFICATION TABLES
+  // ============================================================================
+
+  /**
+   * Push Subscriptions - Store user push notification subscriptions
+   * Used to send notifications when games start, even when app is closed
+   */
+  pushSubscriptions: defineTable({
+    walletAddress: v.optional(v.string()), // User's wallet (optional - can subscribe before login)
+    endpoint: v.string(), // Push service endpoint URL
+    p256dh: v.string(), // Public key for encryption
+    auth: v.string(), // Auth secret for encryption
+    createdAt: v.number(), // When subscription was created
+    lastUsed: v.optional(v.number()), // Last time notification was sent
+    userAgent: v.optional(v.string()), // Browser/device info
+    isActive: v.boolean(), // Whether subscription is still valid
+  })
+    .index("by_endpoint", ["endpoint"]) // Prevent duplicate subscriptions
+    .index("by_wallet", ["walletAddress"]) // Query user's subscriptions
+    .index("by_active", ["isActive"]), // Query active subscriptions for broadcast
 });
     

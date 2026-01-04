@@ -138,12 +138,9 @@ export async function buildCreateLobbyTransaction(
     );
     const program = new Program<Domin81v1Prgm>(IDL as any, provider);
 
-    // Default position for simplicity: [0, 0]
-    const positionA = [0, 0] as [number, number];
-
     // Build the create_lobby instruction
     const createLobbyIx = await program.methods
-      .createLobby(new BN(amount), characterA, positionA, mapId)
+      .createLobby(new BN(amount), characterA, mapId)
       .accounts({
         config: configPda,
         lobby: lobbyPda,
@@ -273,9 +270,6 @@ export async function buildJoinLobbyTransaction(
       throw new Error(`Failed to parse lobby account: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
     }
 
-    // Default position for simplicity: [0, 0]
-    const positionB = [0, 0] as [number, number];
-
     // MagicBlock Oracle Queue (from IDL - this is the actual queue address on devnet)
     const ORACLE_QUEUE = new PublicKey("Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh");
 
@@ -283,7 +277,7 @@ export async function buildJoinLobbyTransaction(
     // NOTE: The #[vrf] macro injects program_identity, vrf_program, slot_hashes automatically
     // Anchor resolves these from the IDL - we should NOT pass them manually
     logger.solana.debug("Building join_lobby instruction...");
-    
+
     let joinLobbyIx: TransactionInstruction;
     try {
       // Log all accounts before building instruction
@@ -299,7 +293,7 @@ export async function buildJoinLobbyTransaction(
       // Let Anchor resolve VRF accounts automatically from IDL
       // (same pattern as endGame in domin8_prgm)
       joinLobbyIx = await program.methods
-        .joinLobby(new BN(lobbyAmount), characterB, positionB)
+        .joinLobby(new BN(lobbyAmount), characterB)
         .accounts({
           config: configPda,
           lobby: lobbyPda,
@@ -378,67 +372,6 @@ export async function buildJoinLobbyTransaction(
 
   } catch (error) {
     logger.solana.error("Failed to build join_lobby transaction:", error);
-    throw error;
-  }
-}
-
-/**
- * Build a cancel_lobby transaction
- * 
- * @param playerA - Player A's public key (must be the creator)
- * @param lobbyPda - Lobby PDA address
- * @param connection - Solana connection
- * @returns Promise<VersionedTransaction>
- */
-export async function buildCancelLobbyTransaction(
-  playerA: PublicKey,
-  lobbyPda: PublicKey,
-  connection: Connection
-): Promise<VersionedTransaction> {
-  try {
-    logger.solana.debug("Building cancel_lobby transaction", {
-      playerA: playerA.toString(),
-      lobbyPda: lobbyPda.toString(),
-    });
-
-    // Create a read-only provider for instruction building
-    const provider = new AnchorProvider(
-      connection,
-      {
-        publicKey: playerA,
-      } as any,
-      { commitment: "confirmed" }
-    );
-
-    const program = new Program<Domin81v1Prgm>(IDL as any, provider);
-
-    // Build the cancel_lobby instruction
-    const cancelLobbyIx = await program.methods
-      .cancelLobby()
-      .accounts({
-        lobby: lobbyPda,
-        playerA,
-      } as any)
-      .instruction();
-
-    // Get the latest blockhash
-    const { blockhash } = await connection.getLatestBlockhash("confirmed");
-
-    // Compile message
-    const messageV0 = new TransactionMessage({
-      payerKey: playerA,
-      recentBlockhash: blockhash,
-      instructions: [
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 300_000 }),
-        cancelLobbyIx,
-      ],
-    }).compileToV0Message();
-
-    const transaction = new VersionedTransaction(messageV0);
-    logger.solana.debug("Created cancel_lobby transaction");
-    return transaction;
-  } catch (error) {
-    logger.solana.error("Failed to build cancel_lobby transaction:", error);
     throw error;
   }
 }

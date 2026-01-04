@@ -11,7 +11,7 @@ use ephemeral_vrf_sdk::types::SerializableAccountMeta;
 // 2. Add the #[vrf] macro to the context
 #[vrf]
 #[derive(Accounts)]
-#[instruction(amount: u64, skin_b: u8, position_b: [u16; 2])]
+#[instruction(amount: u64, skin_b: u8)]
 pub struct JoinLobby<'info> {
     #[account(
         mut,
@@ -44,9 +44,8 @@ pub fn handler(
     ctx: Context<JoinLobby>,
     amount: u64,
     skin_b: u8,
-    position_b: [u16; 2],
 ) -> Result<()> {
-    require!(amount > 0, Domin81v1Error::InvalidBetAmount);
+    require!(amount >= MIN_BET_AMOUNT, Domin81v1Error::BetBelowMinimum);
 
     // Collect all necessary data before taking mutable borrow
     let lobby_status = ctx.accounts.lobby.status;
@@ -60,7 +59,7 @@ pub fn handler(
     // Verify lobby is in CREATED status (waiting for second player)
     require_eq!(
         lobby_status,
-        LOBBY_STATUS_CREATED,
+        LOBBY_STATUS_OPEN,
         Domin81v1Error::InvalidLobbyStatus
     );
 
@@ -72,6 +71,12 @@ pub fn handler(
 
     // Verify Player B hasn't already joined
     require!(lobby_player_b.is_none(), Domin81v1Error::AlreadyJoined);
+
+    // Prevent self-play: Player A cannot join their own lobby
+    require!(
+        ctx.accounts.lobby.player_a != player_b_key,
+        Domin81v1Error::SelfPlayNotAllowed
+    );
 
     // Check Player B has sufficient balance
     require!(
@@ -124,7 +129,6 @@ pub fn handler(
     let lobby = &mut ctx.accounts.lobby;
     lobby.player_b = Some(player_b_key);
     lobby.skin_b = Some(skin_b);
-    lobby.position_b = Some(position_b);
     lobby.status = LOBBY_STATUS_AWAITING_VRF;
 
     msg!("Randomness requested for Lobby {}. Waiting for callback...", lobby_id);

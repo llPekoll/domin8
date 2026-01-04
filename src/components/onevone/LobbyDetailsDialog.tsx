@@ -28,10 +28,12 @@ interface LobbyData {
   characterA: number;
   characterB?: number;
   mapId: number;
-  status: 0 | 1 | 2 | 3; // 0 = Open, 1 = Awaiting VRF, 2 = VRF Received, 3 = Resolved
+  status: 0 | 1 | 2 | 3; // 0 = Open, 1 = Awaiting VRF, 2 = Ready, 3 = Resolved
   winner?: string;
   isPrivate?: boolean;
   settleTxHash?: string; // Transaction hash for prize settlement
+  prizeAmount?: number; // Actual prize won in lamports (from tx logs)
+  winStreak?: number; // Current win streak for double-down
 }
 
 interface LobbyDetailsDialogProps {
@@ -44,7 +46,7 @@ interface LobbyDetailsDialogProps {
   isJoining?: boolean;
   // Props for arena functionality (fight sequence)
   onFightComplete?: () => void;
-  onDoubleDown?: (amount: number) => void;
+  onDoubleDown?: (amount: number, winStreak: number) => void;
 }
 
 type ArenaState =
@@ -265,6 +267,17 @@ export function LobbyDetailsDialog({
     if (!oneVOneScene || sceneInitialized.current) return;
 
     sceneInitialized.current = true;
+
+    // Debug: Log the lobby data received from props
+    console.log("[1v1 Debug] LobbyDetailsDialog - lobby prop received:", {
+      lobbyId: lobby.lobbyId,
+      characterA: lobby.characterA,
+      characterB: lobby.characterB,
+      playerA: lobby.playerA,
+      playerB: lobby.playerB,
+      status: lobby.status,
+    });
+
     logger.game.info("[LobbyDetails] Spawning Player A character", {
       characterId: lobby.characterA,
       isCreator,
@@ -309,10 +322,10 @@ export function LobbyDetailsDialog({
         setArenaState(isCreator ? "waiting" : "preview");
       }
     } else if (lobby.status === 1 || lobby.status === 2) {
-      // Status 1 = Awaiting VRF, Status 2 = VRF Received (both show as pending)
+      // Status 1 = Awaiting VRF, Status 2 = Ready (both show as pending)
       setArenaState("vrf-pending");
     } else if (lobby.status === 3 && lobby.winner) {
-      // Status 3 = Resolved - need to start fight animation after characters spawn
+      // Status 3 = Resolved - always show fight animation first
       logger.game.info(
         "[LobbyDetails] Lobby already resolved on open, scheduling fight animation",
         {
@@ -324,7 +337,6 @@ export function LobbyDetailsDialog({
       setArenaState("fighting");
 
       // Delay fight animation to allow Player B character to spawn and land
-      // Player A spawns immediately, Player B spawns after 500ms, give extra time for landing animation
       const fightDelay = lobby.playerB && lobby.characterB !== undefined ? 1500 : 500;
       setTimeout(() => {
         const scene = getOneVOneScene();
@@ -346,7 +358,7 @@ export function LobbyDetailsDialog({
         }
       }, fightDelay);
     }
-  }, [isOpen, lobby, gameReady, isCreator, getOneVOneScene, getDisplayName]);
+  }, [isOpen, lobby, gameReady, isCreator, getOneVOneScene, getDisplayName, publicKey]);
 
   // Watch for lobby state changes (real-time updates)
   useEffect(() => {
@@ -390,7 +402,7 @@ export function LobbyDetailsDialog({
           setArenaState(isCreator ? "waiting" : "preview");
         }
       } else if (lobby.status === 1 || lobby.status === 2) {
-        // Status 1 = Awaiting VRF, Status 2 = VRF Received - spawn Player B if not already spawned
+        // Status 1 = Awaiting VRF, Status 2 = Ready - spawn Player B if not already spawned
         if (lobby.playerB && lobby.characterB !== undefined && !playerBSpawned.current) {
           const scene = getOneVOneScene();
           if (scene && typeof scene.spawnSingleCharacter === "function") {
@@ -529,11 +541,21 @@ export function LobbyDetailsDialog({
     return (lamports / 1e9).toFixed(3);
   };
 
-  const prizeAmount = lobby ? lobby.amount * 2 * 0.98 : 0;
+  // Use actual prize from tx logs, or calculate fallback (95% of total pot)
+  const prizeAmount = lobby?.prizeAmount ?? (lobby ? lobby.amount * 2 * 0.95 : 0);
+
+  // Win streak logic:
+  // - Only Player A can carry a streak (they created via double-down)
+  // - If Player A wins, their streak continues: currentStreak + 1
+  // - If Player B wins, they start fresh at 1
+  // Use fightResult.winner first, fallback to lobby.winner for resolved lobbies
+  const actualWinner = fightResult?.winner ?? lobby?.winner;
+  const isWinnerPlayerA = lobby && actualWinner === lobby.playerA;
+  const newWinStreak = isWinnerPlayerA ? (lobby?.winStreak ?? 0) + 1 : 1;
 
   const handleDoubleDownClick = () => {
     if (onDoubleDown && prizeAmount > 0) {
-      onDoubleDown(prizeAmount);
+      onDoubleDown(prizeAmount, newWinStreak);
       onClose();
     }
   };
@@ -580,7 +602,7 @@ export function LobbyDetailsDialog({
         return {
           title: fightResult?.isUserWinner ? "🎉 VICTORY!" : "💀 DEFEAT",
           subtitle: fightResult?.isUserWinner
-            ? `You won ${formatAmount(prizeAmount)} SOL!`
+            ? `You won ${formatAmount(prizeAmount)} SOL!${newWinStreak > 1 ? ` 🔥 ${newWinStreak} win streak!` : ""}`
             : "Better luck next time!",
           showSpinner: false,
         };
@@ -681,8 +703,8 @@ export function LobbyDetailsDialog({
           )}
         </div>
 
-        {/* Footer for spectator mode (resolved lobbies) or during fighting */}
-        {(arenaState === "fighting" || (arenaState === "results" && lobby.status === 3)) && (
+        {/* Footer during fighting - just show back button */}
+        {arenaState === "fighting" && (
           <div className="p-4 bg-gradient-to-b from-amber-900/50 to-amber-950/50 border-t border-amber-700/50">
             <div className="text-center flex flex-col items-center gap-2">
               <button
@@ -691,31 +713,37 @@ export function LobbyDetailsDialog({
               >
                 Back to Lobby List
               </button>
-              {lobby.settleTxHash && (
-                <a
-                  href={`https://solscan.io/tx/${lobby.settleTxHash}${import.meta.env.VITE_SOLANA_NETWORK === "devnet" ? "?cluster=devnet" : ""}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-amber-400/60 hover:text-amber-300 underline"
-                >
-                  View settlement transaction ↗
-                </a>
-              )}
             </div>
           </div>
         )}
 
-        {/* Results Actions for live games (not resolved/spectator) */}
-        {arenaState === "results" && fightResult && lobby.status !== 3 && (
+        {/* Results Actions - show win/lose UI with actual prize and win streak */}
+        {arenaState === "results" && fightResult && (
           <div className="p-4 bg-gradient-to-b from-amber-900/50 to-amber-950/50 border-t border-amber-700/50">
             {fightResult.isUserWinner ? (
-              <div className="flex flex-col items-center gap-2 max-w-sm mx-auto">
+              <div className="flex flex-col items-center gap-3 max-w-sm mx-auto">
+                {/* Prize display */}
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <img src="/sol-logo.svg" alt="SOL" className="w-6 h-6" />
+                    <span className="text-2xl font-bold text-amber-300">
+                      +{formatAmount(prizeAmount)} SOL
+                    </span>
+                  </div>
+                  {newWinStreak > 1 && (
+                    <div className="text-amber-400 text-sm font-semibold animate-pulse">
+                      🔥 {newWinStreak} Win Streak!
+                    </div>
+                  )}
+                </div>
+
+                {/* Double down button */}
                 {onDoubleDown && (
                   <button
                     onClick={handleDoubleDownClick}
                     className="w-full py-3 bg-gradient-to-b from-amber-500 to-amber-700 hover:to-amber-800 text-amber-100 font-bold rounded-lg transform hover:scale-105 transition-all shadow-lg"
                   >
-                    DOUBLE DOWN! (Bet {formatAmount(prizeAmount)} SOL)
+                    🔥 DOUBLE DOWN! (Bet {formatAmount(prizeAmount)} SOL)
                   </button>
                 )}
                 <button
@@ -737,6 +765,9 @@ export function LobbyDetailsDialog({
               </div>
             ) : (
               <div className="text-center flex flex-col items-center gap-2">
+                <div className="text-red-400 text-sm mb-1">
+                  You lost {formatAmount(lobby.amount)} SOL
+                </div>
                 <button
                   onClick={onClose}
                   className="px-6 py-2 bg-amber-900/30 hover:bg-amber-800/40 border border-amber-700/40 text-amber-300 rounded transition-colors"

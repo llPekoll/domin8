@@ -1,18 +1,29 @@
 /**
  * Notifications Service
  *
- * Sends game event notifications directly to Discord and Telegram.
+ * Sends game event notifications directly to Discord, Telegram, and PWA Push.
  * Notifies players when games start and when winners are announced.
  */
 "use node";
 import { action, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
+import webpush from "web-push";
 
 // Discord and Telegram webhook URLs (set in Convex environment variables)
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+// VAPID keys for PWA push notifications
+const VAPID_PUBLIC_KEY = process.env.VITE_VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:hello@domin8.fun";
+
+// Configure web-push with VAPID keys
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+}
 
 /**
  * Send a message to Discord via webhook
@@ -88,6 +99,92 @@ async function sendTelegramNotification(message: string): Promise<boolean> {
 }
 
 /**
+ * Send PWA push notifications to all subscribed users
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function sendPushNotifications(
+  ctx: any,
+  payload: {
+    title: string;
+    body: string;
+    url?: string;
+    tag?: string;
+    requireInteraction?: boolean;
+  }
+): Promise<{ sent: number; failed: number }> {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    console.log("[Push] VAPID keys not configured, skipping");
+    return { sent: 0, failed: 0 };
+  }
+
+  try {
+    // Get all active subscriptions
+    const subscriptions = (await ctx.runQuery(internal.pushSubscriptions.getAllActiveSubscriptions, {})) as Array<{
+      endpoint: string;
+      keys: { p256dh: string; auth: string };
+    }>;
+
+    if (subscriptions.length === 0) {
+      console.log("[Push] No active subscriptions");
+      return { sent: 0, failed: 0 };
+    }
+
+    console.log(`[Push] Sending to ${subscriptions.length} subscribers`);
+
+    const notificationPayload = JSON.stringify({
+      title: payload.title,
+      body: payload.body,
+      url: payload.url || "/",
+      tag: payload.tag || "domin8-game",
+      requireInteraction: payload.requireInteraction ?? false,
+    });
+
+    let sent = 0;
+    let failed = 0;
+
+    // Send to all subscribers in parallel
+    const results = await Promise.allSettled(
+      subscriptions.map(async (subscription: { endpoint: string; keys: { p256dh: string; auth: string } }) => {
+        try {
+          await webpush.sendNotification(
+            {
+              endpoint: subscription.endpoint,
+              keys: subscription.keys,
+            },
+            notificationPayload
+          );
+          return { success: true, endpoint: subscription.endpoint };
+        } catch (error) {
+          // If subscription is invalid (410 Gone or 404), mark as inactive
+          const statusCode = (error as { statusCode?: number }).statusCode;
+          if (statusCode === 410 || statusCode === 404) {
+            await ctx.runMutation(internal.pushSubscriptions.markInactive, {
+              endpoint: subscription.endpoint,
+            });
+          }
+          return { success: false, endpoint: subscription.endpoint, error };
+        }
+      })
+    );
+
+    // Count results
+    for (const result of results) {
+      if (result.status === "fulfilled" && result.value.success) {
+        sent++;
+      } else {
+        failed++;
+      }
+    }
+
+    console.log(`[Push] ✅ Sent: ${sent}, Failed: ${failed}`);
+    return { sent, failed };
+  } catch (error) {
+    console.error("[Push] Error sending notifications:", error);
+    return { sent: 0, failed: 0 };
+  }
+}
+
+/**
  * Format SOL amount for display
  */
 function formatSol(lamports: number): string {
@@ -124,7 +221,7 @@ export const notifyGameCreated = action({
     creatorDisplayName: v.string(),
     map: v.optional(v.number()),
   },
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
     // Only send webhooks on mainnet
     const rpcEndpoint = process.env.SOLANA_RPC_ENDPOINT || "";
     const isMainnet = rpcEndpoint.includes("mainnet");
@@ -166,14 +263,24 @@ export const notifyGameCreated = action({
 
     const telegramSent = await sendTelegramNotification(telegramMessage);
 
+    // Send PWA push notifications
+    const pushResult = await sendPushNotifications(ctx, {
+      title: "🎮 New Game Started!",
+      body: `${displayName} started a battle! Join now to win ${potInSol} SOL`,
+      url: "/",
+      tag: `game-${args.roundId}`,
+      requireInteraction: false,
+    });
+
     console.log(
-      `[Webhook] Game creation notification - Discord: ${discordSent}, Telegram: ${telegramSent}`
+      `[Webhook] Game creation notification - Discord: ${discordSent}, Telegram: ${telegramSent}, Push: ${pushResult.sent}/${pushResult.sent + pushResult.failed}`
     );
 
     return {
-      success: discordSent || telegramSent,
+      success: discordSent || telegramSent || pushResult.sent > 0,
       discord: discordSent,
       telegram: telegramSent,
+      push: pushResult,
     };
   },
 });
