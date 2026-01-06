@@ -40,3 +40,7 @@ docker-compose.yml
 # Privy bot signer keys
 private.pem
 public.pem
+
+# Native folders (generated)
+android/
+ios/
