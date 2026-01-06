@@ -5,7 +5,8 @@ interface ImportMetaEnv {
   readonly VITE_CONVEX_URL: string;
 
   // Privy
-  readonly VITE_PRIVY_APP_ID: string;
+  readonly VITE_PRIVY_APP_ID?: string;
+  readonly NEXT_PUBLIC_PRIVY_APP_ID?: string;
 
   // Solana
   readonly VITE_SOLANA_NETWORK: string;

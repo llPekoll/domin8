@@ -12,13 +12,14 @@ import { PlayerNamesProvider } from "./contexts/PlayerNamesContext";
 import { Analytics } from "@vercel/analytics/react";
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
+const privyAppId = import.meta.env.NEXT_PUBLIC_PRIVY_APP_ID ?? import.meta.env.VITE_PRIVY_APP_ID;
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ConvexProvider client={convex}>
       <AssetsProvider>
         <PrivyProvider
-          appId={import.meta.env.VITE_PRIVY_APP_ID}
+          appId={privyAppId}
           config={{
             // SOLANA EMBEDDED WALLETS ONLY
             // Login with email/social - embedded wallet created automatically

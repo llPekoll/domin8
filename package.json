@@ -21,7 +21,8 @@
     "anchor:test:skip": "dotenv -e .env.local -- bash -c 'anchor test --skip-build --skip-deploy --provider.wallet ${ANCHOR_WALLET}'",
     "anchor:build": "dotenv -e .env.local -- bash -c 'anchor build'",
     "anchor:deploy": "dotenv -e .env.local -- bash -c 'anchor deploy --provider.wallet ${ANCHOR_WALLET} --program-name domin8_prgm --program-id ${ANCHOR_PROGRAM_ID}'",
-    "anchor:localnet": "anchor localnet"
+    "anchor:localnet": "anchor localnet",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@coral-xyz/anchor": "0.31.1",
@@ -58,6 +59,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
+    "@playwright/test": "^1.49.0",
     "@solana/spl-token": "^0.4.14",
     "@tailwindcss/vite": "^4.0.14",
     "@types/node": "^24.5.0",
