@@ -18,9 +18,11 @@ void configureStatusBar();
 
 const platform = Capacitor.getPlatform();
 const isAndroid = /Android/i.test(navigator.userAgent);
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 console.log("[App] Platform:", platform);
 console.log("[App] User Agent:", navigator.userAgent);
 console.log("[App] Is Android:", isAndroid);
+console.log("[App] Is Mobile:", isMobile);
 
 // Register MWA on Android (detect via user agent for PWA/web support)
 if (isAndroid) {
@@ -83,21 +85,16 @@ createRoot(document.getElementById("root")!).render(
             appearance: {
               theme: "dark",
               accentColor: "#6366f1",
-              showWalletLoginFirst: platform !== "android", // On Android, show email first
+              showWalletLoginFirst: !isAndroid, // On Android, show email first; on desktop show wallet first
               walletChainType: "solana-only",
-              // On Web: Show common browser wallets
-              // On Android: Don't set walletList - only detected wallets (MWA) will show
-              ...(platform !== "android" && {
-                walletList: ["phantom", "solflare", "backpack"],
-              }),
+              // Don't restrict walletList - let all detected wallets show (including MWA)
             },
             externalWallets: {
               solana: {
-                connectors: toSolanaWalletConnectors(), // For detecting EOA browser wallets
+                connectors: toSolanaWalletConnectors(), // Detects all wallet-standard wallets including MWA
               },
             },
-            // NO external wallets - prevents redirect to wallet websites
-            // Users get embedded Solana wallet automatically
+            // External wallets enabled - allows MWA and browser extension wallets
 
             // Embedded wallets - create for ALL users (in-game wallet)
             embeddedWallets: {
