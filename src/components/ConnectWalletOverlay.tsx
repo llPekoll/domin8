@@ -2,10 +2,6 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import { Button } from "~/components/ui/button";
-import { MWAConnectButton } from "./MWAConnectButton";
-
-// Detect Android via user agent (works for PWA and web)
-const isAndroid = /Android/i.test(navigator.userAgent);
 
 const carouselSlides = [
   { image: "/carousel/1.gif", caption: "Insert coin to play" },
@@ -117,28 +113,6 @@ export function ConnectWalletOverlay() {
               ))}
             </div>
           </div>
-
-          {/* Seeker Wallet Button (Android only) */}
-          <MWAConnectButton
-            onConnect={(publicKey) => {
-              console.log("[Overlay] Connected to Seeker wallet:", publicKey);
-              // Store the connected wallet address for use in the app
-              localStorage.setItem("seekerWalletAddress", publicKey);
-              window.location.reload(); // Refresh to use the new wallet
-            }}
-            onError={(error) => {
-              console.error("[Overlay] Seeker wallet error:", error);
-            }}
-          />
-
-          {/* Divider - only show on Android */}
-          {isAndroid && (
-            <div className="flex items-center gap-3 my-4">
-              <div className="flex-1 h-px bg-gray-600"></div>
-              <span className="text-gray-400 text-sm">or</span>
-              <div className="flex-1 h-px bg-gray-600"></div>
-            </div>
-          )}
 
           {/* Main CTA Button */}
           <Button

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "fun.domin8.dev.twa",
+      "sha256_cert_fingerprints": [
+        "3A:2B:E6:34:2F:B5:9C:A0:DC:E4:BB:64:BB:6A:F3:0D:BC:BC:E1:38:24:EB:48:28:58:D2:1B:14:23:45:76:0B"
+      ]
+    }
+  }
+]
