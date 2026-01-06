@@ -44,3 +44,11 @@ public.pem
 # Native folders (generated)
 android/
 ios/
+
+# Bubblewrap/TWA build files
+.gradle/
+app/build/
+*.apk
+*.aab
+*.idsig
+*.keystore
