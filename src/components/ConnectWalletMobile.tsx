@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { Sparkles } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import { Button } from "~/components/ui/button";
+import { MWAConnectButton } from "./MWAConnectButton";
+
+// Detect Android via user agent (works for PWA and web)
+const isAndroid = /Android/i.test(navigator.userAgent);
 
 const carouselSlides = [
   { image: "/carousel/1.gif", caption: "Insert coin to play" },
@@ -82,6 +86,27 @@ export function ConnectWalletMobile() {
               ))}
             </div>
           </div>
+
+          {/* Seeker Wallet Button (Android only) */}
+          <MWAConnectButton
+            onConnect={(publicKey) => {
+              console.log("[Mobile] Connected to Seeker wallet:", publicKey);
+              localStorage.setItem("seekerWalletAddress", publicKey);
+              window.location.reload();
+            }}
+            onError={(error) => {
+              console.error("[Mobile] Seeker wallet error:", error);
+            }}
+          />
+
+          {/* Divider - only show on Android */}
+          {isAndroid && (
+            <div className="flex items-center gap-2 my-2">
+              <div className="flex-1 h-px bg-gray-600"></div>
+              <span className="text-gray-400 text-xs">or</span>
+              <div className="flex-1 h-px bg-gray-600"></div>
+            </div>
+          )}
 
           {/* CTA Button - compact */}
           <div className="w-full text-center mx-auto">

@@ -11,9 +11,60 @@ import { AssetsProvider } from "./contexts/AssetsContext";
 import { PlayerNamesProvider } from "./contexts/PlayerNamesContext";
 import { Analytics } from "@vercel/analytics/react";
 import { configureStatusBar } from "./utils/statusBar";
+import { Capacitor } from "@capacitor/core";
 
 // Configure native status bar (Android/iOS)
-configureStatusBar();
+void configureStatusBar();
+
+const platform = Capacitor.getPlatform();
+const isAndroid = /Android/i.test(navigator.userAgent);
+console.log("[App] Platform:", platform);
+console.log("[App] User Agent:", navigator.userAgent);
+console.log("[App] Is Android:", isAndroid);
+
+// Register MWA on Android (detect via user agent for PWA/web support)
+if (isAndroid) {
+  console.log("[MWA] Attempting registration on Android...");
+
+  // Dynamic import to avoid crash on HTTP
+  import("@solana-mobile/wallet-standard-mobile")
+    .then((mwaModule) => {
+      try {
+        mwaModule.registerMwa({
+          appIdentity: {
+            name: "Domin8",
+            uri: window.location.origin,
+          },
+          authorizationCache: mwaModule.createDefaultAuthorizationCache(),
+          chains: ["solana:mainnet-beta", "solana:mainnet", "solana:devnet"],
+          chainSelector: mwaModule.createDefaultChainSelector(),
+          onWalletNotFound: async () => {
+            console.log("[MWA] Wallet not found - no UI shown");
+          },
+        });
+        console.log("[MWA] Registration complete!");
+
+        // Check what wallets were detected
+        setTimeout(() => {
+          import("@wallet-standard/app").then(({ getWallets }) => {
+            const { get } = getWallets();
+            const wallets = get();
+            console.log(
+              "[MWA] Detected wallets:",
+              wallets.map((w) => w.name)
+            );
+          });
+        }, 500);
+      } catch (err) {
+        console.error("[MWA] Registration failed:", err);
+      }
+    })
+    .catch((err) => {
+      console.error("[MWA] Failed to load MWA module:", err);
+    });
+} else {
+  console.log("[MWA] Skipped - isAndroid:", isAndroid);
+}
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
 
@@ -32,9 +83,13 @@ createRoot(document.getElementById("root")!).render(
             appearance: {
               theme: "dark",
               accentColor: "#6366f1",
-              showWalletLoginFirst: true,
+              showWalletLoginFirst: platform !== "android", // On Android, show email first
               walletChainType: "solana-only",
-              walletList: ["phantom", "solflare", "backpack", "metamask"],
+              // On Web: Show common browser wallets
+              // On Android: Don't set walletList - only detected wallets (MWA) will show
+              ...(platform !== "android" && {
+                walletList: ["phantom", "solflare", "backpack"],
+              }),
             },
             externalWallets: {
               solana: {
@@ -65,10 +120,6 @@ createRoot(document.getElementById("root")!).render(
                     import.meta.env.VITE_SOLANA_RPC_URL.replace(/^https?:/, "wss:")
                   ),
                 },
-                // "solana:devnet": {
-                //   rpc: createSolanaRpc("http://127.0.0.1:8899"),
-                //   rpcSubscriptions: createSolanaRpcSubscriptions("ws://127.0.0.1:8900"),
-                // },
               },
             },
             // Additional configuration

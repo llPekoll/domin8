@@ -1,65 +1,42 @@
 [
   {
     "id": 1,
-    "name": "orc",
+    "name": "Orc",
     "assetPath": "/characters/orc.png",
     "description": "A mighty fighter with high power and defense",
     "isActive": true
   },
   {
-    "id": 3,
-    "name": "male",
-    "assetPath": "/characters/male.png",
-    "description": "A versatile warrior with balanced stats",
-    "isActive": true
-  },
-  {
-    "id": 4,
-    "name": "sam",
-    "assetPath": "/characters/sam.png",
-    "description": "A quick and agile fighter",
-    "isActive": true
-  },
-  {
-    "id": 5,
-    "name": "warrior",
-    "assetPath": "/characters/warrior.png",
-    "description": "A seasoned combatant with strong defense",
-    "isActive": true
-  },
-  {
     "id": 6,
-    "name": "pepe",
+    "name": "Pepe",
     "assetPath": "/characters/pepe.png",
     "description": "A legendary meme warrior with unique abilities",
     "isActive": true
   },
   {
     "id": 7,
-    "name": "darthvader",
+    "name": "Darthvader",
     "assetPath": "/characters/darthvader.png",
     "description": "Dark lord of the Sith with powerful force abilities",
     "isActive": true
   },
   {
     "id": 8,
-    "name": "huggy_wuggy",
+    "name": "Huggy wuggy",
     "assetPath": "/characters/huggywuggy.png",
     "description": "Creepy but cuddly creature from the shadows",
     "isActive": true
   },
   {
     "id": 9,
-    "name": "yasuo",
+    "name": "Yasuo",
     "assetPath": "/characters/yasuo.png",
     "description": "Swift wandering swordsman seeking redemption",
-    "nftCollection": "8Rt3Ayqth4DAiPnW9MDFi63TiQJHmohfTWLMQFHi4KZH",
-    "nftCollectionName": "Monkey",
     "isActive": true
   },
   {
     "id": 10,
-    "name": "nomu",
+    "name": "Nomu",
     "assetPath": "/characters/fish.png",
     "description": "Nomu's native utility token, bought back on every product sale.",
     "nftCollection": "DsNoUoX6txsJkrsg1hnKA5CpCi575Tw13YgbqiYUzzvU",
@@ -73,6 +50,24 @@
     "description": "Super solana is in the house",
     "nftCollection": "AMdMcYA1fFpjPQ3jwB5gAjKTMSJPVH651RtYZn74eQoy",
     "nftCollectionName": "HMS",
+    "isActive": true
+  },
+  {
+    "id": 12,
+    "name": "Monke",
+    "assetPath": "/characters/monke.png",
+    "description": "Ape together strong",
+    "nftCollection": "8Rt3Ayqth4DAiPnW9MDFi63TiQJHmohfTWLMQFHi4KZH",
+    "nftCollectionName": "MonkeDAO",
+    "isActive": true
+  },
+  {
+    "id": 13,
+    "name": "Bonk",
+    "assetPath": "/characters/bonk.png",
+    "description": "The original Solana dog coin warrior",
+    "nftCollection": "Gvj3urg4ZQYQ4BRQpA8SeAX6GhuvRbvfB3TVVEKeKBnb",
+    "nftCollectionName": "BONKz",
     "isActive": true
   }
 ]

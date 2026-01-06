@@ -30,6 +30,9 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     webContentsDebuggingEnabled: true, // Set to false for production
+    // Custom user agent to bypass MWA WebView check
+    // The MWA library blocks WebViews, but Capacitor can handle intents
+    overrideUserAgent: "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
   },
 };
 
