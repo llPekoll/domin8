@@ -58,7 +58,7 @@ export function FlappyHUD({
         )}
       </div>
 
-      {status === "gameover" && !connected && (
+      {status === "gameover" && !connected && onConnect && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="pointer-events-auto rounded-2xl border border-sky-500/40 bg-slate-950/85 px-5 py-4 shadow-[0_18px_45px_rgba(56,189,248,0.28)] backdrop-blur">
             <p className="mb-3 text-center text-sm font-semibold text-sky-100">Connect wallet to save score</p>
