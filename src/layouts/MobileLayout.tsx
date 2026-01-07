@@ -33,7 +33,7 @@ export function MobileLayout({
       <HeaderMobile />
 
       {/* Phaser Game - Top portion */}
-      <div className="h-[35vh] w-full relative flex-shrink-0">
+      <div className="h-[35vh] w-full relative flex-shrink-0 z-0">
         <PhaserGame ref={phaserRef} />
       </div>
 

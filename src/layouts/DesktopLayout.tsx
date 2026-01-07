@@ -31,7 +31,7 @@ export function DesktopLayout({
       {/* Landscape Enforcer - For tablets in portrait */}
       <LandscapeEnforcer />
 
-      <div className="fixed inset-0 w-full h-full">
+      <div className="fixed inset-0 w-full h-full z-0">
         <PhaserGame ref={phaserRef} />
       </div>
 

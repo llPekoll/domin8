@@ -70,7 +70,7 @@ export function HeaderMobile() {
 
   return (
     <>
-      <header className="flex-shrink-0 bg-gray-950/90 backdrop-blur-sm">
+      <header className="flex-shrink-0 bg-gray-950/90 backdrop-blur-sm relative z-50">
         <div className="flex items-center justify-between px-3 py-1">
           {/* Logo */}
           <div className="flex items-center flex-shrink-0">

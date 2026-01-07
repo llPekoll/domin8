@@ -34,7 +34,7 @@ export function MobileLandscapeLayout({
         <HeaderMobile />
 
         {/* Phaser Game - Takes remaining height */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative z-0">
           <PhaserGame ref={phaserRef} />
         </div>
       </div>
