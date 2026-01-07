@@ -310,9 +310,3 @@ VITE_PRIVY_APP_ID=your-privy-app-id
   // the music
   https://opengameart.org/content/battle-theme-a#
   https://www.patreon.com/cynicmusic
-
-## Build for Seeker
-
-- /Users/peko/Library/Android/sdk/platform-tools/adb devices
-- bubblewrap build
-- ~/.bubblewrap/android_sdk/platform-tools/adb install /Users/peko/work/domin8/app-release-signed.apk
