@@ -68,7 +68,7 @@ export function ConnectWalletOverlay() {
   };
 
   return (
-    <div className="fixed inset-0 z-40 pointer-events-none">
+    <div className="fixed inset-0 z-[60] pointer-events-none">
       {/* Gradient overlay - subtle darkening */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/50 pointer-events-none"></div>
 

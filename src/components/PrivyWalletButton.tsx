@@ -1,17 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useWallets } from "@privy-io/react-auth/solana";
-import {
-  LogIn,
-  LogOut,
-  Wallet,
-  Download,
-  ChevronDown,
-  Copy,
-  Check,
-} from "lucide-react";
+import { LogIn, LogOut, Wallet, ChevronDown, Copy, Check } from "lucide-react";
 import { Button } from "./ui/button";
-import { isPhantomInstalled, openPhantomDownload } from "../lib/solana-wallet-utils";
 import { toast } from "sonner";
 
 interface PrivyWalletButtonProps {
@@ -29,7 +20,6 @@ export function PrivyWalletButton({
   const { ready, authenticated, login, logout, user } = usePrivy();
   const { wallets } = useWallets();
   const [isMounted, setIsMounted] = useState(false);
-  const [hasPhantom, setHasPhantom] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
   // Get Privy embedded wallet from user.linkedAccounts (more reliable)
@@ -58,7 +48,6 @@ export function PrivyWalletButton({
   // Check for Phantom installation
   useEffect(() => {
     setIsMounted(true);
-    setHasPhantom(isPhantomInstalled());
   }, []);
 
   // Close dropdown when clicking outside
@@ -76,12 +65,6 @@ export function PrivyWalletButton({
   }, [dropdownOpen]);
 
   const handleLogin = () => {
-    if (!hasPhantom) {
-      toast.info(
-        "Phantom wallet not detected. You can use email/social login for an embedded wallet, or install Phantom extension.",
-        { duration: 5000 }
-      );
-    }
     login();
   };
 
@@ -99,7 +82,7 @@ export function PrivyWalletButton({
 
   const handleCopyAddress = async () => {
     if (!walletAddress) return;
-    
+
     try {
       await navigator.clipboard.writeText(walletAddress);
       setIsCopied(true);
@@ -129,18 +112,6 @@ export function PrivyWalletButton({
           <LogIn className="h-4 w-4 mr-2" />
           {compact ? "Connect" : "Connect Wallet"}
         </Button>
-
-        {!hasPhantom && (
-          <Button
-            onClick={openPhantomDownload}
-            variant="outline"
-            size={compact ? "sm" : "default"}
-            className="border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white"
-            title="Install Phantom Wallet"
-          >
-            <Download className="h-4 w-4" />
-          </Button>
-        )}
       </div>
     );
   }
