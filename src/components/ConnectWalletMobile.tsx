@@ -70,12 +70,12 @@ export function ConnectWalletMobile() {
       <div className="absolute inset-0 flex items-center justify-center p-2 pointer-events-none">
         <div className="bg-gradient-to-b from-gray-900/95 to-black/95 backdrop-blur-xl border-2 border-amber-500/50 rounded-xl shadow-2xl w-full max-w-sm p-3 pointer-events-auto">
           {/* Logo - smaller */}
-          <div className="flex justify-center ">
+          <div className="flex justify-center mb-3">
             <img src="/assets/logo.webp" alt="Domin8 Logo" className="h-10 w-auto object-contain" />
           </div>
 
           {/* Simple image carousel - swipeable */}
-          <div className="relative -mt-2 -mb-2">
+          <div className="relative mb-4">
             <div
               className="relative overflow-hidden rounded-lg bg-gradient-to-br from-amber-900/30 to-orange-900/30 border border-amber-700/40"
               onTouchStart={handleTouchStart}
@@ -100,7 +100,7 @@ export function ConnectWalletMobile() {
               </div>
 
               {/* Caption */}
-              <p className="text-white font-bold text-center py-2 px-3 text-base">
+              <p className="text-white font-bold text-center  px-3 text-lg">
                 {carouselSlides[currentSlide].caption}
               </p>
             </div>

@@ -74,19 +74,23 @@ export function ConnectWalletOverlay() {
 
       {/* Centered CTA Card */}
       <div className="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
-        <div className="bg-gradient-to-b from-gray-900/95 to-black/95 backdrop-blur-xl border-2 border-amber-500/50 rounded-2xl shadow-2xl max-w-md pt-4 w-full p-8 pointer-events-auto">
+        <div className="bg-gradient-to-b from-gray-900/95 to-black/95 backdrop-blur-xl border-2 border-amber-500/50 rounded-2xl shadow-2xl max-w-md pt-4 w-full p-8 pointer-events-auto landscape:max-w-md landscape:p-4 landscape:py-3">
           {/* Logo */}
           <div className="flex justify-center ">
-            <img src="/assets/logo.webp" alt="Domin8 Logo" className="h-32 w-auto object-contain" />
+            <img
+              src="/assets/logo.webp"
+              alt="Domin8 Logo"
+              className="h-32 landscape:h-16 w-auto object-contain"
+            />
           </div>
 
-          {/* Headline */}
-          <h2 className="text-center text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 mb-3 animate-pulse">
+          {/* Headline - hidden in landscape */}
+          <h2 className="text-center text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 mb-3 animate-pulse landscape:hidden">
             Join the Battle!
           </h2>
 
           {/* Carousel */}
-          <div className="relative mb-8 ">
+          <div className="relative mb-8 landscape:mb-3">
             {/* Carousel Container */}
             <div
               className="relative overflow-hidden rounded-lg bg-gradient-to-br from-amber-900/30 to-orange-900/30 border border-amber-700/40"
@@ -101,7 +105,7 @@ export function ConnectWalletOverlay() {
               >
                 {carouselSlides.map((slide, index) => (
                   <div key={index} className="w-full flex-shrink-0">
-                    <div className="aspect-video">
+                    <div className="aspect-video landscape:aspect-[3/1]">
                       <img
                         src={slide.image}
                         alt={slide.caption}
@@ -113,7 +117,7 @@ export function ConnectWalletOverlay() {
               </div>
 
               {/* Caption */}
-              <p className="text-white font-bold text-center py-3 px-4 text-lg transition-opacity duration-300">
+              <p className="text-white font-bold text-center  px-4 text-lg transition-opacity duration-300">
                 {carouselSlides[currentSlide].caption}
               </p>
 
@@ -151,7 +155,7 @@ export function ConnectWalletOverlay() {
           {/* Main CTA Button */}
           <Button
             onClick={handleConnect}
-            className="relative w-full bg-gradient-to-r from-amber-500 via-orange-600 to-amber-500 hover:from-amber-400 hover:via-orange-500 hover:to-amber-400 text-white font-black py-6 text-2xl shadow-2xl transition-all uppercase tracking-wider overflow-hidden group transform hover:scale-105 active:scale-95"
+            className="relative w-full bg-gradient-to-r from-amber-500 via-orange-600 to-amber-500 hover:from-amber-400 hover:via-orange-500 hover:to-amber-400 text-white font-black py-6 landscape:py-3 text-2xl landscape:text-lg shadow-2xl transition-all uppercase tracking-wider overflow-hidden group transform hover:scale-105 active:scale-95"
           >
             {/* Shimmer effect */}
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
@@ -160,8 +164,8 @@ export function ConnectWalletOverlay() {
             <Sparkles className="w-6 h-6 ml-2 inline-block animate-pulse" />
           </Button>
 
-          {/* Supporting text */}
-          <p className="text-center text-sm text-gray-400 mt-4">
+          {/* Supporting text - hidden in landscape */}
+          <p className="text-center text-sm text-gray-400 mt-4 landscape:hidden">
             No wallet? No problem! Use email or social login
           </p>
         </div>
