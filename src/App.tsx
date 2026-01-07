@@ -56,11 +56,19 @@ function useDeviceLayout() {
       setLayout("desktop");
     };
 
+    // Reload page on orientation change for mobile devices
+    // This ensures clean state and proper layout without complex state management
+    const handleOrientationChange = () => {
+      if (isMobileDevice) {
+        window.location.reload();
+      }
+    };
+
     window.addEventListener("resize", checkLayout);
-    window.addEventListener("orientationchange", checkLayout);
+    window.addEventListener("orientationchange", handleOrientationChange);
     return () => {
       window.removeEventListener("resize", checkLayout);
-      window.removeEventListener("orientationchange", checkLayout);
+      window.removeEventListener("orientationchange", handleOrientationChange);
     };
   }, []);
 
