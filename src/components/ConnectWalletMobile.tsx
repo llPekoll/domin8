@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sparkles } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import { Button } from "~/components/ui/button";
@@ -12,6 +12,8 @@ const carouselSlides = [
 export function ConnectWalletMobile() {
   const { login } = usePrivy();
   const [currentSlide, setCurrentSlide] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
 
   // Auto-advance every 4 seconds
   useEffect(() => {
@@ -21,6 +23,35 @@ export function ConnectWalletMobile() {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Touch handlers for swipe
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current) return;
+
+    const diff = touchStartX.current - touchEndX.current;
+    const minSwipeDistance = 50;
+
+    if (Math.abs(diff) > minSwipeDistance) {
+      if (diff > 0) {
+        // Swipe left - next slide
+        setCurrentSlide((prev) => (prev + 1) % carouselSlides.length);
+      } else {
+        // Swipe right - previous slide
+        setCurrentSlide((prev) => (prev - 1 + carouselSlides.length) % carouselSlides.length);
+      }
+    }
+
+    touchStartX.current = null;
+    touchEndX.current = null;
+  };
 
   const handleConnect = () => {
     try {
@@ -43,9 +74,14 @@ export function ConnectWalletMobile() {
             <img src="/assets/logo.webp" alt="Domin8 Logo" className="h-10 w-auto object-contain" />
           </div>
 
-          {/* Simple image carousel - no arrows */}
-          <div className="relative scale-75 -mt-4 -mb-4">
-            <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-amber-900/30 to-orange-900/30 border border-amber-700/40">
+          {/* Simple image carousel - swipeable */}
+          <div className="relative -mt-2 -mb-2">
+            <div
+              className="relative overflow-hidden rounded-lg bg-gradient-to-br from-amber-900/30 to-orange-900/30 border border-amber-700/40"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
               <div
                 className="flex transition-transform duration-500 ease-in-out"
                 style={{ transform: `translateX(-${currentSlide * 100}%)` }}
@@ -64,19 +100,19 @@ export function ConnectWalletMobile() {
               </div>
 
               {/* Caption */}
-              <p className="text-white font-bold text-center py-1.5 px-2 text-xs">
+              <p className="text-white font-bold text-center py-2 px-3 text-base">
                 {carouselSlides[currentSlide].caption}
               </p>
             </div>
 
             {/* Dots */}
-            <div className="flex justify-center gap-1.5 mt-2">
+            <div className="flex justify-center gap-2 mt-3">
               {carouselSlides.map((_, index) => (
                 <button
                   key={index}
                   onClick={() => setCurrentSlide(index)}
-                  className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
-                    index === currentSlide ? "bg-amber-400 w-3" : "bg-gray-500"
+                  className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                    index === currentSlide ? "bg-amber-400 w-4" : "bg-gray-500"
                   }`}
                 />
               ))}

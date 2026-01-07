@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import { Button } from "~/components/ui/button";
@@ -12,6 +12,8 @@ const carouselSlides = [
 export function ConnectWalletOverlay() {
   const { login } = usePrivy();
   const [currentSlide, setCurrentSlide] = useState(0);
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
 
   const nextSlide = () => {
     setCurrentSlide((prev) => (prev + 1) % carouselSlides.length);
@@ -29,6 +31,33 @@ export function ConnectWalletOverlay() {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Touch handlers for swipe
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current) return;
+
+    const diff = touchStartX.current - touchEndX.current;
+    const minSwipeDistance = 50;
+
+    if (Math.abs(diff) > minSwipeDistance) {
+      if (diff > 0) {
+        nextSlide();
+      } else {
+        prevSlide();
+      }
+    }
+
+    touchStartX.current = null;
+    touchEndX.current = null;
+  };
 
   const handleConnect = () => {
     try {
@@ -59,7 +88,12 @@ export function ConnectWalletOverlay() {
           {/* Carousel */}
           <div className="relative mb-8 ">
             {/* Carousel Container */}
-            <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-amber-900/30 to-orange-900/30 border border-amber-700/40">
+            <div
+              className="relative overflow-hidden rounded-lg bg-gradient-to-br from-amber-900/30 to-orange-900/30 border border-amber-700/40"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
               {/* Slides Container */}
               <div
                 className="flex transition-transform duration-500 ease-in-out"
@@ -79,24 +113,24 @@ export function ConnectWalletOverlay() {
               </div>
 
               {/* Caption */}
-              <p className="text-white font-bold text-center py-3 px-4 text-sm transition-opacity duration-300">
+              <p className="text-white font-bold text-center py-3 px-4 text-lg transition-opacity duration-300">
                 {carouselSlides[currentSlide].caption}
               </p>
 
               {/* Left Arrow */}
               <button
                 onClick={prevSlide}
-                className="absolute left-2 top-[calc(50%-20px)] -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-colors"
+                className="absolute left-2 top-[calc(50%-20px)] -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-colors"
               >
-                <ChevronLeft className="w-5 h-5 text-white" />
+                <ChevronLeft className="w-6 h-6 text-white" />
               </button>
 
               {/* Right Arrow */}
               <button
                 onClick={nextSlide}
-                className="absolute right-2 top-[calc(50%-20px)] -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-colors"
+                className="absolute right-2 top-[calc(50%-20px)] -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center transition-colors"
               >
-                <ChevronRight className="w-5 h-5 text-white" />
+                <ChevronRight className="w-6 h-6 text-white" />
               </button>
             </div>
 
@@ -106,8 +140,8 @@ export function ConnectWalletOverlay() {
                 <button
                   key={index}
                   onClick={() => setCurrentSlide(index)}
-                  className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                    index === currentSlide ? "bg-amber-400 w-4" : "bg-gray-500 hover:bg-gray-400"
+                  className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                    index === currentSlide ? "bg-amber-400 w-5" : "bg-gray-500 hover:bg-gray-400"
                   }`}
                 />
               ))}
