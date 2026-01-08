@@ -269,7 +269,7 @@ ANCHOR_PROGRAM_ID=your-program-id-after-deploy
 
 # Other services
 PRIVY_APP_SECRET=your-privy-secret
-VITE_PRIVY_APP_ID=your-privy-app-id
+NEXT_PUBLIC_PRIVY_APP_ID=your-privy-app-id
 ```
 
 **Note**: Each developer should have their own `.env.local` with their specific wallet and program ID.
@@ -310,3 +310,25 @@ VITE_PRIVY_APP_ID=your-privy-app-id
   // the music
   https://opengameart.org/content/battle-theme-a#
   https://www.patreon.com/cynicmusic
+
+## Flappy mini-game
+
+Run locally:
+
+```bash
+bun install
+bun dev
+```
+
+Then open `http://localhost:5173/flappy`.
+
+## E2E tests (Playwright)
+
+```bash
+# Install deps and Playwright browsers
+bun install
+bunx playwright install
+
+# Run e2e against the dev server (Playwright config starts Vite)
+bun run test:e2e
+```
