@@ -3,6 +3,7 @@ import App from "./App";
 import { GameStatePage } from "./pages/GameStatePage";
 import { OneVOnePage } from "./pages/OneVOnePage";
 import { ReferralPage } from "./pages/ReferralPage";
+import { FlappyPage } from "./pages/FlappyPage";
 
 export function Root() {
   return (
@@ -12,6 +13,7 @@ export function Root() {
         <Route path="/gamestate" element={<GameStatePage />} />
         <Route path="/1v1" element={<OneVOnePage />} />
         <Route path="/referrals" element={<ReferralPage />} />
+        <Route path="/flappy" element={<FlappyPage />} />
       </Routes>
     </BrowserRouter>
   );
