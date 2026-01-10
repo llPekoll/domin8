@@ -11,10 +11,11 @@ export class BootScene extends Phaser.Scene {
   preload() {
     // Load background image
     this.load.image("flappy-bg", "/assets/maps/flappy/bg_flappy.png");
-    // Load fire strip for bottom hazard
-    this.load.image("flappy-fire", "/assets/maps/flappy/fp_fire.png");
+    // Load pipe images
+    this.load.image("flappy-pipe-bottom", "/assets/maps/flappy/fp_pipe.png");
+    this.load.image("flappy-pipe-top", "/assets/maps/flappy/fp_pipe_up.png");
 
-    // Create procedural textures
+    // Create procedural textures (bird only now)
     this.createTextures();
   }
 
@@ -27,7 +28,7 @@ export class BootScene extends Phaser.Scene {
   private createTextures() {
     const graphics = this.add.graphics();
 
-    // Bird texture - amber/orange theme (smaller for 360x540 resolution)
+    // Bird texture - amber/orange theme
     graphics.clear();
     graphics.fillStyle(0xf59e0b, 1);
     graphics.fillRoundedRect(0, 0, 28, 20, 5);
@@ -36,18 +37,6 @@ export class BootScene extends Phaser.Scene {
     graphics.fillStyle(0x1c1917, 1);
     graphics.fillCircle(22, 7, 3);
     graphics.generateTexture("flappy-bird", 28, 20);
-
-    // Pipe texture - dark with amber accent
-    graphics.clear();
-    graphics.fillStyle(0x292524, 1);
-    graphics.fillRoundedRect(0, 0, 50, 300, 4);
-    graphics.lineStyle(2, 0xf59e0b, 1);
-    graphics.strokeRoundedRect(1, 1, 48, 298, 3);
-    graphics.generateTexture("flappy-pipe", 50, 300);
-
-    // Ground texture - not needed (invisible)
-    graphics.clear();
-    graphics.generateTexture("flappy-ground", 1, 1);
 
     graphics.destroy();
   }

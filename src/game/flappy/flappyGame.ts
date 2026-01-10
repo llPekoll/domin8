@@ -36,7 +36,7 @@ export function createFlappyGame(parent: HTMLElement) {
       default: "arcade",
       arcade: {
         gravity: { x: 0, y: 600 },
-        debug: false,
+        // debug: true, // Temporarily enabled to see collision boxes
       },
     },
 
