@@ -26,6 +26,7 @@ export function createFlappyGame(parent: HTMLElement) {
     transparent: true,
     // Crisp pixel art rendering
     pixelArt: true,
+    antialias: false,
     render: {
       antialiasGL: false,
       pixelArt: true,
@@ -47,6 +48,14 @@ export function createFlappyGame(parent: HTMLElement) {
     },
 
     scene: [new BootScene(events), new GameScene(events), new UIScene(events)],
+  });
+
+  // Apply CSS for crisp pixel art scaling
+  game.events.once("ready", () => {
+    const canvas = game.canvas;
+    if (canvas) {
+      canvas.style.imageRendering = "pixelated";
+    }
   });
 
   const destroy = () => {

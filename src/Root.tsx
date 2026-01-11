@@ -12,8 +12,8 @@ export function Root() {
         <Route path="/" element={<App />} />
         <Route path="/gamestate" element={<GameStatePage />} />
         <Route path="/1v1" element={<OneVOnePage />} />
+        <Route path="/bloody" element={<FlappyPage />} />
         <Route path="/referrals" element={<ReferralPage />} />
-        <Route path="/flappy" element={<FlappyPage />} />
       </Routes>
     </BrowserRouter>
   );

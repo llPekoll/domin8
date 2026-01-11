@@ -31,7 +31,11 @@ export function FlappyPage() {
     <div className="relative min-h-screen overflow-hidden ">
       {/* Phaser Game - fills viewport like main game */}
       <div className="fixed inset-0 w-full h-full z-0">
-        <div ref={containerRef} className="w-full h-full" data-testid="flappy-container" />
+        <div
+          ref={containerRef}
+          className="w-full h-full [image-rendering:pixelated] [&>canvas]:[image-rendering:pixelated]"
+          data-testid="flappy-container"
+        />
       </div>
 
       {/* Header overlay - positioned above game */}

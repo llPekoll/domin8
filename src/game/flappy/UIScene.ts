@@ -8,10 +8,7 @@ export class UIScene extends Phaser.Scene {
 
   // UI Elements
   private scoreText!: Phaser.GameObjects.Text;
-  private scoreLabelText!: Phaser.GameObjects.Text;
-  private instructionText!: Phaser.GameObjects.Text;
   private gameOverContainer?: Phaser.GameObjects.Container;
-  private lastRunText?: Phaser.GameObjects.Text;
 
   constructor(eventsBus: Phaser.Events.EventEmitter) {
     super("UIScene");
@@ -28,44 +25,21 @@ export class UIScene extends Phaser.Scene {
   }
 
   private createHUD() {
-    // Score panel background (top left) - amber theme
+    // Score panel background (top left, below header) - amber theme
+    const topOffset = 60; // Move down to avoid header overlap
     const scoreBg = this.add.graphics();
     scoreBg.fillStyle(0x1c1917, 0.9);
-    scoreBg.fillRoundedRect(8, 8, 70, 36, 4);
+    scoreBg.fillRoundedRect(8, topOffset, 70, 36, 4);
     scoreBg.lineStyle(1, 0xf59e0b, 0.5);
-    scoreBg.strokeRoundedRect(8, 8, 70, 36, 4);
-
-    // Score label
-    this.scoreLabelText = this.add.text(16, 12, "SCORE", {
-      fontSize: "8px",
-      fontFamily: "monospace",
-      color: "#a8a29e",
-    });
+    scoreBg.strokeRoundedRect(8, topOffset, 70, 36, 4);
 
     // Score value - amber
-    this.scoreText = this.add.text(16, 24, "0", {
+    this.scoreText = this.add.text(16, topOffset + 16, "0", {
       fontSize: "16px",
       fontFamily: "monospace",
       color: "#f59e0b",
       fontStyle: "bold",
     });
-
-    // Instruction badge (top right) - amber theme
-    const instrBg = this.add.graphics();
-    instrBg.fillStyle(0xf59e0b, 0.15);
-    instrBg.fillRoundedRect(this.scale.width - 105, 8, 97, 20, 4);
-
-    this.instructionText = this.add.text(
-      this.scale.width - 56,
-      18,
-      "SPACE / TAP",
-      {
-        fontSize: "8px",
-        fontFamily: "monospace",
-        color: "#fcd34d",
-        fontStyle: "bold",
-      }
-    ).setOrigin(0.5);
   }
 
   private showGameOver(score: number, lastRun?: { score: number; durationMs: number }) {
@@ -86,34 +60,35 @@ export class UIScene extends Phaser.Scene {
     bg.strokeRoundedRect(-75, -50, 150, 105, 6);
 
     // Game Over title - amber
-    const title = this.add.text(0, -38, "GAME OVER", {
-      fontSize: "14px",
-      fontFamily: "monospace",
-      color: "#fcd34d",
-      fontStyle: "bold",
-    }).setOrigin(0.5);
+    const title = this.add
+      .text(0, -38, "GAME OVER", {
+        fontSize: "14px",
+        fontFamily: "monospace",
+        color: "#fcd34d",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5);
 
     // Score - white
-    const scoreValue = this.add.text(0, -10, String(score), {
-      fontSize: "28px",
-      fontFamily: "monospace",
-      color: "#ffffff",
-      fontStyle: "bold",
-    }).setOrigin(0.5);
+    const scoreValue = this.add
+      .text(0, -10, String(score), {
+        fontSize: "28px",
+        fontFamily: "monospace",
+        color: "#ffffff",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5);
 
     // Last run stats
     let lastRunDisplay: Phaser.GameObjects.Text | undefined;
     if (lastRun) {
-      lastRunDisplay = this.add.text(
-        0,
-        15,
-        `${(lastRun.durationMs / 1000).toFixed(1)}s`,
-        {
+      lastRunDisplay = this.add
+        .text(0, 15, `${(lastRun.durationMs / 1000).toFixed(1)}s`, {
           fontSize: "10px",
           fontFamily: "monospace",
           color: "#a8a29e",
-        }
-      ).setOrigin(0.5);
+        })
+        .setOrigin(0.5);
     }
 
     // Restart button - solid amber like domin8
@@ -121,12 +96,14 @@ export class UIScene extends Phaser.Scene {
     btnBg.fillStyle(0xf59e0b, 1);
     btnBg.fillRoundedRect(-40, 30, 80, 24, 4);
 
-    const btnText = this.add.text(0, 42, "RESTART", {
-      fontSize: "10px",
-      fontFamily: "monospace",
-      color: "#ffffff",
-      fontStyle: "bold",
-    }).setOrigin(0.5);
+    const btnText = this.add
+      .text(0, 42, "RESTART", {
+        fontSize: "10px",
+        fontFamily: "monospace",
+        color: "#ffffff",
+        fontStyle: "bold",
+      })
+      .setOrigin(0.5);
 
     // Make button interactive
     const hitArea = this.add.rectangle(0, 42, 80, 24, 0x000000, 0);
@@ -146,7 +123,14 @@ export class UIScene extends Phaser.Scene {
     });
 
     // Add all to container
-    const elements: Phaser.GameObjects.GameObject[] = [bg, title, scoreValue, btnBg, btnText, hitArea];
+    const elements: Phaser.GameObjects.GameObject[] = [
+      bg,
+      title,
+      scoreValue,
+      btnBg,
+      btnText,
+      hitArea,
+    ];
     if (lastRunDisplay) elements.push(lastRunDisplay);
     this.gameOverContainer.add(elements);
   }

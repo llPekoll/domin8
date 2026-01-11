@@ -13,7 +13,8 @@ import { logger } from "../lib/logger";
 import { Plus, ArrowUpRight, ChevronDown, User } from "lucide-react";
 
 export function HeaderMobile() {
-  const { connected, publicKey, externalWalletAddress, solBalance, isLoadingBalance } = usePrivyWallet();
+  const { connected, publicKey, externalWalletAddress, solBalance, isLoadingBalance } =
+    usePrivyWallet();
   const { handleAddFunds } = useFundWallet();
 
   const [showProfileDialog, setShowProfileDialog] = useState(false);
@@ -90,6 +91,12 @@ export function HeaderMobile() {
               className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs font-semibold"
             >
               1<span className="px-0.5">v</span>1
+            </Link>
+            <Link
+              to="/bloody"
+              className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"
+            >
+              Bloody Bird
             </Link>
           </div>
 

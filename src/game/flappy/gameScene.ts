@@ -19,9 +19,9 @@ export class GameScene extends Phaser.Scene {
   private readonly pipeSpeed = -120;
   private readonly groundHeight = 20;
   private restartKey?: Phaser.Input.Keyboard.Key;
-  private background!: Phaser.GameObjects.TileSprite;
-  private bgScrollSpeed = 0.8; // Background scroll speed
-  private bgTileScale = 2; // Calculated in createBackground
+  private backgrounds: Phaser.GameObjects.Image[] = [];
+  private bgScrollSpeed = 0.8; // Background scroll speed (pixels per frame)
+  private bgScale = 2; // Calculated in createBackground
   private runStartTime = 0;
 
   // Animated lava
@@ -30,7 +30,7 @@ export class GameScene extends Phaser.Scene {
   private lavaOutlineGraphics!: Phaser.GameObjects.Graphics;
   private bubbleGraphics!: Phaser.GameObjects.Graphics;
   private lavaTime = 0;
-  private readonly lavaBaseY = 160; // Base Y position in game coordinates (will be scaled)
+  private lavaScrollOffset = 0; // Scroll offset for lava (same speed as pipes)
   private readonly lavaDepth = 30; // Depth of lava
   private bubbles: { x: number; y: number; size: number; speed: number; wobble: number }[] = [];
   private splashes: { x: number; amplitude: number; age: number }[] = [];
@@ -75,10 +75,10 @@ export class GameScene extends Phaser.Scene {
       if (this.pipeTimer) {
         this.pipeTimer.remove(false);
       }
-      this.input.keyboard?.off("keydown-SPACE", this.handleFlap, this);
-      this.input.keyboard?.off("keydown-UP", this.handleFlap, this);
-      this.input.keyboard?.off("keydown-W", this.handleFlap, this);
-      this.input.off("pointerdown", this.handleFlap, this);
+      this.input.keyboard?.off("keydown-SPACE", void this.handleFlap, this);
+      this.input.keyboard?.off("keydown-UP", void this.handleFlap, this);
+      this.input.keyboard?.off("keydown-W", void this.handleFlap, this);
+      this.input.off("pointerdown", void this.handleFlap, this);
       this.restartKey = undefined;
 
       this.pipes.forEach((pair) => {
@@ -118,12 +118,23 @@ export class GameScene extends Phaser.Scene {
       return true;
     });
 
-    // Scroll background horizontally (sliding effect)
-    // Divide by tileScale since tilePositionX works in texture space
-    this.background.tilePositionX += this.bgScrollSpeed / this.bgTileScale;
+    // Scroll background sprites horizontally
+    const texture = this.textures.get("flappy-bg");
+    const frame = texture.get();
+    const scaledWidth = frame.width * this.bgScale;
+
+    for (const bg of this.backgrounds) {
+      bg.x -= this.bgScrollSpeed;
+      // Wrap around when off screen
+      if (bg.x + scaledWidth <= 0) {
+        bg.x += scaledWidth * 2;
+      }
+    }
 
     // Update animated lava, bubbles, and splashes
     this.lavaTime += 0.016;
+    // Scroll lava at same speed as pipes (pipeSpeed is negative, so we add positive value)
+    this.lavaScrollOffset += Math.abs(this.pipeSpeed) * 0.016;
     this.updateSplashes();
     this.updateBubbles();
     this.drawLava();
@@ -160,10 +171,14 @@ export class GameScene extends Phaser.Scene {
       this.scale.height / 2,
       "flappy-bird"
     );
+    // Scale down the character to fit the game
+    this.bird.setScale(0.4);
     this.bird.setCollideWorldBounds(true);
     this.bird.setDepth(2);
     this.bird.setMaxVelocity(300, 500);
-    this.bird.body.setCircle(10, 6, 2);
+    // Adjust hitbox for scaled sprite (centered circle)
+    const body = this.bird.body as Phaser.Physics.Arcade.Body;
+    body.setCircle(20, 30, 20); // radius, offsetX, offsetY for centered hitbox
   }
 
   private setupInput() {
@@ -178,53 +193,56 @@ export class GameScene extends Phaser.Scene {
       this.bird,
       this.pipesGroup,
       this.handlePipeCollision,
-      this.checkPixelCollision,
+      this.checkPixelCollision as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback,
       this
     );
   }
 
   private checkPixelCollision(
-    bird: Phaser.GameObjects.GameObject,
-    pipe: Phaser.GameObjects.GameObject
+    bird: Phaser.Types.Physics.Arcade.GameObjectWithBody,
+    pipe: Phaser.Types.Physics.Arcade.GameObjectWithBody
   ): boolean {
     const birdSprite = bird as Phaser.Physics.Arcade.Sprite;
     const pipeImage = pipe as Phaser.Physics.Arcade.Image;
 
-    // Get bird center position
-    const birdX = Math.floor(birdSprite.x);
-    const birdY = Math.floor(birdSprite.y);
-    const birdRadius = 8; // Approximate bird hitbox radius
-
-    // Get pipe bounds in world coordinates
+    // Get bounds for both sprites
+    const birdBounds = birdSprite.getBounds();
     const pipeBounds = pipeImage.getBounds();
 
-    // Check multiple points around the bird for collision
-    const checkPoints = [
-      { x: birdX, y: birdY }, // Center
-      { x: birdX + birdRadius, y: birdY }, // Right
-      { x: birdX - birdRadius, y: birdY }, // Left
-      { x: birdX, y: birdY + birdRadius }, // Bottom
-      { x: birdX, y: birdY - birdRadius }, // Top
-    ];
+    // Check if bounding boxes overlap first (early exit)
+    if (
+      birdBounds.x > pipeBounds.x + pipeBounds.width ||
+      birdBounds.x + birdBounds.width < pipeBounds.x ||
+      birdBounds.y > pipeBounds.y + pipeBounds.height ||
+      birdBounds.y + birdBounds.height < pipeBounds.y
+    ) {
+      return false;
+    }
 
-    for (const point of checkPoints) {
-      // Check if point is within pipe sprite bounds
-      if (
-        point.x >= pipeBounds.x &&
-        point.x <= pipeBounds.x + pipeBounds.width &&
-        point.y >= pipeBounds.y &&
-        point.y <= pipeBounds.y + pipeBounds.height
-      ) {
-        // Convert world position to texture position
-        const texX = Math.floor((point.x - pipeBounds.x) / pipeImage.scaleX);
-        const texY = Math.floor((point.y - pipeBounds.y) / pipeImage.scaleY);
+    // Calculate overlap region in world coordinates
+    const overlapX = Math.max(birdBounds.x, pipeBounds.x);
+    const overlapY = Math.max(birdBounds.y, pipeBounds.y);
+    const overlapRight = Math.min(birdBounds.x + birdBounds.width, pipeBounds.x + pipeBounds.width);
+    const overlapBottom = Math.min(birdBounds.y + birdBounds.height, pipeBounds.y + pipeBounds.height);
 
-        // Get pixel alpha at this position
-        const textureKey = pipeImage.texture.key;
-        const alpha = this.textures.getPixelAlpha(texX, texY, textureKey);
+    // Sample pixels in the overlap region (step by 3 pixels for performance)
+    const step = 3;
+    for (let worldX = overlapX; worldX < overlapRight; worldX += step) {
+      for (let worldY = overlapY; worldY < overlapBottom; worldY += step) {
+        // Convert world position to bird texture position
+        const birdTexX = Math.floor((worldX - birdBounds.x) / birdSprite.scaleX);
+        const birdTexY = Math.floor((worldY - birdBounds.y) / birdSprite.scaleY);
 
-        // If alpha > 0, there's a visible pixel = collision
-        if (alpha > 50) {
+        // Convert world position to pipe texture position
+        const pipeTexX = Math.floor((worldX - pipeBounds.x) / pipeImage.scaleX);
+        const pipeTexY = Math.floor((worldY - pipeBounds.y) / pipeImage.scaleY);
+
+        // Get pixel alpha for both sprites
+        const birdAlpha = this.textures.getPixelAlpha(birdTexX, birdTexY, "flappy-bird");
+        const pipeAlpha = this.textures.getPixelAlpha(pipeTexX, pipeTexY, pipeImage.texture.key);
+
+        // Collision only if both pixels are opaque
+        if (birdAlpha > 50 && pipeAlpha > 50) {
           return true;
         }
       }
@@ -267,45 +285,33 @@ export class GameScene extends Phaser.Scene {
 
   private createBackground() {
     // Background image is 246x180
-    // Game is 240x360 (120x180 * 2)
-    //
-    // Like BackgroundManager.scaleToFit(), we scale to COVER the camera:
-    // - scaleY = gameHeight / textureHeight = 360 / 180 = 2
-    // - scaleX = gameWidth / textureWidth = 240 / 246 = 0.976
-    // - scale = Math.max(scaleX, scaleY) = 2
-    //
-    // TileSprite fills game area, tileScale controls texture rendering size
+    // Use regular sprites instead of TileSprite for proper pixel art filtering
     const texture = this.textures.get("flappy-bg");
     const frame = texture.get();
 
-    // Calculate scale to cover (like BackgroundManager)
+    // Calculate scale to cover screen height
     const scaleX = this.scale.width / frame.width;
     const scaleY = this.scale.height / frame.height;
     const coverScale = Math.max(scaleX, scaleY);
+    this.bgScale = coverScale;
 
-    // Create TileSprite centered (like main game backgrounds)
-    this.background = this.add.tileSprite(
-      this.scale.width / 2,
-      this.scale.height / 2,
-      this.scale.width,
-      this.scale.height,
-      "flappy-bg"
-    );
-    this.background.setOrigin(0.5, 0.5);
-    this.background.setTileScale(coverScale);
-    this.background.setDepth(-10);
+    // Create two background sprites for seamless scrolling
+    const scaledWidth = frame.width * coverScale;
+    const bgOffsetY = -20; // Move background down to show the scare at top
 
-    // Store scale for scroll speed calculation
-    this.bgTileScale = coverScale;
+    for (let i = 0; i < 2; i++) {
+      const bg = this.add.image(i * scaledWidth, this.scale.height / 2 + bgOffsetY, "flappy-bg");
+      bg.setOrigin(0, 0.5);
+      bg.setScale(coverScale);
+      bg.setDepth(-10);
+      this.backgrounds.push(bg);
+    }
 
     console.log("[Flappy Debug]", {
       scene: { width: this.scale.width, height: this.scale.height },
       texture: { width: frame.width, height: frame.height },
       coverScale,
-      background: {
-        displayWidth: this.background.displayWidth,
-        displayHeight: this.background.displayHeight,
-      },
+      scaledWidth,
     });
   }
 
@@ -349,6 +355,7 @@ export class GameScene extends Phaser.Scene {
     const height = this.scale.height;
     const baseY = height - this.lavaDepth - this.groundHeight;
     const time = this.lavaTime;
+    const scrollSpeed = Math.abs(this.pipeSpeed) * 0.016; // Same speed as pipes
 
     // Update existing bubbles
     for (let i = this.bubbles.length - 1; i >= 0; i--) {
@@ -356,11 +363,20 @@ export class GameScene extends Phaser.Scene {
       bubble.y -= bubble.speed * 0.016;
       bubble.wobble += 0.1;
       bubble.x += Math.sin(bubble.wobble) * 0.3;
+      // Move bubble left with the lava (same speed as pipes)
+      bubble.x -= scrollSpeed;
 
-      // Calculate surface Y at bubble's X position
+      // Remove if off screen (left side)
+      if (bubble.x < -10) {
+        this.bubbles.splice(i, 1);
+        continue;
+      }
+
+      // Calculate surface Y at bubble's X position (using scrolled wave)
+      const wx = bubble.x + this.lavaScrollOffset;
       let surfaceY = baseY;
-      surfaceY += Math.sin(bubble.x * 0.04 + time * 1.5) * 2.5;
-      surfaceY += Math.sin(bubble.x * 0.08 + time * 2.2) * 1.2;
+      surfaceY += Math.sin(wx * 0.04 + time * 1.5) * 2.5;
+      surfaceY += Math.sin(wx * 0.08 + time * 2.2) * 1.2;
 
       // Remove if above lava surface (bubble pops)
       if (bubble.y < surfaceY) {
@@ -370,7 +386,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Spawn new bubbles occasionally
+    // Spawn new bubbles occasionally (from right side to scroll in)
     if (Math.random() < 0.03 && this.bubbles.length < 8) {
       this.createBubble();
     }
@@ -395,13 +411,15 @@ export class GameScene extends Phaser.Scene {
     this.lavaOutlineGraphics.clear();
 
     // === BACK LAYER (darker, slightly higher) - BEHIND PIPES ===
+    const scrollX = this.lavaScrollOffset; // Scroll offset synced with pipes
     const backPoints: { x: number; y: number }[] = [];
     for (let x = 0; x <= width; x += 1) {
       let y = baseY - 8;
-      // Calmer waves for back layer
-      y += Math.sin(x * 0.03 + time * 1.2) * 3;
-      y += Math.sin(x * 0.07 + time * 1.8) * 1.5;
-      y += Math.sin(x * 0.12 + time * 2.5) * 0.8;
+      // Calmer waves for back layer (offset by scroll to move with pipes)
+      const wx = x + scrollX;
+      y += Math.sin(wx * 0.03 + time * 1.2) * 3;
+      y += Math.sin(wx * 0.07 + time * 1.8) * 1.5;
+      y += Math.sin(wx * 0.12 + time * 2.5) * 0.8;
       backPoints.push({ x, y });
     }
 
@@ -420,10 +438,11 @@ export class GameScene extends Phaser.Scene {
     const frontPoints: { x: number; y: number }[] = [];
     for (let x = 0; x <= width; x += 1) {
       let y = baseY;
-      // Animated waves
-      y += Math.sin(x * 0.04 + time * 1.5) * 2.5;
-      y += Math.sin(x * 0.08 + time * 2.2) * 1.2;
-      y += Math.sin(x * 0.15 + time * 3.0) * 0.6;
+      // Animated waves (offset by scroll to move with pipes)
+      const wx = x + scrollX;
+      y += Math.sin(wx * 0.04 + time * 1.5) * 2.5;
+      y += Math.sin(wx * 0.08 + time * 2.2) * 1.2;
+      y += Math.sin(wx * 0.15 + time * 3.0) * 0.6;
 
       // Add splash ripples
       for (const splash of this.splashes) {
@@ -508,11 +527,6 @@ export class GameScene extends Phaser.Scene {
 
     const pipeX = this.scale.width + 40;
 
-    // Get pipe texture dimensions to calculate proper scaling
-    const pipeTexture = this.textures.get("flappy-pipe-top");
-    const pipeFrame = pipeTexture.get();
-    const pipeWidth = pipeFrame.width;
-
     // Scale pipes slightly smaller than background for better gameplay feel
     const pipeScale = (this.scale.height / 180) * 0.7; // 70% of background scale
 
@@ -536,10 +550,11 @@ export class GameScene extends Phaser.Scene {
     topPipe.setDepth(1); // Between back lava (0.5) and front lava (5)
     topPipe.setVelocityX(this.pipeSpeed);
     topPipe.setImmovable(true);
-    topPipe.body.setAllowGravity(false);
+    const topBody = topPipe.body as Phaser.Physics.Arcade.Body;
+    topBody.allowGravity = false;
     // Full sprite bounds - pixel check handles actual collision
-    topPipe.body.setSize(topFrame.width, topFrame.height);
-    topPipe.body.setOffset(0, 0);
+    topBody.setSize(topFrame.width, topFrame.height);
+    topBody.setOffset(0, 0);
     // Position so visual bottom aligns with gap top
     topPipe.y = gapCenter - gapSize / 2 - topPipe.displayHeight;
 
@@ -554,10 +569,11 @@ export class GameScene extends Phaser.Scene {
     bottomPipe.setDepth(1); // Between back lava (0.5) and front lava (5)
     bottomPipe.setVelocityX(this.pipeSpeed);
     bottomPipe.setImmovable(true);
-    bottomPipe.body.setAllowGravity(false);
+    const bottomBody = bottomPipe.body as Phaser.Physics.Arcade.Body;
+    bottomBody.allowGravity = false;
     // Full sprite bounds - pixel check handles actual collision
-    bottomPipe.body.setSize(bottomFrame.width, bottomFrame.height);
-    bottomPipe.body.setOffset(0, 0);
+    bottomBody.setSize(bottomFrame.width, bottomFrame.height);
+    bottomBody.setOffset(0, 0);
 
     this.pipes.push({ top: topPipe, bottom: bottomPipe, scored: false });
   }
