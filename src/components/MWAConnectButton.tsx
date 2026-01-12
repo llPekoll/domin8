@@ -6,7 +6,7 @@ interface MWAConnectButtonProps {
   onError?: (error: Error) => void;
 }
 
-// Detect Android via user agent (works for PWA, web, and Capacitor)
+// Detect Android via user agent (works for PWA and web)
 const isAndroid = /Android/i.test(navigator.userAgent);
 
 /**

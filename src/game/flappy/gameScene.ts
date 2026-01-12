@@ -287,10 +287,10 @@ export class GameScene extends Phaser.Scene {
     // Create blood sprite
     const blood = this.add.sprite(x, y, "blood");
     blood.setDepth(10); // Above everything
-    blood.setScale(0.8); // Slightly smaller to fit game scale
+    blood.setScale(1); // Full size for visibility
 
     // Play the animation
-    blood.play(animNum.toString());
+    blood.play(`blood_${animNum}`);
 
     // Destroy when animation completes
     blood.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {

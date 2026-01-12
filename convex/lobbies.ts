@@ -510,6 +510,7 @@ export const _internalSettleLobby = internalMutation({
     }
 
     // Update loser stats
+    let loserDisplayName: string | undefined;
     if (loser) {
       const loserPlayer = await ctx.db
         .query("players")
@@ -517,12 +518,23 @@ export const _internalSettleLobby = internalMutation({
         .first();
 
       if (loserPlayer) {
+        loserDisplayName = loserPlayer.displayName || undefined;
         await ctx.db.patch(loserPlayer._id, {
           totalGamesPlayed: (loserPlayer.totalGamesPlayed || 0) + 1,
           lastActive: Date.now(),
         });
       }
     }
+
+    // Announce winner in chat
+    const prizeInSol = totalPot / 1_000_000_000; // lamports to SOL
+    await ctx.scheduler.runAfter(0, internal.chat.announceWinner, {
+      winnerWallet: args.winner,
+      winnerName: winnerPlayer?.displayName || undefined,
+      prizeAmount: prizeInSol,
+      gameType: "1v1",
+      loserName: loserDisplayName,
+    });
 
     return lobby._id;
   },

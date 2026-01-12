@@ -35,6 +35,22 @@ export const getPlayerDisplayNameInternal = internalQuery({
 });
 
 /**
+ * Internal query to get full player by wallet address
+ * Can be called from internal actions
+ */
+export const getPlayerInternal = internalQuery({
+  args: { walletAddress: v.string() },
+  handler: async (ctx, args) => {
+    const player = await ctx.db
+      .query("players")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", args.walletAddress))
+      .first();
+
+    return player || null;
+  },
+});
+
+/**
  * Get multiple players by wallet addresses
  * Returns a map of wallet address -> display name for quick lookups
  */

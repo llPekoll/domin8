@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Header } from "../components/Header";
+import { ChatPanel } from "../components/ChatPanel";
 import { CreateLobby } from "../components/onevone/CreateLobby";
 import { LobbyDetailsDialog } from "../components/onevone/LobbyDetailsDialog";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
@@ -547,8 +548,15 @@ export function OneVOnePage() {
     <div className="min-h-screen w-full bg-gradient-to-b from-gray-950/90 via-gray-900/90 to-black/90">
       <Header />
 
-      {/* Main Content Area - Always show lobby list */}
-      <main className="pt-20 pb-8 px-3 md:px-6">
+      {/* Main Content Area with Chat Sidebar */}
+      <div className="pt-20 pb-8 px-3 md:px-6 flex gap-4">
+        {/* Chat Sidebar - Left (sticky) */}
+        <div className="hidden lg:block w-[320px] flex-shrink-0 sticky top-20 self-start">
+          <ChatPanel embedded />
+        </div>
+
+        {/* Main Content */}
+        <main className="flex-1 min-w-0">
         {/* Games List - Single column for both connected and not connected */}
         {connected && publicKey ? (
           <div className="max-w-4xl mx-auto space-y-4">
@@ -1209,7 +1217,8 @@ export function OneVOnePage() {
             </div>
           </div>
         )}
-      </main>
+        </main>
+      </div>
 
       {/* Arena Modal - Shows the Phaser game in a dialog (uses LobbyDetailsDialog with real-time state) */}
       <LobbyDetailsDialog

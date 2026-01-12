@@ -21,20 +21,9 @@
     "anchor:test:skip": "dotenv -e .env.local -- bash -c 'anchor test --skip-build --skip-deploy --provider.wallet ${ANCHOR_WALLET}'",
     "anchor:build": "dotenv -e .env.local -- bash -c 'anchor build'",
     "anchor:deploy": "dotenv -e .env.local -- bash -c 'anchor deploy --provider.wallet ${ANCHOR_WALLET} --program-name domin8_prgm --program-id ${ANCHOR_PROGRAM_ID}'",
-    "anchor:localnet": "anchor localnet",
-    "cap:sync": "npx cap sync",
-    "cap:build": "bun run build && npx cap sync",
-    "cap:android": "npx cap open android",
-    "cap:run:android": "npx cap run android"
+    "anchor:localnet": "anchor localnet"
   },
   "dependencies": {
-    "@capacitor/android": "^8.0.0",
-    "@capacitor/app": "^8.0.0",
-    "@capacitor/browser": "^8.0.0",
-    "@capacitor/cli": "^8.0.0",
-    "@capacitor/core": "^8.0.0",
-    "@capacitor/haptics": "^8.0.0",
-    "@capacitor/status-bar": "^8.0.0",
     "@coral-xyz/anchor": "0.31.1",
     "@metaplex-foundation/js": "^0.20.1",
     "@metaplex-foundation/mpl-token-metadata": "^3.4.0",
@@ -73,11 +62,11 @@
     "react-device-detect": "^2.2.3",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.9.4",
+    "resend": "^6.7.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "tweetnacl": "^1.0.3",
-    "vite-plugin-pwa": "^1.2.0",
-    "web-push": "^3.6.7"
+    "vite-plugin-pwa": "^1.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",

@@ -620,6 +620,24 @@ export const executeSendPrize = internalAction({
           } catch (pointsError) {
             console.error(`Round ${roundId}: Failed to award points to winner:`, pointsError);
           }
+
+          // Announce winner in chat
+          try {
+            const winnerPlayer = await ctx.runQuery(internal.players.getPlayerInternal, {
+              walletAddress: gameRound.winner.toString(),
+            });
+            const prizeInSol = gameRound.winnerPrize / 1_000_000_000; // lamports to SOL
+
+            await ctx.runMutation(internal.chat.announceWinner, {
+              winnerWallet: gameRound.winner.toString(),
+              winnerName: winnerPlayer?.displayName || undefined,
+              prizeAmount: prizeInSol,
+              gameType: "domin8",
+            });
+            console.log(`Round ${roundId}: Winner announced in chat`);
+          } catch (chatError) {
+            console.error(`Round ${roundId}: Failed to announce winner in chat:`, chatError);
+          }
         }
 
         // Update bot performance stats for this round

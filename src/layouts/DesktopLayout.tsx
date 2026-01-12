@@ -9,6 +9,7 @@ import { WinnerShareOverlay } from "../components/WinnerShareOverlay";
 import { LastWinnerCard } from "../components/LastWinnerCard";
 import { LandscapeEnforcer } from "../components/LandscapeEnforcer";
 import { ConnectWalletOverlay } from "../components/ConnectWalletOverlay";
+import { ChatPanel } from "../components/ChatPanel";
 import type { Character } from "../types/character";
 
 interface DesktopLayoutProps {
@@ -41,6 +42,9 @@ export function DesktopLayout({
       <div className="relative z-10">
         <Header />
       </div>
+
+      {/* Chat Panel - Top Left under Header (resizable) */}
+      <ChatPanel resizable />
 
       {/* Character Selection Carousel - Bottom Left */}
       <CharacterSelection2 onCharacterSelected={onCharacterSelected} />

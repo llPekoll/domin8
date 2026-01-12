@@ -135,6 +135,20 @@ export default defineSchema({
     .index("by_referral_code", ["referralCode"]), // Look up by code during signup
 
   /**
+   * Payout History - Record of all referral payouts
+   * Shows users when they received payments
+   */
+  payoutHistory: defineTable({
+    walletAddress: v.string(), // Referrer's wallet
+    amount: v.number(), // Amount paid in lamports
+    paidAt: v.number(), // Unix timestamp
+    txHash: v.optional(v.string()), // Solana transaction hash (optional)
+    note: v.optional(v.string()), // Optional note from admin
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_paid_at", ["paidAt"]),
+
+  /**
    * Referral Stats - Aggregated statistics per referrer
    * Used for leaderboards and personal dashboards
    * Rank is calculated on-demand, not stored
@@ -144,7 +158,10 @@ export default defineSchema({
     referralCode: v.string(), // Their unique referral code
     totalReferred: v.number(), // Count of users they've referred
     totalRevenue: v.number(), // Sum of all referred users' bet volume (in lamports)
-    accumulatedRewards: v.number(), // 1.5% of totalRevenue - rewards earned (in lamports)
+    accumulatedRewards: v.number(), // 1% of totalRevenue - rewards earned (in lamports)
+    totalPaidOut: v.optional(v.number()), // Total amount already paid out (in lamports)
+    lastPayoutDate: v.optional(v.number()), // Unix timestamp of last payout
+    lastPayoutAmount: v.optional(v.number()), // Amount of last payout (in lamports)
     createdAt: v.number(), // When they created their referral link
   }).index("by_wallet", ["walletAddress"])
     .index("by_code", ["referralCode"])
@@ -338,5 +355,24 @@ export default defineSchema({
     .index("by_endpoint", ["endpoint"]) // Prevent duplicate subscriptions
     .index("by_wallet", ["walletAddress"]) // Query user's subscriptions
     .index("by_active", ["isActive"]), // Query active subscriptions for broadcast
+
+  // ============================================================================
+  // CHAT TABLES
+  // ============================================================================
+
+  /**
+   * Chat Messages - Global chat messages for player communication
+   * Includes user messages and system announcements (winners)
+   */
+  chatMessages: defineTable({
+    senderWallet: v.optional(v.string()), // Sender wallet (null for system messages)
+    senderName: v.optional(v.string()), // Display name if available
+    message: v.string(), // Message content (max 200 chars)
+    type: v.string(), // "user" | "system" | "winner"
+    gameType: v.optional(v.string()), // "domin8" | "1v1" (for winner messages)
+    timestamp: v.number(), // When message was sent
+  })
+    .index("by_timestamp", ["timestamp"]) // For fetching recent messages
+    .index("by_sender_and_time", ["senderWallet", "timestamp"]), // For rate limiting
 });
     

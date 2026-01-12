@@ -35,6 +35,9 @@ export const getOrCreateReferralCode = mutation({
         totalReferred: existingStats.totalReferred,
         totalRevenue: existingStats.totalRevenue,
         accumulatedRewards: existingStats.accumulatedRewards || 0,
+        totalPaidOut: existingStats.totalPaidOut || 0,
+        lastPayoutDate: existingStats.lastPayoutDate,
+        lastPayoutAmount: existingStats.lastPayoutAmount,
       };
     }
 
@@ -72,6 +75,9 @@ export const getOrCreateReferralCode = mutation({
       totalReferred: 0,
       totalRevenue: 0,
       accumulatedRewards: 0,
+      totalPaidOut: 0,
+      lastPayoutDate: undefined,
+      lastPayoutAmount: undefined,
     };
   },
 });
@@ -163,8 +169,8 @@ export const updateReferralRevenue = mutation({
       .unique();
 
     if (referrerStats) {
-      // Calculate 1.5% reward
-      const rewardAmount = Math.floor(args.betAmount * 0.015); // 1.5% in lamports
+      // Calculate 1% reward
+      const rewardAmount = Math.floor(args.betAmount * 0.01); // 1% in lamports
 
       await ctx.db.patch(referrerStats._id, {
         totalRevenue: referrerStats.totalRevenue + args.betAmount,
@@ -198,6 +204,9 @@ export const getReferralStats = query({
       totalReferred: stats.totalReferred,
       totalRevenue: stats.totalRevenue,
       accumulatedRewards: stats.accumulatedRewards || 0,
+      totalPaidOut: stats.totalPaidOut || 0,
+      lastPayoutDate: stats.lastPayoutDate,
+      lastPayoutAmount: stats.lastPayoutAmount,
       createdAt: stats.createdAt,
     };
   },
@@ -312,3 +321,106 @@ export const getUserRank = query({
     };
   },
 });
+
+/**
+ * Record a manual payout to a referrer
+ * Called by admin when sending monthly payouts
+ */
+export const recordPayout = mutation({
+  args: {
+    walletAddress: v.string(),
+    payoutAmount: v.number(), // Amount paid out in lamports
+    txHash: v.optional(v.string()), // Solana transaction hash
+    note: v.optional(v.string()), // Optional note
+  },
+  handler: async (ctx, args) => {
+    const stats = await ctx.db
+      .query("referralStats")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", args.walletAddress))
+      .unique();
+
+    if (!stats) {
+      throw new Error("Referrer not found");
+    }
+
+    const currentPaidOut = stats.totalPaidOut || 0;
+    const pendingAmount = (stats.accumulatedRewards || 0) - currentPaidOut;
+
+    if (args.payoutAmount > pendingAmount) {
+      throw new Error(`Payout amount exceeds pending rewards. Pending: ${pendingAmount} lamports`);
+    }
+
+    const now = Date.now();
+
+    // Update stats
+    await ctx.db.patch(stats._id, {
+      totalPaidOut: currentPaidOut + args.payoutAmount,
+      lastPayoutDate: now,
+      lastPayoutAmount: args.payoutAmount,
+    });
+
+    // Record in payout history
+    await ctx.db.insert("payoutHistory", {
+      walletAddress: args.walletAddress,
+      amount: args.payoutAmount,
+      paidAt: now,
+      txHash: args.txHash,
+      note: args.note,
+    });
+
+    return {
+      success: true,
+      newTotalPaidOut: currentPaidOut + args.payoutAmount,
+      remainingPending: pendingAmount - args.payoutAmount,
+    };
+  },
+});
+
+/**
+ * Get payout history for a user
+ */
+export const getPayoutHistory = query({
+  args: {
+    walletAddress: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const payouts = await ctx.db
+      .query("payoutHistory")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", args.walletAddress))
+      .order("desc")
+      .collect();
+
+    return payouts;
+  },
+});
+
+/**
+ * Get all referrers with pending payouts
+ * Useful for admin to see who needs to be paid
+ */
+export const getPendingPayouts = query({
+  args: {},
+  handler: async (ctx) => {
+    const allStats = await ctx.db.query("referralStats").collect();
+
+    const pendingPayouts = allStats
+      .map((stats) => {
+        const totalPaidOut = stats.totalPaidOut || 0;
+        const pendingAmount = (stats.accumulatedRewards || 0) - totalPaidOut;
+        return {
+          walletAddress: stats.walletAddress,
+          referralCode: stats.referralCode,
+          totalReferred: stats.totalReferred,
+          accumulatedRewards: stats.accumulatedRewards || 0,
+          totalPaidOut,
+          pendingAmount,
+          lastPayoutDate: stats.lastPayoutDate,
+        };
+      })
+      .filter((stats) => stats.pendingAmount > 0)
+      .sort((a, b) => b.pendingAmount - a.pendingAmount);
+
+    return pendingPayouts;
+  },
+});
+

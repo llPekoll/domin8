@@ -4,6 +4,7 @@ import { api } from "../../convex/_generated/api";
 import { useState, useEffect, useRef } from "react";
 import { ProfileDialog } from "./ProfileDialog";
 import { WithdrawDialog } from "./WithdrawDialog";
+import { LeaderboardDialog } from "./LeaderboardDialog";
 import { PrivyWalletButton } from "./PrivyWalletButton";
 import { SoundControl } from "./SoundControl";
 import { toast } from "sonner";
@@ -12,13 +13,13 @@ import { logger } from "../lib/logger";
 import { useFundWallet } from "../hooks/useFundWallet";
 import { Plus, ArrowUpRight, ChevronDown, User } from "lucide-react";
 import { Link } from "react-router-dom";
-import { NotificationBell } from "./NotificationToggle";
 
 export function Header() {
   const { connected, publicKey, externalWalletAddress, solBalance, isLoadingBalance } =
     usePrivyWallet();
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
+  const [showLeaderboardDialog, setShowLeaderboardDialog] = useState(false);
   const [showBalanceMenu, setShowBalanceMenu] = useState(false);
   const [hasAttemptedCreation, setHasAttemptedCreation] = useState(false);
   const [profileDefaultTab, setProfileDefaultTab] = useState<"profile" | "sound">("profile");
@@ -105,12 +106,16 @@ export function Header() {
               >
                 Bloody Bird
               </Link>
+              <Link
+                to="/referrals"
+                className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"
+              >
+                Referrals
+              </Link>
             </div>
 
             {/* Right Side - User Controls */}
             <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
-              {/* Notification Bell */}
-              <NotificationBell walletAddress={publicKey?.toString()} />
 
               {/* Sound Control - Hidden on mobile */}
               <div className="hidden md:block">
@@ -118,9 +123,9 @@ export function Header() {
                   onSettingsClick={
                     connected && publicKey
                       ? () => {
-                          setProfileDefaultTab("sound");
-                          setShowProfileDialog(true);
-                        }
+                        setProfileDefaultTab("sound");
+                        setShowProfileDialog(true);
+                      }
                       : undefined
                   }
                 />
@@ -128,6 +133,31 @@ export function Header() {
 
               {connected && (
                 <>
+                  {/* Divider - Hidden on mobile */}
+                  <div className="hidden md:block h-8 w-px bg-indigo-500/30"></div>
+
+                  {/* Points - Opens Leaderboard */}
+                  <button
+                    onClick={() => setShowLeaderboardDialog(true)}
+                    className="flex flex-col hover:bg-indigo-800/30 px-1.5 md:px-2 py-1 rounded-lg transition-all cursor-pointer group"
+                    title="View Leaderboard"
+                  >
+                    <div className="text-[10px] md:text-xs text-indigo-400/80 leading-tight group-hover:text-indigo-300/90">
+                      Points
+                    </div>
+                    <div className="text-indigo-200 font-bold text-sm md:text-base flex items-center gap-1 leading-tight group-hover:text-indigo-100">
+                      {playerData ? (
+                        <>
+                          <span className="text-yellow-400">🏆</span>
+                          <span className="hidden md:inline">{(playerData.totalPoints ?? 0).toLocaleString()}</span>
+                          <span className="md:hidden">{(playerData.totalPoints ?? 0) >= 1000 ? `${((playerData.totalPoints ?? 0) / 1000).toFixed(1)}k` : (playerData.totalPoints ?? 0)}</span>
+                        </>
+                      ) : (
+                        <span className="text-xs md:text-sm">--</span>
+                      )}
+                    </div>
+                  </button>
+
                   {/* Divider - Hidden on mobile */}
                   <div className="hidden md:block h-8 w-px bg-indigo-500/30"></div>
 
@@ -237,6 +267,11 @@ export function Header() {
       )}
 
       <WithdrawDialog isOpen={showWithdrawDialog} onClose={() => setShowWithdrawDialog(false)} />
+
+      <LeaderboardDialog
+        open={showLeaderboardDialog}
+        onOpenChange={setShowLeaderboardDialog}
+      />
     </>
   );
 }

@@ -10,16 +10,9 @@ import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
 import { AssetsProvider } from "./contexts/AssetsContext";
 import { PlayerNamesProvider } from "./contexts/PlayerNamesContext";
 import { Analytics } from "@vercel/analytics/react";
-import { configureStatusBar } from "./utils/statusBar";
-import { Capacitor } from "@capacitor/core";
 
-// Configure native status bar (Android/iOS)
-void configureStatusBar();
-
-const platform = Capacitor.getPlatform();
 const isAndroid = /Android/i.test(navigator.userAgent);
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-console.log("[App] Platform:", platform);
 console.log("[App] User Agent:", navigator.userAgent);
 console.log("[App] Is Android:", isAndroid);
 console.log("[App] Is Mobile:", isMobile);
