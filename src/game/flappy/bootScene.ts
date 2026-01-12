@@ -16,6 +16,8 @@ export class BootScene extends Phaser.Scene {
     this.load.image("flappy-pipe-top", "/assets/maps/flappy/fp_pipe_up.png");
     // Load character
     this.load.image("flappy-bird", "/assets/characters/flappy/char.png");
+    // Load blood splatter spritesheet
+    this.load.aseprite("blood", "/assets/vfx/blood_spritesheet.png", "/assets/vfx/blood_spritesheet.json");
   }
 
   create() {
@@ -24,6 +26,10 @@ export class BootScene extends Phaser.Scene {
     this.textures.get("flappy-pipe-bottom").setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.textures.get("flappy-pipe-top").setFilter(Phaser.Textures.FilterMode.NEAREST);
     this.textures.get("flappy-bird").setFilter(Phaser.Textures.FilterMode.NEAREST);
+    this.textures.get("blood").setFilter(Phaser.Textures.FilterMode.NEAREST);
+
+    // Create blood splatter animations from Aseprite tags (9 different splatters)
+    this.anims.createFromAseprite("blood");
 
     this.eventsBus.emit("flappy:state", { state: "playing", score: 0 });
     this.scene.start("GameScene");

@@ -272,7 +272,30 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handlePipeCollision() {
+    if (this.isGameOver) return;
+
+    // Spawn blood splatter at bird position
+    this.spawnBloodSplatter(this.bird.x, this.bird.y);
+
     this.handleGameOver();
+  }
+
+  private spawnBloodSplatter(x: number, y: number) {
+    // Pick a random blood animation (1-9)
+    const animNum = Phaser.Math.Between(1, 9);
+
+    // Create blood sprite
+    const blood = this.add.sprite(x, y, "blood");
+    blood.setDepth(10); // Above everything
+    blood.setScale(0.8); // Slightly smaller to fit game scale
+
+    // Play the animation
+    blood.play(animNum.toString());
+
+    // Destroy when animation completes
+    blood.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      blood.destroy();
+    });
   }
 
   private handlePointerDown(pointer: Phaser.Input.Pointer) {
