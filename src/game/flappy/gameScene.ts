@@ -35,6 +35,11 @@ export class GameScene extends Phaser.Scene {
   private bubbles: { x: number; y: number; size: number; speed: number; wobble: number }[] = [];
   private splashes: { x: number; amplitude: number; age: number }[] = [];
 
+  // Lava kick-out effect
+  private isBurnt = false;
+  private smokeParticles: { x: number; y: number; alpha: number; size: number; vx: number; vy: number }[] = [];
+  private smokeGraphics!: Phaser.GameObjects.Graphics;
+
   constructor(eventsBus: Phaser.Events.EventEmitter) {
     super("GameScene");
     this.eventsBus = eventsBus;
@@ -45,12 +50,15 @@ export class GameScene extends Phaser.Scene {
     this.score = 0;
     this.pipes = [];
     this.runStartTime = this.time.now;
+    this.isBurnt = false;
+    this.smokeParticles = [];
 
     this.cameras.main.setBackgroundColor("#050816");
     this.physics.world.setBounds(0, 0, this.scale.width, this.scale.height);
 
     this.createBackground();
     this.createLava();
+    this.createSmoke();
     this.createBird();
     this.pipesGroup = this.physics.add.group();
     this.createGround();
@@ -99,8 +107,20 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (this.bird.y <= 0 || this.bird.y >= this.scale.height - this.groundHeight) {
+    // Check ceiling collision (game over) - but not if burnt (flying off screen)
+    if (this.bird.y <= 0 && !this.isBurnt) {
       this.handleGameOver();
+    }
+
+    // Check lava collision (kick-out effect)
+    const lavaBaseY = this.scale.height - this.lavaDepth - this.groundHeight;
+    if (this.bird.y >= lavaBaseY && !this.isBurnt) {
+      this.handleLavaKick();
+    }
+
+    // Update and draw smoke particles if burnt
+    if (this.isBurnt) {
+      this.updateSmoke();
     }
 
     this.pipes = this.pipes.filter((pair) => {
@@ -338,6 +358,12 @@ export class GameScene extends Phaser.Scene {
 
     // Initial draw
     this.drawLava();
+  }
+
+  private createSmoke() {
+    // Graphics for smoke particles behind the burnt bird
+    this.smokeGraphics = this.add.graphics();
+    this.smokeGraphics.setDepth(1.5); // Behind bird but above pipes
   }
 
   private createBubble() {
@@ -579,13 +605,93 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleFlap() {
-    if (this.isGameOver) return;
+    if (this.isGameOver || this.isBurnt) return; // Can't flap when burnt
     this.bird.setVelocityY(-220);
   }
 
   private incrementScore() {
     this.score += 1;
     this.eventsBus.emit("flappy:score", this.score);
+  }
+
+  private handleLavaKick() {
+    if (this.isGameOver || this.isBurnt) return; // Only kick once
+
+    // Set burnt state
+    this.isBurnt = true;
+
+    // Apply burnt brown tint to bird
+    this.bird.setTint(0x4a3728); // Dark brown/burnt color
+
+    // Disable world bounds so bird can fly off screen
+    this.bird.setCollideWorldBounds(false);
+
+    // Remove velocity cap so kick can be super strong
+    this.bird.setMaxVelocity(9999, 9999);
+
+    // Kick the bird WAY up - strong enough to fly off screen fast
+    this.bird.setVelocityY(-1500);
+
+    // Add a big splash in the lava
+    this.addSplash(this.bird.x, 2.5);
+
+    // Spawn initial burst of smoke
+    for (let i = 0; i < 12; i++) {
+      this.spawnSmokeParticle();
+    }
+
+    // Camera shake for impact
+    this.cameras.main.shake(200, 0.008);
+
+    // Flash with orange/fire color
+    this.cameras.main.flash(150, 255, 100, 50);
+
+    // Trigger game over after 1 second
+    this.time.delayedCall(1000, () => {
+      this.handleGameOver();
+    });
+  }
+
+  private spawnSmokeParticle() {
+    this.smokeParticles.push({
+      x: this.bird.x + Phaser.Math.Between(-10, 10),
+      y: this.bird.y + this.bird.displayHeight * 0.3, // Spawn below/behind bird
+      alpha: 0.8 + Math.random() * 0.2,
+      size: 4 + Math.random() * 6,
+      vx: Phaser.Math.Between(-20, 20), // Slight horizontal spread
+      vy: Phaser.Math.Between(10, 30), // Drift downward (smoke trails behind rising bird)
+    });
+  }
+
+  private updateSmoke() {
+    // Spawn new smoke particles while bird is moving (burnt)
+    if (this.isBurnt && !this.isGameOver && Math.random() < 0.6) {
+      this.spawnSmokeParticle();
+    }
+
+    // Update existing particles
+    for (let i = this.smokeParticles.length - 1; i >= 0; i--) {
+      const p = this.smokeParticles[i];
+      p.x += p.vx * 0.016;
+      p.y += p.vy * 0.016;
+      p.alpha -= 0.02; // Fade out
+      p.size += 0.3; // Expand slightly
+
+      // Remove faded particles
+      if (p.alpha <= 0) {
+        this.smokeParticles.splice(i, 1);
+      }
+    }
+
+    // Draw smoke
+    this.smokeGraphics.clear();
+    for (const p of this.smokeParticles) {
+      // Gradient from dark gray to light gray
+      const grayValue = Math.floor(80 + (1 - p.alpha) * 80);
+      const color = (grayValue << 16) | (grayValue << 8) | grayValue;
+      this.smokeGraphics.fillStyle(color, p.alpha * 0.7);
+      this.smokeGraphics.fillCircle(p.x, p.y, p.size);
+    }
   }
 
   private handleGameOver = () => {
