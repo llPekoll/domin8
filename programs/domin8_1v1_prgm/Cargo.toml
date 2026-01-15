@@ -1,0 +1,25 @@
+[package]
+name = "domin8_1v1_prgm"
+version = "0.1.0"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "domin8_1v1_prgm"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+
+
+[dependencies]
+anchor-lang = "0.31.1"
+ephemeral-vrf-sdk = { version = "0.1.2", features = ["anchor"] }
+rust_decimal = "1.33"
+
+

@@ -2,6 +2,7 @@ import { Scene } from "phaser";
 import { GamePhase } from "./GlobalGameStateManager";
 import { EventBus } from "../EventBus";
 import { currentUserWallet } from "../main";
+import { SoundManager } from "./SoundManager";
 
 export class UIManager {
   private scene: Scene;
@@ -14,6 +15,8 @@ export class UIManager {
 
   private gameState: any = null;
   private timerContainer!: Phaser.GameObjects.Container;
+  private playerNamesMap: Map<string, string> = new Map();
+  private cachedBetAmounts: number[] = []; // Cache bet amounts before game ends
 
   // Demo-style countdown (large, bottom center)
   private demoCountdownText!: Phaser.GameObjects.Text;
@@ -28,6 +31,14 @@ export class UIManager {
   private phaseText!: Phaser.GameObjects.Text;
   private subText!: Phaser.GameObjects.Text;
   private winnerContainer!: Phaser.GameObjects.Container;
+  private multiplierText!: Phaser.GameObjects.Text;
+
+  // Insert Coin UI (waiting for first bet)
+  private insertCoinText!: Phaser.GameObjects.Text;
+  private insertCoinTween!: Phaser.Tweens.Tween;
+
+  // Track if countdown sound has been played for current game
+  private countdownSoundPlayed: boolean = false;
 
   constructor(scene: Scene, centerX: number) {
     this.scene = scene;
@@ -56,10 +67,18 @@ export class UIManager {
         this.hideAllUI();
         break;
 
+      case GamePhase.INSERT_COIN:
+        // Game created, waiting for first bet - show INSERT COIN
+        console.log("[UIManager] 🪙 Showing INSERT COIN");
+        this.hideAllUI();
+        this.showInsertCoin();
+        break;
+
       case GamePhase.WAITING:
         // Waiting for bets - show countdown
         this.vrfOverlay.setVisible(false);
         this.vrfContainer.setVisible(false);
+        this.hideInsertCoin();
         // Countdown visibility handled by updateTimer
         break;
 
@@ -70,6 +89,7 @@ export class UIManager {
         this.vrfContainer.setVisible(true);
         this.timerContainer.setVisible(false);
         this.timerBackground.setVisible(false);
+        this.hideInsertCoin();
         break;
 
       case GamePhase.FIGHTING:
@@ -77,11 +97,13 @@ export class UIManager {
         console.log("[UIManager] ⚔️ Hiding VRF overlay for battle");
         this.vrfOverlay.setVisible(false);
         this.vrfContainer.setVisible(false);
+        this.hideInsertCoin();
         break;
 
       case GamePhase.CELEBRATING:
         // Winner celebration - show winner UI
         console.log("[UIManager] 🎉 Showing winner UI for celebration");
+        this.hideInsertCoin();
         this.showWinnerUI();
         break;
 
@@ -99,7 +121,9 @@ export class UIManager {
       this.timerContainer &&
       this.timerBackground &&
       this.demoCountdownText &&
-      this.winnerContainer
+      this.winnerContainer &&
+      this.multiplierText &&
+      this.insertCoinText
     );
   }
 
@@ -113,6 +137,13 @@ export class UIManager {
     this.vrfOverlay.setVisible(false);
     this.vrfContainer.setVisible(false);
     this.winnerContainer.setVisible(false);
+    this.hideInsertCoin();
+
+    // Clear cached data for next game
+    this.cachedBetAmounts = [];
+
+    // Reset countdown sound flag for next game
+    this.countdownSoundPlayed = false;
   }
 
   private showWinnerUI() {
@@ -128,9 +159,43 @@ export class UIManager {
 
     // Get winner info from game state
     const winnerWallet = this.gameState?.winner?.toBase58?.() || this.gameState?.winner;
-    const winnerPrize = this.gameState?.winnerPrize
-      ? (Number(this.gameState.winnerPrize) / 1e9).toFixed(3)
-      : "0";
+    const winnerPrizeNum = this.gameState?.winnerPrize
+      ? Number(this.gameState.winnerPrize) / 1e9
+      : 0;
+    const winnerPrize = winnerPrizeNum.toFixed(3);
+
+    // Calculate multiplier from winner's bet (use cached amounts since live data gets cleared)
+    let multiplier = 0;
+    const winningBetIndex = this.gameState?.winningBetIndex;
+    console.log(
+      `[UIManager] Multiplier calc: winningBetIndex=${winningBetIndex}, cached bets=${this.cachedBetAmounts.length}, prize=${winnerPrizeNum}`
+    );
+
+    if (
+      winningBetIndex !== null &&
+      winningBetIndex !== undefined &&
+      this.cachedBetAmounts.length > 0
+    ) {
+      // winningBetIndex might be a BN object
+      const betIdx =
+        typeof winningBetIndex === "object" && winningBetIndex.toNumber
+          ? winningBetIndex.toNumber()
+          : Number(winningBetIndex);
+
+      console.log(
+        `[UIManager] Bet index: ${betIdx}, cachedBetAmount:`,
+        this.cachedBetAmounts[betIdx]
+      );
+
+      if (this.cachedBetAmounts[betIdx]) {
+        const winnerBetAmount = this.cachedBetAmounts[betIdx] / 1e9;
+        console.log(`[UIManager] Winner bet amount: ${winnerBetAmount} SOL`);
+        if (winnerBetAmount > 0) {
+          multiplier = winnerPrizeNum / winnerBetAmount;
+          console.log(`[UIManager] Calculated multiplier: x${multiplier.toFixed(1)}`);
+        }
+      }
+    }
 
     // Check if current user is the winner
     const isCurrentUserWinner = currentUserWallet && winnerWallet === currentUserWallet;
@@ -144,12 +209,70 @@ export class UIManager {
       this.subText.setVisible(true);
       this.subText.setText("Restarting in 4s...");
 
+      // Show multiplier with punchy animation
+      this.showMultiplier(multiplier);
+
       // Emit event for React to show Twitter share button
       EventBus.emit("show-winner-share", {
         isCurrentUser: isCurrentUserWinner,
         prize: winnerPrize,
       });
+    } else if (winnerWallet) {
+      // Show winner name for non-winners
+      const mappedName = this.playerNamesMap.get(winnerWallet);
+      console.log(
+        `[UIManager] Looking up winner: ${winnerWallet}, found: ${mappedName}, map size: ${this.playerNamesMap.size}`
+      );
+
+      const winnerDisplayName =
+        mappedName || `${winnerWallet.slice(0, 4)}...${winnerWallet.slice(-4)}`;
+
+      this.winnerContainer.setVisible(true);
+      this.winnerContainer.setAlpha(1);
+      this.phaseText.setVisible(true);
+      this.phaseText.setText(`🏆 ${winnerDisplayName} WON!`);
+      this.subText.setVisible(true);
+      this.subText.setText(`Prize: ${winnerPrize} SOL`);
+
+      // Show multiplier with punchy animation
+      this.showMultiplier(multiplier);
     }
+  }
+
+  /**
+   * Show multiplier with punchy scale animation
+   */
+  private showMultiplier(multiplier: number) {
+    if (multiplier <= 1) {
+      this.multiplierText.setVisible(false);
+      return;
+    }
+
+    // Format multiplier (e.g., x2.5 or x10)
+    const multiplierStr =
+      multiplier >= 10 ? `x${Math.round(multiplier)}` : `x${multiplier.toFixed(1)}`;
+
+    this.multiplierText.setText(multiplierStr);
+    this.multiplierText.setVisible(true);
+    this.multiplierText.setScale(0);
+    this.multiplierText.setAlpha(1);
+
+    // Punchy scale-in animation
+    this.scene.tweens.add({
+      targets: this.multiplierText,
+      scale: { from: 0, to: 1.3 },
+      duration: 300,
+      ease: "Back.easeOut",
+      onComplete: () => {
+        // Settle to normal size
+        this.scene.tweens.add({
+          targets: this.multiplierText,
+          scale: 1,
+          duration: 150,
+          ease: "Sine.easeOut",
+        });
+      },
+    });
   }
 
   /**
@@ -169,6 +292,59 @@ export class UIManager {
         this.winnerContainer.setAlpha(1); // Reset for next time
       },
     });
+  }
+
+  /**
+   * Show INSERT COIN text with blinking animation
+   */
+  private showInsertCoin() {
+    if (!this.insertCoinText) {
+      console.log("[UIManager] ⚠️ showInsertCoin called but insertCoinText not created yet");
+      return;
+    }
+
+    console.log("[UIManager] 🪙 showInsertCoin() - Making INSERT COIN visible");
+
+    // Hide conflicting UI elements (VRF overlay, winner UI, countdown)
+    // This fixes race condition where updateGameState() calls showInsertCoin()
+    // before phase change event properly hides other elements
+    if (this.vrfOverlay) this.vrfOverlay.setVisible(false);
+    if (this.vrfContainer) this.vrfContainer.setVisible(false);
+    if (this.winnerContainer) this.winnerContainer.setVisible(false);
+    if (this.demoCountdownText) this.demoCountdownText.setVisible(false);
+
+    this.insertCoinText.setVisible(true);
+    this.insertCoinText.setAlpha(1);
+
+    // Stop existing tween if any
+    if (this.insertCoinTween) {
+      this.insertCoinTween.destroy();
+    }
+
+    // Create blinking animation (classic arcade style)
+    this.insertCoinTween = this.scene.tweens.add({
+      targets: this.insertCoinText,
+      alpha: { from: 1, to: 0.2 },
+      duration: 500,
+      ease: "Sine.easeInOut",
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
+  /**
+   * Hide INSERT COIN text and stop animation
+   */
+  private hideInsertCoin() {
+    if (!this.insertCoinText) return;
+
+    this.insertCoinText.setVisible(false);
+
+    // Stop blinking animation
+    if (this.insertCoinTween) {
+      this.insertCoinTween.destroy();
+      this.insertCoinTween = undefined!;
+    }
   }
 
   updateCenter(centerX: number) {
@@ -194,6 +370,9 @@ export class UIManager {
     }
     if (this.winnerContainer) {
       this.winnerContainer.setX(centerX);
+    }
+    if (this.insertCoinText) {
+      this.insertCoinText.setX(centerX);
     }
   }
 
@@ -331,12 +510,73 @@ export class UIManager {
     });
     this.subText.setOrigin(0.5);
 
+    // Multiplier text (e.g., "x10") - punchy style
+    this.multiplierText = this.scene.add.text(0, 42, "", {
+      fontFamily: "metal-slug",
+      fontSize: "20px",
+      color: "#00FF00", // Bright green
+      stroke: "#000000",
+      strokeThickness: 3,
+      resolution: 4,
+    });
+    this.multiplierText.setOrigin(0.5);
+    this.multiplierText.setVisible(false);
+
     // Add to container
-    this.winnerContainer.add([this.phaseText, this.subText]);
+    this.winnerContainer.add([this.phaseText, this.subText, this.multiplierText]);
+
+    // Create INSERT COIN text (blinking, Metal Slug style)
+    // Position similar to demo countdown (75% down + 35 offset)
+    const insertCoinY = this.scene.cameras.main.height / 2 + 35;
+    this.insertCoinText = this.scene.add.text(this.centerX, insertCoinY, "INSERT COIN!", {
+      fontFamily: "metal-slug",
+      fontSize: "30px", // Same size as demo countdown
+      color: "#FFD700", // Gold color
+      stroke: "#000000",
+      strokeThickness: 3,
+      resolution: 4,
+    });
+    this.insertCoinText.setOrigin(0.5);
+    this.insertCoinText.setDepth(1000);
+    this.insertCoinText.setScrollFactor(0);
+    this.insertCoinText.setVisible(false);
   }
 
   updateGameState(gameState: any) {
     this.gameState = gameState;
+
+    // Cache bet amounts while they're available (before game ends and clears them)
+    if (gameState?.betAmounts && gameState.betAmounts.length > 0) {
+      this.cachedBetAmounts = gameState.betAmounts.map((amt: any) =>
+        typeof amt === "object" && amt.toNumber ? amt.toNumber() : Number(amt)
+      );
+      console.log(`[UIManager] Cached ${this.cachedBetAmounts.length} bet amounts`);
+    }
+
+    // Check if we should show INSERT COIN based on game status
+    // Smart contract constants.rs: OPEN=0, CLOSED=1, WAITING=2
+    const status = gameState?.status;
+    const isInsertCoin = status === 2 || status === "waiting" || status === "Waiting";
+
+    if (isInsertCoin && this.isUIReady()) {
+      console.log("[UIManager] 🪙 Status is WAITING (2) - showing INSERT COIN");
+      this.showInsertCoin();
+    } else if (!isInsertCoin && this.isUIReady()) {
+      this.hideInsertCoin();
+    }
+  }
+
+  setPlayerNames(playerNames: Array<{ walletAddress: string; displayName: string | null }>) {
+    this.playerNamesMap.clear();
+    playerNames.forEach(({ walletAddress, displayName }) => {
+      if (displayName) {
+        this.playerNamesMap.set(walletAddress, displayName);
+      }
+    });
+    console.log(
+      `[UIManager] Player names updated: ${this.playerNamesMap.size} with names, ${playerNames.length} total`
+    );
+    console.log(`[UIManager] Names map:`, Object.fromEntries(this.playerNamesMap));
   }
 
   updateTimer() {
@@ -377,6 +617,12 @@ export class UIManager {
       // Pulse effect for last 5 seconds - scale text (not container) so it scales from center
       const scale = 1 + Math.sin(currentTime * 0.01) * 0.15;
       this.demoCountdownText.setScale(scale);
+
+      // Play countdown sound when hitting 5 seconds (only once per game)
+      if (!this.countdownSoundPlayed) {
+        this.countdownSoundPlayed = true;
+        SoundManager.playCountdown5Sec(this.scene);
+      }
     } else if (seconds <= 10) {
       this.demoCountdownText.setColor("#FFA500"); // Orange
       this.demoCountdownText.setScale(1);
@@ -389,5 +635,10 @@ export class UIManager {
   // Cleanup event listeners
   destroy() {
     EventBus.off("game-phase-changed", this.onPhaseChanged.bind(this));
+
+    // Cleanup insert coin tween
+    if (this.insertCoinTween) {
+      this.insertCoinTween.destroy();
+    }
   }
 }

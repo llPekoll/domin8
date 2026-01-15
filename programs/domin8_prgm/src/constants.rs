@@ -6,6 +6,7 @@ pub const SEED: &str = "anchor";
 // Game status constants
 pub const GAME_STATUS_OPEN: u8 = 0;
 pub const GAME_STATUS_CLOSED: u8 = 1;
+pub const GAME_STATUS_WAITING: u8 = 2;
 
 // Fee constants (basis points)
 pub const MAX_HOUSE_FEE: u64 = 1000; // 10%
@@ -26,6 +27,7 @@ pub const MAX_BETS_PER_USER_LARGE: usize = 30; // Max bets per user for bets >= 
 pub const SMALL_BET_THRESHOLD: u64 = 10_000_000; // 0.01 SOL in lamports
 
 pub const BET_INFO_SIZE: usize = 2 + 8 + 1 + 4; // wallet_index (2) + amount (8) + skin (1) + position (2*2) = 15 bytes
+
 pub const BASE_GAME_ACCOUNT_SIZE: usize = 8 + // discriminator
     8 + // game_round
     8 + // start_date
@@ -36,6 +38,7 @@ pub const BASE_GAME_ACCOUNT_SIZE: usize = 8 + // discriminator
     8 + // user_count
     32 + // force ([u8; 32])
     1 + // status
+    1 + // vrf_requested (bool)
     33 + // winner (Option<Pubkey>): 1 byte discriminant + 32 bytes pubkey
     8 + // winner_prize
     9 + // winning_bet_index (Option<u64>): 1 byte discriminant + 8 bytes u64

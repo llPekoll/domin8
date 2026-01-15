@@ -55,6 +55,9 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
 
     game.current = StartGame("game-container");
 
+    // Expose game instance globally for modal components to access
+    (window as any).phaserGame = game.current;
+
     // Initialize GlobalGameStateManager ONCE with Phaser game lifecycle
     if (game.current) {
       gameStateManager.current = new GlobalGameStateManager(game.current);
@@ -68,6 +71,9 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
     }
 
     return () => {
+      // Clean up global reference
+      (window as any).phaserGame = undefined;
+      
       // Cleanup GlobalGameStateManager before destroying game
       if (gameStateManager.current) {
         gameStateManager.current.destroy();

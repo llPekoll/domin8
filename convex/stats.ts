@@ -259,26 +259,50 @@ export const getLastFinishedGame = query({
     let winningBet = hasBetData ? lastGame.betSkin![winningBetIndex] : undefined;
     let winningAmount =
       lastGame.betAmounts && lastGame.betAmounts.length > winningBetIndex
-        ? lastGame.betAmounts![winningBetIndex]
+        ? lastGame.betAmounts[winningBetIndex]
         : undefined;
+
+    console.log("[getLastFinishedGame] Initial bet data:", {
+      roundId: lastGame.roundId,
+      winningBetIndex,
+      hasBetData,
+      winningBet,
+      betSkinLength: lastGame.betSkin?.length,
+    });
 
     // If bet data is missing from finished state, try to get it from the waiting state
     if (!hasBetData || winningAmount === undefined) {
+      console.log(
+        "[getLastFinishedGame] Bet data missing from finished state, trying waiting state..."
+      );
       const waitingState = await ctx.db
         .query("gameRoundStates")
-        .withIndex("by_round_and_status", (q) => q.eq("roundId", lastGame.roundId).eq("status", "waiting"))
+        .withIndex("by_round_and_status", (q) =>
+          q.eq("roundId", lastGame.roundId).eq("status", "waiting")
+        )
         .first();
 
       if (waitingState) {
+        console.log("[getLastFinishedGame] Found waiting state:", {
+          betSkinLength: waitingState.betSkin?.length,
+          betAmountsLength: waitingState.betAmounts?.length,
+        });
         if (!hasBetData && waitingState.betSkin && waitingState.betSkin.length > winningBetIndex) {
           winningBet = waitingState.betSkin[winningBetIndex];
           hasBetData = true;
         }
-        if (winningAmount === undefined && waitingState.betAmounts && waitingState.betAmounts.length > winningBetIndex) {
+        if (
+          winningAmount === undefined &&
+          waitingState.betAmounts &&
+          waitingState.betAmounts.length > winningBetIndex
+        ) {
           winningAmount = waitingState.betAmounts[winningBetIndex];
         }
+      } else {
+        console.log("[getLastFinishedGame] No waiting state found for round:", lastGame.roundId);
       }
     }
+    console.log("[getLastFinishedGame] After fallback:", { winningBet, hasBetData, winningAmount });
 
     // Final fallback for winning amount
     if (winningAmount === undefined) {
@@ -290,7 +314,8 @@ export const getLastFinishedGame = query({
     const prizeSOL = prizeAmount / LAMPORTS_PER_SOL;
 
     // Get the character info
-    const character =
+    console.log("[getLastFinishedGame] Looking up character with skin ID:", winningBet);
+    let character =
       winningBet !== undefined
         ? await ctx.db
             .query("characters")
@@ -298,12 +323,31 @@ export const getLastFinishedGame = query({
             .first()
         : null;
 
+    // Fallback to default character (ID 1 = "orc") if not found
+    if (!character) {
+      console.log(
+        "[getLastFinishedGame] Character not found for skin ID:",
+        winningBet,
+        "- using fallback"
+      );
+      character = await ctx.db
+        .query("characters")
+        .filter((q) => q.eq(q.field("id"), 1))
+        .first();
+    }
+    console.log(
+      "[getLastFinishedGame] Character result:",
+      character?.name || "NOT FOUND",
+      "for skin ID:",
+      winningBet
+    );
+
     return {
       roundId: lastGame.roundId,
       winnerAddress: lastGame.winner,
       characterId: winningBet ?? 1, // Default to character 1 if not available
-      characterName: character?.name || "Unknown",
-      characterAssetPath: character?.assetPath || null,
+      characterName: character?.name || "orc", // Fallback to "orc" if somehow still not found
+      characterAssetPath: character?.assetPath || "/characters/orc.png", // Fallback path
       prizeAmount: prizeSOL,
       betAmount: winningAmount ? winningAmount / LAMPORTS_PER_SOL : 0,
       totalPot: lastGame.totalPot ? lastGame.totalPot / LAMPORTS_PER_SOL : 0,

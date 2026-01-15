@@ -15,6 +15,21 @@ export function usePrivyWallet() {
   const walletAddress = solanaWallet?.address;
   const connected = ready && authenticated && !!walletAddress;
 
+  // Debug: Log user and linked accounts
+  useEffect(() => {
+    if (user) {
+      console.log('[DEBUG] Privy user object:', {
+        id: user.id,
+        linkedAccounts: user.linkedAccounts?.map(acc => ({
+          type: acc.type,
+          chainType: 'chainType' in acc ? acc.chainType : 'N/A',
+          walletClientType: 'walletClientType' in acc ? acc.walletClientType : 'N/A',
+          address: 'address' in acc ? acc.address : 'N/A'
+        }))
+      });
+    }
+  }, [user]);
+
   // Get external wallet address (non-Privy wallet, e.g., Phantom)
   const externalWalletAccount = user?.linkedAccounts?.find(
     (account) =>
@@ -34,39 +49,61 @@ export function usePrivyWallet() {
     ? externalWalletAccount.address
     : null;
 
-  // Fetch SOL balance from the Privy embedded wallet
+  // Fetch SOL balance from the Privy embedded wallet using WebSocket subscription
   useEffect(() => {
     if (!connected || !walletAddress) {
       setSolBalance(0);
       return;
     }
 
-    const fetchBalance = async () => {
+    const publicKey = new PublicKey(walletAddress);
+    const connection = getSharedConnection();
+    let subscriptionId: number | null = null;
+
+    // Initial balance fetch
+    const fetchInitialBalance = async () => {
       setIsLoadingBalance(true);
       try {
-        // Use shared connection instance
-        const connection = getSharedConnection();
-
-        // Fetch balance in lamports
-        const publicKey = new PublicKey(walletAddress);
         const balanceLamports = await connection.getBalance(publicKey);
-
-        // Convert lamports to SOL
         const balanceSOL = balanceLamports / LAMPORTS_PER_SOL;
         setSolBalance(balanceSOL);
+        logger.solana.debug("[usePrivyWallet] Initial balance fetched:", balanceSOL);
       } catch (error) {
-        logger.solana.error("Error fetching SOL balance:", error);
+        logger.solana.error("Error fetching initial SOL balance:", error);
         setSolBalance(0);
       } finally {
         setIsLoadingBalance(false);
       }
     };
 
-    void fetchBalance();
+    // Subscribe to account changes via WebSocket for real-time updates
+    const subscribeToBalance = async () => {
+      try {
+        subscriptionId = connection.onAccountChange(
+          publicKey,
+          (accountInfo) => {
+            const balanceSOL = accountInfo.lamports / LAMPORTS_PER_SOL;
+            setSolBalance(balanceSOL);
+            logger.solana.debug("[usePrivyWallet] Balance updated via WebSocket:", balanceSOL);
+          },
+          "confirmed"
+        );
+        logger.solana.debug("[usePrivyWallet] WebSocket subscription active, id:", subscriptionId);
+      } catch (error) {
+        logger.solana.error("Error subscribing to balance changes:", error);
+      }
+    };
 
-    // Refresh balance every 10 seconds while connected
-    const interval = setInterval(() => void fetchBalance(), 10000);
-    return () => clearInterval(interval);
+    void fetchInitialBalance();
+    void subscribeToBalance();
+
+    // Cleanup: unsubscribe when component unmounts or wallet changes
+    return () => {
+      if (subscriptionId !== null) {
+        connection.removeAccountChangeListener(subscriptionId);
+        logger.solana.debug("[usePrivyWallet] WebSocket subscription removed, id:", subscriptionId);
+      }
+    };
   }, [connected, walletAddress]);
 
   // Function to manually refresh balance (e.g., after a transaction)
@@ -87,7 +124,17 @@ export function usePrivyWallet() {
     }
    
   };
-   return {
+  // Debug: Log what we're returning
+  // console.log('[DEBUG] usePrivyWallet returning:', {
+  //   connected,
+  //   walletAddress,
+  //   externalWalletAddress,
+  //   externalWalletAccountType,
+  //   ready,
+  //   linkedAccountsCount: user?.linkedAccounts?.length || 0
+  // });
+
+  return {
       connected,
       publicKey: walletAddress ? new PublicKey(walletAddress) : null,
       walletAddress,

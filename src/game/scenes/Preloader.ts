@@ -1,5 +1,13 @@
 import { Scene } from "phaser";
-import { currentMapData, charactersData, allMapsData, demoMapData, activeGameData, blockchainDataReady } from "../main";
+import {
+  currentMapData,
+  charactersData,
+  allMapsData,
+  demoMapData,
+  activeGameData,
+  blockchainDataReady,
+  GAME_STATUS,
+} from "../main";
 import { logger } from "../../lib/logger";
 import { loadBackgroundConfig } from "../config/backgrounds";
 import { EventBus } from "../EventBus";
@@ -9,22 +17,119 @@ export class Preloader extends Scene {
     super("Preloader");
   }
 
+  private percentText!: Phaser.GameObjects.Text;
+  private loadingBars: Phaser.GameObjects.Rectangle[] = [];
+  private monkeSprite!: Phaser.GameObjects.Sprite;
+
   init() {
-    //  A simple progress bar. This is the outline of the bar.
-    this.add.rectangle(512, 384, 468, 32).setStrokeStyle(1, 0xffffff);
+    // Reset state for scene restarts
+    this.loadingBars = [];
+    this.monkeSprite = undefined!;
 
-    //  This is the progress bar itself. It will increase in size from the left based on the % of progress.
-    const bar = this.add.rectangle(512 - 230, 384, 4, 28, 0xffffff);
+    const centerX = this.cameras.main.width / 2;
+    const centerY = this.cameras.main.height / 2;
 
-    //  Use the 'progress' event emitted by the LoaderPlugin to update the loading bar
+    // Create segmented loading bar (like the image)
+    const barCount = 100;
+    const barWidth = 8;
+    const barHeight = 24;
+    const barSpacing = 2;
+    const totalWidth = barCount * (barWidth + barSpacing);
+    const startX = centerX - totalWidth / 2;
+    const barY = centerY + 150;
+
+    // Create bar outline/background
+    this.add
+      .rectangle(centerX, barY, totalWidth + 20, barHeight + 10)
+      .setStrokeStyle(2, 0xffffff)
+      .setFillStyle(0x000000, 0.5);
+
+    // Create individual bar segments
+    for (let i = 0; i < barCount; i++) {
+      const bar = this.add.rectangle(
+        startX + i * (barWidth + barSpacing) + barWidth / 2,
+        barY,
+        barWidth,
+        barHeight,
+        0x333333
+      );
+      this.loadingBars.push(bar);
+    }
+
+    // Add "Loading" and percentage on same line, aligned right below the bar
+    const rightEdge = centerX + totalWidth / 2;
+
+    this.percentText = this.add
+      .text(rightEdge, barY + 50, "0%", {
+        fontFamily: "jersey15",
+        fontSize: "36px",
+        color: "#ffffff",
+      })
+      .setOrigin(1, 0.5); // Right-aligned
+
+    // Use the 'progress' event emitted by the LoaderPlugin to update the loading bar
     this.load.on("progress", (progress: number) => {
-      //  Update the progress bar (our bar is 464px wide, so 100% = 464px)
-      bar.width = 4 + 460 * progress;
+      // Update segmented bars
+      const filledBars = Math.floor(progress * this.loadingBars.length);
+      for (let i = 0; i < this.loadingBars.length; i++) {
+        if (i < filledBars) {
+          this.loadingBars[i].setFillStyle(0xffffff);
+        } else {
+          this.loadingBars[i].setFillStyle(0x333333);
+        }
+      }
+
+      // Update percentage text
+      this.percentText.setText(`${Math.floor(progress * 100)}%`);
     });
+
+    // Create monke immediately (assets loaded in Boot scene)
+    this.createMonkeAnimation();
+  }
+
+  private createMonkeAnimation() {
+    // Prevent creating multiple sprites
+    if (this.monkeSprite) return;
+
+    const centerX = this.cameras.main.width / 2;
+    const centerY = this.cameras.main.height / 2;
+    const barY = centerY + 150;
+
+    // Same bar dimensions as in init()
+    const barCount = 100;
+    const barWidth = 8;
+    const barSpacing = 2;
+    const totalWidth = barCount * (barWidth + barSpacing);
+    const leftEdge = centerX - totalWidth / 2;
+
+    // Check if atlas is loaded
+    if (!this.textures.exists("monke-loader")) return;
+
+    // Create win animation for monke loader
+    if (!this.anims.exists("monke-loader-win")) {
+      this.anims.create({
+        key: "monke-loader-win",
+        frames: this.anims.generateFrameNames("monke-loader", {
+          prefix: "monke ",
+          suffix: ".ase",
+          start: 18,
+          end: 33,
+        }),
+        frameRate: 10,
+        repeat: -1,
+      });
+    }
+
+    // Create the monke sprite on the LEFT, above the loading bar
+    this.monkeSprite = this.add.sprite(leftEdge + 80, barY - 120, "monke-loader");
+    this.monkeSprite.setScale(5);
+    this.monkeSprite.play("monke-loader-win");
   }
 
   preload() {
     this.load.setPath("assets");
+
+    // Note: monke-loader assets are loaded in Boot scene for instant display
 
     // Load custom fonts
     this.load.addFile(
@@ -143,7 +248,6 @@ export class Preloader extends Scene {
     logger.game.debug("[Preloader] 🎨 Background configs queued for loading");
 
     // Load VFX assets
-    this.load.atlas("explosion", "vfx/Explosion.png", "vfx/Explosion.json");
     this.load.atlas("explosion-fullscreen", "vfx/fight-effect.png", "vfx/fight-effect.json");
     this.load.atlas("blood", "vfx/blood_spritesheet.png", "vfx/blood_spritesheet.json");
     this.load.atlas("dust", "dust_char.png", "dust_char.json");
@@ -156,13 +260,26 @@ export class Preloader extends Scene {
     // Load winner throne
     this.load.image("throne", "misc/throne.png");
 
+    // Load badge assets
+    this.load.image("badge-lvl1-1", "badge/badge-lvl1-1.png");
+    this.load.image("badge-lvl1-2", "badge/badge-lvl1-2.png");
+    this.load.image("badge-lvl1-3", "badge/badge-lvl1-3.png");
+    this.load.image("badge-lvl2-1", "badge/badge-lvl2-1.png");
+    this.load.image("badge-lvl2-2", "badge/badge-lvl2-2.png");
+    this.load.image("badge-lvl2-3", "badge/badge-lvl2-3.png");
+    this.load.image("badge-lvl2-4", "badge/badge-lvl2-4.png");
+    this.load.image("badge-lvl3-1", "badge/badge-lvl3-1.png");
+    this.load.image("badge-lvl4-1", "badge/badge-lvl4-1.png");
+
     // Load sound effects
     this.load.audio("battle-theme", "sounds/battleThemeA.mp3");
+    this.load.audio("fire-sounds", "sounds/fire-sounds.mp3");
     this.load.audio("domin8-intro", "sounds/domin8-intro.mp3");
     this.load.audio("explosion-dust", "sounds/explosion-dust.wav");
     this.load.audio("victory", "sounds/victory2.mp3");
     this.load.audio("insert-coin", "sounds/insert-coin.mp3");
     this.load.audio("challenger", "sounds/challenger.mp3");
+    this.load.audio("countdown-5sec", "sounds/5-second-countdown.mp3");
 
     // Load impact sounds for character landing
     this.load.audio("impact-1", "sounds/impacts/sfx_sounds_impact1.wav");
@@ -329,19 +446,6 @@ export class Preloader extends Scene {
       });
     });
 
-    // Create explosion animation
-    this.anims.create({
-      key: "explosion",
-      frames: this.anims.generateFrameNames("explosion", {
-        prefix: "Explosion 2 SpriteSheet ",
-        suffix: ".png",
-        start: 0,
-        end: 17,
-      }),
-      frameRate: 18,
-      repeat: 0,
-    });
-
     // Create fullscreen explosion animation
     this.anims.create({
       key: "explosion-fullscreen",
@@ -412,6 +516,11 @@ export class Preloader extends Scene {
 
   /**
    * Wait for blockchain data (with timeout), then start appropriate scene
+   *
+   * Scene Decision Logic:
+   * - No game data / CLOSED (2): MapCarousel (spinning background selection)
+   * - WAITING (0): Game scene with "Insert Coin" mode (waiting for first bet)
+   * - OPEN (1): Game scene with active betting and countdown
    */
   private waitForBlockchainThenStartScene() {
     const maxWaitTime = 2000; // Wait max 2 seconds for blockchain
@@ -421,30 +530,61 @@ export class Preloader extends Scene {
     const checkAndStart = () => {
       if (blockchainDataReady || elapsedTime >= maxWaitTime) {
         // Blockchain loaded or timeout reached, make decision
-        const hasActiveGame =
-          activeGameData &&
-          activeGameData.bets &&
-          activeGameData.bets.length > 0 &&
-          activeGameData.status !== undefined;
+        // Handle status as BN or number (blockchain returns BN)
+        const rawStatus = activeGameData?.status;
+        const gameStatus =
+          typeof rawStatus === "object" && rawStatus?.toNumber ? rawStatus.toNumber() : rawStatus;
 
         logger.game.debug("[Preloader] Starting scene decision:", {
           blockchainReady: blockchainDataReady,
           timedOut: elapsedTime >= maxWaitTime,
-          hasActiveGame,
+          rawStatus,
+          gameStatus,
+          activeGameData: activeGameData
+            ? {
+                status: gameStatus,
+                gameRound: activeGameData.gameRound?.toString?.() || activeGameData.gameRound,
+                betsCount: activeGameData.bets?.length,
+              }
+            : null,
           elapsedMs: elapsedTime,
         });
 
-        if (hasActiveGame) {
-          if (this.scene.isActive("Demo")) {
-            this.scene.stop("Demo");
+        // Stop any currently running scenes
+        ["Demo", "Game", "MapCarousel"].forEach((sceneName) => {
+          if (this.scene.isActive(sceneName)) {
+            this.scene.stop(sceneName);
           }
-          this.scene.start("Game");
+        });
+
+        // Decide which scene to start based on game status
+        // gameStatus can be 0 (WAITING), 1 (OPEN), or 2 (CLOSED)
+        if (activeGameData && (gameStatus === 0 || gameStatus === 1 || gameStatus === 2)) {
+          if (gameStatus === GAME_STATUS.WAITING) {
+            // Game created by backend, waiting for first bet
+            // Show Game scene with "Insert Coin" mode
+            logger.game.info("[Preloader] Starting Game scene (WAITING - Insert Coin mode)");
+            this.scene.start("Game", { mode: "insert-coin" });
+          } else if (gameStatus === GAME_STATUS.OPEN) {
+            // Game has bets, countdown is running
+            // Show Game scene with active betting
+            logger.game.info("[Preloader] Starting Game scene (OPEN - Active betting)");
+            this.scene.start("Game", { mode: "betting" });
+          } else if (gameStatus === GAME_STATUS.CLOSED) {
+            // Game ended, show MapCarousel for next game selection
+            logger.game.info("[Preloader] Starting MapCarousel (CLOSED - Game ended)");
+            this.scene.start("MapCarousel");
+          } else {
+            // Unknown status, default to MapCarousel
+            logger.game.warn("[Preloader] Unknown game status:", gameStatus);
+            this.scene.start("MapCarousel");
+          }
         } else {
-          if (this.scene.isActive("Game")) {
-            this.scene.stop("Game");
-          }
-          this.scene.start("Demo");
+          // No active game data, show MapCarousel
+          logger.game.info("[Preloader] Starting MapCarousel (No active game)");
+          this.scene.start("MapCarousel");
         }
+
         EventBus.emit("preloader-complete");
       } else {
         // Still waiting for blockchain, check again

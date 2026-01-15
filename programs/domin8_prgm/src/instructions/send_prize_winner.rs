@@ -43,18 +43,21 @@ pub struct SendPrizeWinner<'info> {
 ///
 /// Data:
 /// - round_id: [u64] Round ID for the game
-pub fn handler(
-    ctx: Context<SendPrizeWinner>,
-    round_id: u64,
-) -> Result<()> {
+pub fn handler(ctx: Context<SendPrizeWinner>, round_id: u64) -> Result<()> {
     let claimer = &ctx.accounts.claimer;
     let winner = &ctx.accounts.winner;
     let admin = ctx.accounts.config.admin;
-
+    require!(
+        ctx.accounts.claimer.key() == admin,
+        Domin8Error::Unauthorized
+    );
     // First, get the prize amount and verify everything without mutable borrow
     let game_data = &ctx.accounts.game;
     require!(game_data.game_round == round_id, Domin8Error::GameNotOpen);
-    require!(game_data.status == GAME_STATUS_CLOSED, Domin8Error::InvalidGameStatus);
+    require!(
+        game_data.status == GAME_STATUS_CLOSED,
+        Domin8Error::InvalidGameStatus
+    );
     require!(game_data.winner.is_some(), Domin8Error::NoWinnerFound);
 
     // Verify that the winner account matches the game's winner
@@ -85,17 +88,30 @@ pub fn handler(
     require!(actual_transfer > 0, Domin8Error::ArithmeticError);
 
     // Transfer prize to the winner
-    **ctx.accounts.game.to_account_info().try_borrow_mut_lamports()? -= actual_transfer;
+    **ctx
+        .accounts
+        .game
+        .to_account_info()
+        .try_borrow_mut_lamports()? -= actual_transfer;
     **ctx.accounts.winner.try_borrow_mut_lamports()? += actual_transfer;
 
-    msg!("✓ Prize transferred: {} lamports to {}", actual_transfer, winner.key());
-    msg!("✓ Claimed by: {} (is_winner: {}, is_admin: {})", claimer.key(), is_winner, is_admin);
+    msg!(
+        "✓ Prize transferred: {} lamports to {}",
+        actual_transfer,
+        winner.key()
+    );
+    msg!(
+        "✓ Claimed by: {} (is_winner: {}, is_admin: {})",
+        claimer.key(),
+        is_winner,
+        is_admin
+    );
 
     // Now update the game state (mutable borrow after transfer is done)
-    let game = &mut ctx.accounts.game;
-    game.winner_prize = 0;
+    // let game = &mut ctx.accounts.game;
+    // game.winner_prize = 0;
 
-    msg!("✓ Prize sent to winner: {} lamports for round {}", prize_amount, round_id);
+    // msg!("✓ Prize sent to winner: {} lamports for round {}", prize_amount, round_id);
 
     Ok(())
 }

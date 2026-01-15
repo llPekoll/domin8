@@ -29,7 +29,7 @@
 import { useCallback, useMemo } from "react";
 import { usePrivyWallet } from "./usePrivyWallet";
 import { useWallets } from "@privy-io/react-auth/solana";
-import { useAction, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import {
   Connection,
@@ -50,6 +50,7 @@ import { type Domin8Prgm } from "../../target/types/domin8_prgm";
 import Domin8PrgmIDL from "../../target/idl/domin8_prgm.json";
 import { logger } from "../lib/logger";
 import { getSharedConnection } from "~/lib/sharedConnection";
+import { BetEntry } from "./useGameState";
 
 // Extract Program ID from IDL
 export const DOMIN8_PROGRAM_ID = new PublicKey(Domin8PrgmIDL.address);
@@ -86,6 +87,8 @@ class PrivyWalletAdapter {
     }
 
     // Sign and send with Privy (Privy doesn't have sign-only method)
+    // TODO SING: and send via FAST
+    // const result = await this.privyWallet.
     const result = await this.privyWallet.signAndSendAllTransactions([
       {
         chain: chainId,
@@ -115,6 +118,7 @@ class PrivyWalletAdapter {
       }
     });
 
+    // TODO SING: and send via FAST
     const results = await this.privyWallet.signAndSendAllTransactions(
       serializedTxs.map((transaction) => ({
         chain: chainId,
@@ -150,7 +154,7 @@ const BET_ENTRY_SEED = "bet";
 /**
  * HELIUS OPTIMIZATION: Build and send optimized transaction with Privy
  * This helper wraps Privy's signAndSendAllTransactions with Helius best practices
- * 
+ *
  * @param connection - Solana connection
  * @param instructions - Array of transaction instructions
  * @param payer - Transaction fee payer
@@ -166,20 +170,15 @@ async function sendOptimizedTransactionWithPrivy(
   network: string
 ): Promise<string> {
   // HELIUS BEST PRACTICE #1: Use 'confirmed' commitment for blockhash
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
 
   logger.solana.debug("[sendOptimizedTx] Got blockhash", {
-    blockhash: blockhash.slice(0, 8) + '...',
-    lastValidBlockHeight
+    blockhash: blockhash.slice(0, 8) + "...",
+    lastValidBlockHeight,
   });
 
   // HELIUS BEST PRACTICE #2: Simulate to optimize compute units
-  const computeUnits = await simulateForComputeUnits(
-    connection,
-    instructions,
-    payer,
-    blockhash
-  );
+  const computeUnits = await simulateForComputeUnits(connection, instructions, payer, blockhash);
 
   // HELIUS BEST PRACTICE #3: Get dynamic priority fee
   const priorityFee = await getPriorityFeeForInstructions(
@@ -191,7 +190,7 @@ async function sendOptimizedTransactionWithPrivy(
 
   logger.solana.debug("[sendOptimizedTx] Optimized parameters", {
     computeUnits,
-    priorityFee
+    priorityFee,
   });
 
   // Build final optimized transaction with compute budget instructions
@@ -221,9 +220,9 @@ async function sendOptimizedTransactionWithPrivy(
       logger.solana.debug(`[sendOptimizedTx] Attempt ${attempt + 1}/${maxRetries}`);
 
       // Check blockhash validity before retry
-      const currentBlockHeight = await connection.getBlockHeight('confirmed');
+      const currentBlockHeight = await connection.getBlockHeight("confirmed");
       if (currentBlockHeight > lastValidBlockHeight) {
-        throw new Error('Blockhash expired, need to rebuild transaction');
+        throw new Error("Blockhash expired, need to rebuild transaction");
       }
 
       // Sign and send with Privy
@@ -252,20 +251,22 @@ async function sendOptimizedTransactionWithPrivy(
       );
 
       if (confirmed) {
-        logger.solana.info(`[sendOptimizedTx] Transaction confirmed on attempt ${attempt + 1}: ${signature}`);
+        logger.solana.info(
+          `[sendOptimizedTx] Transaction confirmed on attempt ${attempt + 1}: ${signature}`
+        );
         break;
       } else {
         logger.solana.warn(`[sendOptimizedTx] Confirmation timeout on attempt ${attempt + 1}`);
       }
     } catch (error: any) {
       logger.solana.warn(`[sendOptimizedTx] Attempt ${attempt + 1} failed:`, error.message);
-      
+
       if (attempt === maxRetries - 1) {
         throw error;
       }
 
       // Exponential backoff: 1s, 2s, 3s
-      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
     }
   }
 
@@ -321,13 +322,14 @@ async function simulateForComputeUnits(
     }
 
     // Add 10% buffer (Helius recommendation)
-    const optimizedCU = simulation.value.unitsConsumed < 1000 
-      ? 1000 
-      : Math.ceil(simulation.value.unitsConsumed * 1.1);
+    const optimizedCU =
+      simulation.value.unitsConsumed < 1000
+        ? 1000
+        : Math.ceil(simulation.value.unitsConsumed * 1.1);
 
     logger.solana.debug("[simulateForComputeUnits] Optimized CU", {
       consumed: simulation.value.unitsConsumed,
-      withBuffer: optimizedCU
+      withBuffer: optimizedCU,
     });
 
     return optimizedCU;
@@ -371,17 +373,19 @@ async function getPriorityFeeForInstructions(
         jsonrpc: "2.0",
         id: "helius-priority-fee",
         method: "getPriorityFeeEstimate",
-        params: [{
-          transaction: serializedTx,
-          options: { 
-            recommended: true  // Use Helius recommended fee
-          }
-        }]
-      })
+        params: [
+          {
+            transaction: serializedTx,
+            options: {
+              recommended: true, // Use Helius recommended fee
+            },
+          },
+        ],
+      }),
     });
 
     const data = await response.json();
-    
+
     if (data.result?.priorityFeeEstimate) {
       // Add 20% safety buffer
       const estimatedFee = Math.ceil(data.result.priorityFeeEstimate * 1.2);
@@ -420,76 +424,93 @@ async function confirmTransactionWithPolling(
 
       if (status) {
         if (status.err) {
-          logger.solana.error('[confirmTransactionWithPolling] Transaction failed:', status.err);
+          logger.solana.error("[confirmTransactionWithPolling] Transaction failed:", status.err);
           return false;
         }
-        
-        if (status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized') {
+
+        if (
+          status.confirmationStatus === "confirmed" ||
+          status.confirmationStatus === "finalized"
+        ) {
           return true;
         }
       }
 
       // Check blockhash expiry
-      const currentBlockHeight = await connection.getBlockHeight('confirmed');
+      const currentBlockHeight = await connection.getBlockHeight("confirmed");
       if (currentBlockHeight > lastValidBlockHeight) {
-        logger.solana.warn('[confirmTransactionWithPolling] Blockhash expired during polling');
+        logger.solana.warn("[confirmTransactionWithPolling] Blockhash expired during polling");
         return false;
       }
     } catch (error) {
-      logger.solana.warn('[confirmTransactionWithPolling] Status check failed:', error);
+      logger.solana.warn("[confirmTransactionWithPolling] Status check failed:", error);
     }
 
-    await new Promise(resolve => setTimeout(resolve, interval));
+    await new Promise((resolve) => setTimeout(resolve, interval));
   }
 
-  logger.solana.warn('[confirmTransactionWithPolling] Confirmation timeout');
+  logger.solana.warn("[confirmTransactionWithPolling] Confirmation timeout");
   return false;
 }
 
+// Game status constants (matching smart contract constants.rs)
+// IMPORTANT: These values MUST match the Rust constants:
+// pub const GAME_STATUS_OPEN: u8 = 0;
+// pub const GAME_STATUS_CLOSED: u8 = 1;
+// pub const GAME_STATUS_WAITING: u8 = 2;
+export const GAME_STATUS = {
+  OPEN: 0, // Game is open for betting (countdown running)
+  CLOSED: 1, // Game ended, winner selected
+  WAITING: 2, // Game created, no bets yet (waiting for first bet)
+} as const;
+
 // Type definitions
 export interface GameRound {
-  roundId: BN;
-  status: "waiting" | "awaitingWinnerRandomness" | "finished";
-  startTimestamp: BN;
-  endTimestamp: BN;
-  betCount: number;
-  totalPot: BN;
-  betAmounts: BN[];
-  winner: PublicKey;
-  winningBetIndex: number;
-  vrfRequestPubkey: PublicKey;
-  vrfSeed: number[];
+  gameRound: BN;
+  status: number; // 0=WAITING, 1=OPEN, 2=CLOSED
+  startDate: BN;
+  endDate: BN;
+  totalDeposit: BN;
+  rand: BN;
+  map: number;
+  userCount: BN;
+  force: number[];
+  vrfRequested: boolean;
+  winner: PublicKey | null;
+  winnerPrize: BN;
+  winningBetIndex: BN | null;
+  wallets: PublicKey[];
+  bets: BetInfo[];
+}
+
+export interface BetInfo {
+  walletIndex: number;
+  amount: BN;
+  skin: number;
+  position: [number, number];
 }
 
 export interface GameConfig {
-  authority: PublicKey;
+  admin: PublicKey;
   treasury: PublicKey;
-  houseFee: number;
-  minBet: BN;
-  betsLocked: boolean;
+  gameRound: BN;
+  houseFee: BN;
+  minDepositAmount: BN;
+  maxDepositAmount: BN;
+  roundTime: BN;
+  lock: boolean;
   force: number[];
-}
-
-export interface BetEntry {
-  roundId: BN;
-  betIndex: number;
-  wallet: PublicKey;
-  betAmount: BN;
-}
-
-export interface GameCounter {
-  currentRoundId: BN;
 }
 
 export const useGameContract = () => {
   const { connected, publicKey, walletAddress } = usePrivyWallet();
   const { wallets } = useWallets();
 
-  // Convex action for webhook notifications
-  const notifyGameCreated = useAction(api.webhooks.notifyGameCreated);
-
   // Convex mutation for awarding points
   const awardPoints = useMutation(api.players.awardPoints);
+
+  // Convex mutation for tracking referral revenue
+  const updateReferralRevenue = useMutation(api.referrals.updateReferralRevenue);
 
   // Get selected wallet (first Solana wallet from Privy)
   const selectedWallet = useMemo(() => {
@@ -505,7 +526,7 @@ export const useGameContract = () => {
   }, []);
 
   // Create Anchor Provider and Program
-  const { provider, program, walletAdapter } = useMemo<{
+  const { program, walletAdapter } = useMemo<{
     provider: AnchorProvider | null;
     program: Program<Domin8Prgm> | null;
     walletAdapter: PrivyWalletAdapter | null;
@@ -517,7 +538,6 @@ export const useGameContract = () => {
     try {
       const wallet = new PrivyWalletAdapter(publicKey, selectedWallet, network);
       const provider = new AnchorProvider(connection, wallet, {
-        // HELIUS BEST PRACTICE: Use 'confirmed' commitment
         commitment: "confirmed",
       });
 
@@ -642,29 +662,27 @@ export const useGameContract = () => {
 
   /**
    * Place a bet in the current game using OPTIMIZED manual transaction building
-   * This function handles both creating a new game (if needed) and placing additional bets
-   * 
+   *
+   * NOTE: Games are created by the backend (Convex). This function only places bets.
+   * The game must already exist (status WAITING or OPEN) for betting to work.
+   *
    * HELIUS OPTIMIZATIONS APPLIED:
    * - Confirmed commitment for blockhash
    * - Compute unit simulation and optimization
    * - Dynamic priority fees via Helius API
    * - Custom retry logic with blockhash expiry checks
    * - Transaction confirmation polling
-   * 
+   *
    * @param amount - Bet amount in SOL
    * @param skin - Character skin ID (0-255)
-   * @param displayName - Player display name for webhooks
    * @param position - Spawn position [x, y] in game coordinates
-   * @param map - Map/background ID (0-255), defaults to 0
    * @returns Object with transaction signature, round ID, and bet index
    */
   const placeBet = useCallback(
     async (
       amount: number,
       skin: number = 0,
-      displayName: string = "",
-      position: [number, number] = [0, 0],
-      map: number = 0
+      position: [number, number] = [0, 0]
     ): Promise<{ signature: TransactionSignature; roundId: number; betIndex: number }> => {
       logger.solana.group("[placeBet] Starting OPTIMIZED placeBet function");
       logger.solana.debug("Connection status", {
@@ -682,10 +700,6 @@ export const useGameContract = () => {
         throw new Error(`Minimum bet is ${MIN_BET_LAMPORTS / LAMPORTS_PER_SOL} SOL`);
       }
 
-      let activeRoundId = 0;
-      let betIndex = 0;
-      let shouldCreateNewGame = false;
-
       try {
         logger.solana.debug("[placeBet] Placing bet of", amount, "SOL");
 
@@ -695,87 +709,59 @@ export const useGameContract = () => {
         // Derive PDAs
         const { gameConfigPda, activeGamePda } = derivePDAs();
 
-        // OPTIMIZATION: Fetch state in parallel
-        const [activeGameAccount, configAccount] = await Promise.all([
-          program.account.domin8Game.fetch(activeGamePda).catch(() => null),
-          program.account.domin8Config.fetch(gameConfigPda)
-        ]);
+        // Fetch active game state
+        const activeGameAccount = await program.account.domin8Game
+          .fetch(activeGamePda)
+          .catch(() => null);
 
-        // Determine game state and strategy
-        if (activeGameAccount && activeGameAccount.status === 0) {
-          const endTimestamp = activeGameAccount.endDate.toNumber();
-          const currentTime = Math.floor(Date.now() / 1000);
-          const betCount = activeGameAccount.bets?.length || 0;
-
-          if (currentTime < endTimestamp) {
-            shouldCreateNewGame = false;
-            activeRoundId = activeGameAccount.gameRound.toNumber();
-            betIndex = betCount;
-          } else if (betCount === 0) {
-            shouldCreateNewGame = true;
-            activeRoundId = configAccount.gameRound.toNumber();
-          } else {
-            throw new Error("Betting window closed. Please wait for the current game to finish.");
-          }
-        } else {
-          shouldCreateNewGame = true;
-          activeRoundId = configAccount.gameRound.toNumber();
+        if (!activeGameAccount) {
+          throw new Error("No active game found. Please wait for a new game to be created.");
         }
 
-        logger.solana.debug("[placeBet] Decision", { shouldCreateNewGame, activeRoundId });
+        // Smart contract constants.rs: OPEN=0, CLOSED=1, WAITING=2
+        const gameStatus = activeGameAccount.status;
 
-        // BUILD INSTRUCTION (instead of using .rpc())
-        let instruction: TransactionInstruction;
-
-        if (shouldCreateNewGame) {
-          betIndex = 0;
-          const forceArr = configAccount.force;
-          const forceBuf = Buffer.from(forceArr);
-          const gameRoundPdaForCreate = deriveGameRoundPda(activeRoundId);
-          const roundIdBN = new BN(activeRoundId);
-
-          // DEVNET/MAINNET: ORAO VRF
-          const { Orao, networkStateAccountAddress, randomnessAccountAddress } = await import(
-            "@orao-network/solana-vrf"
-          );
-          const orao = new Orao(provider as any);
-          const networkState = networkStateAccountAddress();
-          const vrfRequest = randomnessAccountAddress(forceBuf);
-          const networkStateData = await orao.getNetworkState();
-          const treasury = networkStateData.config.treasury;
-
-          instruction = await program.methods
-            .createGameRound(roundIdBN, amountBN, skin, position, map)
-            .accounts({
-              // @ts-expect-error - Anchor type issue
-              config: gameConfigPda,
-              game: gameRoundPdaForCreate,
-              activeGame: activeGamePda,
-              user: publicKey,
-              vrfRandomness: vrfRequest,
-              vrfTreasury: treasury,
-              networkState: networkState,
-              vrfProgram: orao.programId,
-              systemProgram: SystemProgram.programId,
-            })
-            .instruction(); // ✅ Get instruction instead of .rpc()
-        } else {
-          // PLACE ADDITIONAL BET
-          const gameRoundPda = deriveGameRoundPda(activeRoundId);
-          const roundIdBN = new BN(activeRoundId);
-
-          instruction = await program.methods
-            .bet(roundIdBN, amountBN, skin, position)
-            .accounts({
-              // @ts-expect-error - Anchor type issue
-              config: gameConfigPda,
-              game: gameRoundPda,
-              activeGame: activeGamePda,
-              user: publicKey,
-              systemProgram: SystemProgram.programId,
-            })
-            .instruction(); // ✅ Get instruction instead of .rpc()
+        // Can bet when game is OPEN (0) or WAITING (2)
+        // Cannot bet when game is CLOSED (1)
+        if (gameStatus === GAME_STATUS.CLOSED) {
+          throw new Error("Game is closed. Please wait for the next game.");
         }
+
+        // Check if betting window is still open (endDate is set after first bet)
+        const endTimestamp = activeGameAccount.endDate.toNumber();
+        const currentTime = Math.floor(Date.now() / 1000);
+
+        // If endDate is set (> 0) and we're past it, betting is closed
+        if (endTimestamp > 0 && currentTime >= endTimestamp) {
+          throw new Error("Betting window closed. Please wait for the current game to finish.");
+        }
+
+        const activeRoundId = activeGameAccount.gameRound.toNumber();
+        const betIndex = activeGameAccount.bets?.length || 0;
+
+        logger.solana.debug("[placeBet] Game state", {
+          activeRoundId,
+          betIndex,
+          gameStatus,
+          endTimestamp: endTimestamp > 0 ? new Date(endTimestamp * 1000).toISOString() : "not set",
+        });
+
+        // Derive game round PDA
+        const gameRoundPda = deriveGameRoundPda(activeRoundId);
+        const roundIdBN = new BN(activeRoundId);
+
+        // Build bet instruction
+        const instruction = await program.methods
+          .bet(roundIdBN, amountBN, skin, position)
+          .accounts({
+            // @ts-expect-error - Anchor type issue
+            config: gameConfigPda,
+            game: gameRoundPda,
+            activeGame: activeGamePda,
+            user: publicKey,
+            systemProgram: SystemProgram.programId,
+          })
+          .instruction();
 
         // ✅ HELIUS OPTIMIZATION: Send with all optimizations
         const signature = await sendOptimizedTransactionWithPrivy(
@@ -804,31 +790,16 @@ export const useGameContract = () => {
           logger.solana.error("[placeBet] Failed to award points:", pointsError);
         }
 
-        // Send webhook notification if this was a game creation (first bet)
-        if (shouldCreateNewGame) {
-          try {
-            // Fetch the newly created game data
-            const gameAccount = await program.account.domin8Game.fetch(activeGamePda);
-
-            logger.solana.debug("[placeBet] Calling webhook notification for game creation");
-
-            // Call Convex action to send webhook (keeps webhook URL secure in backend)
-            await notifyGameCreated({
-              roundId: activeRoundId,
-              transactionSignature: signature,
-              startTimestamp: gameAccount.startDate.toNumber(),
-              endTimestamp: gameAccount.endDate.toNumber(),
-              totalPot: gameAccount.totalDeposit.toNumber(),
-              creatorAddress: publicKey.toString(),
-              creatorDisplayName: displayName,
-              map: gameAccount.map,
-            });
-
-            logger.solana.debug("[placeBet] Webhook notification sent successfully");
-          } catch (webhookError) {
-            // Don't fail the bet if webhook fails
-            logger.solana.error("[placeBet] Failed to send webhook notification:", webhookError);
-          }
+        // Track referral revenue if this user was referred
+        try {
+          await updateReferralRevenue({
+            userId: publicKey.toString(),
+            betAmount: amountLamports,
+          });
+          logger.solana.debug("[placeBet] Referral revenue tracked");
+        } catch (referralError) {
+          // Don't fail the bet if referral tracking fails
+          logger.solana.error("[placeBet] Failed to track referral revenue:", referralError);
         }
 
         logger.solana.groupEnd();
@@ -860,10 +831,11 @@ export const useGameContract = () => {
       program,
       selectedWallet,
       deriveGameRoundPda,
+      derivePDAs,
       connection,
       network,
-      notifyGameCreated,
       awardPoints,
+      updateReferralRevenue,
     ]
   );
 
@@ -912,18 +884,23 @@ export const useGameContract = () => {
 
   /**
    * Check if user can place bet based on game status
-   * @param gameStatus - Current game status
-   * @param endTimestamp - Betting window end time
+   * Smart contract constants.rs: OPEN=0, CLOSED=1, WAITING=2
+   *
+   * @param gameStatus - Current game status (numeric: 0, 1, or 2)
+   * @param endTimestamp - Betting window end time (0 if not set yet)
    * @returns Can place bet
    */
-  const canPlaceBet = useCallback((gameStatus: string, endTimestamp: number): boolean => {
+  const canPlaceBet = useCallback((gameStatus: number, endTimestamp: number): boolean => {
     const now = Math.floor(Date.now() / 1000);
 
-    if (gameStatus !== "waiting") {
+    // Can bet when game is OPEN (0) or WAITING (2)
+    // Cannot bet when game is CLOSED (1)
+    if (gameStatus === GAME_STATUS.CLOSED) {
       return false;
     }
 
-    if (now >= endTimestamp) {
+    // If endTimestamp is set (> 0) and we're past it, betting is closed
+    if (endTimestamp > 0 && now >= endTimestamp) {
       return false;
     }
 

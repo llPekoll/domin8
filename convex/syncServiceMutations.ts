@@ -3,6 +3,7 @@
  */
 import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+import { GAME_STATUS } from "./constants";
 
 /**
  * Upsert game state from blockchain to database
@@ -27,6 +28,8 @@ export const upsertGameState = internalMutation({
       betAmounts: v.optional(v.array(v.number())),
       betSkin: v.optional(v.array(v.number())),
       betPosition: v.optional(v.array(v.array(v.number()))),
+      betWalletIndex: v.optional(v.array(v.number())),
+      wallets: v.optional(v.array(v.string())),
       totalPot: v.optional(v.number()),
       winner: v.optional(v.union(v.string(), v.null())),
       winningBetIndex: v.optional(v.number()),
@@ -39,8 +42,14 @@ export const upsertGameState = internalMutation({
 
     const roundId = gameRound.roundId;
 
-    // Convert status: 0 = "waiting" (open), 1 = "finished" (closed)
-    const status = gameRound.status === 0 ? "waiting" : "finished";
+    // Convert blockchain status to database format
+    // GAME_STATUS: OPEN=0, CLOSED=1, WAITING=2
+    const statusMap: Record<number, string> = {
+      [GAME_STATUS.OPEN]: "waiting",      // OPEN (has bets) → "waiting" in DB
+      [GAME_STATUS.CLOSED]: "finished",   // CLOSED (ended) → "finished" in DB
+      [GAME_STATUS.WAITING]: "waiting",   // WAITING (no bets) → "waiting" in DB
+    };
+    const status = statusMap[gameRound.status] ?? "waiting";
 
     // Store map ID directly from blockchain (no lookup needed)
     const mapId = gameRound.map;
@@ -67,6 +76,8 @@ export const upsertGameState = internalMutation({
           betAmounts: gameRound.betAmounts,
           betSkin: gameRound.betSkin,
           betPosition: gameRound.betPosition,
+          betWalletIndex: gameRound.betWalletIndex,
+          wallets: gameRound.wallets,
           totalPot: gameRound.totalPot,
           winner: null, // No winner during waiting phase
           winningBetIndex: 0,
@@ -94,6 +105,8 @@ export const upsertGameState = internalMutation({
       betAmounts: gameRound.betAmounts,
       betSkin: gameRound.betSkin,
       betPosition: gameRound.betPosition,
+      betWalletIndex: gameRound.betWalletIndex,
+      wallets: gameRound.wallets,
       totalPot: gameRound.totalPot,
       winner: gameRound.winner,
       winningBetIndex: gameRound.winningBetIndex ?? 0,
@@ -116,67 +129,6 @@ export const upsertGameState = internalMutation({
       await db.insert("gameRoundStates", gameData);
       console.log(`[Sync Mutations] Created game ${roundId} (status: ${status}, map: ${gameRound.map})`);
     }
-  },
-});
-
-/**
- * Query to find ended games still in "waiting" status
- * Returns games where endTimestamp < currentTime and status = "waiting"
- */
-export const getEndedWaitingGames = internalQuery({
-  args: {
-    currentTime: v.number(),
-  },
-  handler: async (ctx, { currentTime }) => {
-    const { db } = ctx;
-
-    // Find all games in "waiting" status that have passed their end time
-    const endedGames = await db
-      .query("gameRoundStates")
-      .withIndex("by_status", (q) => q.eq("status", "waiting"))
-      .filter((q) => q.lt(q.field("endTimestamp"), currentTime))
-      .collect();
-
-    // Return simplified game data
-    return endedGames.map((game) => ({
-      _id: game._id,
-      roundId: game.roundId,
-      endTimestamp: game.endTimestamp,
-      startTimestamp: game.startTimestamp,
-      betCount: game.betCount,
-      totalPot: game.totalPot,
-    }));
-  },
-});
-
-/**
- * Query to find finished games (for prize distribution check)
- * Returns games in "finished" status, ordered by most recent first
- */
-export const getFinishedGames = internalQuery({
-  args: {
-    limit: v.number(),
-  },
-  handler: async (ctx, { limit }) => {
-    const { db } = ctx;
-
-    // Find all games in "finished" status, ordered by roundId descending (most recent first)
-    const finishedGames = await db
-      .query("gameRoundStates")
-      .withIndex("by_status", (q) => q.eq("status", "finished"))
-      .order("desc")
-      .take(limit);
-
-    // Return simplified game data
-    return finishedGames.map((game) => ({
-      _id: game._id,
-      roundId: game.roundId,
-      endTimestamp: game.endTimestamp,
-      startTimestamp: game.startTimestamp,
-      betCount: game.betCount,
-      totalPot: game.totalPot,
-      winner: game.winner,
-    }));
   },
 });
 
@@ -210,5 +162,44 @@ export const getFinishedGamesNeedingPrize = internalQuery({
       winner: game.winner,
       prizeSent: game.prizeSent,
     }));
+  },
+});
+
+/**
+ * Query to get the current (most recent) game state
+ * Used by bot executor to check if betting is open
+ */
+export const getCurrentGameState = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const { db } = ctx;
+
+    // Get the most recent game in "waiting" status (active game)
+    const activeGame = await db
+      .query("gameRoundStates")
+      .withIndex("by_status", (q) => q.eq("status", "waiting"))
+      .order("desc")
+      .first();
+
+    if (!activeGame) {
+      return null;
+    }
+
+    // Convert database status to blockchain status
+    // Database: "waiting" = betting open, "finished" = game ended
+    // Blockchain: OPEN=0, CLOSED=1, WAITING=2
+    const status = activeGame.status === "waiting" ? 0 : 1;
+
+    return {
+      roundId: activeGame.roundId,
+      status,
+      startTimestamp: activeGame.startTimestamp,
+      endTimestamp: activeGame.endTimestamp,
+      mapId: activeGame.mapId,
+      betCount: activeGame.betCount,
+      totalPot: activeGame.totalPot,
+      winner: activeGame.winner,
+      prizeSent: activeGame.prizeSent,
+    };
   },
 });

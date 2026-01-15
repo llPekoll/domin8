@@ -29,6 +29,8 @@ export default defineSchema({
     betAmounts: v.optional(v.array(v.number())), // Array of bet amounts
     betSkin: v.optional(v.array(v.number())), // Array of skin IDs (u8) - character customization
     betPosition: v.optional(v.array(v.array(v.number()))), // Array of [x, y] positions (u16)
+    betWalletIndex: v.optional(v.array(v.number())), // Index into wallets array for each bet
+    wallets: v.optional(v.array(v.string())), // Array of unique wallet addresses (base58)
     totalPot: v.optional(v.number()), // Total accumulated pot in lamports
     winner: v.optional(v.union(v.string(), v.null())), // Winner wallet (base58), null if not determined
     winningBetIndex: v.optional(v.number()), // Index of winning bet
@@ -111,4 +113,266 @@ export default defineSchema({
     totalPoints: v.optional(v.number()), // Points earned from bets and prizes (1 point per 0.001 SOL)
     achievements: v.array(v.string()),
   }).index("by_wallet", ["walletAddress"]),
+
+  // ============================================================================
+  // REFERRAL SYSTEM TABLES
+  // ============================================================================
+
+  /**
+   * Referrals - Individual referral relationships
+   * Tracks which users were referred by whom
+   */
+  referrals: defineTable({
+    referrerId: v.string(), // Wallet address of the person who referred
+    referredUserId: v.string(), // Wallet address of the person who signed up
+    referralCode: v.string(), // The referral code used
+    signupDate: v.number(), // Unix timestamp when they signed up
+    totalBetVolume: v.number(), // Total SOL (in lamports) bet by this referred user
+    status: v.string(), // "active" | "inactive"
+  })
+    .index("by_referrer", ["referrerId"]) // Query all users referred by someone
+    .index("by_referred_user", ["referredUserId"]) // Check if user was referred
+    .index("by_referral_code", ["referralCode"]), // Look up by code during signup
+
+  /**
+   * Payout History - Record of all referral payouts
+   * Shows users when they received payments
+   */
+  payoutHistory: defineTable({
+    walletAddress: v.string(), // Referrer's wallet
+    amount: v.number(), // Amount paid in lamports
+    paidAt: v.number(), // Unix timestamp
+    txHash: v.optional(v.string()), // Solana transaction hash (optional)
+    note: v.optional(v.string()), // Optional note from admin
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_paid_at", ["paidAt"]),
+
+  /**
+   * Referral Stats - Aggregated statistics per referrer
+   * Used for leaderboards and personal dashboards
+   * Rank is calculated on-demand, not stored
+   */
+  referralStats: defineTable({
+    walletAddress: v.string(), // Referrer's wallet address
+    referralCode: v.string(), // Their unique referral code
+    totalReferred: v.number(), // Count of users they've referred
+    totalRevenue: v.number(), // Sum of all referred users' bet volume (in lamports)
+    accumulatedRewards: v.number(), // 1% of totalRevenue - rewards earned (in lamports)
+    totalPaidOut: v.optional(v.number()), // Total amount already paid out (in lamports)
+    lastPayoutDate: v.optional(v.number()), // Unix timestamp of last payout
+    lastPayoutAmount: v.optional(v.number()), // Amount of last payout (in lamports)
+    createdAt: v.number(), // When they created their referral link
+  }).index("by_wallet", ["walletAddress"])
+    .index("by_code", ["referralCode"])
+    .index("by_revenue", ["totalRevenue"]), // For leaderboard sorting
+
+  // ============================================================================
+  // NFT COLLECTION HOLDER CACHE TABLES
+  // ============================================================================
+
+  /**
+   * NFT Collection Holders - Cached list of wallet addresses that own NFTs from specific collections
+   * Updated every 12 hours via cron job + manual refresh (rate-limited)
+   */
+  nftCollectionHolders: defineTable({
+    collectionAddress: v.string(), // Collection address (base58)
+    walletAddress: v.string(), // Holder wallet address (base58)
+    nftCount: v.number(), // Number of NFTs owned from this collection
+    lastVerified: v.number(), // Unix timestamp when this holder was last verified
+    addedBy: v.string(), // "cron" | "manual" - how this entry was created
+  })
+    .index("by_collection", ["collectionAddress"]) // Query all holders of a collection
+    .index("by_collection_and_wallet", ["collectionAddress", "walletAddress"]) // Check specific holder
+    .index("by_wallet", ["walletAddress"]), // Query all collections owned by wallet
+
+  /**
+   * NFT Refresh Rate Limits - Prevent abuse of manual refresh functionality
+   * Users can refresh their NFT status once every 5 minutes
+   */
+  nftRefreshLimits: defineTable({
+    walletAddress: v.string(), // User's wallet address
+    lastRefreshAt: v.number(), // Unix timestamp of last refresh
+    refreshCount: v.number(), // Total refreshes (for analytics)
+  }).index("by_wallet", ["walletAddress"]),
+
+  // ============================================================================
+  // 1V1 LOBBY TABLES
+  // ============================================================================
+
+  /**
+   * OneVOne Lobbies - Track 1v1 coinflip games
+   * Mirrors the on-chain Domin81v1Lobby PDA accounts
+   */
+  oneVOneLobbies: defineTable({
+    // Identifiers
+    lobbyId: v.number(), // Unique lobby ID from on-chain
+    lobbyPda: v.optional(v.string()), // Public key of the Lobby PDA (base58)
+    shareToken: v.string(), // 8-char unique token for sharing lobby URL (privacy-focused)
+
+    // Players
+    playerA: v.string(), // Player A's wallet address (base58)
+    playerB: v.optional(v.string()), // Player B's wallet address (base58, None until joined)
+
+    // Game state
+    amount: v.number(), // Bet amount per player (in lamports)
+    status: v.number(), // 0 = created (waiting), 1 = awaiting vrf, 2 = resolved
+    winner: v.optional(v.string()), // Winner's wallet address (base58, None until resolved)
+    isPrivate: v.optional(v.boolean()), // Private lobbies are only joinable via share link
+
+    // Character & Map selection
+    characterA: v.number(), // Player A's character/skin ID (0-255)
+    characterB: v.optional(v.number()), // Player B's character/skin ID (0-255, None until joined)
+    mapId: v.number(), // Map/background ID (0-255)
+
+    // Timestamps
+    createdAt: v.number(), // When lobby was created (Unix timestamp)
+    resolvedAt: v.optional(v.number()), // When lobby was resolved (Unix timestamp)
+
+    // Transaction hashes
+    settleTxHash: v.optional(v.string()), // Solana transaction hash for settlement (base58)
+
+    // Prize (parsed from on-chain settlement)
+    prizeAmount: v.optional(v.number()), // Actual prize won in lamports (from tx logs)
+
+    // Win streak (for consecutive double-down wins)
+    winStreak: v.optional(v.number()), // Current streak count (increments on double-down win)
+  })
+    .index("by_status", ["status"]) // Query open lobbies (status = 0)
+    .index("by_player_a", ["playerA"]) // Query lobbies by Player A
+    .index("by_player_b", ["playerB"]) // Query lobbies by Player B
+    .index("by_status_and_created", ["status", "createdAt"]) // For pagination and stuck lobby detection
+    .index("by_lobbyId", ["lobbyId"]) // Query specific lobby by ID
+    .index("by_shareToken", ["shareToken"]), // Fast lookup by share token for URL-based access
+
+    
+
+  // ============================================================================
+  // AUTO-BETTING BOT TABLES
+  // ============================================================================
+
+  /**
+   * Bot Purchases - Track which tiers each user has unlocked
+   * Users can own multiple bots (Rookie, Pro, Elite) simultaneously
+   * Each tier is a one-time purchase with its own configuration
+   */
+  botPurchases: defineTable({
+    walletAddress: v.string(), // User's wallet address
+    tier: v.string(), // "rookie" | "pro" | "elite"
+    purchasedAt: v.number(), // Unix timestamp of purchase
+    transactionSignature: v.string(), // Solana tx signature for purchase verification
+    purchaseAmount: v.number(), // Amount paid in lamports
+    isActiveBot: v.optional(v.boolean()), // Is this the currently active bot for this user
+  })
+    .index("by_wallet", ["walletAddress"]) // Query all bots owned by user
+    .index("by_wallet_and_tier", ["walletAddress", "tier"]), // Prevent duplicate tier purchases
+
+  /**
+   * Bot Configurations - User's bot settings and state
+   * Persists bot configuration and tracks spending/performance
+   */
+  botConfigurations: defineTable({
+    walletAddress: v.string(),
+    tier: v.string(), // "rookie" | "pro" | "elite"
+    isActive: v.boolean(), // Is the bot currently running
+
+    // Rookie settings (all tiers)
+    fixedBetAmount: v.optional(v.number()), // Fixed bet in lamports
+    selectedCharacter: v.optional(v.number()), // Character skin ID
+    budgetLimit: v.optional(v.number()), // Max spending limit in lamports
+    currentSpent: v.optional(v.number()), // Track spending against budget
+
+    // Pro settings (Pro + Elite tiers)
+    betMin: v.optional(v.number()), // Min bet in range (lamports)
+    betMax: v.optional(v.number()), // Max bet in range (lamports)
+    stopLoss: v.optional(v.number()), // Stop if losses reach X lamports
+    winStreakMultiplier: v.optional(v.number()), // Multiplier after wins (e.g., 1.5)
+    cooldownRounds: v.optional(v.number()), // Skip N rounds between bets
+    characterRotation: v.optional(v.array(v.number())), // List of character IDs to rotate
+
+    // Elite settings (Elite tier only)
+    takeProfit: v.optional(v.number()), // Auto-stop when up X lamports
+    martingaleEnabled: v.optional(v.boolean()), // Double bet after loss
+    antiMartingaleEnabled: v.optional(v.boolean()), // Double bet after win
+    scheduleStart: v.optional(v.number()), // Hour to start (0-23 UTC)
+    scheduleEnd: v.optional(v.number()), // Hour to end (0-23 UTC)
+    smartSizing: v.optional(v.boolean()), // Bet more when pot is small
+    smartSizingThreshold: v.optional(v.number()), // Pot threshold in lamports
+
+    // State tracking
+    consecutiveWins: v.optional(v.number()),
+    consecutiveLosses: v.optional(v.number()),
+    lastBetAmount: v.optional(v.number()),
+    roundsSkipped: v.optional(v.number()),
+    totalProfit: v.optional(v.number()), // Track P&L (can be negative)
+    totalBets: v.optional(v.number()), // Total bets placed
+    totalWins: v.optional(v.number()), // Total wins
+
+    // Session signer state
+    sessionSignerEnabled: v.optional(v.boolean()),
+    lastUpdated: v.number(),
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_and_tier", ["walletAddress", "tier"]) // Each tier has its own config
+    .index("by_active", ["isActive"]),
+
+  /**
+   * Bot Performance Stats - Historical tracking of bot bets
+   * Used for analytics and performance display
+   */
+  botPerformanceStats: defineTable({
+    walletAddress: v.string(),
+    roundId: v.number(),
+    betAmount: v.number(), // Bet amount in lamports
+    result: v.string(), // "win" | "loss" | "refund"
+    prizeAmount: v.optional(v.number()), // Prize won (if win)
+    profit: v.number(), // Can be negative for losses
+    timestamp: v.number(),
+    strategy: v.optional(v.string()), // Which strategy was used
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_and_round", ["walletAddress", "roundId"])
+    .index("by_timestamp", ["timestamp"]),
+
+  // ============================================================================
+  // PWA PUSH NOTIFICATION TABLES
+  // ============================================================================
+
+  /**
+   * Push Subscriptions - Store user push notification subscriptions
+   * Used to send notifications when games start, even when app is closed
+   */
+  pushSubscriptions: defineTable({
+    walletAddress: v.optional(v.string()), // User's wallet (optional - can subscribe before login)
+    endpoint: v.string(), // Push service endpoint URL
+    p256dh: v.string(), // Public key for encryption
+    auth: v.string(), // Auth secret for encryption
+    createdAt: v.number(), // When subscription was created
+    lastUsed: v.optional(v.number()), // Last time notification was sent
+    userAgent: v.optional(v.string()), // Browser/device info
+    isActive: v.boolean(), // Whether subscription is still valid
+  })
+    .index("by_endpoint", ["endpoint"]) // Prevent duplicate subscriptions
+    .index("by_wallet", ["walletAddress"]) // Query user's subscriptions
+    .index("by_active", ["isActive"]), // Query active subscriptions for broadcast
+
+  // ============================================================================
+  // CHAT TABLES
+  // ============================================================================
+
+  /**
+   * Chat Messages - Global chat messages for player communication
+   * Includes user messages and system announcements (winners)
+   */
+  chatMessages: defineTable({
+    senderWallet: v.optional(v.string()), // Sender wallet (null for system messages)
+    senderName: v.optional(v.string()), // Display name if available
+    message: v.string(), // Message content (max 200 chars)
+    type: v.string(), // "user" | "system" | "winner"
+    gameType: v.optional(v.string()), // "domin8" | "1v1" (for winner messages)
+    timestamp: v.number(), // When message was sent
+  })
+    .index("by_timestamp", ["timestamp"]) // For fetching recent messages
+    .index("by_sender_and_time", ["senderWallet", "timestamp"]), // For rate limiting
 });
+    

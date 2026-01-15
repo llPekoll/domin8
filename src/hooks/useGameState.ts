@@ -8,6 +8,7 @@
 import { useActiveGame } from "./useActiveGame";
 import { useMemo } from "react";
 import { logger } from "../lib/logger";
+import { GAME_STATUS } from "../game/constants";
 
 export interface BetEntry {
   wallet: string;
@@ -17,7 +18,7 @@ export interface BetEntry {
 
 export interface GameState {
   roundId: number;
-  status: "Waiting" | "AwaitingWinnerRandomness" | "Finished";
+  status: "Waiting" | "Open" | "Closed";
   startTimestamp: number;
   endTimestamp: number;
   bets: BetEntry[];
@@ -47,10 +48,11 @@ export function useGameState() {
   const error = null;
 
   // Helper to convert blockchain status to expected format
+  // Smart contract constants.rs: OPEN=0, CLOSED=1, WAITING=2
   const formatStatus = (status: number): GameState["status"] => {
-    // Status is a u8 in the smart contract: 0 = Open/Waiting, 1 = Closed/Finished
-    if (status === 0) return "Waiting";
-    if (status === 1) return "Finished";
+    if (status === GAME_STATUS.OPEN) return "Open";       // 0 - betting active
+    if (status === GAME_STATUS.CLOSED) return "Closed";   // 1 - game ended
+    if (status === GAME_STATUS.WAITING) return "Waiting"; // 2 - no bets yet
     return "Waiting"; // Default to waiting
   };
 
@@ -87,7 +89,7 @@ export function useGameState() {
       vrfFeeLamports: 0.001, // 0.001 SOL
       vrfNetworkState: "Devnet",
       vrfTreasury: "VRF Treasury",
-      gameLocked: activeGame?.status === 1 || false, // Locked when status = 1 (Closed)
+      gameLocked: activeGame?.status === 1 || false, // Locked when GAME_STATUS_CLOSED = 1
     }),
     [activeGame]
   );

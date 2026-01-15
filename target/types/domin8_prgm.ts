@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/domin8_prgm.json`.
  */
 export type Domin8Prgm = {
-  "address": "7bHYHZVu7kWRU4xf7DWypCvefWvuDqW1CqVfsuwdGiR7",
+  "address": "92LhoG1EGxWpRovjrjJ2vA8amNTHFZSTFr1EHUYWjkky",
   "metadata": {
     "name": "domin8Prgm",
     "version": "0.1.0",
@@ -149,13 +149,10 @@ export type Domin8Prgm = {
     {
       "name": "createGameRound",
       "docs": [
-        "Create new game round with first bet",
+        "Create new game round (admin only, no bets yet)",
         "",
         "Parameters:",
         "- round_id: u64 - Round ID for the game",
-        "- bet_amount: u64 - Initial bet amount in lamports",
-        "- skin: u8 - Character skin ID (0-255)",
-        "- position: [u16; 2] - Spawn position [x, y]",
         "- map: u8 - Map/background ID (0-255)"
       ],
       "discriminator": [
@@ -253,98 +250,6 @@ export type Domin8Prgm = {
           "signer": true
         },
         {
-          "name": "vrfRandomness",
-          "writable": true
-        },
-        {
-          "name": "vrfTreasury",
-          "writable": true
-        },
-        {
-          "name": "vrfConfig",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  111,
-                  114,
-                  97,
-                  111,
-                  45,
-                  118,
-                  114,
-                  102,
-                  45,
-                  110,
-                  101,
-                  116,
-                  119,
-                  111,
-                  114,
-                  107,
-                  45,
-                  99,
-                  111,
-                  110,
-                  102,
-                  105,
-                  103,
-                  117,
-                  114,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              }
-            ],
-            "program": {
-              "kind": "const",
-              "value": [
-                7,
-                71,
-                177,
-                26,
-                250,
-                145,
-                180,
-                209,
-                249,
-                34,
-                242,
-                123,
-                14,
-                186,
-                193,
-                218,
-                178,
-                59,
-                33,
-                41,
-                164,
-                190,
-                243,
-                79,
-                50,
-                164,
-                123,
-                88,
-                245,
-                206,
-                252,
-                120
-              ]
-            }
-          }
-        },
-        {
-          "name": "vrfProgram",
-          "address": "VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y"
-        },
-        {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
@@ -353,23 +258,6 @@ export type Domin8Prgm = {
         {
           "name": "roundId",
           "type": "u64"
-        },
-        {
-          "name": "betAmount",
-          "type": "u64"
-        },
-        {
-          "name": "skin",
-          "type": "u8"
-        },
-        {
-          "name": "position",
-          "type": {
-            "array": [
-              "u16",
-              2
-            ]
-          }
         },
         {
           "name": "map",
@@ -569,11 +457,41 @@ export type Domin8Prgm = {
           "writable": true
         },
         {
-          "name": "vrfRandomness"
+          "name": "oracleQueue",
+          "writable": true,
+          "address": "Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh"
         },
         {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "programIdentity",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vrfProgram",
+          "address": "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz"
+        },
+        {
+          "name": "slotHashes",
+          "address": "SysvarS1otHashes111111111111111111111111111"
         }
       ],
       "args": [
@@ -781,6 +699,54 @@ export type Domin8Prgm = {
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "vrfCallback",
+      "docs": [
+        "VRF callback - called automatically by Magic Block VRF",
+        "",
+        "Parameters:",
+        "- randomness: [u8; 32] - 32 bytes of verifiable randomness"
+      ],
+      "discriminator": [
+        248,
+        224,
+        55,
+        227,
+        56,
+        10,
+        108,
+        36
+      ],
+      "accounts": [
+        {
+          "name": "vrfProgramIdentity",
+          "docs": [
+            "This check ensures that the vrf_program_identity (which is a PDA) is a signer",
+            "enforcing the callback is executed by the VRF program through CPI"
+          ],
+          "signer": true,
+          "address": "9irBy75QS2BN81FUgXuHcjqceJJRuc9oDkAe8TKVvvAw"
+        },
+        {
+          "name": "game",
+          "docs": [
+            "Game account passed via accounts_metas in VRF request"
+          ],
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "randomness",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -809,18 +775,46 @@ export type Domin8Prgm = {
         9,
         28
       ]
+    }
+  ],
+  "events": [
+    {
+      "name": "betPlaced",
+      "discriminator": [
+        88,
+        88,
+        145,
+        226,
+        126,
+        206,
+        32,
+        0
+      ]
     },
     {
-      "name": "networkState",
+      "name": "gameCreated",
       "discriminator": [
-        212,
-        237,
-        148,
-        56,
-        97,
-        245,
-        51,
-        169
+        218,
+        25,
+        150,
+        94,
+        177,
+        112,
+        96,
+        2
+      ]
+    },
+    {
+      "name": "gameEnded",
+      "discriminator": [
+        35,
+        93,
+        113,
+        153,
+        29,
+        144,
+        200,
+        109
       ]
     }
   ],
@@ -939,6 +933,11 @@ export type Domin8Prgm = {
       "code": 6022,
       "name": "invalidPosition",
       "msg": "Invalid position coordinates"
+    },
+    {
+      "code": 6023,
+      "name": "invalidGameAccount",
+      "msg": "Invalid game account provided"
     }
   ],
   "types": [
@@ -970,6 +969,55 @@ export type Domin8Prgm = {
                 2
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "betPlaced",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "roundId",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "totalPot",
+            "type": "u64"
+          },
+          {
+            "name": "betIndex",
+            "type": "u64"
+          },
+          {
+            "name": "isNewUser",
+            "type": "bool"
+          },
+          {
+            "name": "skin",
+            "type": "u8"
+          },
+          {
+            "name": "position",
+            "type": {
+              "array": [
+                "u16",
+                2
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }
@@ -1076,6 +1124,10 @@ export type Domin8Prgm = {
             "type": "u8"
           },
           {
+            "name": "vrfRequested",
+            "type": "bool"
+          },
+          {
             "name": "winner",
             "type": {
               "option": "pubkey"
@@ -1111,89 +1163,115 @@ export type Domin8Prgm = {
       }
     },
     {
-      "name": "networkConfiguration",
+      "name": "gameCreated",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "authority",
-            "type": "pubkey"
-          },
-          {
-            "name": "treasury",
-            "type": "pubkey"
-          },
-          {
-            "name": "requestFee",
+            "name": "roundId",
             "type": "u64"
           },
           {
-            "name": "fulfillmentAuthorities",
-            "type": {
-              "vec": "pubkey"
-            }
+            "name": "creator",
+            "type": "pubkey"
           },
           {
-            "name": "tokenFeeConfig",
+            "name": "initialBet",
+            "type": "u64"
+          },
+          {
+            "name": "startTime",
+            "type": "i64"
+          },
+          {
+            "name": "endTime",
+            "type": "i64"
+          },
+          {
+            "name": "vrfForce",
+            "type": "string"
+          },
+          {
+            "name": "vrfForceBytes",
             "type": {
-              "option": {
-                "defined": {
-                  "name": "oraoTokenFeeConfig"
-                }
-              }
+              "array": [
+                "u8",
+                32
+              ]
             }
           }
         ]
       }
     },
     {
-      "name": "networkState",
+      "name": "gameEnded",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "config",
+            "name": "roundId",
+            "type": "u64"
+          },
+          {
+            "name": "winner",
+            "type": "pubkey"
+          },
+          {
+            "name": "winningBetIndex",
+            "type": "u64"
+          },
+          {
+            "name": "winningBetAmount",
+            "type": "u64"
+          },
+          {
+            "name": "totalPot",
+            "type": "u64"
+          },
+          {
+            "name": "prize",
+            "type": "u64"
+          },
+          {
+            "name": "houseFee",
+            "type": "u64"
+          },
+          {
+            "name": "houseFeePercentage",
+            "type": "u64"
+          },
+          {
+            "name": "totalBets",
+            "type": "u64"
+          },
+          {
+            "name": "uniqueUsers",
+            "type": "u64"
+          },
+          {
+            "name": "winProbability",
+            "type": "u64"
+          },
+          {
+            "name": "vrfForce",
+            "type": "string"
+          },
+          {
+            "name": "vrfForceBytes",
             "type": {
-              "defined": {
-                "name": "networkConfiguration"
-              }
+              "array": [
+                "u8",
+                32
+              ]
             }
           },
           {
-            "name": "numReceived",
-            "docs": [
-              "Total number of received requests."
-            ],
+            "name": "randomness",
             "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "oraoTokenFeeConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "mint",
-            "docs": [
-              "ORAO token mint address."
-            ],
-            "type": "pubkey"
           },
           {
-            "name": "treasury",
-            "docs": [
-              "ORAO token treasury account."
-            ],
-            "type": "pubkey"
-          },
-          {
-            "name": "fee",
-            "docs": [
-              "Fee in ORAO SPL token smallest units."
-            ],
-            "type": "u64"
+            "name": "timestamp",
+            "type": "i64"
           }
         ]
       }

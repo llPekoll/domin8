@@ -1,38 +1,90 @@
 import { useRef, useEffect, useMemo, useState } from "react";
-import { IRefPhaserGame, PhaserGame } from "./PhaserGame";
-import { Header } from "./components/Header";
-import { CharacterSelection2 } from "./components/CharacterSelection2";
-import { BettingPanel } from "./components/BettingPanel";
-import { BlockchainDebugDialog } from "./components/BlockchainDebugDialog";
-import { MultiParticipantPanel } from "./components/MultiParticipantPanel";
-import { PotDisplayPanel } from "./components/PotDisplayPanel";
-import { WinnerShareOverlay } from "./components/WinnerShareOverlay";
-import { LastWinnerCard } from "./components/LastWinnerCard";
+import { IRefPhaserGame } from "./PhaserGame";
+import { isMobile as isMobileDevice } from "react-device-detect";
 import { useActiveGame } from "./hooks/useActiveGame";
 import { usePrivyWallet } from "./hooks/usePrivyWallet";
 import { EventBus } from "./game/EventBus";
 import { setActiveGameData, setCurrentUserWallet } from "./game/main";
 import type { Character } from "./types/character";
 import { useAutoCreatePlayer } from "./hooks/useAutoCreatePlayer";
+import { useGameCreatedNotification } from "./hooks/useGameCreatedNotification";
+import { DesktopLayout } from "./layouts/DesktopLayout";
+import { MobileLayout } from "./layouts/MobileLayout";
+import { MobileLandscapeLayout } from "./layouts/MobileLandscapeLayout";
+
+// Custom hook for device detection (mobile + orientation)
+function useDeviceLayout() {
+  const [layout, setLayout] = useState<"desktop" | "mobile-portrait" | "mobile-landscape">(() => {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const isLandscape = width > height;
+
+    // Real mobile device - use mobile layouts
+    if (isMobileDevice) {
+      return isLandscape ? "mobile-landscape" : "mobile-portrait";
+    }
+
+    // Desktop browser with narrow viewport (Chrome DevTools) - use mobile for testing
+    // Only trigger mobile if BOTH narrow width AND portrait-ish aspect ratio
+    if (width < 500) {
+      return isLandscape ? "mobile-landscape" : "mobile-portrait";
+    }
+
+    // Desktop
+    return "desktop";
+  });
+
+  useEffect(() => {
+    const checkLayout = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const isLandscape = width > height;
+
+      // Real mobile device - use mobile layouts
+      if (isMobileDevice) {
+        setLayout(isLandscape ? "mobile-landscape" : "mobile-portrait");
+        return;
+      }
+
+      // Desktop browser with very narrow viewport (Chrome DevTools mobile emulation)
+      if (width < 500) {
+        setLayout(isLandscape ? "mobile-landscape" : "mobile-portrait");
+        return;
+      }
+
+      // Desktop
+      setLayout("desktop");
+    };
+
+    window.addEventListener("resize", checkLayout);
+    window.addEventListener("orientationchange", checkLayout);
+    return () => {
+      window.removeEventListener("resize", checkLayout);
+      window.removeEventListener("orientationchange", checkLayout);
+    };
+  }, []);
+
+  return layout;
+}
 
 export default function App() {
+  const layout = useDeviceLayout();
   const phaserRef = useRef<IRefPhaserGame | null>(null);
 
   // Track selected character from carousel
   const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
 
   // Get current user's wallet
-  const { connected, publicKey, externalWalletAddress } = usePrivyWallet();
+  const { connected, ready: walletReady, publicKey, externalWalletAddress } = usePrivyWallet();
 
   // Auto-create player when wallet connects
-  useAutoCreatePlayer(
-    connected,
-    publicKey?.toBase58() || null,
-    externalWalletAddress || undefined
-  );
+  useAutoCreatePlayer(connected, publicKey?.toBase58() || null, externalWalletAddress || undefined);
 
   // Get current game state directly from blockchain (no Convex, <1s updates)
   const { activeGame: currentRoundState } = useActiveGame();
+
+  // Send notification when game transitions from WAITING to OPEN (first bet placed)
+  useGameCreatedNotification(currentRoundState);
 
   // ✅ Create a stable reference that only changes when meaningful data changes
   // This prevents infinite re-renders from object recreation
@@ -78,53 +130,30 @@ export default function App() {
   // Simple: Just pipe blockchain data to Phaser via EventBus
   // Only updates when key fields actually change
   useEffect(() => {
-    const timestamp = Date.now();
     const fullData = stableGameState?._fullData || null;
 
-    console.log(`📡 [App] [${timestamp}] Blockchain state changed:`, {
-      hasGameState: !!fullData,
-      status: fullData?.status,
-      map: fullData?.map,
-      hasBets: !!fullData?.bets,
-      betCount: fullData?.bets?.length || 0,
-    });
 
-    // Store in global state for Phaser scenes to access during initialization
     setActiveGameData(fullData);
-
-    // Also emit via EventBus for runtime updates
-    console.log(`📡 [App] [${timestamp}] 🚀 Emitting blockchain-state-update event`);
     EventBus.emit("blockchain-state-update", fullData);
-    console.log(`📡 [App] [${timestamp}] ✅ blockchain-state-update event emitted`);
   }, [stableGameState]);
 
-  return (
-    <div className="relative min-h-screen overflow-hidden">
-      <div className="fixed inset-0 w-full h-full">
-        <PhaserGame ref={phaserRef} />
-      </div>
+  // Shared props for all layouts
+  const layoutProps = {
+    phaserRef,
+    selectedCharacter,
+    onCharacterSelected: setSelectedCharacter,
+    walletReady,
+    connected,
+  };
 
-      <div className="relative z-10">
-        <Header />
-      </div>
+  // Render appropriate layout based on device and orientation
+  if (layout === "mobile-portrait") {
+    return <MobileLayout {...layoutProps} />;
+  }
 
-      {/* Character Selection Carousel - Bottom Left */}
-      <CharacterSelection2 onCharacterSelected={setSelectedCharacter} />
+  if (layout === "mobile-landscape") {
+    return <MobileLandscapeLayout {...layoutProps} />;
+  }
 
-      {/* Betting Panel - Bottom Center */}
-      <div className="fixed items-center bottom-4 left-1/2 -translate-x-1/2 z-50">
-        <BlockchainDebugDialog />
-        <BettingPanel selectedCharacter={selectedCharacter} />
-      </div>
-
-      {/* Pot Display - Top Center */}
-      <PotDisplayPanel />
-
-      <div className="fixed top-18 right-4 ">
-        <LastWinnerCard />
-      </div>
-      <MultiParticipantPanel />
-      <WinnerShareOverlay />
-    </div>
-  );
+  return <DesktopLayout {...layoutProps} />;
 }

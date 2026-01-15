@@ -3,10 +3,11 @@ import { api } from "../../convex/_generated/api";
 import { Card, CardContent } from "./ui/card";
 import { WinnerCharacterPreviewScene } from "./WinnerCharacterPreviewScene";
 import { useMemo } from "react";
+import { isMobile, isTablet } from "react-device-detect";
 
 export function LastWinnerCard() {
   const lastFinishedGame = useQuery(api.stats.getLastFinishedGame);
-  console.log({ lastFinishedGame });
+  console.log("[LastWinnerCard] lastFinishedGame:", lastFinishedGame, "characterName:", lastFinishedGame?.characterName);
   // Get display name for the winner
   const playerInfo = useQuery(
     api.players.getPlayer,
@@ -31,6 +32,11 @@ export function LastWinnerCard() {
     return wallet || "Unknown";
   }, [lastFinishedGame, playerInfo]);
 
+  // Don't show on mobile/tablet devices
+  if (isMobile || isTablet) {
+    return null;
+  }
+
   // Don't show if no winner data
   if (!lastFinishedGame) {
     return null;
@@ -38,7 +44,7 @@ export function LastWinnerCard() {
 
   return (
     <div className="-mr-7">
-      <Card className="bg-black/60 pt-2 backdrop-blur-md border-purple-500/50 shadow-xl shadow-purple-500/20 w-80">
+      <Card className="bg-black/60 pt-2 backdrop-blur-md border-purple-500/50 shadow-xl shadow-purple-500/20 w-64">
         <CardContent className=" space-y-3">
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -73,9 +79,17 @@ export function LastWinnerCard() {
             </div>
 
             {/* Winner Details - Name and Bet */}
-            <div className="flex-1 min-w-0">
-              <div className="text-white font-bold text-xl truncate">{displayName}</div>
-              <div className="text-white/50 text-lg flex items-center gap-1 -mt-2">
+            <div className="flex-1 min-w-0 pr-2">
+              {/* Win Rate above player name */}
+              <div className="flex flex-col items-end">
+                <span className="text-white/50 text-xs pt-1">Win Rate</span>
+                <span className="text-purple-300 font-semibold text-sm -mt-1.5 ">
+                  {((lastFinishedGame.betAmount / lastFinishedGame.totalPot) * 100).toFixed(1)}%
+                </span>
+              </div>
+
+              <div className="text-white font-bold text-xl truncate text-right">{displayName}</div>
+              <div className="text-white/50 text-lg flex items-center justify-end gap-1 -mt-2">
                 <span>Bet:</span>
                 <img
                   src="/sol-logo.svg"
@@ -87,31 +101,6 @@ export function LastWinnerCard() {
                   }}
                 />
                 <span>{lastFinishedGame.betAmount.toFixed(3)}</span>
-              </div>
-            </div>
-
-            {/* Stats - Vertical Layout */}
-            <div className="flex flex-col gap-2 text-right pr-3">
-              <div>
-                <div className="text-white/50 text-xs">Total Pot</div>
-                <div className="text-purple-300 -mt-2 font-semibold text-xl flex items-center justify-end gap-1">
-                  <img
-                    src="/sol-logo.svg"
-                    alt="SOL"
-                    className="w-3 h-3"
-                    style={{
-                      filter:
-                        "brightness(0) saturate(100%) invert(77%) sepia(26%) saturate(444%) hue-rotate(213deg) brightness(95%) contrast(92%)",
-                    }}
-                  />
-                  <span>{lastFinishedGame.totalPot.toFixed(3)}</span>
-                </div>
-              </div>
-              <div>
-                <div className="text-white/50 text-xs">Win Rate</div>
-                <div className="text-purple-300 -mt-2 font-semibold text-xl">
-                  {((lastFinishedGame.betAmount / lastFinishedGame.totalPot) * 100).toFixed(1)}%
-                </div>
               </div>
             </div>
           </div>

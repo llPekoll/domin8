@@ -208,7 +208,11 @@ export const cleanupOldJobs = internalMutation({
 });
 
 /**
- * Check if a specific action is already scheduled (Query version for use in actions)
+ * Check if a specific action is already scheduled or completed (Query version for use in actions)
+ * Checks for:
+ * - Pending jobs (in progress)
+ * - Recently completed jobs (don't re-schedule something that succeeded)
+ * - Recently failed jobs (within last 5 minutes to prevent rapid retry loops)
  */
 export const isActionScheduled = internalQuery({
   args: {
@@ -216,7 +220,8 @@ export const isActionScheduled = internalQuery({
     action: v.string(),
   },
   handler: async (ctx, args) => {
-    const job = await ctx.db
+    // Check for pending job
+    const pendingJob = await ctx.db
       .query("scheduledJobs")
       .withIndex("by_round_and_status", (q) =>
         q.eq("roundId", args.roundId).eq("status", "pending")
@@ -224,6 +229,38 @@ export const isActionScheduled = internalQuery({
       .filter((q) => q.eq(q.field("action"), args.action))
       .first();
 
-    return job !== null;
+    if (pendingJob) {
+      return true;
+    }
+
+    // Check for completed job (don't re-schedule something that already succeeded)
+    const completedJob = await ctx.db
+      .query("scheduledJobs")
+      .withIndex("by_round_and_status", (q) =>
+        q.eq("roundId", args.roundId).eq("status", "completed")
+      )
+      .filter((q) => q.eq(q.field("action"), args.action))
+      .first();
+
+    if (completedJob) {
+      return true;
+    }
+
+    // Also check for recently failed jobs (within last 5 minutes) to prevent rapid retry loops
+    const fiveMinutesAgo = Math.floor(Date.now() / 1000) - 5 * 60;
+    const recentFailedJob = await ctx.db
+      .query("scheduledJobs")
+      .withIndex("by_round_and_status", (q) =>
+        q.eq("roundId", args.roundId).eq("status", "failed")
+      )
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("action"), args.action),
+          q.gte(q.field("completedAt"), fiveMinutesAgo)
+        )
+      )
+      .first();
+
+    return recentFailedJob !== null;
   },
 });

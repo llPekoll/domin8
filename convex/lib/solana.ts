@@ -1,14 +1,14 @@
 // Solana integration layer for the Convex crank service
 "use node";
 import * as anchor from "@coral-xyz/anchor";
-import { 
-  Connection, 
-  PublicKey, 
-  Keypair, 
-  Transaction, 
-  VersionedTransaction, 
+import {
+  Connection,
+  PublicKey,
+  Keypair,
+  Transaction,
+  VersionedTransaction,
   ComputeBudgetProgram,
-  TransactionMessage
+  TransactionMessage,
 } from "@solana/web3.js";
 import { GameConfig, GameRound, DOMIN8_PROGRAM_ID, PDA_SEEDS, BetInfoStruct } from "./types";
 import { Buffer } from "buffer";
@@ -243,6 +243,7 @@ export class SolanaClient {
         betAmounts: bets.map((b) => b.amount),
         betSkin: bets.map((b) => b.skin),
         betPosition: bets.map((b) => b.position),
+        betWalletIndex: bets.map((b) => b.walletIndex),
       };
     } catch (error) {
       // Game round account doesn't exist yet (no bets placed)
@@ -309,6 +310,7 @@ export class SolanaClient {
         betAmounts: bets.map((b) => b.amount),
         betSkin: bets.map((b) => b.skin),
         betPosition: bets.map((b) => b.position),
+        betWalletIndex: bets.map((b) => b.walletIndex),
       };
     } catch (error) {
       console.log("Error fetching active game:", error);
@@ -332,8 +334,8 @@ export class SolanaClient {
 
   // End game and lock for winner selection (risk-based architecture)
   // HELIUS OPTIMIZED: Uses confirmed commitment, CU optimization, priority fees, and retry logic
-  async endGame(roundId: number): Promise<string> {
-    const { config, activeGame } = this.getPDAs();
+  async endGame(roundId: number): Promise<{ signature: string }> {
+    const { config } = this.getPDAs();
     const { gameRound } = this.getPDAs(roundId);
 
     if (!gameRound) {
@@ -342,23 +344,8 @@ export class SolanaClient {
 
     console.log(`Ending game for round ${roundId} with Helius optimizations`);
 
-    // Fetch config to get treasury and force
+    // Fetch config to get treasury
     const configAccount = await this.program.account.domin8Config.fetch(config);
-
-    // Fetch game to get the force seed
-    const gameAccount = await this.program.account.domin8Game.fetch(gameRound);
-
-    // Derive VRF randomness account using ORAO VRF program
-    const ORAO_VRF_PROGRAM_ID = new PublicKey("VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y");
-    const RANDOMNESS_ACCOUNT_SEED = Buffer.from("orao-vrf-randomness-request");
-
-    // Convert force from number[] to Buffer
-    const forceBuffer = Buffer.from(gameAccount.force);
-
-    const [vrfRandomness] = PublicKey.findProgramAddressSync(
-      [RANDOMNESS_ACCOUNT_SEED, forceBuffer],
-      ORAO_VRF_PROGRAM_ID
-    );
 
     // Build the instruction (instead of using .rpc() directly)
     const instruction = await this.program.methods
@@ -366,24 +353,23 @@ export class SolanaClient {
       .accounts({
         config,
         game: gameRound,
-        activeGame,
         admin: this.authority.publicKey,
         treasury: configAccount.treasury,
-        vrfRandomness,
+        oracleQueue: new PublicKey("Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh"), // Magic Block queue
         systemProgram: anchor.web3.SystemProgram.programId,
       } as any)
       .instruction();
 
     // Send using Helius-optimized transaction flow
     const signature = await this.sendOptimizedTransaction(instruction);
-    
+
     console.log(`Game ${roundId} ended successfully: ${signature}`);
-    return signature;
+    return { signature };
   }
 
   // Send prize to winner (risk-based architecture)
   // HELIUS OPTIMIZED: Uses confirmed commitment, CU optimization, priority fees, and retry logic
-  async sendPrizeWinner(roundId: number): Promise<string> {
+  async sendPrizeWinner(roundId: number): Promise<{ signature: string }> {
     const { config, gameRound } = this.getPDAs(roundId);
 
     if (!gameRound) {
@@ -398,7 +384,9 @@ export class SolanaClient {
     }
 
     const winnerPubkey = gameAccount.winner;
-    console.log(`Sending prize to winner ${winnerPubkey.toBase58()} for round ${roundId} with Helius optimizations`);
+    console.log(
+      `Sending prize to winner ${winnerPubkey.toBase58()} for round ${roundId} with Helius optimizations`
+    );
     console.log(`Prize amount: ${gameAccount.winnerPrize.toString()} lamports`);
 
     // Build the instruction (instead of using .rpc() directly)
@@ -415,12 +403,142 @@ export class SolanaClient {
 
     // Send using Helius-optimized transaction flow
     const signature = await this.sendOptimizedTransaction(instruction);
-    
+
     console.log(`Prize sent successfully for round ${roundId}: ${signature}`);
+    return { signature };
+  }
+
+  // Delete old game account and recover rent (admin only)
+  // HELIUS OPTIMIZED: Uses confirmed commitment, CU optimization, priority fees, and retry logic
+  async deleteGame(roundId: number): Promise<string> {
+    const { config, gameRound } = this.getPDAs(roundId);
+
+    if (!gameRound) {
+      throw new Error("Failed to derive game round PDA");
+    }
+
+    console.log(`Deleting game account for round ${roundId} with Helius optimizations`);
+
+    // Build the instruction (instead of using .rpc() directly)
+    const instruction = await this.program.methods
+      .deleteGame(new anchor.BN(roundId))
+      .accounts({
+        config,
+        game: gameRound,
+        admin: this.authority.publicKey,
+      } as any)
+      .instruction();
+
+    // Send using Helius-optimized transaction flow
+    const signature = await this.sendOptimizedTransaction(instruction);
+
+    console.log(`Game ${roundId} deleted successfully (rent refunded): ${signature}`);
     return signature;
   }
 
   // Note: VRF functionality removed - risk architecture uses simpler randomness
+
+  // Initialize game configuration (admin only)
+  async initializeConfig(
+    treasury: string,
+    houseFee: number,
+    minDepositAmount: number,
+    maxDepositAmount: number,
+    roundTime: number
+  ): Promise<{ signature: string }> {
+    const { config } = this.getPDAs();
+
+    try {
+      const treasuryPubkey = new PublicKey(treasury);
+
+      const instruction = await this.program.methods
+        .initializeConfig(
+          treasuryPubkey,
+          new anchor.BN(houseFee),
+          new anchor.BN(minDepositAmount),
+          new anchor.BN(maxDepositAmount),
+          new anchor.BN(roundTime)
+        )
+        .accounts({
+          config,
+          admin: this.authority.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        } as any)
+        .instruction();
+
+      const signature = await this.sendOptimizedTransaction(instruction);
+
+      console.log(`Config initialized successfully: ${signature}`);
+      return { signature };
+    } catch (error) {
+      console.error("Failed to initialize config:", error);
+      throw error;
+    }
+  }
+
+  // Create a new game round (admin only, no bets yet)
+  async createGameRound(roundId: number, mapId: number): Promise<{ signature: string }> {
+    const { config, activeGame, gameRound } = this.getPDAs(roundId);
+
+    if (!gameRound) {
+      throw new Error("Failed to derive game round PDA");
+    }
+
+    try {
+      const instruction = await this.program.methods
+        .createGameRound(new anchor.BN(roundId), mapId)
+        .accounts({
+          config,
+          game: gameRound,
+          activeGame,
+          user: this.authority.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        } as any)
+        .instruction();
+
+      const signature = await this.sendOptimizedTransaction(instruction);
+
+      console.log(`Game round ${roundId} created (no bets yet): ${signature}`);
+      return { signature };
+    } catch (error) {
+      console.error("Failed to create game round:", error);
+      throw error;
+    }
+  }
+
+  // Place a bet in the current game (additional bets after game created)
+  async placeBet(
+    roundId: number,
+    betAmount: number,
+    skin: number,
+    position: [number, number]
+  ): Promise<{ signature: string }> {
+    const { config, gameRound } = this.getPDAs(roundId);
+
+    if (!gameRound) {
+      throw new Error("Failed to derive game round PDA");
+    }
+
+    try {
+      const instruction = await this.program.methods
+        .bet(new anchor.BN(roundId), new anchor.BN(betAmount), skin, position)
+        .accounts({
+          config,
+          game: gameRound,
+          user: this.authority.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        } as any)
+        .instruction();
+
+      const signature = await this.sendOptimizedTransaction(instruction);
+
+      console.log(`Bet placed successfully: ${signature}`);
+      return { signature };
+    } catch (error) {
+      console.error("Failed to place bet:", error);
+      throw error;
+    }
+  }
 
   // Fetch all bets for a specific round (risk-based architecture - bets stored inline)
   async getBetsForRound(roundId: number): Promise<Array<BetInfoStruct & { wallet: string }>> {
@@ -702,7 +820,7 @@ export class SolanaClient {
   /**
    * Get dynamic priority fee estimate using Helius Priority Fee API
    * HELIUS BEST PRACTICE: Use serialized transaction method for most accurate estimates
-   * 
+   *
    * @param instruction - The instruction to estimate fee for
    * @param payer - The payer public key
    * @returns Priority fee in microlamports/CU, or fallback value if API fails
@@ -713,7 +831,7 @@ export class SolanaClient {
   ): Promise<number> {
     try {
       // HELIUS BEST PRACTICE #1: Use 'confirmed' commitment for latest blockhash
-      const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
+      const { blockhash } = await this.connection.getLatestBlockhash("confirmed");
 
       // Create temp transaction for fee estimation
       const tempMessage = new TransactionMessage({
@@ -733,17 +851,19 @@ export class SolanaClient {
           jsonrpc: "2.0",
           id: "1",
           method: "getPriorityFeeEstimate",
-          params: [{
-            transaction: serializedTx,
-            options: { 
-              recommended: true  // Use Helius recommended fee for staked connections
-            }
-          }]
-        })
+          params: [
+            {
+              transaction: serializedTx,
+              options: {
+                recommended: true, // Use Helius recommended fee for staked connections
+              },
+            },
+          ],
+        }),
       });
 
       const data = await response.json();
-      
+
       if (data.result?.priorityFeeEstimate) {
         // Add 20% safety buffer to recommended fee (Helius recommendation)
         const estimatedFee = Math.ceil(data.result.priorityFeeEstimate * 1.2);
@@ -763,7 +883,7 @@ export class SolanaClient {
   /**
    * Simulate transaction and optimize compute units
    * HELIUS BEST PRACTICE: Simulate with high CU limit, then use actual consumption + 10% buffer
-   * 
+   *
    * @param instruction - The instruction to simulate
    * @param payer - The payer public key
    * @param blockhash - Recent blockhash
@@ -806,11 +926,14 @@ export class SolanaClient {
       }
 
       // HELIUS BEST PRACTICE: Add 10% buffer to compute units
-      const optimizedCU = simulation.value.unitsConsumed < 1000 
-        ? 1000 
-        : Math.ceil(simulation.value.unitsConsumed * 1.1);
+      const optimizedCU =
+        simulation.value.unitsConsumed < 1000
+          ? 1000
+          : Math.ceil(simulation.value.unitsConsumed * 1.1);
 
-      console.log(`Optimized compute units: ${optimizedCU} (consumed: ${simulation.value.unitsConsumed})`);
+      console.log(
+        `Optimized compute units: ${optimizedCU} (consumed: ${simulation.value.unitsConsumed})`
+      );
       return optimizedCU;
     } catch (error) {
       console.warn("Compute unit simulation failed:", error);
@@ -821,7 +944,7 @@ export class SolanaClient {
 
   /**
    * Build and send an optimized transaction with Helius best practices
-   * 
+   *
    * @param instruction - The instruction to send
    * @param extraSigners - Additional signers (if any)
    * @returns Transaction signature
@@ -831,20 +954,18 @@ export class SolanaClient {
     extraSigners: Keypair[] = []
   ): Promise<string> {
     // HELIUS BEST PRACTICE #1: Use 'confirmed' commitment for latest blockhash
-    const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash('confirmed');
+    const { blockhash, lastValidBlockHeight } =
+      await this.connection.getLatestBlockhash("confirmed");
 
     // HELIUS BEST PRACTICE #2: Simulate to optimize compute units
     const computeUnits = await this.simulateAndOptimizeComputeUnits(
-      instruction, 
-      this.authority.publicKey, 
+      instruction,
+      this.authority.publicKey,
       blockhash
     );
 
     // HELIUS BEST PRACTICE #3: Get dynamic priority fee estimate
-    const priorityFee = await this.getPriorityFeeEstimate(
-      instruction, 
-      this.authority.publicKey
-    );
+    const priorityFee = await this.getPriorityFeeEstimate(instruction, this.authority.publicKey);
 
     // Build final optimized transaction with compute budget instructions
     // Note: Compute budget instructions MUST come first
@@ -873,26 +994,20 @@ export class SolanaClient {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         // Check if blockhash is still valid
-        const currentBlockHeight = await this.connection.getBlockHeight('confirmed');
+        const currentBlockHeight = await this.connection.getBlockHeight("confirmed");
         if (currentBlockHeight > lastValidBlockHeight) {
-          throw new Error('Blockhash expired, need to rebuild transaction');
+          throw new Error("Blockhash expired, need to rebuild transaction");
         }
 
         // Send with skipPreflight: true (Helius best practice)
-        signature = await this.connection.sendRawTransaction(
-          finalTransaction.serialize(),
-          {
-            skipPreflight: true,
-            maxRetries: 0,  // We handle retries ourselves
-          }
-        );
+        signature = await this.connection.sendRawTransaction(finalTransaction.serialize(), {
+          skipPreflight: true,
+          maxRetries: 0, // We handle retries ourselves
+        });
 
         // Confirm transaction with polling
-        const confirmed = await this.confirmTransactionWithPolling(
-          signature, 
-          lastValidBlockHeight
-        );
-        
+        const confirmed = await this.confirmTransactionWithPolling(signature, lastValidBlockHeight);
+
         if (confirmed) {
           console.log(`Transaction confirmed on attempt ${attempt + 1}: ${signature}`);
           break;
@@ -905,7 +1020,7 @@ export class SolanaClient {
           throw error;
         }
         // Exponential backoff
-        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
       }
     }
 
@@ -919,7 +1034,7 @@ export class SolanaClient {
   /**
    * Confirm transaction with polling and blockhash expiry check
    * HELIUS BEST PRACTICE: Implement robust confirmation polling
-   * 
+   *
    * @param signature - Transaction signature
    * @param lastValidBlockHeight - Last valid block height for the transaction
    * @returns True if confirmed, false otherwise
@@ -939,29 +1054,32 @@ export class SolanaClient {
 
         if (status) {
           if (status.err) {
-            console.error('Transaction failed with error:', status.err);
+            console.error("Transaction failed with error:", status.err);
             return false;
           }
-          
-          if (status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized') {
+
+          if (
+            status.confirmationStatus === "confirmed" ||
+            status.confirmationStatus === "finalized"
+          ) {
             return true;
           }
         }
 
         // Check if blockhash expired
-        const currentBlockHeight = await this.connection.getBlockHeight('confirmed');
+        const currentBlockHeight = await this.connection.getBlockHeight("confirmed");
         if (currentBlockHeight > lastValidBlockHeight) {
-          console.warn('Blockhash expired during confirmation polling');
+          console.warn("Blockhash expired during confirmation polling");
           return false;
         }
       } catch (error) {
-        console.warn('Status check failed:', error);
+        console.warn("Status check failed:", error);
       }
 
-      await new Promise(resolve => setTimeout(resolve, interval));
+      await new Promise((resolve) => setTimeout(resolve, interval));
     }
 
-    console.warn('Transaction confirmation timeout');
+    console.warn("Transaction confirmation timeout");
     return false;
   }
 }

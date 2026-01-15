@@ -36,3 +36,19 @@ Cargo.lock
 
 test-ledger/
 docker-compose.yml
+
+# Privy bot signer keys
+private.pem
+public.pem
+
+# Native folders (generated)
+android/
+ios/
+
+# Bubblewrap/TWA build files
+.gradle/
+app/build/
+*.apk
+*.aab
+*.idsig
+*.keystore
