@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
@@ -12,7 +13,8 @@ interface LeaderboardDialogProps {
 
 export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps) {
   const { publicKey } = usePrivyWallet();
-  const leaderboard = useQuery(api.players.getLeaderboard, { limit: 50 });
+  const [sortBy, setSortBy] = useState<"points" | "level">("points");
+  const leaderboard = useQuery(api.players.getLeaderboard, { limit: 50, sortBy });
 
   const getRankStyle = (rank: number) => {
     switch (rank) {
@@ -102,14 +104,38 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
           <X className="w-5 h-5" />
         </button>
 
-        <DialogHeader className="pb-4">
+        <DialogHeader className="pb-2">
           <DialogTitle className="text-indigo-100 flex items-center justify-center gap-3 text-4xl font-bold tracking-wide">
             <Trophy className="w-8 h-8 text-yellow-400" />
             LEADERBOARD
           </DialogTitle>
         </DialogHeader>
 
-        <div className="overflow-y-auto max-h-[55vh] pr-1 scrollbar-thin scrollbar-thumb-indigo-700/50 scrollbar-track-transparent">
+        {/* Sort Toggle */}
+        <div className="flex justify-center gap-2 pb-3">
+          <button
+            onClick={() => setSortBy("points")}
+            className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+              sortBy === "points"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "bg-indigo-900/50 text-indigo-300 hover:bg-indigo-800/50"
+            }`}
+          >
+            Points
+          </button>
+          <button
+            onClick={() => setSortBy("level")}
+            className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+              sortBy === "level"
+                ? "bg-purple-600 text-white shadow-lg"
+                : "bg-indigo-900/50 text-indigo-300 hover:bg-indigo-800/50"
+            }`}
+          >
+            Level
+          </button>
+        </div>
+
+        <div className="overflow-y-auto max-h-[50vh] pr-1 scrollbar-thin scrollbar-thumb-indigo-700/50 scrollbar-track-transparent">
           {leaderboard === undefined ? (
             <div className="text-center py-6 text-indigo-400/60">Loading...</div>
           ) : leaderboard.length === 0 ? (
@@ -118,12 +144,15 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
             <table className="w-full">
               <thead className="sticky top-0 bg-indigo-950/95 z-10">
                 <tr className="text-base text-indigo-300/70 uppercase">
-                  <th className=" py-2 pl-3 text-center">#</th>
+                  <th className="py-2 pl-3 text-center">#</th>
                   <th className="text-left py-2">Player</th>
-                  <th className="text-center  w-20">Games</th>
-                  <th className="text-center py-2 w-20">Wins</th>
-                  <th className="text-center py-2 w-20">Win%</th>
-                  <th className="text-right py-2 pr-3 w-24">Points</th>
+                  <th className="text-center py-2 w-14">Lvl</th>
+                  <th className="text-center w-16">Games</th>
+                  <th className="text-center py-2 w-16">Wins</th>
+                  <th className="text-center py-2 w-16">Win%</th>
+                  <th className="text-right py-2 pr-3 w-20">
+                    {sortBy === "level" ? "XP" : "Points"}
+                  </th>
                 </tr>
               </thead>
               <tbody className="space-y-1">
@@ -151,39 +180,51 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
                       <td className="py-3">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`font-semibold text-xl truncate max-w-[180px] ${style.nameColor}`}
+                            className={`font-semibold text-lg truncate max-w-[140px] ${style.nameColor}`}
                           >
                             {player.displayName}
                           </span>
                           {renderBadges(player.totalWins)}
                           {isCurrent && (
-                            <span className="px-2 py-1 bg-indigo-500/60 text-white text-sm rounded font-medium">
+                            <span className="px-2 py-0.5 bg-indigo-500/60 text-white text-xs rounded font-medium">
                               YOU
                             </span>
                           )}
                         </div>
                       </td>
 
+                      {/* Level */}
+                      <td className="text-center py-3">
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="text-yellow-400 text-sm">&#9733;</span>
+                          <span className={`font-bold text-lg ${style.statsColor}`}>
+                            {player.level}
+                          </span>
+                        </div>
+                      </td>
+
                       {/* Games */}
-                      <td className={`text-center py-3 font-semibold text-xl ${style.statsColor}`}>
+                      <td className={`text-center py-3 font-semibold text-lg ${style.statsColor}`}>
                         {player.totalGamesPlayed}
                       </td>
 
                       {/* Wins */}
-                      <td className={`text-center py-3 font-semibold text-xl ${style.statsColor}`}>
+                      <td className={`text-center py-3 font-semibold text-lg ${style.statsColor}`}>
                         {player.totalWins}
                       </td>
 
                       {/* Win% */}
-                      <td className={`text-center py-3 font-semibold text-xl ${style.statsColor}`}>
+                      <td className={`text-center py-3 font-semibold text-lg ${style.statsColor}`}>
                         {calculateWinRate(player.totalWins, player.totalGamesPlayed)}
                       </td>
 
-                      {/* Points */}
+                      {/* Points or XP */}
                       <td
-                        className={`text-right py-3 pr-3 font-bold text-2xl ${style.pointsColor}`}
+                        className={`text-right py-3 pr-3 font-bold text-xl ${style.pointsColor}`}
                       >
-                        {player.totalPoints.toLocaleString()}
+                        {sortBy === "level"
+                          ? player.xp.toLocaleString()
+                          : player.totalPoints.toLocaleString()}
                       </td>
                     </tr>
                   );

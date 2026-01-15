@@ -112,7 +112,15 @@ export default defineSchema({
     totalWins: v.number(),
     totalPoints: v.optional(v.number()), // Points earned from bets and prizes (1 point per 0.001 SOL)
     achievements: v.array(v.string()),
-  }).index("by_wallet", ["walletAddress"]),
+    // XP System fields
+    xp: v.optional(v.number()), // Total XP earned
+    level: v.optional(v.number()), // Current level (1-10)
+    currentWinStreak: v.optional(v.number()), // Consecutive wins for streak bonus
+    lastDailyLoginDate: v.optional(v.string()), // ISO date "YYYY-MM-DD" for daily login bonus
+    lastDailyBetDate: v.optional(v.string()), // ISO date "YYYY-MM-DD" for first bet of day bonus
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_xp", ["xp"]),
 
   // ============================================================================
   // REFERRAL SYSTEM TABLES

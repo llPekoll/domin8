@@ -322,7 +322,7 @@ export class AnimationManager {
 
       // Play death screams for each eliminated character (with slight delays for variety)
       let screamDelay = 0;
-      eliminatedParticipants.forEach((p) => {
+      eliminatedParticipants.forEach((_p) => {
         const delay = staggered ? Math.random() * 1000 : screamDelay;
         this.scene.time.delayedCall(delay, () => {
           SoundManager.playRandomDeathScream(this.scene, 0.5);

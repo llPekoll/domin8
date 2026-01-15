@@ -47,6 +47,10 @@ export class PlayerManager {
     this.currentMap = mapData;
   }
 
+  getMapData(): any {
+    return this.currentMap;
+  }
+
   getParticipants(): Map<string, GameParticipant> {
     return this.participants;
   }
@@ -157,36 +161,36 @@ export class PlayerManager {
       pixelPerfect: true, // Only trigger on non-transparent pixels
     });
     sprite.on("pointerdown", () => {
-      // Only play poke animation if currently playing idle
-      const currentAnim = sprite.anims.currentAnim;
-      if (currentAnim && currentAnim.key === `${textureKey}-idle`) {
-        // Randomly choose between poke and poke1 animations
-        const pokeVariant = Math.random() < 0.5 ? "poke" : "poke1";
-        const pokeAnimKey = `${textureKey}-${pokeVariant}`;
+      // Randomly choose between poke and poke1 animations
+      const pokeVariant = Math.random() < 0.5 ? "poke" : "poke1";
+      const pokeAnimKey = `${textureKey}-${pokeVariant}`;
 
-        // Check if the chosen poke animation exists, otherwise try the other one
-        let selectedPokeKey = pokeAnimKey;
-        if (!this.scene.anims.exists(pokeAnimKey)) {
-          const fallbackVariant = pokeVariant === "poke" ? "poke1" : "poke";
-          const fallbackKey = `${textureKey}-${fallbackVariant}`;
-          if (this.scene.anims.exists(fallbackKey)) {
-            selectedPokeKey = fallbackKey;
-          } else {
-            // Neither poke animation exists, don't play anything
-            return;
-          }
+      // Check if the chosen poke animation exists, otherwise try the other one
+      let selectedPokeKey = pokeAnimKey;
+      if (!this.scene.anims.exists(pokeAnimKey)) {
+        const fallbackVariant = pokeVariant === "poke" ? "poke1" : "poke";
+        const fallbackKey = `${textureKey}-${fallbackVariant}`;
+        if (this.scene.anims.exists(fallbackKey)) {
+          selectedPokeKey = fallbackKey;
+        } else {
+          // Neither poke animation exists, don't play anything
+          return;
         }
-
-        sprite.play(selectedPokeKey);
-
-        // After poke animation completes, return to idle
-        sprite.once("animationcomplete", () => {
-          const idleAnimKey = `${textureKey}-idle`;
-          if (this.scene.anims.exists(idleAnimKey)) {
-            sprite.play(idleAnimKey);
-          }
-        });
       }
+
+      // Remove any existing animationcomplete listener to avoid stacking
+      sprite.off("animationcomplete");
+
+      // Play animation from the start (restart if already playing)
+      sprite.play(selectedPokeKey, true);
+
+      // After poke animation completes, return to idle
+      sprite.once("animationcomplete", () => {
+        const idleAnimKey = `${textureKey}-idle`;
+        if (this.scene.anims.exists(idleAnimKey)) {
+          sprite.play(idleAnimKey);
+        }
+      });
     });
 
     // Create dust front sprite (plays in front of character)

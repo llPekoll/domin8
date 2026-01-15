@@ -621,6 +621,29 @@ export const executeSendPrize = internalAction({
             console.error(`Round ${roundId}: Failed to award points to winner:`, pointsError);
           }
 
+          // Award XP to winner (+100 XP + streak bonus)
+          try {
+            const xpResult = await ctx.runMutation(internal.players.awardXpForWin, {
+              walletAddress: gameRound.winner.toString(),
+            });
+            console.log(`Round ${roundId}: XP awarded to winner:`, xpResult);
+          } catch (xpError) {
+            console.error(`Round ${roundId}: Failed to award XP to winner:`, xpError);
+          }
+
+          // Reset win streak for non-winners
+          const losers = gameRound.wallets.filter((w) => w !== gameRound.winner?.toString());
+          if (losers.length > 0) {
+            try {
+              await ctx.runMutation(internal.players.resetWinStreak, {
+                walletAddresses: losers,
+              });
+              console.log(`Round ${roundId}: Win streaks reset for ${losers.length} non-winners`);
+            } catch (streakError) {
+              console.error(`Round ${roundId}: Failed to reset win streaks:`, streakError);
+            }
+          }
+
           // Announce winner in chat
           try {
             const winnerPlayer = await ctx.runQuery(internal.players.getPlayerInternal, {

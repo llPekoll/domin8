@@ -281,7 +281,7 @@ export class Game extends Scene {
             });
 
             // Get explosion center from map config
-            const mapConfig = this.playerManager.currentMap?.spawnConfiguration;
+            const mapConfig = this.playerManager.getMapData()?.spawnConfiguration;
             const explosionCenterX = mapConfig ? mapConfig.centerX * RESOLUTION_SCALE : this.scale.width / 2;
             const explosionCenterY = mapConfig ? mapConfig.centerY * RESOLUTION_SCALE : this.scale.height / 2;
 

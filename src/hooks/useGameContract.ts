@@ -31,6 +31,8 @@ import { usePrivyWallet } from "./usePrivyWallet";
 import { useWallets } from "@privy-io/react-auth/solana";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { EventBus } from "../game/EventBus";
+import { getLevelInfo } from "../../convex/xpConstants";
 import {
   Connection,
   PublicKey,
@@ -509,6 +511,9 @@ export const useGameContract = () => {
   // Convex mutation for awarding points
   const awardPoints = useMutation(api.players.awardPoints);
 
+  // Convex mutation for awarding XP
+  const awardXpForBet = useMutation(api.players.awardXpForBet);
+
   // Convex mutation for tracking referral revenue
   const updateReferralRevenue = useMutation(api.referrals.updateReferralRevenue);
 
@@ -790,6 +795,26 @@ export const useGameContract = () => {
           logger.solana.error("[placeBet] Failed to award points:", pointsError);
         }
 
+        // Award XP for the bet (+10 base + bet bonus + daily bonus)
+        try {
+          const xpResult = await awardXpForBet({
+            walletAddress: publicKey.toString(),
+            betAmountLamports: amountLamports,
+          });
+          logger.solana.debug("[placeBet] XP awarded for bet:", xpResult);
+
+          // Emit level-up event if player leveled up
+          if (xpResult.levelUp) {
+            EventBus.emit("level-up", {
+              newLevel: xpResult.newLevel,
+              levelTitle: getLevelInfo(xpResult.newLevel).title,
+            });
+          }
+        } catch (xpError) {
+          // Don't fail the bet if XP award fails
+          logger.solana.error("[placeBet] Failed to award XP:", xpError);
+        }
+
         // Track referral revenue if this user was referred
         try {
           await updateReferralRevenue({
@@ -835,6 +860,7 @@ export const useGameContract = () => {
       connection,
       network,
       awardPoints,
+      awardXpForBet,
       updateReferralRevenue,
     ]
   );

@@ -1,15 +1,23 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { useWallets } from "@privy-io/react-auth/solana";
 import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { getSharedConnection } from "../lib/sharedConnection";
 import { logger } from "../lib/logger";
+import { EventBus } from "../game/EventBus";
+import { getLevelInfo } from "../../convex/xpConstants";
 
 export function usePrivyWallet() {
   const { ready, authenticated, user } = usePrivy();
   const { wallets } = useWallets();
   const [solBalance, setSolBalance] = useState<number>(0);
   const [isLoadingBalance, setIsLoadingBalance] = useState<boolean>(false);
+  const dailyLoginClaimedRef = useRef<string | null>(null);
+
+  // Convex mutation for daily login XP
+  const claimDailyLoginXp = useMutation(api.players.claimDailyLoginXp);
 
   const solanaWallet = wallets[0];
   const walletAddress = solanaWallet?.address;
@@ -29,6 +37,39 @@ export function usePrivyWallet() {
       });
     }
   }, [user]);
+
+  // Claim daily login XP when wallet is connected
+  useEffect(() => {
+    if (!connected || !walletAddress) return;
+
+    // Prevent multiple claims for the same wallet in the same session
+    if (dailyLoginClaimedRef.current === walletAddress) return;
+
+    const claimLoginXp = async () => {
+      try {
+        const result = await claimDailyLoginXp({ walletAddress });
+
+        if (result.awarded) {
+          logger.solana.info("[usePrivyWallet] Daily login XP claimed:", result);
+
+          // Emit level-up event if player leveled up
+          if (result.levelUp && result.newLevel) {
+            EventBus.emit("level-up", {
+              newLevel: result.newLevel,
+              levelTitle: getLevelInfo(result.newLevel).title,
+            });
+          }
+        }
+
+        // Mark as claimed for this session
+        dailyLoginClaimedRef.current = walletAddress;
+      } catch (error) {
+        logger.solana.error("[usePrivyWallet] Failed to claim daily login XP:", error);
+      }
+    };
+
+    void claimLoginXp();
+  }, [connected, walletAddress, claimDailyLoginXp]);
 
   // Get external wallet address (non-Privy wallet, e.g., Phantom)
   const externalWalletAccount = user?.linkedAccounts?.find(

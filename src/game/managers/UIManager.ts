@@ -287,6 +287,7 @@ export class UIManager {
           ease: "Cubic.easeOut", // Slows down at end for drama
           onUpdate: (tween) => {
             const value = tween.getValue();
+            if (value === null) return;
             const displayValue = value >= 10 ? `x${Math.round(value)}` : `x${value.toFixed(1)}`;
             this.multiplierText.setText(displayValue);
 
