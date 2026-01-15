@@ -256,8 +256,8 @@ export class Game extends Scene {
     });
 
     // Listen for battle phase start
-    EventBus.on("start-battle-phase", () => {
-      logger.game.debug("[Game] ⚔️ Battle phase triggered");
+    EventBus.on("start-battle-phase", ({ winner }: { winner: string | null }) => {
+      logger.game.debug("[Game] ⚔️ Battle phase triggered", { winner });
 
       // Remove arena masks before battle starts
       this.removeArenaMasks();
@@ -265,6 +265,30 @@ export class Game extends Scene {
       const participantsMap = this.playerManager.getParticipants();
       if (participantsMap.size > 0) {
         this.animationManager.startBattlePhaseSequence(this.playerManager);
+
+        // Kick out losers immediately when battle starts
+        if (winner) {
+          this.time.delayedCall(0, () => {
+            const participants = this.playerManager.getParticipants();
+
+            // Mark all non-winners as eliminated
+            participants.forEach((participant: any) => {
+              if (participant.id !== winner && participant.playerId !== winner) {
+                participant.eliminated = true;
+              } else {
+                participant.eliminated = false;
+              }
+            });
+
+            // Get explosion center from map config
+            const mapConfig = this.playerManager.currentMap?.spawnConfiguration;
+            const explosionCenterX = mapConfig ? mapConfig.centerX * RESOLUTION_SCALE : this.scale.width / 2;
+            const explosionCenterY = mapConfig ? mapConfig.centerY * RESOLUTION_SCALE : this.scale.height / 2;
+
+            // Kick out losers with staggered timing
+            this.animationManager.explodeParticipantsOutward(participants, explosionCenterX, explosionCenterY, true);
+          });
+        }
       }
     });
 

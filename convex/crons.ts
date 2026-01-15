@@ -20,7 +20,7 @@
  *       ↑                                              ↓
  *       └──── 7. CLEANUP ← 6. CELEBRATION ← 5. FIGHTING ← 4. END GAME (CLOSED)
  *
- * Timing: 60s betting + 1s end_game + 4s send_prize + 14s create_game = ~79s cycle
+ * Timing: 60s betting + 1s end_game + 4s send_prize + 18s create_game = ~83s cycle
  *
  * ═══════════════════════════════════════════════════════════════════════════════
  */

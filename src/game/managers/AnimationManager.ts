@@ -12,10 +12,10 @@ export class AnimationManager {
   // Physics configuration for explosion - TWEAK THESE VALUES
   // Base values are for RESOLUTION_SCALE = 1, automatically scaled
   private readonly EXPLOSION_CONFIG = {
-    forceMin: 300 * RESOLUTION_SCALE, // Minimum outward force (doubled from 150)
-    forceMax: 500 * RESOLUTION_SCALE, // Maximum outward force (doubled from 250)
-    upwardKickMin: 300 * RESOLUTION_SCALE, // Minimum upward boost (increased from 200)
-    upwardKickMax: 600 * RESOLUTION_SCALE, // Maximum upward boost (increased from 400)
+    forceMin: 150 * RESOLUTION_SCALE, // Minimum outward force
+    forceMax: 250 * RESOLUTION_SCALE, // Maximum outward force
+    upwardKickMin: 150 * RESOLUTION_SCALE, // Minimum upward boost
+    upwardKickMax: 300 * RESOLUTION_SCALE, // Maximum upward boost
     upwardKickChance: 0.8, // Chance to apply upward kick (no scaling needed)
     gravity: 200 * RESOLUTION_SCALE, // Gravity force (increased from 150 to match higher forces)
     rotationSpeed: 10, // Max rotation speed (no scaling needed)
@@ -302,7 +302,8 @@ export class AnimationManager {
   explodeParticipantsOutward(
     participants: Map<string, any>,
     explosionCenterX?: number,
-    explosionCenterY?: number
+    explosionCenterY?: number,
+    staggered: boolean = false
   ) {
     const config = this.EXPLOSION_CONFIG;
 
@@ -314,23 +315,23 @@ export class AnimationManager {
     this.createCenterExplosion();
 
     // Add full-screen blood effect when characters are eliminated
-    const eliminatedCount = Array.from(participants.values()).filter((p) => p.eliminated).length;
+    const eliminatedParticipants = Array.from(participants.values()).filter((p) => p.eliminated);
+    const eliminatedCount = eliminatedParticipants.length;
     if (eliminatedCount > 0) {
       this.createBloodSplatter(centerX, centerY, true);
 
       // Play death screams for each eliminated character (with slight delays for variety)
       let screamDelay = 0;
-      Array.from(participants.values()).forEach((p) => {
-        if (p.eliminated) {
-          this.scene.time.delayedCall(screamDelay, () => {
-            SoundManager.playRandomDeathScream(this.scene, 0.5);
-          });
-          screamDelay += 100; // Stagger screams by 100ms
-        }
+      eliminatedParticipants.forEach((p) => {
+        const delay = staggered ? Math.random() * 1000 : screamDelay;
+        this.scene.time.delayedCall(delay, () => {
+          SoundManager.playRandomDeathScream(this.scene, 0.5);
+        });
+        screamDelay += 100; // Stagger screams by 100ms (used when not staggered)
       });
     }
 
-    // Apply physics only to eliminated participants
+    // Apply physics to eliminated participants (with optional staggered timing)
     participants.forEach((participant) => {
       if (!participant.container || !participant.container.active) return;
 
@@ -340,122 +341,132 @@ export class AnimationManager {
       // Only explode eliminated participants, leave the winner alone
       if (!participant.eliminated) return;
 
-      // Change sprite anchor to center for better rotation physics
-      // Store the current Y position before changing origin
-      const currentY = participant.sprite.y;
-      participant.sprite.setOrigin(0.5, 0.5); // Center origin for rotation
-      // Adjust Y position to compensate for origin change (half sprite height)
-      const spriteHeight = 32 * participant.sprite.scaleY;
-      participant.sprite.setY(currentY - spriteHeight / 2);
+      // Calculate stagger delay: random delay between 0-1000ms for gradual kick-out
+      const staggerDelay = staggered ? Math.random() * 1000 : 0;
 
-      // Calculate angle from explosion center to participant
-      const dx = participant.container.x - centerX;
-      const dy = participant.container.y - centerY;
-      const angle = Math.atan2(dy, dx);
+      // Wrap physics setup in delayed call for staggered effect
+      const applyKickOutPhysics = () => {
+        // Guard against destroyed containers during delay
+        if (!participant.container || !participant.container.active) return;
 
-      // Random force using config values
-      const forceMultiplier = config.forceMin + Math.random() * (config.forceMax - config.forceMin);
+        // Change sprite anchor to center for better rotation physics
+        // Store the current Y position before changing origin
+        const currentY = participant.sprite.y;
+        participant.sprite.setOrigin(0.5, 0.5); // Center origin for rotation
+        // Adjust Y position to compensate for origin change (half sprite height)
+        const spriteHeight = 32 * participant.sprite.scaleY;
+        participant.sprite.setY(currentY - spriteHeight / 2);
 
-      // Initial velocity components
-      const velocityX = Math.cos(angle) * forceMultiplier;
-      const velocityY = Math.sin(angle) * forceMultiplier;
+        // Fountain effect: shoot upward first, then arc down
+        // Strong upward velocity with random horizontal spread for the curl
+        const upwardForce = config.upwardKickMin + Math.random() * (config.upwardKickMax - config.upwardKickMin);
+        const horizontalSpread = (Math.random() - 0.5) * config.forceMax * 0.8; // Random left/right spread
 
-      // Add random upward kick for some particles (like they got punched up)
-      const upwardKick =
-        Math.random() > config.upwardKickChance
-          ? 0
-          : -(config.upwardKickMin + Math.random() * (config.upwardKickMax - config.upwardKickMin));
+        // Initial velocity: strong upward, random horizontal
+        const velocityX = horizontalSpread;
+        const velocityY = -upwardForce; // Negative = upward in screen coords
 
-      // Random rotation speed
-      const rotationSpeed = (Math.random() - 0.5) * config.rotationSpeed * 2;
+        // No additional upward kick needed since we're already going up
+        const upwardKick = 0;
 
-      // Store initial values for physics simulation
-      const currentVelocityX = velocityX;
-      let currentVelocityY = velocityY + upwardKick;
-      let elapsedTime = 0;
+        // Random rotation speed
+        const rotationSpeed = (Math.random() - 0.5) * config.rotationSpeed * 2;
 
-      // Add debug trail only if enabled
-      let debugTrail: Phaser.GameObjects.Graphics | null = null;
-      if (config.showDebugTrails) {
-        debugTrail = this.scene.add.graphics();
-        debugTrail.lineStyle(2, 0xff0000, 0.5);
-        debugTrail.moveTo(participant.container.x, participant.container.y);
-        debugTrail.setDepth(50);
-      }
+        // Store initial values for physics simulation
+        const currentVelocityX = velocityX;
+        let currentVelocityY = velocityY + upwardKick;
+        let elapsedTime = 0;
 
-      // Create physics update loop
-      const physicsUpdate = this.scene.time.addEvent({
-        delay: 16, // ~60fps
-        repeat: -1,
-        callback: () => {
-          if (!participant.container || !participant.container.active) {
-            physicsUpdate.remove();
-            if (debugTrail) debugTrail.destroy();
-            return;
-          }
+        // Add debug trail only if enabled
+        let debugTrail: Phaser.GameObjects.Graphics | null = null;
+        if (config.showDebugTrails) {
+          debugTrail = this.scene.add.graphics();
+          debugTrail.lineStyle(2, 0xff0000, 0.5);
+          debugTrail.moveTo(participant.container.x, participant.container.y);
+          debugTrail.setDepth(50);
+        }
 
-          const deltaTime = 0.016; // 16ms in seconds
-          elapsedTime += deltaTime;
-
-          // Apply gravity to Y velocity
-          currentVelocityY += config.gravity * deltaTime;
-
-          // Update position
-          participant.container.x += currentVelocityX * deltaTime;
-          participant.container.y += currentVelocityY * deltaTime;
-
-          // Draw debug trail if enabled
-          if (debugTrail) {
-            debugTrail.lineTo(participant.container.x, participant.container.y);
-          }
-
-          // Apply rotation to sprite only, not the container
-          if (participant.sprite) {
-            participant.sprite.angle += rotationSpeed;
-          }
-
-          // Keep full opacity - no fading
-          // participant.container.alpha stays at 1
-
-          // Remove when off screen or after max lifetime
-          const gameWidth = this.scene.scale.width;
-          const gameHeight = this.scene.scale.height;
-
-          const isOffScreen =
-            participant.container.x < -100 ||
-            participant.container.x > gameWidth + 100 ||
-            participant.container.y > gameHeight + 100 ||
-            elapsedTime > config.maxLifetime;
-
-          if (isOffScreen) {
-            physicsUpdate.remove();
-            participant.container.setVisible(false);
-            participant.container.setActive(false);
-
-            // Fade out debug trail if it exists
-            if (debugTrail) {
-              this.scene.tweens.add({
-                targets: debugTrail,
-                alpha: 0,
-                duration: 1000,
-                onComplete: () => debugTrail.destroy(),
-              });
+        // Create physics update loop
+        const physicsUpdate = this.scene.time.addEvent({
+          delay: 16, // ~60fps
+          repeat: -1,
+          callback: () => {
+            if (!participant.container || !participant.container.active) {
+              physicsUpdate.remove();
+              if (debugTrail) debugTrail.destroy();
+              return;
             }
-          }
-        },
-      });
 
-      // Add some visual effects during explosion
-      this.scene.tweens.add({
-        targets: participant.sprite,
-        scaleX: participant.sprite.scaleX * 1.2,
-        scaleY: participant.sprite.scaleY * 1.2,
-        duration: 200,
-        ease: "Power2",
-      });
+            const deltaTime = 0.016; // 16ms in seconds
+            elapsedTime += deltaTime;
 
-      // Check if participant hits screen edge and create full-screen blood
-      this.checkScreenEdgeCollision(participant);
+            // Apply gravity to Y velocity
+            currentVelocityY += config.gravity * deltaTime;
+
+            // Update position
+            participant.container.x += currentVelocityX * deltaTime;
+            participant.container.y += currentVelocityY * deltaTime;
+
+            // Draw debug trail if enabled
+            if (debugTrail) {
+              debugTrail.lineTo(participant.container.x, participant.container.y);
+            }
+
+            // Apply rotation to sprite only, not the container
+            if (participant.sprite) {
+              participant.sprite.angle += rotationSpeed;
+            }
+
+            // Keep full opacity - no fading
+            // participant.container.alpha stays at 1
+
+            // Remove when off screen or after max lifetime
+            const gameWidth = this.scene.scale.width;
+            const gameHeight = this.scene.scale.height;
+
+            const isOffScreen =
+              participant.container.x < -100 ||
+              participant.container.x > gameWidth + 100 ||
+              participant.container.y > gameHeight + 100 ||
+              elapsedTime > config.maxLifetime;
+
+            if (isOffScreen) {
+              physicsUpdate.remove();
+              participant.container.setVisible(false);
+              participant.container.setActive(false);
+
+              // Fade out debug trail if it exists
+              if (debugTrail) {
+                this.scene.tweens.add({
+                  targets: debugTrail,
+                  alpha: 0,
+                  duration: 1000,
+                  onComplete: () => debugTrail.destroy(),
+                });
+              }
+            }
+          },
+        });
+
+        // Add some visual effects during explosion
+        this.scene.tweens.add({
+          targets: participant.sprite,
+          scaleX: participant.sprite.scaleX * 1.2,
+          scaleY: participant.sprite.scaleY * 1.2,
+          duration: 200,
+          ease: "Power2",
+        });
+
+        // Check if participant hits screen edge and create full-screen blood
+        this.checkScreenEdgeCollision(participant);
+      }; // End of applyKickOutPhysics function
+
+      // Apply the kick-out physics with stagger delay
+      if (staggerDelay > 0) {
+        this.scene.time.delayedCall(staggerDelay, applyKickOutPhysics);
+      } else {
+        applyKickOutPhysics();
+      }
     });
 
   }
@@ -741,28 +752,14 @@ export class AnimationManager {
   startResultsPhaseSequence(playerManager: any, winner: any, onComplete?: () => void) {
     logger.game.debug("[AnimationManager] 🏆 Starting results phase sequence for winner:", winner);
 
-    // Mark all non-winners as eliminated
-    const participants = playerManager.getParticipants();
-    participants.forEach((participant: any) => {
-      if (participant.id !== winner._id && participant.id !== winner.id) {
-        participant.eliminated = true;
-      } else {
-        participant.eliminated = false; // Winner stays
-      }
-    });
+    // Note: Kick-out now happens 1 second into battle phase (in Game.ts)
+    // This function now only handles the winner celebration
 
-    // Get the spawn center from PlayerManager's current map config
-    const mapConfig = playerManager.currentMap?.spawnConfiguration;
-    const explosionCenterX = mapConfig ? mapConfig.centerX * RESOLUTION_SCALE : this.centerX;
-    const explosionCenterY = mapConfig ? mapConfig.centerY * RESOLUTION_SCALE : this.centerY;
-
-    // Explode losers outward with physics (includes explosions, blood, shake)
-    this.explodeParticipantsOutward(participants, explosionCenterX, explosionCenterY);
-
-    // After 3 seconds: Show winner celebration
-    this.scene.time.delayedCall(3000, () => {
+    // After 2 seconds: Show winner celebration (kick-out already started 1s earlier)
+    this.scene.time.delayedCall(2000, () => {
       logger.game.debug("[AnimationManager] 🎉 Starting winner celebration");
 
+      const participants = playerManager.getParticipants();
       const gameState = {
         status: "results",
         winnerId: winner._id || winner.id,

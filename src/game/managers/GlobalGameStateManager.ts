@@ -493,8 +493,15 @@ export class GlobalGameStateManager {
 
     logger.game.debug("[GlobalGameStateManager] ⚔️ Starting battle sequence (3s)");
 
-    // Tell Game scene to start battle animations
-    EventBus.emit("start-battle-phase");
+    // Get winner from current game state
+    const winnerStr = this.currentGameState?.winner
+      ? typeof this.currentGameState.winner === "string"
+        ? this.currentGameState.winner
+        : this.currentGameState.winner.toBase58?.()
+      : null;
+
+    // Tell Game scene to start battle animations (include winner for early kick-out)
+    EventBus.emit("start-battle-phase", { winner: winnerStr });
 
     // Transition to CELEBRATING after battle duration
     setTimeout(() => {

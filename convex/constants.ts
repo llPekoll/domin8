@@ -26,7 +26,7 @@ export const GAME_TIMING = {
   SEND_PRIZE_DELAY: 2_000, // 2 seconds after end_game
 
   /** Delay before creating next game after send_prize */
-  CREATE_GAME_DELAY: 14_000, // 14 seconds after send_prize
+  CREATE_GAME_DELAY: 18_000, // 18 seconds after send_prize (allows for 10s celebration + VRF delay)
 } as const;
 
 // Game status constants (matching smart contract constants.rs)
