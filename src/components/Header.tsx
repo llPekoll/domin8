@@ -100,12 +100,12 @@ export function Header() {
               >
                 1<span className="px-0.5">v</span>1
               </Link>
-              <Link
+              {/*<Link
                 to="/bloody"
                 className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"
               >
                 Bloody Bird
-              </Link>
+              </Link>*/}
               <Link
                 to="/referrals"
                 className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"
@@ -116,16 +116,15 @@ export function Header() {
 
             {/* Right Side - User Controls */}
             <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
-
               {/* Sound Control - Hidden on mobile */}
               <div className="hidden md:block">
                 <SoundControl
                   onSettingsClick={
                     connected && publicKey
                       ? () => {
-                        setProfileDefaultTab("sound");
-                        setShowProfileDialog(true);
-                      }
+                          setProfileDefaultTab("sound");
+                          setShowProfileDialog(true);
+                        }
                       : undefined
                   }
                 />
@@ -149,8 +148,14 @@ export function Header() {
                       {playerData ? (
                         <>
                           <span className="text-yellow-400">🏆</span>
-                          <span className="hidden md:inline">{(playerData.totalPoints ?? 0).toLocaleString()}</span>
-                          <span className="md:hidden">{(playerData.totalPoints ?? 0) >= 1000 ? `${((playerData.totalPoints ?? 0) / 1000).toFixed(1)}k` : (playerData.totalPoints ?? 0)}</span>
+                          <span className="hidden md:inline">
+                            {(playerData.totalPoints ?? 0).toLocaleString()}
+                          </span>
+                          <span className="md:hidden">
+                            {(playerData.totalPoints ?? 0) >= 1000
+                              ? `${((playerData.totalPoints ?? 0) / 1000).toFixed(1)}k`
+                              : (playerData.totalPoints ?? 0)}
+                          </span>
                         </>
                       ) : (
                         <span className="text-xs md:text-sm">--</span>
@@ -268,10 +273,7 @@ export function Header() {
 
       <WithdrawDialog isOpen={showWithdrawDialog} onClose={() => setShowWithdrawDialog(false)} />
 
-      <LeaderboardDialog
-        open={showLeaderboardDialog}
-        onOpenChange={setShowLeaderboardDialog}
-      />
+      <LeaderboardDialog open={showLeaderboardDialog} onOpenChange={setShowLeaderboardDialog} />
     </>
   );
 }

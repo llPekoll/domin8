@@ -92,11 +92,17 @@ export function HeaderMobile() {
             >
               1<span className="px-0.5">v</span>1
             </Link>
-            <Link
+            {/*<Link
               to="/bloody"
               className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"
             >
               Bloody Bird
+            </Link>*/}
+            <Link
+              to="/referrals"
+              className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"
+            >
+              Referrals
             </Link>
           </div>
 
