@@ -106,12 +106,15 @@ export function CharacterCarouselMobile({ onCharacterSelected }: CharacterCarous
   }
 
   return (
-    <div className="flex-shrink-0 bg-black/40 border-y border-amber-500/20">
+    <div className="shrink-0 bg-black/40 border-y border-amber-500/20 relative z-10">
       <div className="flex items-center gap-2 px-2 py-2">
         {/* Left Arrow */}
         <button
           onClick={() => {
-            console.log("[CharacterCarouselMobile] Left arrow clicked, current index:", currentCharacterIndex);
+            console.log(
+              "[CharacterCarouselMobile] Left arrow clicked, current index:",
+              currentCharacterIndex
+            );
             goToPrevious();
           }}
           className="shrink-0 w-8 h-8 flex items-center justify-center bg-amber-800/50 hover:bg-amber-700/60 border border-amber-600/50 rounded-lg transition-colors"
@@ -167,7 +170,10 @@ export function CharacterCarouselMobile({ onCharacterSelected }: CharacterCarous
         {/* Right Arrow */}
         <button
           onClick={() => {
-            console.log("[CharacterCarouselMobile] Right arrow clicked, current index:", currentCharacterIndex);
+            console.log(
+              "[CharacterCarouselMobile] Right arrow clicked, current index:",
+              currentCharacterIndex
+            );
             goToNext();
           }}
           className="shrink-0 w-8 h-8 flex items-center justify-center bg-amber-800/50 hover:bg-amber-700/60 border border-amber-600/50 rounded-lg transition-colors"

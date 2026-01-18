@@ -17,7 +17,12 @@ interface CreateLobbyProps {
 
 const DEFAULT_BET_AMOUNT_SOL = 0.01;
 
-export function CreateLobby({ selectedCharacter, characters, onCharacterChange, onLobbyCreated }: CreateLobbyProps) {
+export function CreateLobby({
+  selectedCharacter,
+  characters,
+  onCharacterChange,
+  onLobbyCreated,
+}: CreateLobbyProps) {
   const { connected, publicKey, wallet } = usePrivyWallet();
   const createLobbyAction = useAction(api.lobbies.createLobby);
 
@@ -188,10 +193,10 @@ export function CreateLobby({ selectedCharacter, characters, onCharacterChange, 
               <ChevronLeft className="w-5 h-5 text-amber-300" />
             </button>
 
-            <div className="flex items-center gap-2 w-[140px] md:w-[160px] justify-center">
+            <div className="flex items-center gap-2 w-35 md:w-40 justify-center">
               {selectedCharacter && (
                 <>
-                  <div className="w-10 flex-shrink-0 flex items-center justify-center">
+                  <div className="w-10 shrink-0 flex items-center justify-center">
                     <SpriteAnimator
                       name={selectedCharacter.name.toLowerCase()}
                       animation="idle"
@@ -284,7 +289,7 @@ export function CreateLobby({ selectedCharacter, characters, onCharacterChange, 
             <button
               onClick={handleCreateLobby}
               disabled={isLoading || !selectedCharacter || betAmount <= 0}
-              className="flex-1 md:flex-none px-4 md:px-6 py-2 bg-gradient-to-b from-amber-500 to-amber-700 hover:to-amber-800 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-amber-100 font-bold rounded-lg uppercase tracking-wider transition-all shadow-lg text-sm md:text-base"
+              className="flex-1 md:flex-none px-4 md:px-6 py-2 bg-linear-to-b from-amber-500 to-amber-700 hover:to-amber-800 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-amber-100 font-bold rounded-lg uppercase tracking-wider transition-all shadow-lg text-sm md:text-base"
             >
               {isLoading ? "Creating..." : "Create Game"}
             </button>
