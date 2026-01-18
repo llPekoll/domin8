@@ -79,6 +79,12 @@ export default defineSchema({
     nftCollection: v.optional(v.string()), // NFT collection program address for special/exclusive characters
     nftCollectionName: v.optional(v.string()), // Human-readable name of the NFT collection
     isActive: v.boolean(),
+    // Visual configuration for in-game rendering
+    spriteOffsetY: v.optional(v.number()), // Y offset in pixels for in-game (default 0)
+    baseScale: v.optional(v.number()), // Base scale multiplier for in-game (default 1.0)
+    // Visual configuration for preview rendering (character selection + winner display)
+    previewOffsetY: v.optional(v.number()), // Y offset in pixels for preview (default 0)
+    previewScale: v.optional(v.number()), // Base scale multiplier for preview (default 1.0)
   }).index("by_active", ["isActive"]),
 
   /**

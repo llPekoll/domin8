@@ -10,7 +10,6 @@ import { LastWinnerCard } from "../components/LastWinnerCard";
 import { LandscapeEnforcer } from "../components/LandscapeEnforcer";
 import { ConnectWalletOverlay } from "../components/ConnectWalletOverlay";
 import { ChatPanel } from "../components/ChatPanel";
-import { LevelProgressBar } from "../components/LevelProgressBar";
 import { LevelUpNotification } from "../components/LevelUpNotification";
 import type { Character } from "../types/character";
 
@@ -47,11 +46,6 @@ export function DesktopLayout({
 
       {/* Chat Panel - Top Left under Header (resizable) */}
       <ChatPanel resizable />
-
-      {/* Level Progress Bar - Top Left under Chat */}
-      <div className="fixed top-[340px] left-4 z-40">
-        <LevelProgressBar />
-      </div>
 
       {/* Level Up Notification - Center overlay */}
       <LevelUpNotification />

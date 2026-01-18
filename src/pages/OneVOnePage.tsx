@@ -39,7 +39,7 @@ export function OneVOnePage() {
   const createLobbyAction = useAction(api.lobbies.createLobby);
   const joinLobbyAction = useAction(api.lobbies.joinLobby);
   const [searchParams, setSearchParams] = useSearchParams();
-  // Sync characters to Phaser's global state for CharacterPreviewScene
+  // Sync characters to Phaser's global state for game scenes
   useEffect(() => {
     if (characters && characters.length > 0) {
       logger.game.debug("[OneVOnePage] Syncing characters to Phaser global state", {

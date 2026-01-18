@@ -65,4 +65,7 @@ export default defineConfig({
   define: {
     global: "globalThis",
   },
+  optimizeDeps: {
+    include: ["@privy-io/react-auth", "eventemitter3"],
+  },
 });

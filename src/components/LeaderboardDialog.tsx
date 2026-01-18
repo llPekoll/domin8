@@ -13,7 +13,7 @@ interface LeaderboardDialogProps {
 
 export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps) {
   const { publicKey } = usePrivyWallet();
-  const [sortBy, setSortBy] = useState<"points" | "level">("points");
+  const [sortBy, setSortBy] = useState<"points" | "level">("level");
   const leaderboard = useQuery(api.players.getLeaderboard, { limit: 50, sortBy });
 
   const getRankStyle = (rank: number) => {
@@ -114,16 +114,6 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
         {/* Sort Toggle */}
         <div className="flex justify-center gap-2 pb-3">
           <button
-            onClick={() => setSortBy("points")}
-            className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-              sortBy === "points"
-                ? "bg-indigo-600 text-white shadow-lg"
-                : "bg-indigo-900/50 text-indigo-300 hover:bg-indigo-800/50"
-            }`}
-          >
-            Points
-          </button>
-          <button
             onClick={() => setSortBy("level")}
             className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
               sortBy === "level"
@@ -132,6 +122,16 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
             }`}
           >
             Level
+          </button>
+          <button
+            onClick={() => setSortBy("points")}
+            className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+              sortBy === "points"
+                ? "bg-indigo-600 text-white shadow-lg"
+                : "bg-indigo-900/50 text-indigo-300 hover:bg-indigo-800/50"
+            }`}
+          >
+            Points
           </button>
         </div>
 

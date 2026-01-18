@@ -1,5 +1,5 @@
 import { Lock } from "lucide-react";
-import { CharacterPreviewScene } from "./CharacterPreviewScene";
+import { SpriteAnimator } from "./SpriteAnimator";
 import type { Character } from "../types/character";
 
 interface NFTCharacterCardProps {
@@ -38,11 +38,11 @@ export function NFTCharacterCard({
       {/* Character Preview */}
       <div className="p-4">
         <div className="w-full h-32 mb-3 flex items-center justify-center bg-black/20 rounded-lg overflow-hidden">
-          <CharacterPreviewScene
-            characterId={character._id}
-            characterName={character.name}
-            width={128}
-            height={128}
+          <SpriteAnimator
+            assetPath={character.assetPath}
+            animation="idle"
+            size={128}
+            scale={4}
           />
         </div>
 

@@ -272,12 +272,19 @@ export class Game extends Scene {
             const participants = this.playerManager.getParticipants();
 
             // Mark all non-winners as eliminated
+            logger.game.debug("[Game] 🎯 Marking elimination status", {
+              winner,
+              participantCount: participants.size,
+            });
             participants.forEach((participant: any) => {
-              if (participant.id !== winner && participant.playerId !== winner) {
-                participant.eliminated = true;
-              } else {
-                participant.eliminated = false;
-              }
+              const isWinner = participant.id === winner || participant.playerId === winner;
+              participant.eliminated = !isWinner;
+              logger.game.debug("[Game] 👤 Participant status", {
+                id: participant.id,
+                playerId: participant.playerId,
+                isWinner,
+                eliminated: participant.eliminated,
+              });
             });
 
             // Get explosion center from map config
@@ -484,8 +491,8 @@ export class Game extends Scene {
           return;
         }
 
-        const characterName = this.getSkinName(bet.skin);
-        const characterKey = characterName.toLowerCase().replace(/\s+/g, "-");
+        const characterConfig = this.getCharacterConfig(bet.skin);
+        const characterKey = characterConfig.name.toLowerCase().replace(/\s+/g, "-");
         const participantName = this.getParticipantName(walletAddress);
 
         const participant = {
@@ -495,8 +502,10 @@ export class Game extends Scene {
           betAmount: Number(bet.amount.toString()) / 1_000_000_000, // Convert lamports to SOL
           character: {
             key: characterKey,
-            name: characterName,
+            name: characterConfig.name,
             id: bet.skin,
+            spriteOffsetY: characterConfig.spriteOffsetY,
+            baseScale: characterConfig.baseScale,
           },
           spawnIndex: betIndex,
           isBot: false,
@@ -545,6 +554,22 @@ export class Game extends Scene {
       return `Character ${skinId}`;
     }
     return character.name;
+  }
+
+  private getCharacterConfig(skinId: number): {
+    name: string;
+    spriteOffsetY: number;
+    baseScale: number;
+  } {
+    const character = this.characters.find((char) => char.id === skinId);
+    if (!character) {
+      return { name: `Character ${skinId}`, spriteOffsetY: 0, baseScale: 1.0 };
+    }
+    return {
+      name: character.name,
+      spriteOffsetY: character.spriteOffsetY ?? 0,
+      baseScale: character.baseScale ?? 1.0,
+    };
   }
 
   // Helper to get participant display name from wallet address

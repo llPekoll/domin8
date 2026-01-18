@@ -149,9 +149,10 @@ export class PlayerManager {
       sprite.play(fallingAnimKey);
     }
 
-    // Apply base 3x multiplier + bet scaling FIRST
+    // Apply base multiplier + bet scaling + character-specific scale
     const betScale = participant.size || this.calculateParticipantScale(participant.betAmount);
-    const scale = betScale * this.BASE_SCALE_MULTIPLIER;
+    const characterBaseScale = participant.character?.baseScale ?? 1.0;
+    const scale = betScale * this.BASE_SCALE_MULTIPLIER * characterBaseScale;
     sprite.setScale(scale);
     sprite.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
 
@@ -212,20 +213,8 @@ export class PlayerManager {
     dustFrontSprite.setY(dustOffsetY);
 
     // Character-specific Y offset adjustments (scales with sprite size)
-    // These values are in original sprite pixels and will be scaled automatically
-    const spriteOffsetsInPixels: { [key: string]: number } = {
-      male: 48, // Transparent space at bottom in original sprite
-      orc: 13, // Transparent space at bottom in original sprite
-      soldier: 42,
-      pepe: 13, // Transparent space at bottom in original sprite
-      yasuo: 13, // Transparent space at bottom in original sprite
-      darthvader: 13, // Transparent space at bottom in original sprite
-      huggy_wuggy: 13, // Transparent space at bottom in original sprite
-      nomu: 12, // Transparent space at bottom in original sprite
-      siren: 12, // Transparent space at bottom in original sprite
-      // Add other characters here if needed
-    };
-    const offsetPixels = spriteOffsetsInPixels[textureKey] || 0;
+    // Values come from Convex database (character.spriteOffsetY)
+    const offsetPixels = participant.character?.spriteOffsetY ?? 0;
     const scaledOffset = offsetPixels * scale;
     sprite.setY(scaledOffset);
 

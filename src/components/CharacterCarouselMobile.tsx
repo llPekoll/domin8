@@ -83,18 +83,23 @@ export function CharacterCarouselMobile({ onCharacterSelected }: CharacterCarous
 
   // Scroll selected character into view
   useEffect(() => {
-    if (scrollContainerRef.current) {
+    if (scrollContainerRef.current && availableCharacters.length > 0) {
       const container = scrollContainerRef.current;
       const selectedElement = container.children[currentCharacterIndex] as HTMLElement;
       if (selectedElement) {
-        selectedElement.scrollIntoView({
+        // Calculate scroll position to center the element
+        const containerWidth = container.offsetWidth;
+        const elementLeft = selectedElement.offsetLeft;
+        const elementWidth = selectedElement.offsetWidth;
+        const scrollLeft = elementLeft - containerWidth / 2 + elementWidth / 2;
+
+        container.scrollTo({
+          left: scrollLeft,
           behavior: "smooth",
-          block: "nearest",
-          inline: "center",
         });
       }
     }
-  }, [currentCharacterIndex]);
+  }, [currentCharacterIndex, availableCharacters.length]);
 
   if (!connected || availableCharacters.length === 0) {
     return null;
@@ -105,8 +110,11 @@ export function CharacterCarouselMobile({ onCharacterSelected }: CharacterCarous
       <div className="flex items-center gap-2 px-2 py-2">
         {/* Left Arrow */}
         <button
-          onClick={goToPrevious}
-          className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-amber-800/50 hover:bg-amber-700/60 border border-amber-600/50 rounded-lg transition-colors"
+          onClick={() => {
+            console.log("[CharacterCarouselMobile] Left arrow clicked, current index:", currentCharacterIndex);
+            goToPrevious();
+          }}
+          className="shrink-0 w-8 h-8 flex items-center justify-center bg-amber-800/50 hover:bg-amber-700/60 border border-amber-600/50 rounded-lg transition-colors"
         >
           <ChevronLeft className="w-5 h-5 text-amber-100" />
         </button>
@@ -126,16 +134,16 @@ export function CharacterCarouselMobile({ onCharacterSelected }: CharacterCarous
                 key={character._id}
                 onClick={() => selectCharacter(index)}
                 className={`
-                  flex-shrink-0 relative w-14 h-14 rounded-lg border-2 transition-all overflow-hidden bg-black/30
+                  shrink-0 relative w-14 h-14 rounded-lg border-2 transition-all overflow-hidden bg-black/30 flex items-start justify-center
                   ${isSelected ? "border-amber-400 ring-2 ring-amber-400/50" : "border-amber-600/30"}
                   ${isLocked ? "opacity-50 grayscale" : ""}
                 `}
               >
                 <SpriteAnimator
-                  name={character.name.toLowerCase()}
+                  assetPath={character.assetPath}
                   animation="idle"
-                  size={56}
-                  scale={1.5}
+                  size={48}
+                  scale={1.2}
                 />
 
                 {/* Lock overlay */}
@@ -158,8 +166,11 @@ export function CharacterCarouselMobile({ onCharacterSelected }: CharacterCarous
 
         {/* Right Arrow */}
         <button
-          onClick={goToNext}
-          className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-amber-800/50 hover:bg-amber-700/60 border border-amber-600/50 rounded-lg transition-colors"
+          onClick={() => {
+            console.log("[CharacterCarouselMobile] Right arrow clicked, current index:", currentCharacterIndex);
+            goToNext();
+          }}
+          className="shrink-0 w-8 h-8 flex items-center justify-center bg-amber-800/50 hover:bg-amber-700/60 border border-amber-600/50 rounded-lg transition-colors"
         >
           <ChevronRight className="w-5 h-5 text-amber-100" />
         </button>

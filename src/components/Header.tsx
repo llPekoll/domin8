@@ -135,26 +135,22 @@ export function Header() {
                   {/* Divider - Hidden on mobile */}
                   <div className="hidden md:block h-8 w-px bg-indigo-500/30"></div>
 
-                  {/* Points - Opens Leaderboard */}
+                  {/* Level & XP - Opens Leaderboard */}
                   <button
                     onClick={() => setShowLeaderboardDialog(true)}
                     className="flex flex-col hover:bg-indigo-800/30 px-1.5 md:px-2 py-1 rounded-lg transition-all cursor-pointer group"
                     title="View Leaderboard"
                   >
                     <div className="text-[10px] md:text-xs text-indigo-400/80 leading-tight group-hover:text-indigo-300/90">
-                      Points
+                      Level
                     </div>
                     <div className="text-indigo-200 font-bold text-sm md:text-base flex items-center gap-1 leading-tight group-hover:text-indigo-100">
                       {playerData ? (
                         <>
-                          <span className="text-yellow-400">🏆</span>
-                          <span className="hidden md:inline">
-                            {(playerData.totalPoints ?? 0).toLocaleString()}
-                          </span>
-                          <span className="md:hidden">
-                            {(playerData.totalPoints ?? 0) >= 1000
-                              ? `${((playerData.totalPoints ?? 0) / 1000).toFixed(1)}k`
-                              : (playerData.totalPoints ?? 0)}
+                          <span className="text-yellow-400">&#9733;</span>
+                          <span>Lv.{playerData.level ?? 1}</span>
+                          <span className="text-indigo-400 text-xs font-normal hidden md:inline">
+                            ({(playerData.xp ?? 0).toLocaleString()} XP)
                           </span>
                         </>
                       ) : (

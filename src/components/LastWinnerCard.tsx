@@ -1,19 +1,28 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Card, CardContent } from "./ui/card";
-import { WinnerCharacterPreviewScene } from "./WinnerCharacterPreviewScene";
+import { SpriteAnimator } from "./SpriteAnimator";
+import { useAssets } from "../contexts/AssetsContext";
 import { useMemo } from "react";
 import { isMobile, isTablet } from "react-device-detect";
 
 export function LastWinnerCard() {
   const lastFinishedGame = useQuery(api.stats.getLastFinishedGame);
-  console.log("[LastWinnerCard] lastFinishedGame:", lastFinishedGame, "characterName:", lastFinishedGame?.characterName);
+  const { characters } = useAssets();
+
   // Get display name for the winner
   const playerInfo = useQuery(
     api.players.getPlayer,
-    // lastFinishedGame?.winnerAddress ? { walletAddress: lastFinishedGame.winnerAddress } : "skip"
     lastFinishedGame?.winnerAddress ? { walletAddress: lastFinishedGame.winnerAddress } : "skip"
   );
+
+  // Find character data by name to get assetPath
+  const characterData = useMemo(() => {
+    if (!lastFinishedGame?.characterName || !characters) return null;
+    return characters.find(
+      (char) => char.name.toLowerCase() === lastFinishedGame.characterName.toLowerCase()
+    );
+  }, [lastFinishedGame?.characterName, characters]);
 
   const displayName = useMemo(() => {
     if (!lastFinishedGame) return null;
@@ -69,13 +78,16 @@ export function LastWinnerCard() {
 
           {/* Winner Info */}
           <div className="mt-7 flex items-center  bg-purple-900/20 rounded-lg  border border-purple-500/30">
-            {/* Character Avatar with Phaser Animation */}
-            <div className="relative w-20 h-20 flex-shrink-0">
-              <WinnerCharacterPreviewScene
-                characterName={lastFinishedGame.characterName}
-                width={128}
-                height={128}
-              />
+            {/* Character Avatar */}
+            <div className="relative w-20 h-20 shrink-0">
+              {characterData && (
+                <SpriteAnimator
+                  assetPath={characterData.assetPath}
+                  animation="idle"
+                  size={80}
+                  scale={3}
+                />
+              )}
             </div>
 
             {/* Winner Details - Name and Bet */}

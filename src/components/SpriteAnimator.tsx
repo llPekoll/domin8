@@ -24,18 +24,26 @@ interface SpriteMetadata {
 const metadataCache: Record<string, SpriteMetadata | null> = {};
 
 interface SpriteAnimatorProps {
-  name: string; // character name (lowercase)
-  animation?: string; // animation name, defaults to "idle"
-  size?: number; // container size in pixels
-  scale?: number; // sprite scale multiplier
+  /** Asset path from character data (e.g., "/characters/orc.png") */
+  assetPath: string;
+  /** Animation name, defaults to "idle" */
+  animation?: string;
+  /** Container size in pixels */
+  size?: number;
+  /** Sprite scale multiplier */
+  scale?: number;
+  /** Additional Y offset for positioning */
+  offsetY?: number;
+  /** Additional CSS classes */
   className?: string;
 }
 
 export function SpriteAnimator({
-  name,
+  assetPath,
   animation = "idle",
   size = 56,
   scale = 2,
+  offsetY = 0,
   className = "",
 }: SpriteAnimatorProps) {
   const [metadata, setMetadata] = useState<SpriteMetadata | null>(null);
@@ -44,39 +52,43 @@ export function SpriteAnimator({
   const lastFrameTimeRef = useRef<number>(0);
   const frameIndexRef = useRef<number>(0);
 
-  const pngPath = `/assets/characters/${name}.png`;
-  const jsonPath = `/assets/characters/${name}.json`;
+  // Derive paths from assetPath (e.g., "/characters/orc.png" -> "/assets/characters/orc.png")
+  const pngPath = assetPath ? `/assets${assetPath}` : "";
+  const jsonPath = assetPath ? `/assets${assetPath.replace(".png", ".json")}` : "";
+  const cacheKey = assetPath || "";
 
   // Load metadata
   useEffect(() => {
+    if (!assetPath) return;
+
     let cancelled = false;
 
     const loadMetadata = async () => {
-      if (metadataCache[name] !== undefined) {
-        if (!cancelled) setMetadata(metadataCache[name]);
+      if (metadataCache[cacheKey] !== undefined) {
+        if (!cancelled) setMetadata(metadataCache[cacheKey]);
         return;
       }
 
       try {
         const response = await fetch(jsonPath);
         if (!response.ok) {
-          metadataCache[name] = null;
+          metadataCache[cacheKey] = null;
           return;
         }
         const data: SpriteMetadata = await response.json();
-        metadataCache[name] = data;
+        metadataCache[cacheKey] = data;
         if (!cancelled) setMetadata(data);
       } catch {
-        metadataCache[name] = null;
+        metadataCache[cacheKey] = null;
       }
     };
 
-    loadMetadata();
+    void loadMetadata();
 
     return () => {
       cancelled = true;
     };
-  }, [name, jsonPath]);
+  }, [cacheKey, jsonPath]);
 
   // Get animation frame range
   const frameTag = metadata?.meta?.frameTags?.find(
@@ -86,25 +98,28 @@ export function SpriteAnimator({
   const endFrame = frameTag?.to ?? (metadata?.frames?.length ? metadata.frames.length - 1 : 0);
 
   // Animation loop
-  const animate = useCallback((timestamp: number) => {
-    if (!metadata?.frames) return;
+  const animate = useCallback(
+    (timestamp: number) => {
+      if (!metadata?.frames) return;
 
-    if (!lastFrameTimeRef.current) {
-      lastFrameTimeRef.current = timestamp;
-    }
+      if (!lastFrameTimeRef.current) {
+        lastFrameTimeRef.current = timestamp;
+      }
 
-    const currentFrame = metadata.frames[frameIndexRef.current];
-    const frameDuration = currentFrame?.duration || 150;
+      const currentFrame = metadata.frames[frameIndexRef.current];
+      const frameDuration = currentFrame?.duration || 150;
 
-    if (timestamp - lastFrameTimeRef.current >= frameDuration) {
-      const nextFrame = frameIndexRef.current + 1;
-      frameIndexRef.current = nextFrame > endFrame ? startFrame : nextFrame;
-      setCurrentFrameIndex(frameIndexRef.current);
-      lastFrameTimeRef.current = timestamp;
-    }
+      if (timestamp - lastFrameTimeRef.current >= frameDuration) {
+        const nextFrame = frameIndexRef.current + 1;
+        frameIndexRef.current = nextFrame > endFrame ? startFrame : nextFrame;
+        setCurrentFrameIndex(frameIndexRef.current);
+        lastFrameTimeRef.current = timestamp;
+      }
 
-    animationRef.current = requestAnimationFrame(animate);
-  }, [metadata, startFrame, endFrame]);
+      animationRef.current = requestAnimationFrame(animate);
+    },
+    [metadata, startFrame, endFrame]
+  );
 
   // Start animation
   useEffect(() => {
@@ -125,13 +140,16 @@ export function SpriteAnimator({
     };
   }, [metadata, startFrame, animate]);
 
-  if (!metadata?.frames) {
+  // Show loading spinner while loading, or empty if no assetPath
+  if (!assetPath || !metadata?.frames) {
     return (
       <div
         className={`flex items-center justify-center ${className}`}
         style={{ width: size, height: size }}
       >
-        <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+        {assetPath && (
+          <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+        )}
       </div>
     );
   }
@@ -164,6 +182,7 @@ export function SpriteAnimator({
           backgroundSize: `${scaledSheetW}px ${scaledSheetH}px`,
           backgroundRepeat: "no-repeat",
           imageRendering: "pixelated",
+          transform: offsetY !== 0 ? `translateY(${offsetY}px)` : undefined,
         }}
       />
     </div>

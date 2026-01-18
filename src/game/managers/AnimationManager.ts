@@ -91,7 +91,6 @@ export class AnimationManager {
     this.celebrationObjects = [];
   }
 
-
   addWinnerCelebration() {
     // Play victory sound when winner celebration starts
     SoundManager.playVictory(this.scene, 0.6);
@@ -128,48 +127,6 @@ export class AnimationManager {
       duration: 800,
       ease: "Power2",
     });
-
-    // Apply pixelated rendering - render at lower resolution for crisp pixel art look
-
-    // Get screen height for positioning at bottom
-    // const screenHeight = this.scene.scale.height;
-
-    // Get the displayName - first try from playerNamesMap using playerId, then fall back to participant.displayName
-    // let winnerDisplayName = "Champion";
-
-    // if (winnerParticipant?.playerId) {
-    //   // Try to get display name from playerNamesMap using the wallet address (playerId)
-    //   const mappedName = this.playerNamesMap.get(winnerParticipant.playerId);
-    //   if (mappedName) {
-    //     winnerDisplayName = mappedName;
-    //     logger.game.debug("[AnimationManager] Found winner display name in map:", mappedName);
-    //   } else {
-    //     // Fall back to participant's displayName property
-    //     winnerDisplayName = winnerParticipant.displayName || "Champion";
-    //     logger.game.debug(
-    //       "[AnimationManager] Using participant.displayName:",
-    //       winnerParticipant.displayName
-    //     );
-    //   }
-    // } else {
-    //   winnerDisplayName = winnerParticipant?.displayName || "Champion";
-    // }
-
-    // logger.game.debug("[AnimationManager] Final winner display name:", winnerDisplayName);
-
-    // // Winner name at bottom of screen
-    // const nameText = this.scene.add
-    //   .text(this.centerX, screenHeight - 25, winnerDisplayName, {
-    //     fontFamily: "jersey",
-    //     fontSize: 12, // Scaled down from 32px
-    //     color: "#ffffff",
-    //     stroke: "#000000",
-    //     strokeThickness: 1, // Scaled down from 4
-    //     align: "center",
-    //     resolution: 4, // High resolution for crisp text when scaled
-    //   })
-    //   .setOrigin(0.5)
-    //   .setDepth(200);
 
     // Track celebration objects for cleanup (throne and overlay)
     this.celebrationObjects.push(backgroundOverlay, throne);
@@ -311,6 +268,19 @@ export class AnimationManager {
     const centerX = explosionCenterX ?? this.centerX;
     const centerY = explosionCenterY ?? this.centerY;
 
+    // Log elimination status for debugging
+    const allParticipants = Array.from(participants.values());
+    logger.game.debug("[AnimationManager] 💥 explodeParticipantsOutward called", {
+      totalParticipants: allParticipants.length,
+      eliminatedCount: allParticipants.filter((p) => p.eliminated).length,
+      winnerCount: allParticipants.filter((p) => !p.eliminated).length,
+      participants: allParticipants.map((p) => ({
+        id: p.id,
+        playerId: p.playerId,
+        eliminated: p.eliminated,
+      })),
+    });
+
     // Create explosion at center first
     this.createCenterExplosion();
 
@@ -349,6 +319,10 @@ export class AnimationManager {
         // Guard against destroyed containers during delay
         if (!participant.container || !participant.container.active) return;
 
+        // Kill any active tweens on the container that might interfere with kick-out physics
+        // (e.g., moveToCenter tweens from battle phase start)
+        this.scene.tweens.killTweensOf(participant.container);
+
         // Change sprite anchor to center for better rotation physics
         // Store the current Y position before changing origin
         const currentY = participant.sprite.y;
@@ -359,7 +333,8 @@ export class AnimationManager {
 
         // Fountain effect: shoot upward first, then arc down
         // Strong upward velocity with random horizontal spread for the curl
-        const upwardForce = config.upwardKickMin + Math.random() * (config.upwardKickMax - config.upwardKickMin);
+        const upwardForce =
+          config.upwardKickMin + Math.random() * (config.upwardKickMax - config.upwardKickMin);
         const horizontalSpread = (Math.random() - 0.5) * config.forceMax * 0.8; // Random left/right spread
 
         // Initial velocity: strong upward, random horizontal
@@ -468,7 +443,6 @@ export class AnimationManager {
         applyKickOutPhysics();
       }
     });
-
   }
 
   showBettingPrompt() {
@@ -501,7 +475,6 @@ export class AnimationManager {
       bettingText.destroy();
     });
   }
-
 
   checkScreenEdgeCollision(participant: any) {
     // Get screen dimensions
@@ -687,8 +660,6 @@ export class AnimationManager {
       });
     }
   }
-
-
 
   /**
    * Shared battle phase animation sequence

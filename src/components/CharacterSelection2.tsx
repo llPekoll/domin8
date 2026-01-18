@@ -6,7 +6,7 @@ import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 // import { BadgeCheck, Star, ChevronLeft, ChevronRight, Lock, Crown } from "lucide-react";
 import { ChevronLeft, ChevronRight, Lock, Crown } from "lucide-react";
-import { CharacterPreviewScene } from "./CharacterPreviewScene";
+import { SpriteAnimator } from "./SpriteAnimator";
 import { NFTCharacterModal } from "./NFTCharacterModal";
 import { useAssets } from "../contexts/AssetsContext";
 import type { Character } from "../types/character";
@@ -176,10 +176,11 @@ const CharacterSelection2 = memo(function CharacterSelection({
                     filter: currentCharacterLocked ? "grayscale(100%)" : "none",
                   }}
                 >
-                  <CharacterPreviewScene
-                    characterId={currentCharacter._id}
-                    characterName={currentCharacter.name}
-                    isSpecial={!!currentCharacter.nftCollection}
+                  <SpriteAnimator
+                    assetPath={currentCharacter.assetPath}
+                    animation="idle"
+                    size={140}
+                    scale={4}
                   />
                 </div>
 
