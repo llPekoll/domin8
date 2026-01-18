@@ -110,13 +110,7 @@ export function CharacterCarouselMobile({ onCharacterSelected }: CharacterCarous
       <div className="flex items-center gap-2 px-2 py-2">
         {/* Left Arrow */}
         <button
-          onClick={() => {
-            console.log(
-              "[CharacterCarouselMobile] Left arrow clicked, current index:",
-              currentCharacterIndex
-            );
-            goToPrevious();
-          }}
+          onClick={goToPrevious}
           className="shrink-0 w-8 h-8 flex items-center justify-center bg-amber-800/50 hover:bg-amber-700/60 border border-amber-600/50 rounded-lg transition-colors"
         >
           <ChevronLeft className="w-5 h-5 text-amber-100" />
