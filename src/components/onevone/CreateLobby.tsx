@@ -198,7 +198,7 @@ export function CreateLobby({
                 <>
                   <div className="w-10 shrink-0 flex items-center justify-center">
                     <SpriteAnimator
-                      name={selectedCharacter.name.toLowerCase()}
+                      assetPath={selectedCharacter.assetPath}
                       animation="idle"
                       size={40}
                       scale={1.8}

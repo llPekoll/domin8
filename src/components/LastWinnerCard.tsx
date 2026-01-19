@@ -20,7 +20,7 @@ export function LastWinnerCard() {
   const characterData = useMemo(() => {
     if (!lastFinishedGame?.characterName || !characters) return null;
     return characters.find(
-      (char) => char.name.toLowerCase() === lastFinishedGame.characterName.toLowerCase()
+      (char: { name: string }) => char.name.toLowerCase() === lastFinishedGame.characterName.toLowerCase()
     );
   }, [lastFinishedGame?.characterName, characters]);
 

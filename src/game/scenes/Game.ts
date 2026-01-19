@@ -266,9 +266,9 @@ export class Game extends Scene {
       if (participantsMap.size > 0) {
         this.animationManager.startBattlePhaseSequence(this.playerManager);
 
-        // Kick out losers immediately when battle starts
+        // Kick out losers after they run to center (moveParticipantsToCenter takes 400-600ms)
         if (winner) {
-          this.time.delayedCall(0, () => {
+          this.time.delayedCall(700, () => {
             const participants = this.playerManager.getParticipants();
 
             // Mark all non-winners as eliminated
@@ -545,15 +545,6 @@ export class Game extends Scene {
 
     // ✅ Phase handling is now done by GlobalGameStateManager
     // No need to call handleGamePhase() here
-  }
-
-  private getSkinName(skinId: number): string {
-    const character = this.characters.find((char) => char.id === skinId);
-    if (!character) {
-      logger.game.warn(`[Game] Character not found for skin ID ${skinId}, using default`);
-      return `Character ${skinId}`;
-    }
-    return character.name;
   }
 
   private getCharacterConfig(skinId: number): {

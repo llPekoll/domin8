@@ -12,6 +12,7 @@ import { generateRandomName } from "../lib/nameGenerator";
 import { logger } from "../lib/logger";
 import { useFundWallet } from "../hooks/useFundWallet";
 import { Plus, ArrowUpRight, ChevronDown, User } from "lucide-react";
+import { getXpProgressInfo } from "../lib/xpUtils";
 import { Link } from "react-router-dom";
 
 export function Header() {
@@ -136,28 +137,58 @@ export function Header() {
                   <div className="hidden md:block h-8 w-px bg-indigo-500/30"></div>
 
                   {/* Level & XP - Opens Leaderboard */}
-                  <button
-                    onClick={() => setShowLeaderboardDialog(true)}
-                    className="flex flex-col hover:bg-indigo-800/30 px-1.5 md:px-2 py-1 rounded-lg transition-all cursor-pointer group"
-                    title="View Leaderboard"
-                  >
-                    <div className="text-[10px] md:text-xs text-indigo-400/80 leading-tight group-hover:text-indigo-300/90">
-                      Level
-                    </div>
-                    <div className="text-indigo-200 font-bold text-sm md:text-base flex items-center gap-1 leading-tight group-hover:text-indigo-100">
-                      {playerData ? (
-                        <>
-                          <span className="text-yellow-400">&#9733;</span>
-                          <span>Lv.{playerData.level ?? 1}</span>
-                          <span className="text-indigo-400 text-xs font-normal hidden md:inline">
-                            ({(playerData.xp ?? 0).toLocaleString()} XP)
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-xs md:text-sm">--</span>
-                      )}
-                    </div>
-                  </button>
+                  {(() => {
+                    const xpProgress = playerData
+                      ? getXpProgressInfo(playerData.xp ?? 0, playerData.level ?? 1)
+                      : null;
+                    return (
+                      <button
+                        onClick={() => setShowLeaderboardDialog(true)}
+                        className="flex flex-col hover:bg-indigo-800/30 px-1.5 md:px-2 py-1 rounded-lg transition-all cursor-pointer group min-w-[80px] md:min-w-[120px]"
+                        title={xpProgress ? `${xpProgress.levelTitle} - ${xpProgress.xpToNextLevel} XP to next level` : "View Leaderboard"}
+                      >
+                        <div className="text-[10px] md:text-xs text-indigo-400/80 leading-tight group-hover:text-indigo-300/90">
+                          Level
+                        </div>
+                        <div className="text-indigo-200 font-bold text-sm md:text-base flex items-center gap-1 leading-tight group-hover:text-indigo-100">
+                          {playerData ? (
+                            <>
+                              <span className="text-yellow-400">&#9733;</span>
+                              <span>Lv.{playerData.level ?? 1}</span>
+                              <span className="text-indigo-400 text-xs font-normal hidden md:inline">
+                                ({(playerData.xp ?? 0).toLocaleString()} XP)
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-xs md:text-sm">--</span>
+                          )}
+                        </div>
+                        {/* XP Progress Bar */}
+                        {xpProgress && xpProgress.xpToNextLevel > 0 && (
+                          <div className="w-full mt-1">
+                            <div className="h-1.5 bg-indigo-900/60 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 rounded-full transition-all duration-500"
+                                style={{ width: `${xpProgress.progress}%` }}
+                              />
+                            </div>
+                            <div className="text-[8px] md:text-[9px] text-indigo-400/70 mt-0.5 text-center hidden md:block">
+                              {xpProgress.xpToNextLevel.toLocaleString()} XP to Lv.{(playerData?.level ?? 1) + 1}
+                            </div>
+                          </div>
+                        )}
+                        {/* Max Level indicator */}
+                        {xpProgress && xpProgress.xpToNextLevel === 0 && (
+                          <div className="w-full mt-1">
+                            <div className="h-1.5 bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 rounded-full" />
+                            <div className="text-[8px] md:text-[9px] text-yellow-400/80 mt-0.5 text-center hidden md:block">
+                              MAX LEVEL
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })()}
 
                   {/* Divider - Hidden on mobile */}
                   <div className="hidden md:block h-8 w-px bg-indigo-500/30"></div>

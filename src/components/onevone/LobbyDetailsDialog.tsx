@@ -854,7 +854,7 @@ export function LobbyDetailsDialog({
                             <>
                               <div className="w-8 flex-shrink-0 flex items-center justify-center">
                                 <SpriteAnimator
-                                  name={localSelectedCharacter.name.toLowerCase()}
+                                  assetPath={localSelectedCharacter.assetPath}
                                   animation="idle"
                                   size={32}
                                   scale={1.5}

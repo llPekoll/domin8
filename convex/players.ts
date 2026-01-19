@@ -1,9 +1,8 @@
 import { mutation, query, action, internalQuery, internalMutation } from "./_generated/server";
-import { api, internal } from "./_generated/api";
+import { api } from "./_generated/api";
 import { v } from "convex/values";
 import {
   XP_REWARDS,
-  LEVEL_THRESHOLDS,
   calculateLevel,
   getLevelInfo,
   getXpProgressInfo,

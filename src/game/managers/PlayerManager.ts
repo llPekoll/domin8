@@ -564,9 +564,9 @@ export class PlayerManager {
       // The offset compensates for transparent space at bottom of sprite
       const spriteOffset = winnerParticipant.sprite.y;
 
-      // Position container so feet align with throne anchor
-      // Need to ADD offset to move container down to account for sprite's internal offset
-      const targetThroneY = this.centerY + 230;
+      // Position container so winner sits on the throne seat
+      // Throne is at centerY + 50, winner should sit slightly above center of throne
+      const targetThroneY = this.centerY + 100;
       const containerY = targetThroneY + spriteOffset;
 
       this.scene.tweens.add({
