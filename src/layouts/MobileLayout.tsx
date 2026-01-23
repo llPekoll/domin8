@@ -15,6 +15,11 @@ interface MobileLayoutProps {
   onCharacterSelected: (character: Character | null) => void;
   walletReady: boolean;
   connected: boolean;
+  // Boss-related props (unused in mobile for now)
+  isBoss?: boolean;
+  bossFirstBetPlaced?: boolean;
+  bossLockedCharacterId?: number | null;
+  onBossFirstBet?: (characterId: number) => void;
 }
 
 export function MobileLayout({
@@ -23,6 +28,11 @@ export function MobileLayout({
   onCharacterSelected,
   walletReady,
   connected,
+  // Boss props - can be used later for mobile components
+  isBoss: _isBoss,
+  bossFirstBetPlaced: _bossFirstBetPlaced,
+  bossLockedCharacterId: _bossLockedCharacterId,
+  onBossFirstBet: _onBossFirstBet,
 }: MobileLayoutProps) {
   return (
     <div className="flex flex-col h-[100dvh] bg-black overflow-hidden">

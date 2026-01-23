@@ -280,6 +280,7 @@ export class Preloader extends Scene {
     this.load.audio("insert-coin", "sounds/insert-coin.mp3");
     this.load.audio("challenger", "sounds/challenger.mp3");
     this.load.audio("countdown-5sec", "sounds/5-second-countdown.mp3");
+    this.load.audio("boss-power-up", "sounds/01-power-up-mario.mp3");
 
     // Load impact sounds for character landing
     this.load.audio("impact-1", "sounds/impacts/sfx_sounds_impact1.wav");

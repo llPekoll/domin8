@@ -25,11 +25,20 @@ const DEFAULT_BET_AMOUNT = MIN_BET_AMOUNT;
 interface BettingPanelProps {
   selectedCharacter: Character | null;
   onBetPlaced?: () => void;
+  // Boss-related props
+  isBoss?: boolean;
+  bossFirstBetPlaced?: boolean;
+  bossLockedCharacterId?: number | null;
+  onBossFirstBet?: (characterId: number) => void;
 }
 
 const BettingPanel = memo(function BettingPanel({
   selectedCharacter,
   onBetPlaced,
+  isBoss = false,
+  bossFirstBetPlaced = false,
+  bossLockedCharacterId = null,
+  onBossFirstBet,
 }: BettingPanelProps) {
   const { connected, publicKey, solBalance, isLoadingBalance, externalWalletAddress } =
     usePrivyWallet();
@@ -170,7 +179,29 @@ const BettingPanel = memo(function BettingPanel({
       return;
     }
 
+    // BOSS ENFORCEMENT: If boss already placed bet, must use same character
+    if (isBoss && bossFirstBetPlaced && bossLockedCharacterId !== null) {
+      if (selectedCharacter.id !== bossLockedCharacterId) {
+        toast.error("Boss must use locked character!", {
+          description: `You can only bet with character ID ${bossLockedCharacterId}`,
+        });
+        console.log("🔒 [BOSS BET] BLOCKED - wrong character:", {
+          selected: selectedCharacter.id,
+          locked: bossLockedCharacterId,
+        });
+        return;
+      }
+    }
+
     setIsSubmitting(true);
+
+    // Lock boss character IMMEDIATELY (before transaction completes)
+    // This prevents changing character while bet is processing
+    const wasFirstBossBet = isBoss && !bossFirstBetPlaced;
+    if (wasFirstBossBet && onBossFirstBet) {
+      console.log("🔒 [BOSS BET] LOCKING CHARACTER IMMEDIATELY:", selectedCharacter.id);
+      onBossFirstBet(selectedCharacter.id);
+    }
 
     try {
       // Calculate spawn position based on current time for randomness
@@ -297,6 +328,9 @@ const BettingPanel = memo(function BettingPanel({
       EventBus.emit("player-bet-placed", eventData);
       logger.ui.debug("[BettingPanel] ✅ Event emitted successfully");
 
+      // Boss character lock already happened at start of bet (optimistic)
+      // No need to lock again here
+
       onBetPlaced?.();
     } catch (error) {
       logger.ui.error("Failed to place bet:", error);
@@ -332,6 +366,9 @@ const BettingPanel = memo(function BettingPanel({
     verifyCachedNFT,
     externalWalletAddress,
     allMaps,
+    isBoss,
+    bossFirstBetPlaced,
+    onBossFirstBet,
   ]);
 
   // Don't render if not connected

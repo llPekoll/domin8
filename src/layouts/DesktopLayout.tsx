@@ -19,6 +19,11 @@ interface DesktopLayoutProps {
   onCharacterSelected: (character: Character | null) => void;
   walletReady: boolean;
   connected: boolean;
+  // Boss-related props
+  isBoss: boolean;
+  bossFirstBetPlaced: boolean;
+  bossLockedCharacterId: number | null;
+  onBossFirstBet: (characterId: number) => void;
 }
 
 export function DesktopLayout({
@@ -27,6 +32,10 @@ export function DesktopLayout({
   onCharacterSelected,
   walletReady,
   connected,
+  isBoss,
+  bossFirstBetPlaced,
+  bossLockedCharacterId,
+  onBossFirstBet,
 }: DesktopLayoutProps) {
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -51,11 +60,22 @@ export function DesktopLayout({
       <LevelUpNotification />
 
       {/* Character Selection Carousel - Bottom Left */}
-      <CharacterSelection2 onCharacterSelected={onCharacterSelected} />
+      <CharacterSelection2
+        onCharacterSelected={onCharacterSelected}
+        isLocked={isBoss && bossFirstBetPlaced}
+        lockedCharacterId={bossLockedCharacterId}
+        isBoss={isBoss}
+      />
 
       {/* Betting Panel - Bottom Center */}
       <div className="fixed items-center bottom-4 left-1/2 -translate-x-1/2 z-50">
-        <BettingPanel selectedCharacter={selectedCharacter} />
+        <BettingPanel
+          selectedCharacter={selectedCharacter}
+          isBoss={isBoss}
+          bossFirstBetPlaced={bossFirstBetPlaced}
+          bossLockedCharacterId={bossLockedCharacterId}
+          onBossFirstBet={onBossFirstBet}
+        />
       </div>
 
       {/* Pot Display - Top Center */}

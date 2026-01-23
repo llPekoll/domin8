@@ -13,10 +13,16 @@ import type { Character } from "../types/character";
 
 interface CharacterSelectionProps {
   onCharacterSelected?: (character: Character | null) => void;
+  isLocked?: boolean; // Disable navigation (boss has placed first bet)
+  lockedCharacterId?: number | null; // Force to this character when locked
+  isBoss?: boolean; // Show boss indicator
 }
 
 const CharacterSelection2 = memo(function CharacterSelection({
   onCharacterSelected,
+  isLocked = false,
+  lockedCharacterId,
+  isBoss = false,
 }: CharacterSelectionProps) {
   const { connected, externalWalletAddress, walletAddress } = usePrivyWallet();
   const { characters: allCharacters } = useAssets();
@@ -96,22 +102,45 @@ const CharacterSelection2 = memo(function CharacterSelection({
     return isCharacterLocked(currentCharacter);
   }, [currentCharacter, isCharacterLocked]);
 
+  // Check if navigation should be disabled (boss has placed first bet)
+  const canNavigate = !isLocked && availableCharacters.length > 1;
+
+  // Debug logging - more visible
+  if (isBoss) {
+    console.log("🎮 [CHAR SELECT] Boss state:", {
+      isLocked,
+      lockedCharacterId,
+      canNavigate,
+      currentCharacter: currentCharacter?.name,
+    });
+  }
+
+  // Jump to locked character when boss places first bet
+  useEffect(() => {
+    if (isLocked && lockedCharacterId !== null && lockedCharacterId !== undefined) {
+      const idx = availableCharacters.findIndex((c) => c.id === lockedCharacterId);
+      if (idx !== -1 && idx !== currentCharacterIndex) {
+        setCurrentCharacterIndex(idx);
+      }
+    }
+  }, [isLocked, lockedCharacterId, availableCharacters, currentCharacterIndex]);
+
   // Carousel navigation functions - show ALL characters (including locked ones)
   const goToPrevious = useCallback(() => {
-    if (availableCharacters.length === 0) return;
+    if (!canNavigate) return;
 
     setCurrentCharacterIndex((prevIndex) => {
       return prevIndex === 0 ? availableCharacters.length - 1 : prevIndex - 1;
     });
-  }, [availableCharacters.length]);
+  }, [canNavigate, availableCharacters.length]);
 
   const goToNext = useCallback(() => {
-    if (availableCharacters.length === 0) return;
+    if (!canNavigate) return;
 
     setCurrentCharacterIndex((prevIndex) => {
       return prevIndex === availableCharacters.length - 1 ? 0 : prevIndex + 1;
     });
-  }, [availableCharacters.length]);
+  }, [canNavigate, availableCharacters.length]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -215,22 +244,30 @@ const CharacterSelection2 = memo(function CharacterSelection({
               </div>
             </div>
 
+            {/* Boss Lock Indicator */}
+            {isBoss && isLocked && (
+              <div className="flex items-center justify-center gap-1 mb-2 px-2 py-1 bg-amber-600/40 rounded-lg border border-amber-500/50">
+                <Lock className="w-3 h-3 text-amber-300" />
+                <span className="text-amber-200 text-xs font-bold uppercase">Boss Locked</span>
+              </div>
+            )}
+
             {/* Navigation Arrows - Bottom */}
             <div className="flex items-center justify-center gap-8 mb-4">
               <button
                 onClick={goToPrevious}
-                disabled={availableCharacters.length <= 1}
+                disabled={!canNavigate}
                 className="w-10 h-10 flex items-center justify-center bg-amber-800/50 hover:bg-amber-700/60 disabled:bg-gray-700/30 disabled:opacity-50 border-2 border-amber-600/50 rounded-lg transition-all shadow-lg disabled:cursor-not-allowed"
-                title="Previous character (Arrow Left)"
+                title={isLocked ? "Character locked (Boss)" : "Previous character (Arrow Left)"}
               >
                 <ChevronLeft className="w-6 h-6 text-amber-100" />
               </button>
 
               <button
                 onClick={goToNext}
-                disabled={availableCharacters.length <= 1}
+                disabled={!canNavigate}
                 className="w-10 h-10 flex items-center justify-center bg-amber-800/50 hover:bg-amber-700/60 disabled:bg-gray-700/30 disabled:opacity-50 border-2 border-amber-600/50 rounded-lg transition-all shadow-lg disabled:cursor-not-allowed"
-                title="Next character (Arrow Right)"
+                title={isLocked ? "Character locked (Boss)" : "Next character (Arrow Right)"}
               >
                 <ChevronRight className="w-6 h-6 text-amber-100" />
               </button>

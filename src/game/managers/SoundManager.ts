@@ -217,6 +217,13 @@ export class SoundManager {
   }
 
   /**
+   * Play boss power-up sound (Mario-style power-up for boss additional bets)
+   */
+  static playBossPowerUp(scene: Scene, baseVolume: number = 0.6) {
+    this.playSound(scene, "boss-power-up", baseVolume);
+  }
+
+  /**
    * Play 5-second countdown sound (for final countdown)
    * Plays the intro sound after countdown finishes
    */

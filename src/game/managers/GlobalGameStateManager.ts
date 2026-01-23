@@ -67,6 +67,9 @@ export class GlobalGameStateManager {
   // Store current game state for phase transitions
   private currentGameState: any = null;
 
+  // Boss wallet (previous winner)
+  private bossWallet: string | null = null;
+
   // Local countdown timer
   private countdownInterval: NodeJS.Timeout | null = null;
 
@@ -127,11 +130,13 @@ export class GlobalGameStateManager {
 
     // ✅ Listen to blockchain updates from App.tsx
     // Note: Preloader handles initial scene selection, we only handle runtime updates
-    EventBus.on("blockchain-state-update", (gameState: any) => {
+    EventBus.on("blockchain-state-update", (data: { gameState: any; bossWallet: string | null }) => {
       logger.game.debug(
         `[GlobalGameStateManager] [${Date.now()}] 📥 blockchain-state-update event received`
       );
-      this.handleBlockchainUpdate(gameState);
+      // Store bossWallet for use when updating Game scene
+      this.bossWallet = data.bossWallet;
+      this.handleBlockchainUpdate(data.gameState);
     });
 
     // Listen to player names updates
@@ -633,8 +638,10 @@ export class GlobalGameStateManager {
 
     // Only Game scene needs blockchain data
     if (sceneKey === "Game") {
-      logger.game.debug("[GlobalGameStateManager] ✅ Calling Game.updateGameState()");
-      (activeScene as any).updateGameState?.(gameState);
+      logger.game.debug("[GlobalGameStateManager] ✅ Calling Game.updateGameState()", {
+        bossWallet: this.bossWallet,
+      });
+      (activeScene as any).updateGameState?.(gameState, this.bossWallet);
     } else {
       logger.game.debug("[GlobalGameStateManager] ⏭️ Skipping update - active scene is", sceneKey);
     }

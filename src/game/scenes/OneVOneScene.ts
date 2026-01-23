@@ -338,6 +338,8 @@ export class OneVOneScene extends Scene {
       targetY: explicitPosition.y,
       spawnIndex: participant.spawnIndex,
       flipX,
+      isBoss: false, // 1v1 doesn't have boss system
+      betCount: 1,
     };
 
     this.playerManager.getParticipants().set(participant._id, gameParticipant);

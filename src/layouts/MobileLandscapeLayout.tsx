@@ -14,6 +14,11 @@ interface MobileLandscapeLayoutProps {
   onCharacterSelected: (character: Character | null) => void;
   walletReady: boolean;
   connected: boolean;
+  // Boss-related props (unused in mobile for now)
+  isBoss?: boolean;
+  bossFirstBetPlaced?: boolean;
+  bossLockedCharacterId?: number | null;
+  onBossFirstBet?: (characterId: number) => void;
 }
 
 export function MobileLandscapeLayout({
@@ -22,6 +27,11 @@ export function MobileLandscapeLayout({
   onCharacterSelected,
   walletReady,
   connected,
+  // Boss props - can be used later for mobile components
+  isBoss: _isBoss,
+  bossFirstBetPlaced: _bossFirstBetPlaced,
+  bossLockedCharacterId: _bossLockedCharacterId,
+  onBossFirstBet: _onBossFirstBet,
 }: MobileLandscapeLayoutProps) {
   return (
     <div className="flex h-[100dvh] bg-black overflow-hidden">

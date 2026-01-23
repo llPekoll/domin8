@@ -22,6 +22,10 @@ export interface GameParticipant {
   targetX: number;
   targetY: number;
   spawnIndex: number;
+  // Boss features
+  isBoss: boolean;
+  betCount: number; // Track number of bets for animation
+  currentScaleTweens?: Phaser.Tweens.Tween[]; // For rapid bet handling
 }
 
 export class PlayerManager {
@@ -149,10 +153,11 @@ export class PlayerManager {
       sprite.play(fallingAnimKey);
     }
 
-    // Apply base multiplier + bet scaling + character-specific scale
+    // Apply base multiplier + bet scaling + character-specific scale + boss multiplier
     const betScale = participant.size || this.calculateParticipantScale(participant.betAmount);
     const characterBaseScale = participant.character?.baseScale ?? 1.0;
-    const scale = betScale * this.BASE_SCALE_MULTIPLIER * characterBaseScale;
+    const bossMultiplier = participant.isBoss ? 1.2 : 1.0; // Boss gets 1.2x size
+    const scale = betScale * this.BASE_SCALE_MULTIPLIER * characterBaseScale * bossMultiplier;
     sprite.setScale(scale);
     sprite.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
 
@@ -328,6 +333,9 @@ export class PlayerManager {
       targetX,
       targetY,
       spawnIndex: participant.spawnIndex,
+      isBoss: participant.isBoss || false,
+      betCount: 1, // First bet
+      currentScaleTweens: [],
     };
 
     this.participants.set(participantId, gameParticipant);
@@ -414,21 +422,31 @@ export class PlayerManager {
   updateParticipantData(participant: any) {
     const gameParticipant = this.participants.get(participant._id);
     if (gameParticipant) {
-      // Update scale if bet amount changed (apply base multiplier)
+      // Update scale if bet amount changed (apply base multiplier + boss multiplier)
       const betScale = participant.size || this.calculateParticipantScale(participant.betAmount);
-      const newScale = betScale * this.BASE_SCALE_MULTIPLIER;
+      const characterBaseScale = participant.character?.baseScale ?? 1.0;
+      const bossMultiplier = gameParticipant.isBoss ? 1.2 : 1.0;
+      const newScale = betScale * this.BASE_SCALE_MULTIPLIER * characterBaseScale * bossMultiplier;
+
       if (gameParticipant.size !== newScale) {
         gameParticipant.size = newScale;
         gameParticipant.betAmount = participant.betAmount;
+        gameParticipant.betCount = (gameParticipant.betCount || 0) + 1;
 
-        // Scale only the sprite, not the text
-        this.scene.tweens.add({
-          targets: gameParticipant.sprite,
-          scaleX: newScale,
-          scaleY: newScale,
-          duration: 300,
-          ease: "Power2",
-        });
+        // Use Mario animation for boss subsequent bets (not first bet)
+        if (gameParticipant.isBoss && gameParticipant.betCount > 1) {
+          logger.game.debug("👑 [BOSS] Mario animation triggered! betCount:", gameParticipant.betCount);
+          this.animateBossBetScale(gameParticipant, newScale, participant.character);
+        } else {
+          // Standard smooth tween for non-boss or first bet
+          this.scene.tweens.add({
+            targets: gameParticipant.sprite,
+            scaleX: newScale,
+            scaleY: newScale,
+            duration: 300,
+            ease: "Power2",
+          });
+        }
       }
 
       // Update tint - simple logic
@@ -443,6 +461,111 @@ export class PlayerManager {
       // Update elimination status from backend
       gameParticipant.eliminated = participant.eliminated || false;
     }
+  }
+
+  /**
+   * Mario-style scale oscillation animation for boss subsequent bets
+   * Oscillates: 1.5x -> 0.8x -> 1.3x -> 0.9x -> final
+   */
+  private animateBossBetScale(participant: GameParticipant, finalScale: number, character?: any) {
+    logger.game.debug("👑 [BOSS] animateBossBetScale called:", {
+      participantId: participant.id,
+      finalScale,
+      currentScale: participant.sprite?.scaleX,
+    });
+
+    // Play Mario power-up sound
+    SoundManager.playBossPowerUp(this.scene, 0.5);
+
+    const sprite = participant.sprite;
+    const dustBackSprite = participant.dustBackSprite;
+    const dustFrontSprite = participant.dustFrontSprite;
+
+    // Cancel any existing scale tweens
+    if (participant.currentScaleTweens && participant.currentScaleTweens.length > 0) {
+      participant.currentScaleTweens.forEach((t) => {
+        if (t && t.isPlaying()) {
+          t.stop();
+        }
+      });
+    }
+    participant.currentScaleTweens = [];
+
+    // Get character-specific sprite offset
+    const offsetPixels = character?.spriteOffsetY ?? 0;
+
+    // Oscillation sequence: 1.5x -> 0.8x -> 1.3x -> 0.9x -> final
+    const keyframes = [
+      { scale: finalScale * 1.5, duration: 100 },
+      { scale: finalScale * 0.8, duration: 100 },
+      { scale: finalScale * 1.3, duration: 100 },
+      { scale: finalScale * 0.9, duration: 100 },
+      { scale: finalScale, duration: 100 },
+    ];
+
+    // Fixed gap below sprite bottom (same as in addParticipant)
+    const nameYOffset = 10;
+
+    let delay = 0;
+    keyframes.forEach((kf) => {
+      // Calculate sprite Y offset for this scale
+      const scaledOffset = offsetPixels * kf.scale;
+
+      // Calculate dust scale for this sprite scale
+      const dustScale = kf.scale * 0.2;
+
+      // Calculate name Y position to maintain consistent gap below sprite feet
+      const nameY = scaledOffset + nameYOffset;
+
+      // Animate sprite scale and Y position
+      const spriteTween = this.scene.tweens.add({
+        targets: sprite,
+        scaleX: kf.scale,
+        scaleY: kf.scale,
+        y: scaledOffset,
+        duration: kf.duration,
+        delay: delay,
+        ease: "Quad.easeOut",
+      });
+      participant.currentScaleTweens!.push(spriteTween);
+
+      // Animate name text to follow sprite and maintain consistent gap
+      const nameTween = this.scene.tweens.add({
+        targets: participant.nameText,
+        y: nameY,
+        duration: kf.duration,
+        delay: delay,
+        ease: "Quad.easeOut",
+      });
+      participant.currentScaleTweens!.push(nameTween);
+
+      // Animate dust sprites to match
+      if (dustBackSprite) {
+        const dustBackTween = this.scene.tweens.add({
+          targets: dustBackSprite,
+          scaleX: dustScale,
+          scaleY: dustScale,
+          duration: kf.duration,
+          delay: delay,
+          ease: "Quad.easeOut",
+        });
+        participant.currentScaleTweens!.push(dustBackTween);
+      }
+
+      if (dustFrontSprite) {
+        const dustFrontTween = this.scene.tweens.add({
+          targets: dustFrontSprite,
+          scaleX: dustScale,
+          scaleY: dustScale,
+          duration: kf.duration,
+          delay: delay,
+          ease: "Quad.easeOut",
+        });
+        participant.currentScaleTweens!.push(dustFrontTween);
+      }
+
+      delay += kf.duration;
+    });
   }
 
   updateParticipantScale(participant: any) {

@@ -216,6 +216,68 @@ export const getAllTimeStats = query({
 });
 
 /**
+ * Get boss info (previous winner's wallet and character)
+ * Returns the wallet address and character ID of the previous game winner
+ * Used to determine if current user is the "Boss" with special privileges
+ */
+export const getBossInfo = query({
+  args: {},
+  handler: async (ctx) => {
+    // Query finished games, ordered by roundId descending (same as getLastFinishedGame)
+    const finishedGames = await ctx.db
+      .query("gameRoundStates")
+      .withIndex("by_status_and_round", (q) => q.eq("status", "finished"))
+      .order("desc")
+      .take(20);
+
+    if (finishedGames.length === 0) {
+      return { bossWallet: null, bossCharacterId: null };
+    }
+
+    // Find the most recent game with a valid winner (no time delay for boss detection)
+    const lastGame = finishedGames.find(
+      (game) =>
+        game.winner &&
+        game.winningBetIndex !== undefined &&
+        game.totalPot &&
+        game.totalPot > 0
+    );
+
+    if (!lastGame || !lastGame.winner) {
+      return { bossWallet: null, bossCharacterId: null };
+    }
+
+    // Get the winning bet's character (skin ID)
+    const winningBetIndex = lastGame.winningBetIndex!;
+    let bossCharacterId: number | null = null;
+
+    // Try to get character from finished state first
+    if (lastGame.betSkin && lastGame.betSkin.length > winningBetIndex) {
+      bossCharacterId = lastGame.betSkin[winningBetIndex];
+    }
+
+    // Fallback to waiting state if bet data is missing
+    if (bossCharacterId === null) {
+      const waitingState = await ctx.db
+        .query("gameRoundStates")
+        .withIndex("by_round_and_status", (q) =>
+          q.eq("roundId", lastGame.roundId).eq("status", "waiting")
+        )
+        .first();
+
+      if (waitingState?.betSkin && waitingState.betSkin.length > winningBetIndex) {
+        bossCharacterId = waitingState.betSkin[winningBetIndex];
+      }
+    }
+
+    return {
+      bossWallet: lastGame.winner,
+      bossCharacterId: bossCharacterId,
+    };
+  },
+});
+
+/**
  * Get the last finished game round with winner information
  * Returns the most recent completed game with winner details
  */

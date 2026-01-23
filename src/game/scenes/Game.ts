@@ -29,6 +29,9 @@ export class Game extends Scene {
   private currentMapId: number | null = null;
   private arenaMask: Phaser.Display.Masks.BitmapMask | null = null;
 
+  // Boss wallet (previous winner)
+  private bossWallet: string | null = null;
+
   // Audio
   private battleMusic: Phaser.Sound.BaseSound | null = null;
   private fireSounds: Phaser.Sound.BaseSound | null = null;
@@ -333,6 +336,12 @@ export class Game extends Scene {
         this.setPlayerNames(playerNames);
       }
     );
+
+    // Listen for boss info updates from App
+    EventBus.on("boss-info-update", ({ bossWallet }: { bossWallet: string | null }) => {
+      logger.game.debug("[Game] 👑 Boss wallet update:", bossWallet);
+      this.bossWallet = bossWallet;
+    });
   }
 
   /**
@@ -410,7 +419,13 @@ export class Game extends Scene {
   }
 
   // Update game state from blockchain
-  updateGameState(gameState: any) {
+  // bossWallet is passed directly to avoid timing issues
+  updateGameState(gameState: any, bossWallet?: string | null) {
+    // Update bossWallet if provided (takes precedence over EventBus update)
+    if (bossWallet !== undefined) {
+      this.bossWallet = bossWallet;
+    }
+
     logger.game.debug("[Game] 🎮 updateGameState called", {
       hasGameState: !!gameState,
       hasMap: !!gameState?.map,
@@ -421,6 +436,7 @@ export class Game extends Scene {
       hasCharacters: !!this.characters,
       characterCount: this.characters?.length || 0,
       status: gameState?.status,
+      bossWallet: this.bossWallet,
     });
 
     this.gameState = gameState;
@@ -470,6 +486,30 @@ export class Game extends Scene {
         currentParticipantCount: this.playerManager?.getParticipants().size || 0,
       });
 
+      // For boss: combine all bets into single participant
+      // Track boss's total bet amount and first bet info
+      let bossTotalBet = 0;
+      let bossFirstBet: any = null;
+      let bossFirstBetIndex = -1;
+
+      // First pass: calculate boss total if boss is in this game
+      if (this.bossWallet) {
+        gameState.bets.forEach((bet: any, betIndex: number) => {
+          const walletAddress = gameState.wallets[bet.walletIndex]?.toBase58();
+          if (walletAddress === this.bossWallet) {
+            const betAmount = Number(bet.amount.toString()) / 1_000_000_000;
+            bossTotalBet += betAmount;
+            if (bossFirstBet === null) {
+              bossFirstBet = bet;
+              bossFirstBetIndex = betIndex;
+            }
+          }
+        });
+        if (bossTotalBet > 0) {
+          logger.game.debug("[Game] 👑 Boss total bet calculated:", bossTotalBet);
+        }
+      }
+
       gameState.bets.forEach((bet: any, betIndex: number) => {
         logger.game.debug(`[Game] 🔍 Processing bet ${betIndex}:`, {
           walletIndex: bet.walletIndex,
@@ -483,11 +523,41 @@ export class Game extends Scene {
           return;
         }
 
-        const participantId = `${walletAddress}_${betIndex}`;
+        const isBoss = walletAddress === this.bossWallet;
 
-        // Skip if participant already exists
+        // For boss: only create ONE participant (skip subsequent bets)
+        // Use wallet address as ID (not wallet_betIndex) so all bets merge
+        const participantId = isBoss ? walletAddress : `${walletAddress}_${betIndex}`;
+
+        // For boss: skip if not the first bet (we'll update the existing one)
+        if (isBoss && betIndex !== bossFirstBetIndex) {
+          // Check if boss participant exists and update their bet amount
+          const existingBoss = this.playerManager.getParticipant(participantId);
+          if (existingBoss) {
+            logger.game.debug(`[Game] 👑 Boss additional bet - updating existing participant`);
+            // Update bet amount to trigger animation
+            this.playerManager.updateParticipantData({
+              _id: participantId,
+              betAmount: bossTotalBet,
+              character: existingBoss.sprite ? { baseScale: 1.0 } : undefined,
+            });
+          }
+          return; // Skip creating new participant
+        }
+
+        // Skip if participant already exists (for non-boss)
         if (this.playerManager.getParticipant(participantId)) {
-          logger.game.debug(`[Game] ⏭️ Participant ${participantId} already exists, skipping`);
+          // For boss, update with new total
+          if (isBoss) {
+            logger.game.debug(`[Game] 👑 Boss exists, updating bet amount to ${bossTotalBet}`);
+            this.playerManager.updateParticipantData({
+              _id: participantId,
+              betAmount: bossTotalBet,
+              character: { baseScale: 1.0 },
+            });
+          } else {
+            logger.game.debug(`[Game] ⏭️ Participant ${participantId} already exists, skipping`);
+          }
           return;
         }
 
@@ -495,11 +565,14 @@ export class Game extends Scene {
         const characterKey = characterConfig.name.toLowerCase().replace(/\s+/g, "-");
         const participantName = this.getParticipantName(walletAddress);
 
+        // For boss: use combined total bet amount
+        const betAmount = isBoss ? bossTotalBet : Number(bet.amount.toString()) / 1_000_000_000;
+
         const participant = {
           _id: participantId,
           playerId: walletAddress,
           displayName: participantName,
-          betAmount: Number(bet.amount.toString()) / 1_000_000_000, // Convert lamports to SOL
+          betAmount: betAmount,
           character: {
             key: characterKey,
             name: characterConfig.name,
@@ -511,6 +584,7 @@ export class Game extends Scene {
           isBot: false,
           eliminated: false,
           colorHue: undefined,
+          isBoss: isBoss,
         };
 
         logger.game.debug("[Game] ✅ Spawning participant from blockchain:", participant);
@@ -653,6 +727,7 @@ export class Game extends Scene {
     EventBus.off("start-celebration");
     EventBus.off("cleanup-game");
     EventBus.off("sound-settings-changed");
+    EventBus.off("boss-info-update");
 
     // Clean up UIManager
     if (this.uiManager) {
