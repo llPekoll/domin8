@@ -118,12 +118,6 @@ export class PlayerManager {
       sprite.setFlipX(true);
     }
 
-    // Start with falling animation
-    const fallingAnimKey = `${textureKey}-falling`;
-    if (this.scene.anims.exists(fallingAnimKey)) {
-      sprite.play(fallingAnimKey);
-    }
-
     // Apply base multiplier + bet scaling + character-specific scale + boss multiplier
     const betScale = participant.size || this.calculateParticipantScale(participant.betAmount);
     const characterBaseScale = participant.character?.baseScale ?? 1.0;
@@ -131,6 +125,30 @@ export class PlayerManager {
     const scale = betScale * this.BASE_SCALE_MULTIPLIER * characterBaseScale * bossMultiplier;
     sprite.setScale(scale);
     sprite.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+
+    // Calculate Y offset from IDLE animation's first frame (use consistent offset for all animations)
+    // This prevents glitching when transitioning between falling/landing/idle
+    const idleAnimKey = `${textureKey}-idle`;
+    let feetGapScaled = 0;
+    if (this.scene.anims.exists(idleAnimKey)) {
+      const idleAnim = this.scene.anims.get(idleAnimKey);
+      const firstFrame = idleAnim.frames[0];
+      if (firstFrame && firstFrame.frame) {
+        const customData = firstFrame.frame.customData as FrameCustomData | undefined;
+        const sourceHeight = customData?.sourceSize?.h || firstFrame.frame.height;
+        const trimY = customData?.spriteSourceSize?.y || 0;
+        const trimHeight = customData?.spriteSourceSize?.h || firstFrame.frame.height;
+        const feetGapUnscaled = sourceHeight - (trimY + trimHeight);
+        feetGapScaled = feetGapUnscaled * scale;
+      }
+    }
+    sprite.setY(feetGapScaled);
+
+    // Start with falling animation (Y offset already set from idle frame)
+    const fallingAnimKey = `${textureKey}-falling`;
+    if (this.scene.anims.exists(fallingAnimKey)) {
+      sprite.play(fallingAnimKey);
+    }
 
     // Make sprite interactive for poke animation, but allow clicks to pass through
     sprite.setInteractive({
@@ -187,19 +205,6 @@ export class PlayerManager {
     const dustOffsetY = 15; // Offset down from character's feet
     dustBackSprite.setY(dustOffsetY);
     dustFrontSprite.setY(dustOffsetY);
-
-    // Auto-calculate Y offset to align visible feet with container origin
-    // The sprite's origin (0.5, 1.0) is at the bottom of sourceSize canvas
-    const spriteFrame = sprite.frame;
-    const customData = spriteFrame.customData as FrameCustomData | undefined;
-    const sourceHeight = customData?.sourceSize?.h || spriteFrame.height;
-    const trimY = customData?.spriteSourceSize?.y || 0;
-    const trimHeight = customData?.spriteSourceSize?.h || spriteFrame.height;
-    // Gap from visible feet to canvas bottom (in unscaled pixels)
-    const feetGapUnscaled = sourceHeight - (trimY + trimHeight);
-    // Scale the gap because sprite.setY is in container space but the visual gap scales with sprite
-    const feetGapScaled = feetGapUnscaled * scale;
-    sprite.setY(feetGapScaled);
 
     // With bottom-origin sprite, name goes below with consistent gap
     const nameYOffset = 10; // Fixed gap below sprite bottom
@@ -277,8 +282,6 @@ export class PlayerManager {
             const idleAnimKey = `${textureKey}-idle`;
             if (sprite && sprite.active && this.scene.anims.exists(idleAnimKey)) {
               sprite.play(idleAnimKey);
-              // Recalculate Y offset for idle frame (may differ from falling frame)
-              this.recalculateSpriteY(sprite, scale);
             }
           });
         } else {
@@ -286,8 +289,6 @@ export class PlayerManager {
           const idleAnimKey = `${textureKey}-idle`;
           if (this.scene.anims.exists(idleAnimKey)) {
             sprite.play(idleAnimKey);
-            // Recalculate Y offset for idle frame
-            this.recalculateSpriteY(sprite, scale);
           }
         }
       },
@@ -317,21 +318,6 @@ export class PlayerManager {
       id: participantId,
       newCount: this.participants.size,
     });
-  }
-
-  /**
-   * Recalculate sprite Y position based on current frame metadata
-   * Called after animation changes (e.g., falling -> idle) since frames may have different sizes
-   */
-  private recalculateSpriteY(sprite: Phaser.GameObjects.Sprite, scale: number) {
-    const spriteFrame = sprite.frame;
-    const customData = spriteFrame.customData as FrameCustomData | undefined;
-    const sourceHeight = customData?.sourceSize?.h || spriteFrame.height;
-    const trimY = customData?.spriteSourceSize?.y || 0;
-    const trimHeight = customData?.spriteSourceSize?.h || spriteFrame.height;
-    const feetGapUnscaled = sourceHeight - (trimY + trimHeight);
-    const feetGapScaled = feetGapUnscaled * scale;
-    sprite.setY(feetGapScaled);
   }
 
   private calculateParticipantScale(betAmountInSOL: number): number {
