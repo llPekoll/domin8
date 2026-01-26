@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query } from "./_generated/server";
+import { query, internalQuery } from "./_generated/server";
 
 export const getActiveCharacters = query({
   args: {},
@@ -70,3 +70,41 @@ export const getExclusiveCharacters = query({
 
 // Note: Bet data with skin/position now comes directly from blockchain via useActiveGame hook
 // No longer stored in Convex database - source of truth is on-chain
+
+/**
+ * Internal query to get character by skin ID (the numeric ID stored on blockchain)
+ * Returns character data or null if not found
+ */
+export const getCharacterBySkinId = internalQuery({
+  args: { skinId: v.number() },
+  handler: async (ctx, { skinId }) => {
+    const characters = await ctx.db
+      .query("characters")
+      .filter((q) => q.eq(q.field("id"), skinId))
+      .first();
+
+    return characters;
+  },
+});
+
+/**
+ * Internal query to resolve skin ID to character key (sprite name)
+ * Returns the key like "warrior", "orc", etc. or a fallback
+ */
+export const resolveCharacterKey = internalQuery({
+  args: { skinId: v.number() },
+  handler: async (ctx, { skinId }) => {
+    const character = await ctx.db
+      .query("characters")
+      .filter((q) => q.eq(q.field("id"), skinId))
+      .first();
+
+    if (character?.name) {
+      // Convert name to key format (lowercase, replace spaces with dashes)
+      return character.name.toLowerCase().replace(/\s+/g, "-");
+    }
+
+    // Fallback
+    return "warrior";
+  },
+});

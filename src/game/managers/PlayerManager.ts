@@ -277,6 +277,8 @@ export class PlayerManager {
             const idleAnimKey = `${textureKey}-idle`;
             if (sprite && sprite.active && this.scene.anims.exists(idleAnimKey)) {
               sprite.play(idleAnimKey);
+              // Recalculate Y offset for idle frame (may differ from falling frame)
+              this.recalculateSpriteY(sprite, scale);
             }
           });
         } else {
@@ -284,6 +286,8 @@ export class PlayerManager {
           const idleAnimKey = `${textureKey}-idle`;
           if (this.scene.anims.exists(idleAnimKey)) {
             sprite.play(idleAnimKey);
+            // Recalculate Y offset for idle frame
+            this.recalculateSpriteY(sprite, scale);
           }
         }
       },
@@ -313,6 +317,21 @@ export class PlayerManager {
       id: participantId,
       newCount: this.participants.size,
     });
+  }
+
+  /**
+   * Recalculate sprite Y position based on current frame metadata
+   * Called after animation changes (e.g., falling -> idle) since frames may have different sizes
+   */
+  private recalculateSpriteY(sprite: Phaser.GameObjects.Sprite, scale: number) {
+    const spriteFrame = sprite.frame;
+    const customData = spriteFrame.customData as FrameCustomData | undefined;
+    const sourceHeight = customData?.sourceSize?.h || spriteFrame.height;
+    const trimY = customData?.spriteSourceSize?.y || 0;
+    const trimHeight = customData?.spriteSourceSize?.h || spriteFrame.height;
+    const feetGapUnscaled = sourceHeight - (trimY + trimHeight);
+    const feetGapScaled = feetGapUnscaled * scale;
+    sprite.setY(feetGapScaled);
   }
 
   private calculateParticipantScale(betAmountInSOL: number): number {

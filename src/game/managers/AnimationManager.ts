@@ -7,7 +7,6 @@ export class AnimationManager {
   private scene: Scene;
   private centerX: number;
   private centerY: number;
-  private playerNamesMap: Map<string, string> = new Map();
 
   // Physics configuration for explosion - TWEAK THESE VALUES
   // Base values are for RESOLUTION_SCALE = 1, automatically scaled
@@ -29,17 +28,6 @@ export class AnimationManager {
     this.scene = scene;
     this.centerX = centerX;
     this.centerY = centerY;
-  }
-
-  updateCenter(centerX: number, centerY: number) {
-    this.centerX = centerX;
-    this.centerY = centerY;
-  }
-
-  // Update player names mapping
-  setPlayerNames(playerNames: Map<string, string>) {
-    this.playerNamesMap = playerNames;
-    logger.game.debug("[AnimationManager] Player names map updated:", this.playerNamesMap.size);
   }
 
   // Store celebration objects for cleanup
@@ -442,37 +430,6 @@ export class AnimationManager {
       } else {
         applyKickOutPhysics();
       }
-    });
-  }
-
-  showBettingPrompt() {
-    // Show betting phase indicator
-    const bettingText = this.scene.add
-      .text(this.centerX, 15, "BETTING PHASE", {
-        fontFamily: "jersey",
-        fontSize: 12, // Scaled down from 32px
-        color: "#00ff00",
-        stroke: "#000000",
-        strokeThickness: 1, // Scaled down from 4
-        align: "center",
-        resolution: 4, // High resolution for crisp text when scaled
-      })
-      .setOrigin(0.5)
-      .setDepth(200);
-
-    // Pulse animation
-    this.scene.tweens.add({
-      targets: bettingText,
-      scale: { from: 1, to: 1.2 },
-      duration: 800,
-      ease: "Sine.easeInOut",
-      yoyo: true,
-      repeat: -1,
-    });
-
-    // Remove after 3 seconds
-    this.scene.time.delayedCall(3000, () => {
-      bettingText.destroy();
     });
   }
 

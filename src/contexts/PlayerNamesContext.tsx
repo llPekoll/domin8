@@ -3,7 +3,6 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useActiveGame } from "../hooks/useActiveGame";
 import { logger } from "../lib/logger";
-import { EventBus } from "../game/EventBus";
 
 const PlayerNamesContext = createContext<any>(undefined);
 
@@ -34,13 +33,8 @@ export function PlayerNamesProvider({ children }: { children: ReactNode }) {
     walletAddresses.length > 0 ? { walletAddresses } : "skip"
   );
 
-  // Pass player names to Phaser when they change
-  useEffect(() => {
-    if (!playerNames) return;
-
-    logger.game.debug("[PlayerNamesContext] Broadcasting player names to Phaser:", playerNames.length);
-    EventBus.emit("player-names-update", playerNames);
-  }, [playerNames]);
+  // Note: Player names for Phaser now come via unified participants-update event
+  // from Convex (names resolved server-side). This context is only used by React components.
 
   return (
     <PlayerNamesContext.Provider value={{ playerNames }}>

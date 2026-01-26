@@ -371,6 +371,41 @@ export default defineSchema({
     .index("by_active", ["isActive"]), // Query active subscriptions for broadcast
 
   // ============================================================================
+  // CURRENT GAME PARTICIPANTS TABLE
+  // ============================================================================
+
+  /**
+   * Current Game Participants - Unified participant data for the active game
+   * One row per "character on screen":
+   * - Boss: ONE entry (character locked, betAmount = total of all bets)
+   * - Non-boss: ONE entry PER BET (each bet = separate character)
+   *
+   * Cleared when game ends and new game starts
+   */
+  currentGameParticipants: defineTable({
+    odid: v.string(), // Unique ID: walletAddress for boss, wallet_betIndex for others
+    walletAddress: v.string(),
+    displayName: v.string(), // Resolved player name or truncated wallet
+    gameRound: v.number(), // Which game round this belongs to
+
+    // Character info
+    characterId: v.number(), // Skin ID from blockchain
+    characterKey: v.string(), // Sprite key for Phaser (e.g., "warrior", "orc")
+
+    // Bet info
+    betIndex: v.number(), // Original index in blockchain bets array
+    betAmount: v.number(), // In SOL (boss: total, others: single bet)
+    position: v.array(v.number()), // [x, y] spawn position from blockchain
+
+    // Flags
+    isBoss: v.boolean(), // Previous winner gets special treatment
+    spawnIndex: v.number(), // For spawn position calculation
+  })
+    .index("by_gameRound", ["gameRound"])
+    .index("by_odid", ["odid"])
+    .index("by_walletAddress", ["walletAddress"]),
+
+  // ============================================================================
   // CHAT TABLES
   // ============================================================================
 

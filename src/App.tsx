@@ -4,6 +4,7 @@ import { isMobile as isMobileDevice } from "react-device-detect";
 import { useActiveGame } from "./hooks/useActiveGame";
 import { usePrivyWallet } from "./hooks/usePrivyWallet";
 import { useBossInfo } from "./hooks/useBossInfo";
+import { useGameParticipants } from "./hooks/useGameParticipants";
 import { EventBus } from "./game/EventBus";
 import { setActiveGameData, setCurrentUserWallet } from "./game/main";
 import type { Character } from "./types/character";
@@ -96,6 +97,9 @@ export default function App() {
   // Send notification when game transitions from WAITING to OPEN (first bet placed)
   useGameCreatedNotification(currentRoundState);
 
+  // Get unified participants from Convex (includes resolved names, boss status)
+  const { participants } = useGameParticipants();
+
   // Reset boss state when round changes
   useEffect(() => {
     const currentRoundId = currentRoundState?.gameRound?.toString() || null;
@@ -182,6 +186,46 @@ export default function App() {
     setActiveGameData(fullData);
     EventBus.emit("blockchain-state-update", { gameState: fullData, bossWallet });
   }, [stableGameState, bossWallet]);
+
+  // Emit unified participants to Phaser (from Convex, includes resolved names)
+  // Also re-emit when Phaser Game scene becomes ready (in case it missed the first emit)
+  useEffect(() => {
+    if (participants && participants.length > 0) {
+      console.log(`👥 [App] Emitting ${participants.length} participants to Phaser`);
+      EventBus.emit("participants-update", { participants });
+    }
+  }, [participants]);
+
+  // Re-emit game state and participants when Game scene becomes ready (handles late scene initialization)
+  useEffect(() => {
+    const handleSceneReady = (scene: any) => {
+      // Only re-emit for Game scene (not CharacterPreview or other scenes)
+      if (scene?.scene?.key === "Game") {
+        const fullData = stableGameState?._fullData || null;
+
+        // Re-emit boss wallet info
+        console.log(`👑 [App] Scene ready - re-emitting boss info:`, bossWallet);
+        EventBus.emit("boss-info-update", { bossWallet });
+
+        // Re-emit blockchain state (includes map data) FIRST
+        console.log(`🗺️ [App] Scene ready - re-emitting blockchain state`);
+        EventBus.emit("blockchain-state-update", { gameState: fullData, bossWallet });
+
+        // Re-emit participants AFTER map data is set (small delay to ensure order)
+        if (participants && participants.length > 0) {
+          setTimeout(() => {
+            console.log(`👥 [App] Scene ready - re-emitting ${participants.length} participants`);
+            EventBus.emit("participants-update", { participants });
+          }, 100);
+        }
+      }
+    };
+
+    EventBus.on("current-scene-ready", handleSceneReady);
+    return () => {
+      EventBus.off("current-scene-ready", handleSceneReady);
+    };
+  }, [participants, bossWallet, stableGameState]);
 
   // Shared props for all layouts
   const layoutProps = {

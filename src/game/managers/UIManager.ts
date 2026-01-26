@@ -46,6 +46,23 @@ export class UIManager {
 
     // Listen for phase changes from GamePhaseManager
     EventBus.on("game-phase-changed", this.onPhaseChanged.bind(this));
+
+    // Listen for participants update to get player names (for winner display)
+    EventBus.on("participants-update", this.onParticipantsUpdate.bind(this));
+  }
+
+  /**
+   * Handle participants update from Convex (via App.tsx)
+   * Extract wallet -> displayName mapping for winner UI
+   */
+  private onParticipantsUpdate(data: { participants: Array<{ walletAddress: string; displayName: string }> }) {
+    this.playerNamesMap.clear();
+    data.participants.forEach(({ walletAddress, displayName }) => {
+      if (displayName) {
+        this.playerNamesMap.set(walletAddress, displayName);
+      }
+    });
+    console.log(`[UIManager] 👥 Player names updated from participants: ${this.playerNamesMap.size} entries`);
   }
 
   /**
@@ -660,18 +677,6 @@ export class UIManager {
     }
   }
 
-  setPlayerNames(playerNames: Array<{ walletAddress: string; displayName: string | null }>) {
-    this.playerNamesMap.clear();
-    playerNames.forEach(({ walletAddress, displayName }) => {
-      if (displayName) {
-        this.playerNamesMap.set(walletAddress, displayName);
-      }
-    });
-    console.log(
-      `[UIManager] Player names updated: ${this.playerNamesMap.size} with names, ${playerNames.length} total`
-    );
-    console.log(`[UIManager] Names map:`, Object.fromEntries(this.playerNamesMap));
-  }
 
   updateTimer() {
     if (!this.gameState) {
@@ -729,6 +734,7 @@ export class UIManager {
   // Cleanup event listeners
   destroy() {
     EventBus.off("game-phase-changed", this.onPhaseChanged.bind(this));
+    EventBus.off("participants-update", this.onParticipantsUpdate.bind(this));
 
     // Cleanup insert coin tween
     if (this.insertCoinTween) {

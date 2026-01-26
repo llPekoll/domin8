@@ -1,4 +1,4 @@
-import { query } from "./_generated/server";
+import { query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
@@ -274,6 +274,36 @@ export const getBossInfo = query({
       bossWallet: lastGame.winner,
       bossCharacterId: bossCharacterId,
     };
+  },
+});
+
+/**
+ * Internal version of getBossInfo for use in sync service
+ * Returns the wallet address of the previous game winner (the "boss")
+ */
+export const getBossWalletInternal = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    // Query finished games, ordered by roundId descending
+    const finishedGames = await ctx.db
+      .query("gameRoundStates")
+      .withIndex("by_status_and_round", (q) => q.eq("status", "finished"))
+      .order("desc")
+      .take(5);
+
+    if (finishedGames.length === 0) {
+      return null;
+    }
+
+    // Find the most recent game with a valid winner
+    const lastGame = finishedGames.find(
+      (game) =>
+        game.winner &&
+        game.totalPot &&
+        game.totalPot > 0
+    );
+
+    return lastGame?.winner ?? null;
   },
 });
 

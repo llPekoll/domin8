@@ -87,6 +87,32 @@ async function syncActiveGame(ctx: any, activeGame: any) {
     });
 
     console.log(`[Sync Service] Synced game round ${activeGame.gameRound} to database`);
+
+    // Sync participants if there are bets
+    if (activeGame.bets && activeGame.bets.length > 0 && activeGame.wallets) {
+      // Get boss wallet (previous winner)
+      const bossWallet = await ctx.runQuery(internal.stats.getBossWalletInternal, {});
+
+      // Sync participants - convert wallet PublicKeys to strings
+      await ctx.runMutation(internal.syncServiceMutations.syncParticipants, {
+        gameRound: activeGame.gameRound,
+        bets: activeGame.bets.map((b: any) => ({
+          walletIndex: b.walletIndex,
+          amount: typeof b.amount === 'object' ? Number(b.amount.toString()) : b.amount,
+          skin: b.skin,
+          position: b.position,
+        })),
+        wallets: activeGame.wallets.map((w: any) =>
+          typeof w === 'string' ? w : w.toBase58?.() || w.toString()
+        ),
+        bossWallet,
+      });
+
+      // Clear old participants from previous rounds
+      await ctx.runMutation(internal.syncServiceMutations.clearOldParticipants, {
+        currentGameRound: activeGame.gameRound,
+      });
+    }
   } catch (error) {
     console.error("[Sync Service] Error syncing active game:", error);
   }

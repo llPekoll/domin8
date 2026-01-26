@@ -139,13 +139,8 @@ export class GlobalGameStateManager {
       this.handleBlockchainUpdate(data.gameState);
     });
 
-    // Listen to player names updates
-    EventBus.on(
-      "player-names-update",
-      (playerNames: Array<{ walletAddress: string; displayName: string | null }>) => {
-        this.updateActiveSceneWithPlayerNames(playerNames);
-      }
-    );
+    // Note: Player names are now handled via unified participants-update event
+    // which goes directly to Game.ts (no need to relay through GlobalGameStateManager)
 
     // Listen for Preloader complete event (Preloader now handles initial scene selection)
     EventBus.on("preloader-complete", () => {
@@ -648,25 +643,6 @@ export class GlobalGameStateManager {
   }
 
   /**
-   * Update active scene with player names
-   */
-  private updateActiveSceneWithPlayerNames(
-    playerNames: Array<{ walletAddress: string; displayName: string | null }>
-  ) {
-    const gameScene = this.game.scene.getScene("Game");
-    if (gameScene?.scene.isActive()) {
-      (gameScene as any).setPlayerNames?.(playerNames);
-    }
-  }
-
-  /**
-   * Get current phase (for external consumers)
-   */
-  getCurrentPhase(): GamePhase {
-    return this.currentPhase;
-  }
-
-  /**
    * Clean up event listeners
    */
   destroy() {
@@ -678,7 +654,6 @@ export class GlobalGameStateManager {
     }
 
     EventBus.off("blockchain-state-update");
-    EventBus.off("player-names-update");
     EventBus.off("current-scene-ready");
     EventBus.off("preloader-complete");
     logger.game.debug("[GlobalGameStateManager] 🗑️ Destroyed");

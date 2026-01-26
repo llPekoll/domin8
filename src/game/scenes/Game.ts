@@ -7,6 +7,7 @@ import { BackgroundManager } from "../managers/BackgroundManager";
 import { SoundManager } from "../managers/SoundManager";
 import { logger } from "../../lib/logger";
 import { activeGameData, allMapsData, RESOLUTION_SCALE } from "../main";
+import type { GameParticipant } from "../../hooks/useGameParticipants";
 
 export class Game extends Scene {
   camera!: Phaser.Cameras.Scene2D.Camera;
@@ -22,8 +23,6 @@ export class Game extends Scene {
 
   private introPlayed: boolean = false;
   private characters: any[] = [];
-  private playerNames: Map<string, string> = new Map(); // wallet -> displayName
-  private playerWins: Map<string, number> = new Map(); // wallet -> totalWins
 
   // Arena mask
   private currentMapId: number | null = null;
@@ -44,48 +43,6 @@ export class Game extends Scene {
   // Set characters data from AssetsContext
   setCharacters(characters: any[]) {
     this.characters = characters || [];
-  }
-
-  // Set player names and stats mapping (wallet address -> display name, totalWins)
-  setPlayerNames(playerNames: Array<{ walletAddress: string; displayName: string | null; totalWins?: number }>) {
-    this.playerNames.clear();
-    this.playerWins.clear();
-    playerNames.forEach(({ walletAddress, displayName, totalWins }) => {
-      if (displayName) {
-        this.playerNames.set(walletAddress, displayName);
-      }
-      if (totalWins !== undefined) {
-        this.playerWins.set(walletAddress, totalWins);
-      }
-    });
-
-    // Pass updated player names to AnimationManager
-    if (this.animationManager) {
-      this.animationManager.setPlayerNames(this.playerNames);
-    }
-
-    // Pass updated player names to UIManager
-    if (this.uiManager) {
-      this.uiManager.setPlayerNames(playerNames);
-    }
-
-    // Update existing participants with new display names
-    if (this.playerManager) {
-      this.updateParticipantDisplayNames();
-    }
-  }
-
-  // Update display names for all existing participants
-  private updateParticipantDisplayNames() {
-    const participants = this.playerManager.getParticipants();
-    participants.forEach((participant) => {
-      if (participant.playerId) {
-        const displayName = this.playerNames.get(participant.playerId);
-        if (displayName && displayName !== participant.nameText.text) {
-          participant.nameText.setText(displayName);
-        }
-      }
-    });
   }
 
   create() {
@@ -113,7 +70,6 @@ export class Game extends Scene {
         activeGameData.map.id
       );
       this.backgroundManager.setBackgroundById(activeGameData.map.id);
-      console.log("Background set oooo");
     } else {
       logger.game.warn("[Game] No map data in activeGameData, will wait for updateGameState()");
     }
@@ -330,12 +286,12 @@ export class Game extends Scene {
       this.handleGameCleanup();
     });
 
-    // Listen for player names updates from PlayerNamesContext
+    // Listen for unified participants update from Convex (via App.tsx)
     EventBus.on(
-      "player-names-update",
-      (playerNames: Array<{ walletAddress: string; displayName: string | null }>) => {
-        logger.game.debug("[Game] 📛 Player names update received:", playerNames.length);
-        this.setPlayerNames(playerNames);
+      "participants-update",
+      ({ participants }: { participants: GameParticipant[] }) => {
+        logger.game.debug("[Game] 👥 Participants update received:", participants.length);
+        this.handleParticipantsUpdate(participants);
       }
     );
 
@@ -420,7 +376,8 @@ export class Game extends Scene {
     logger.game.debug("[CLEANUP] Complete");
   }
 
-  // Update game state from blockchain
+  // Update game state from blockchain (map/background only)
+  // Participant spawning is now handled by handleParticipantsUpdate via Convex
   // bossWallet is passed directly to avoid timing issues
   updateGameState(gameState: any, bossWallet?: string | null) {
     // Update bossWallet if provided (takes precedence over EventBus update)
@@ -431,12 +388,6 @@ export class Game extends Scene {
     logger.game.debug("[Game] 🎮 updateGameState called", {
       hasGameState: !!gameState,
       hasMap: !!gameState?.map,
-      hasBets: !!gameState?.bets,
-      betCount: gameState?.bets?.length || 0,
-      hasWallets: !!gameState?.wallets,
-      walletCount: gameState?.wallets?.length || 0,
-      hasCharacters: !!this.characters,
-      characterCount: this.characters?.length || 0,
       status: gameState?.status,
       bossWallet: this.bossWallet,
     });
@@ -465,7 +416,6 @@ export class Game extends Scene {
       const selectedMap = allMapsData.find((map: any) => map.id === mapId);
       if (selectedMap) {
         logger.game.debug("[Game] Loaded map config for spawning:", selectedMap.spawnConfiguration);
-        // Just set the map config, don't manage participants (they're managed separately below)
         this.playerManager.setMapData(selectedMap);
       } else {
         logger.game.error(
@@ -479,146 +429,11 @@ export class Game extends Scene {
       logger.game.error("[Game] ❌ No map data in game state!");
     }
 
-    // Spawn characters from blockchain bet data
-    if (gameState.bets && gameState.wallets) {
-      logger.game.debug("[Game] 🚀 Starting character spawn from blockchain bet data:", {
-        betCount: gameState.bets.length,
-        walletCount: gameState.wallets.length,
-        hasPlayerManager: !!this.playerManager,
-        currentParticipantCount: this.playerManager?.getParticipants().size || 0,
-      });
-
-      // For boss: combine all bets into single participant
-      // Track boss's total bet amount and first bet info
-      let bossTotalBet = 0;
-      let bossFirstBet: any = null;
-      let bossFirstBetIndex = -1;
-
-      // First pass: calculate boss total if boss is in this game
-      if (this.bossWallet) {
-        gameState.bets.forEach((bet: any, betIndex: number) => {
-          const walletAddress = gameState.wallets[bet.walletIndex]?.toBase58();
-          if (walletAddress === this.bossWallet) {
-            const betAmount = Number(bet.amount.toString()) / 1_000_000_000;
-            bossTotalBet += betAmount;
-            if (bossFirstBet === null) {
-              bossFirstBet = bet;
-              bossFirstBetIndex = betIndex;
-            }
-          }
-        });
-        if (bossTotalBet > 0) {
-          logger.game.debug("[Game] 👑 Boss total bet calculated:", bossTotalBet);
-        }
-      }
-
-      gameState.bets.forEach((bet: any, betIndex: number) => {
-        logger.game.debug(`[Game] 🔍 Processing bet ${betIndex}:`, {
-          walletIndex: bet.walletIndex,
-          skin: bet.skin,
-          amount: bet.amount?.toString(),
-        });
-
-        const walletAddress = gameState.wallets[bet.walletIndex]?.toBase58();
-        if (!walletAddress) {
-          logger.game.warn("[Game] ❌ No wallet found for bet index", betIndex);
-          return;
-        }
-
-        const isBoss = walletAddress === this.bossWallet;
-
-        // For boss: only create ONE participant (skip subsequent bets)
-        // Use wallet address as ID (not wallet_betIndex) so all bets merge
-        const participantId = isBoss ? walletAddress : `${walletAddress}_${betIndex}`;
-
-        // For boss: skip if not the first bet (we'll update the existing one)
-        if (isBoss && betIndex !== bossFirstBetIndex) {
-          // Check if boss participant exists and update their bet amount
-          const existingBoss = this.playerManager.getParticipant(participantId);
-          if (existingBoss) {
-            logger.game.debug(`[Game] 👑 Boss additional bet - updating existing participant`);
-            // Update bet amount to trigger animation
-            this.playerManager.updateParticipantData({
-              _id: participantId,
-              betAmount: bossTotalBet,
-              character: existingBoss.sprite ? { baseScale: 1.0 } : undefined,
-            });
-          }
-          return; // Skip creating new participant
-        }
-
-        // Skip if participant already exists (for non-boss)
-        if (this.playerManager.getParticipant(participantId)) {
-          // For boss, update with new total
-          if (isBoss) {
-            logger.game.debug(`[Game] 👑 Boss exists, updating bet amount to ${bossTotalBet}`);
-            this.playerManager.updateParticipantData({
-              _id: participantId,
-              betAmount: bossTotalBet,
-              character: { baseScale: 1.0 },
-            });
-          } else {
-            logger.game.debug(`[Game] ⏭️ Participant ${participantId} already exists, skipping`);
-          }
-          return;
-        }
-
-        const characterConfig = this.getCharacterConfig(bet.skin);
-        const characterKey = characterConfig.name.toLowerCase().replace(/\s+/g, "-");
-        const participantName = this.getParticipantName(walletAddress);
-
-        // For boss: use combined total bet amount
-        const betAmount = isBoss ? bossTotalBet : Number(bet.amount.toString()) / 1_000_000_000;
-
-        const participant = {
-          _id: participantId,
-          playerId: walletAddress,
-          displayName: participantName,
-          betAmount: betAmount,
-          character: {
-            key: characterKey,
-            name: characterConfig.name,
-            id: bet.skin,
-            spriteOffsetY: characterConfig.spriteOffsetY,
-            baseScale: characterConfig.baseScale,
-          },
-          spawnIndex: betIndex,
-          eliminated: false,
-          isBoss: isBoss,
-        };
-
-        logger.game.debug("[Game] ✅ Spawning participant from blockchain:", participant);
-        this.playerManager.addParticipant(participant);
-
-        // Play challenger sound to notify all players of new participant
-        SoundManager.playChallenger(this);
-
-        // Apply arena mask to the newly spawned participant
-        if (this.arenaMask) {
-          const gameParticipant = this.playerManager.getParticipant(participantId);
-          if (gameParticipant) {
-            gameParticipant.container.setMask(this.arenaMask);
-            logger.game.debug(`[Game] Arena mask applied to participant ${participantId}`);
-          }
-        }
-      });
-
-      logger.game.debug(
-        "[Game] ✅ Character spawn complete. Final participant count:",
-        this.playerManager.getParticipants().size
-      );
-    } else {
-      logger.game.warn("[Game] ⚠️ No bets or wallets in game state!", {
-        hasBets: !!gameState.bets,
-        hasWallets: !!gameState.wallets,
-      });
-    }
-
     // Update UI
     this.uiManager.updateGameState(gameState);
 
-    // ✅ Phase handling is now done by GlobalGameStateManager
-    // No need to call handleGamePhase() here
+    // Note: Participant spawning is handled by handleParticipantsUpdate
+    // which receives unified data from Convex via participants-update event
   }
 
   private getCharacterConfig(skinId: number): {
@@ -637,17 +452,91 @@ export class Game extends Scene {
     };
   }
 
-  // Helper to get participant display name from wallet address
-  private getParticipantName(walletAddress: string): string {
-    // Try to get display name from playerNames mapping
-    const displayName = this.playerNames.get(walletAddress);
-
-    if (displayName) {
-      return displayName;
+  /**
+   * Handle unified participants update from Convex
+   * This is the primary way participants are spawned/updated - data comes pre-resolved from server
+   */
+  private handleParticipantsUpdate(participants: GameParticipant[]) {
+    if (!this.playerManager) {
+      logger.game.warn("[Game] PlayerManager not ready for participants update");
+      return;
     }
 
-    // Fallback to truncated wallet address
-    return `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`;
+    // Check if map data is ready (required for spawning)
+    if (!this.playerManager.getMapData()) {
+      logger.game.warn("[Game] ⏳ Map data not ready yet, skipping participants update");
+      return;
+    }
+
+    logger.game.debug("[Game] 👥 Processing participants update:", {
+      count: participants.length,
+      currentCount: this.playerManager.getParticipants().size,
+    });
+
+    participants.forEach((participant) => {
+      // Use odid as the unique identifier
+      const participantId = participant.odid;
+
+      // Check if participant already exists
+      const existing = this.playerManager.getParticipant(participantId);
+
+      if (existing) {
+        // Update existing participant (e.g., boss bet amount increased)
+        if (existing.betAmount !== participant.betAmount) {
+          logger.game.debug(`[Game] 💰 Updating participant ${participantId} bet amount: ${participant.betAmount}`);
+          this.playerManager.updateParticipantData({
+            _id: participantId,
+            betAmount: participant.betAmount,
+            character: { baseScale: 1.0 },
+          });
+        }
+        // Update display name if changed
+        if (existing.nameText && existing.nameText.text !== participant.displayName) {
+          existing.nameText.setText(participant.displayName);
+        }
+        return;
+      }
+
+      // Get character config from local characters data (for sprite offsets etc)
+      const characterConfig = this.getCharacterConfig(participant.characterId);
+
+      const newParticipant = {
+        _id: participantId,
+        playerId: participant.walletAddress,
+        displayName: participant.displayName, // Pre-resolved from Convex
+        betAmount: participant.betAmount,
+        character: {
+          key: participant.characterKey,
+          name: characterConfig.name,
+          id: participant.characterId,
+          spriteOffsetY: characterConfig.spriteOffsetY,
+          baseScale: characterConfig.baseScale,
+        },
+        spawnIndex: participant.spawnIndex,
+        eliminated: false,
+        isBoss: participant.isBoss,
+      };
+
+      logger.game.debug("[Game] ✅ Spawning participant from Convex:", newParticipant);
+      this.playerManager.addParticipant(newParticipant);
+
+      // Play challenger sound to notify all players of new participant
+      SoundManager.playChallenger(this);
+
+      // Apply arena mask to the newly spawned participant
+      if (this.arenaMask) {
+        const gameParticipant = this.playerManager.getParticipant(participantId);
+        if (gameParticipant) {
+          gameParticipant.container.setMask(this.arenaMask);
+          logger.game.debug(`[Game] Arena mask applied to participant ${participantId}`);
+        }
+      }
+    });
+
+    logger.game.debug(
+      "[Game] ✅ Participants update complete. Final count:",
+      this.playerManager.getParticipants().size
+    );
   }
 
   // Update method to update the timer display
@@ -728,6 +617,7 @@ export class Game extends Scene {
     EventBus.off("cleanup-game");
     EventBus.off("sound-settings-changed");
     EventBus.off("boss-info-update");
+    EventBus.off("participants-update");
 
     // Clean up UIManager
     if (this.uiManager) {
