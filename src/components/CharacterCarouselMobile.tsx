@@ -163,13 +163,7 @@ export function CharacterCarouselMobile({ onCharacterSelected }: CharacterCarous
 
         {/* Right Arrow */}
         <button
-          onClick={() => {
-            console.log(
-              "[CharacterCarouselMobile] Right arrow clicked, current index:",
-              currentCharacterIndex
-            );
-            goToNext();
-          }}
+          onClick={goToNext}
           className="shrink-0 w-8 h-8 flex items-center justify-center bg-amber-800/50 hover:bg-amber-700/60 border border-amber-600/50 rounded-lg transition-colors"
         >
           <ChevronRight className="w-5 h-5 text-amber-100" />

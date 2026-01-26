@@ -4,28 +4,30 @@ import { SoundManager } from "./SoundManager";
 import { logger } from "../../lib/logger";
 import { RESOLUTION_SCALE } from "../main";
 
+// Type for Phaser frame customData with Aseprite trim info
+interface FrameCustomData {
+  sourceSize?: { w: number; h: number };
+  spriteSourceSize?: { x: number; y: number; w: number; h: number };
+}
+
 export interface GameParticipant {
   id: string;
   playerId?: string;
   container: Phaser.GameObjects.Container;
   sprite: Phaser.GameObjects.Sprite;
-  dustBackSprite?: Phaser.GameObjects.Sprite; // Dust animation behind character
-  dustFrontSprite?: Phaser.GameObjects.Sprite; // Dust animation in front of character
+  dustBackSprite?: Phaser.GameObjects.Sprite;
+  dustFrontSprite?: Phaser.GameObjects.Sprite;
   nameText: Phaser.GameObjects.Text;
   characterKey: string;
-  displayName: string;
   betAmount: number;
   size: number;
-  colorHue?: number;
-  isBot: boolean;
   eliminated: boolean;
   targetX: number;
   targetY: number;
   spawnIndex: number;
-  // Boss features
   isBoss: boolean;
-  betCount: number; // Track number of bets for animation
-  currentScaleTweens?: Phaser.Tweens.Tween[]; // For rapid bet handling
+  betCount: number;
+  currentScaleTweens?: Phaser.Tweens.Tween[];
 }
 
 export class PlayerManager {
@@ -38,11 +40,6 @@ export class PlayerManager {
 
   constructor(scene: Scene, centerX: number, centerY: number) {
     this.scene = scene;
-    this.centerX = centerX;
-    this.centerY = centerY;
-  }
-
-  updateCenter(centerX: number, centerY: number) {
     this.centerX = centerX;
     this.centerY = centerY;
   }
@@ -61,32 +58,6 @@ export class PlayerManager {
 
   getParticipant(id: string): GameParticipant | undefined {
     return this.participants.get(id);
-  }
-
-  // Get all participants for a specific player
-  getPlayerParticipants(playerId: string): GameParticipant[] {
-    return Array.from(this.participants.values()).filter((p) => p.playerId === playerId);
-  }
-
-  updateParticipantsInWaiting(participants: any[], mapData: any) {
-    this.currentMap = mapData;
-
-    // Add new participants or update existing ones
-    participants.forEach((participant: any) => {
-      if (!this.participants.has(participant._id)) {
-        this.addParticipant(participant);
-      } else {
-        this.updateParticipantData(participant);
-      }
-    });
-
-    // Remove participants who left
-    const currentIds = new Set(participants.map((p: any) => p._id));
-    this.participants.forEach((_participant, id) => {
-      if (!currentIds.has(id)) {
-        this.removeParticipant(id);
-      }
-    });
   }
 
   addParticipant(participant: any) {
@@ -217,28 +188,30 @@ export class PlayerManager {
     dustBackSprite.setY(dustOffsetY);
     dustFrontSprite.setY(dustOffsetY);
 
-    // Character-specific Y offset adjustments (scales with sprite size)
-    // Values come from Convex database (character.spriteOffsetY)
-    const offsetPixels = participant.character?.spriteOffsetY ?? 0;
-    const scaledOffset = offsetPixels * scale;
-    sprite.setY(scaledOffset);
+    // Auto-calculate Y offset to align visible feet with container origin
+    // The sprite's origin (0.5, 1.0) is at the bottom of sourceSize canvas
+    const spriteFrame = sprite.frame;
+    const customData = spriteFrame.customData as FrameCustomData | undefined;
+    const sourceHeight = customData?.sourceSize?.h || spriteFrame.height;
+    const trimY = customData?.spriteSourceSize?.y || 0;
+    const trimHeight = customData?.spriteSourceSize?.h || spriteFrame.height;
+    // Gap from visible feet to canvas bottom (in unscaled pixels)
+    const feetGapUnscaled = sourceHeight - (trimY + trimHeight);
+    // Scale the gap because sprite.setY is in container space but the visual gap scales with sprite
+    const feetGapScaled = feetGapUnscaled * scale;
+    sprite.setY(feetGapScaled);
 
     // With bottom-origin sprite, name goes below with consistent gap
     const nameYOffset = 10; // Fixed gap below sprite bottom
-
-    // Style bot names differently
-    const isBot = participant.isBot && !participant.playerId;
-    const nameColor = isBot ? "#ffff99" : "#ffffff"; // Light yellow for bots
-    const strokeColor = isBot ? "#666600" : "#000000"; // Darker yellow stroke for bots
 
     const nameText = this.scene.add
       .text(0, nameYOffset, participant.displayName, {
         fontFamily: "jersey15",
         fontSize: "13px",
-        color: nameColor,
-        stroke: strokeColor,
-        strokeThickness: 2, // Scaled down from 6px
-        resolution: 40, // High resolution for crisp text when scaled
+        color: "#ffffff",
+        stroke: "#000000",
+        strokeThickness: 2,
+        resolution: 40,
         align: "center",
       })
       .setOrigin(0.5);
@@ -324,11 +297,8 @@ export class PlayerManager {
       dustFrontSprite,
       nameText,
       characterKey: textureKey,
-      displayName: participant.displayName,
       betAmount: participant.betAmount,
       size: scale,
-      colorHue: participant.colorHue,
-      isBot: participant.isBot || false,
       eliminated: participant.eliminated || false,
       targetX,
       targetY,
@@ -435,27 +405,31 @@ export class PlayerManager {
 
         // Use Mario animation for boss subsequent bets (not first bet)
         if (gameParticipant.isBoss && gameParticipant.betCount > 1) {
-          logger.game.debug("👑 [BOSS] Mario animation triggered! betCount:", gameParticipant.betCount);
-          this.animateBossBetScale(gameParticipant, newScale, participant.character);
+          logger.game.debug(
+            "👑 [BOSS] Mario animation triggered! betCount:",
+            gameParticipant.betCount
+          );
+          this.animateBossBetScale(gameParticipant, newScale);
         } else {
           // Standard smooth tween for non-boss or first bet
+          // Calculate new Y position to keep feet at container origin
+          const spriteFrame = gameParticipant.sprite.frame;
+          const customData = spriteFrame.customData as FrameCustomData | undefined;
+          const sourceHeight = customData?.sourceSize?.h || spriteFrame.height;
+          const trimY = customData?.spriteSourceSize?.y || 0;
+          const trimHeight = customData?.spriteSourceSize?.h || spriteFrame.height;
+          const feetGapUnscaled = sourceHeight - (trimY + trimHeight);
+          const feetGapScaled = feetGapUnscaled * newScale;
+
           this.scene.tweens.add({
             targets: gameParticipant.sprite,
             scaleX: newScale,
             scaleY: newScale,
+            y: feetGapScaled,
             duration: 300,
             ease: "Power2",
           });
         }
-      }
-
-      // Update tint - simple logic
-      if (participant.colorHue !== undefined && !participant.isBot) {
-        const hue = participant.colorHue / 360;
-        const tint = Phaser.Display.Color.HSVToRGB(hue, 0.3, 1.0).color;
-        gameParticipant.sprite.setTint(tint);
-      } else {
-        gameParticipant.sprite.clearTint();
       }
 
       // Update elimination status from backend
@@ -466,8 +440,9 @@ export class PlayerManager {
   /**
    * Mario-style scale oscillation animation for boss subsequent bets
    * Oscillates: 1.5x -> 0.8x -> 1.3x -> 0.9x -> final
+   * Scales from the visible feet position (magenta dot / container origin)
    */
-  private animateBossBetScale(participant: GameParticipant, finalScale: number, character?: any) {
+  private animateBossBetScale(participant: GameParticipant, finalScale: number) {
     logger.game.debug("👑 [BOSS] animateBossBetScale called:", {
       participantId: participant.id,
       finalScale,
@@ -491,53 +466,44 @@ export class PlayerManager {
     }
     participant.currentScaleTweens = [];
 
-    // Get character-specific sprite offset
-    const offsetPixels = character?.spriteOffsetY ?? 0;
+    // Get frame data to calculate feet offset (same as in addParticipant)
+    const spriteFrame = sprite.frame;
+    const customData = spriteFrame.customData as FrameCustomData | undefined;
+    const sourceHeight = customData?.sourceSize?.h || spriteFrame.height;
+    const trimY = customData?.spriteSourceSize?.y || 0;
+    const trimHeight = customData?.spriteSourceSize?.h || spriteFrame.height;
+    const feetGapUnscaled = sourceHeight - (trimY + trimHeight);
 
-    // Oscillation sequence: 1.5x -> 0.8x -> 1.3x -> 0.9x -> final
+    // Oscillation sequence: extended Mario-style bounce with no interpolation
     const keyframes = [
       { scale: finalScale * 1.5, duration: 100 },
+      { scale: finalScale * 0.7, duration: 100 },
+      { scale: finalScale * 1.4, duration: 100 },
       { scale: finalScale * 0.8, duration: 100 },
-      { scale: finalScale * 1.3, duration: 100 },
+      { scale: finalScale * 1.25, duration: 100 },
       { scale: finalScale * 0.9, duration: 100 },
       { scale: finalScale, duration: 100 },
     ];
 
-    // Fixed gap below sprite bottom (same as in addParticipant)
-    const nameYOffset = 10;
-
     let delay = 0;
     keyframes.forEach((kf) => {
-      // Calculate sprite Y offset for this scale
-      const scaledOffset = offsetPixels * kf.scale;
-
       // Calculate dust scale for this sprite scale
       const dustScale = kf.scale * 0.2;
 
-      // Calculate name Y position to maintain consistent gap below sprite feet
-      const nameY = scaledOffset + nameYOffset;
+      // Calculate Y offset for this scale (feet gap scales with sprite)
+      const feetGapScaled = feetGapUnscaled * kf.scale;
 
-      // Animate sprite scale and Y position
+      // Animate sprite scale and Y position to keep feet at container origin
       const spriteTween = this.scene.tweens.add({
         targets: sprite,
         scaleX: kf.scale,
         scaleY: kf.scale,
-        y: scaledOffset,
+        y: feetGapScaled, // Keep feet anchored at magenta dot
         duration: kf.duration,
         delay: delay,
-        ease: "Quad.easeOut",
+        ease: "Stepped",
       });
       participant.currentScaleTweens!.push(spriteTween);
-
-      // Animate name text to follow sprite and maintain consistent gap
-      const nameTween = this.scene.tweens.add({
-        targets: participant.nameText,
-        y: nameY,
-        duration: kf.duration,
-        delay: delay,
-        ease: "Quad.easeOut",
-      });
-      participant.currentScaleTweens!.push(nameTween);
 
       // Animate dust sprites to match
       if (dustBackSprite) {
@@ -547,7 +513,7 @@ export class PlayerManager {
           scaleY: dustScale,
           duration: kf.duration,
           delay: delay,
-          ease: "Quad.easeOut",
+          ease: "Stepped",
         });
         participant.currentScaleTweens!.push(dustBackTween);
       }
@@ -559,105 +525,12 @@ export class PlayerManager {
           scaleY: dustScale,
           duration: kf.duration,
           delay: delay,
-          ease: "Quad.easeOut",
+          ease: "Stepped",
         });
         participant.currentScaleTweens!.push(dustFrontTween);
       }
 
       delay += kf.duration;
-    });
-  }
-
-  updateParticipantScale(participant: any) {
-    // Legacy method for backward compatibility
-    this.updateParticipantData(participant);
-  }
-
-  removeParticipant(participantId: string) {
-    const participant = this.participants.get(participantId);
-    if (participant) {
-      // Destroying the container automatically destroys all children
-      participant.container.destroy();
-      this.participants.delete(participantId);
-    }
-  }
-
-  moveParticipantsToCenter() {
-    // Use map-specific spawn center, not screen center
-    const config: MapSpawnConfig = this.currentMap?.spawnConfiguration;
-    const targetCenterX = config ? config.centerX * RESOLUTION_SCALE : this.centerX;
-    const targetCenterY = config ? config.centerY * RESOLUTION_SCALE : this.centerY;
-
-    this.participants.forEach((participant) => {
-      // Show names when moving to center
-      participant.nameText.setVisible(true);
-
-      // Animate container moving towards map center (sprite and text move together)
-      // Faster duration: 400-600ms instead of 800-1200ms
-      this.scene.tweens.add({
-        targets: participant.container,
-        x: targetCenterX + (Math.random() - 0.5) * 5,
-        y: targetCenterY + 30 + (Math.random() - 0.5) * 100,
-        duration: 400 + Math.random() * 200,
-        ease: "Cubic.easeIn",
-      });
-
-      // Change to running animation
-      const runAnimKey = `${participant.characterKey}-run`;
-      if (this.scene.anims.exists(runAnimKey)) {
-        participant.sprite.play(runAnimKey);
-      }
-    });
-  }
-
-  showSurvivors(survivorIds: string[]) {
-    // Highlight the survivors (only called for large games)
-    this.participants.forEach((participant, id) => {
-      const isSurvivor = survivorIds.includes(id);
-
-      if (isSurvivor) {
-        // Highlight survivors
-        participant.sprite.setTint(0xffd700); // Golden tint
-        participant.nameText.setColor("#ffd700"); // Golden name
-
-        // Add glowing effect to container (affects both sprite and text)
-        this.scene.tweens.add({
-          targets: participant.container,
-          alpha: { from: 1, to: 0.7 },
-          duration: 500,
-          yoyo: true,
-          repeat: -1,
-        });
-      } else {
-        // Fade out eliminated participants
-        participant.sprite.setTint(0x666666);
-        participant.container.setAlpha(0.3); // Fades both sprite and text
-        participant.eliminated = true;
-      }
-    });
-  }
-
-  showBattlePhase() {
-    // Animate battle between remaining participants
-    this.participants.forEach((participant) => {
-      if (!participant.eliminated) {
-        // Battle animations - rapid movement of container
-        this.scene.tweens.add({
-          targets: participant.container,
-          x: this.centerX + (Math.random() - 0.5) * 200,
-          y: this.centerY + (Math.random() - 0.5) * 200,
-          duration: 300,
-          ease: "Power2.easeInOut",
-          repeat: 5,
-          yoyo: true,
-        });
-
-        // Change to attack animation
-        const attackAnimKey = `${participant.characterKey}-attack`;
-        if (this.scene.anims.exists(attackAnimKey)) {
-          participant.sprite.play(attackAnimKey);
-        }
-      }
     });
   }
 
@@ -725,19 +598,6 @@ export class PlayerManager {
     return null;
   }
 
-  // Update participants in any phase (not just waiting)
-  updateParticipants(participants: any[]) {
-    // Update existing participants with new data from backend
-    participants.forEach((participant: any) => {
-      const gameParticipant = this.participants.get(participant._id);
-      if (gameParticipant) {
-        // Update elimination status and other data
-        gameParticipant.eliminated = participant.eliminated || false;
-        gameParticipant.betAmount = participant.betAmount;
-      }
-    });
-  }
-
   clearParticipants() {
     logger.game.debug(
       `[CLEANUP] PlayerManager.clearParticipants() - ${this.participants.size} participants`
@@ -752,7 +612,7 @@ export class PlayerManager {
         // Check if container still exists and is active before destroying
         if (participant.container && participant.container.scene) {
           logger.game.debug(
-            `[CLEANUP]   Destroying: ${id} (${participant.displayName}) - alpha:${participant.container.alpha}`
+            `[CLEANUP]   Destroying: ${id} (${participant.nameText.text}) - alpha:${participant.container.alpha}`
           );
           participant.container.destroy();
           destroyedCount++;
@@ -774,109 +634,5 @@ export class PlayerManager {
 
     this.participants.clear();
     logger.game.debug(`[CLEANUP] Participants Map cleared (size now: ${this.participants.size})`);
-  }
-
-  // Debug: Draw the spawn ellipse to visualize configuration
-  debugDrawSpawnEllipse(config?: MapSpawnConfig) {
-    const spawnConfig: MapSpawnConfig = config || this.currentMap?.spawnConfiguration;
-
-    if (!spawnConfig) {
-      logger.game.error("[PlayerManager] No spawn configuration available for debug drawing!");
-      console.error("[DEBUG] currentMap:", this.currentMap);
-      return;
-    }
-
-    // Apply resolution scale to all values for drawing
-    const scaledConfig = {
-      centerX: spawnConfig.centerX * RESOLUTION_SCALE,
-      centerY: spawnConfig.centerY * RESOLUTION_SCALE,
-      radiusX: spawnConfig.radiusX * RESOLUTION_SCALE,
-      radiusY: spawnConfig.radiusY * RESOLUTION_SCALE,
-      minSpawnRadius: spawnConfig.minSpawnRadius * RESOLUTION_SCALE,
-      maxSpawnRadius: spawnConfig.maxSpawnRadius * RESOLUTION_SCALE,
-      minSpacing: spawnConfig.minSpacing * RESOLUTION_SCALE,
-    };
-
-    console.log(`[DEBUG] ===== SPAWN ELLIPSE DEBUG =====`);
-    console.log(`[DEBUG] Base centerX: ${spawnConfig.centerX} → Scaled: ${scaledConfig.centerX}`);
-    console.log(`[DEBUG] Base centerY: ${spawnConfig.centerY} → Scaled: ${scaledConfig.centerY}`);
-    console.log(`[DEBUG] Base radiusX: ${spawnConfig.radiusX} → Scaled: ${scaledConfig.radiusX}`);
-    console.log(`[DEBUG] Base radiusY: ${spawnConfig.radiusY} → Scaled: ${scaledConfig.radiusY}`);
-    console.log(`[DEBUG] Resolution scale: ${RESOLUTION_SCALE}`);
-    console.log(
-      `[DEBUG] Green ellipse size: ${scaledConfig.radiusX * 2} x ${scaledConfig.radiusY * 2}`
-    );
-    console.log(`[DEBUG] ==================================`);
-
-    // Draw center point
-    const centerDot = this.scene.add.circle(
-      scaledConfig.centerX,
-      scaledConfig.centerY,
-      3,
-      0xff0000,
-      1
-    );
-    centerDot.setDepth(10000);
-
-    // Draw outer ellipse (full radiusX and radiusY)
-    const outerEllipse = this.scene.add.ellipse(
-      scaledConfig.centerX,
-      scaledConfig.centerY,
-      scaledConfig.radiusX * 2, // diameter = radius * 2
-      scaledConfig.radiusY * 2,
-      0x00ff00,
-      0
-    );
-    outerEllipse.setStrokeStyle(2, 0x00ff00, 1);
-    outerEllipse.setDepth(10000);
-
-    // Draw min spawn radius ellipse (inner boundary)
-    const minRadius = scaledConfig.minSpawnRadius;
-    const minRadiusX = (minRadius / scaledConfig.radiusY) * scaledConfig.radiusX;
-    const minEllipse = this.scene.add.ellipse(
-      scaledConfig.centerX,
-      scaledConfig.centerY,
-      minRadiusX * 2,
-      minRadius * 2,
-      0xff0000,
-      0
-    );
-    minEllipse.setStrokeStyle(2, 0xff0000, 1);
-    minEllipse.setDepth(10000);
-
-    // Draw max spawn radius ellipse (outer boundary)
-    const maxRadius = scaledConfig.maxSpawnRadius;
-    const maxRadiusX = (maxRadius / scaledConfig.radiusY) * scaledConfig.radiusX;
-    const maxEllipse = this.scene.add.ellipse(
-      scaledConfig.centerX,
-      scaledConfig.centerY,
-      maxRadiusX * 2,
-      maxRadius * 2,
-      0x0000ff,
-      0
-    );
-    maxEllipse.setStrokeStyle(2, 0x0000ff, 1);
-    maxEllipse.setDepth(10000);
-
-    // Add labels
-    const labelY = scaledConfig.centerY - scaledConfig.radiusY - 10;
-    const label = this.scene.add.text(
-      scaledConfig.centerX,
-      labelY,
-      `Spawn Ellipse\nCenter: (${scaledConfig.centerX}, ${scaledConfig.centerY})\nRadius: (${scaledConfig.radiusX}, ${scaledConfig.radiusY})`,
-      {
-        fontFamily: "jersey",
-        fontSize: "20px",
-        color: "#ffffff",
-        stroke: "#000000",
-        strokeThickness: 1,
-        align: "center",
-        resolution: 40,
-      }
-    );
-    label.setOrigin(0.5, 1);
-    label.setDepth(10000);
-
-    logger.game.info(`[DEBUG] Ellipse drawn - Green=Full, Red=Min, Blue=Max`);
   }
 }

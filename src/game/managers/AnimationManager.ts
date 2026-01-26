@@ -662,6 +662,37 @@ export class AnimationManager {
   }
 
   /**
+   * Move all participants towards the center with running animation
+   * @param participants - Map of participants from PlayerManager
+   * @param mapConfig - Optional map spawn configuration for center position
+   */
+  moveParticipantsToCenter(participants: Map<string, any>, mapConfig?: any) {
+    // Use map-specific spawn center, or fall back to screen center
+    const targetCenterX = mapConfig ? mapConfig.centerX * RESOLUTION_SCALE : this.centerX;
+    const targetCenterY = mapConfig ? mapConfig.centerY * RESOLUTION_SCALE : this.centerY;
+
+    participants.forEach((participant) => {
+      // Show names when moving to center
+      participant.nameText.setVisible(true);
+
+      // Animate container moving towards map center (sprite and text move together)
+      this.scene.tweens.add({
+        targets: participant.container,
+        x: targetCenterX + (Math.random() - 0.5) * 5,
+        y: targetCenterY + 30 + (Math.random() - 0.5) * 100,
+        duration: 400 + Math.random() * 200,
+        ease: "Cubic.easeIn",
+      });
+
+      // Change to running animation
+      const runAnimKey = `${participant.characterKey}-run`;
+      if (this.scene.anims.exists(runAnimKey)) {
+        participant.sprite.play(runAnimKey);
+      }
+    });
+  }
+
+  /**
    * Shared battle phase animation sequence
    * Moves participants to center, starts explosions after delay
    * @param playerManager - PlayerManager instance to move participants
@@ -705,7 +736,9 @@ export class AnimationManager {
     this.scene.cameras.main.shake(400, 0.015);
 
     // Move participants to center
-    playerManager.moveParticipantsToCenter();
+    const participants = playerManager.getParticipants();
+    const mapConfig = playerManager.getMapData()?.spawnConfiguration;
+    this.moveParticipantsToCenter(participants, mapConfig);
 
     // Call onComplete callback if provided
     if (onComplete) {
@@ -740,11 +773,6 @@ export class AnimationManager {
 
       // Show winner with PlayerManager (scales up, golden tint, etc.)
       const winnerParticipant = playerManager.showResults(gameState);
-
-      logger.game.debug(
-        "[AnimationManager] Winner participant from showResults:",
-        winnerParticipant
-      );
 
       // Add celebration animations (confetti, text, bounce)
       if (winnerParticipant) {

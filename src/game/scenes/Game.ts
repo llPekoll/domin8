@@ -81,8 +81,7 @@ export class Game extends Scene {
     participants.forEach((participant) => {
       if (participant.playerId) {
         const displayName = this.playerNames.get(participant.playerId);
-        if (displayName && displayName !== participant.displayName) {
-          participant.displayName = displayName;
+        if (displayName && displayName !== participant.nameText.text) {
           participant.nameText.setText(displayName);
         }
       }
@@ -100,6 +99,9 @@ export class Game extends Scene {
     this.animationManager = new AnimationManager(this, this.centerX, this.centerY);
     this.uiManager = new UIManager(this, this.centerX);
     this.backgroundManager = new BackgroundManager(this, this.centerX, this.centerY);
+
+    // Expose playerManager globally for debugging (access via window.playerManager)
+    (window as any).playerManager = this.playerManager;
 
     // Set up event listeners from GlobalGameStateManager
     this.setupEventListeners();
@@ -581,9 +583,7 @@ export class Game extends Scene {
             baseScale: characterConfig.baseScale,
           },
           spawnIndex: betIndex,
-          isBot: false,
           eliminated: false,
-          colorHue: undefined,
           isBoss: isBoss,
         };
 
