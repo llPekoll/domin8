@@ -13,6 +13,9 @@ export class DebugPreloader extends Scene {
   preload() {
     this.load.setPath("assets");
 
+    // Load crown image for boss indicator testing
+    this.load.image("crown", "misc/crown.png");
+
     // Check if character data is available
     if (!charactersData || charactersData.length === 0) {
       logger.game.error("[DebugPreloader] No characters data available!");

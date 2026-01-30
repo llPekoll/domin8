@@ -260,6 +260,9 @@ export class Preloader extends Scene {
     // Load winner throne
     this.load.image("throne", "misc/throne.png");
 
+    // Load boss crown indicator
+    this.load.image("crown", "misc/crown.png");
+
     // Load badge assets
     this.load.image("badge-lvl1-1", "badge/badge-lvl1-1.png");
     this.load.image("badge-lvl1-2", "badge/badge-lvl1-2.png");

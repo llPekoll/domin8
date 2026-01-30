@@ -55,14 +55,18 @@ export class UIManager {
    * Handle participants update from Convex (via App.tsx)
    * Extract wallet -> displayName mapping for winner UI
    */
-  private onParticipantsUpdate(data: { participants: Array<{ walletAddress: string; displayName: string }> }) {
+  private onParticipantsUpdate(data: {
+    participants: Array<{ walletAddress: string; displayName: string }>;
+  }) {
     this.playerNamesMap.clear();
     data.participants.forEach(({ walletAddress, displayName }) => {
       if (displayName) {
         this.playerNamesMap.set(walletAddress, displayName);
       }
     });
-    console.log(`[UIManager] 👥 Player names updated from participants: ${this.playerNamesMap.size} entries`);
+    console.log(
+      `[UIManager] 👥 Player names updated from participants: ${this.playerNamesMap.size} entries`
+    );
   }
 
   /**
@@ -592,8 +596,8 @@ export class UIManager {
       repeat: -1,
     });
 
-    // Create winner UI container (bottom 1/3 of screen, like demo mode)
-    const bottomThirdY = this.scene.cameras.main.height * 0.75; // 75% down the screen
+    // Create winner UI container (bottom of screen, below the character)
+    const bottomThirdY = this.scene.cameras.main.height * 0.88; // 88% down the screen (shifted lower)
     this.winnerContainer = this.scene.add.container(this.centerX, bottomThirdY);
     this.winnerContainer.setDepth(1000);
     this.winnerContainer.setScrollFactor(0);
@@ -621,8 +625,11 @@ export class UIManager {
     });
     this.subText.setOrigin(0.5);
 
-    // Multiplier text (e.g., "x10") - punchy style, positioned right and higher
-    this.multiplierText = this.scene.add.text(100, -190, "", {
+    // Multiplier text (e.g., "x10") - punchy style, positioned at top-right area
+    // Using absolute screen position (not inside container) for easier positioning
+    const multiplierX = this.centerX + 100;
+    const multiplierY = this.scene.cameras.main.height * 0.25; // 25% from top
+    this.multiplierText = this.scene.add.text(multiplierX, multiplierY, "", {
       fontFamily: "metal-slug",
       fontSize: "20px",
       color: "#00FF00", // Bright green
@@ -631,10 +638,12 @@ export class UIManager {
       resolution: 4,
     });
     this.multiplierText.setOrigin(0.5);
+    this.multiplierText.setDepth(1001); // Above winner container
+    this.multiplierText.setScrollFactor(0);
     this.multiplierText.setVisible(false);
 
-    // Add to container
-    this.winnerContainer.add([this.phaseText, this.subText, this.multiplierText]);
+    // Add phaseText and subText to container (multiplierText is now independent)
+    this.winnerContainer.add([this.phaseText, this.subText]);
 
     // Create INSERT COIN text (blinking, Metal Slug style)
     // Position similar to demo countdown (75% down + 35 offset)
@@ -676,7 +685,6 @@ export class UIManager {
       this.hideInsertCoin();
     }
   }
-
 
   updateTimer() {
     if (!this.gameState) {

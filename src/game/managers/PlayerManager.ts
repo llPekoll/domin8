@@ -17,6 +17,8 @@ export interface GameParticipant {
   sprite: Phaser.GameObjects.Sprite;
   dustBackSprite?: Phaser.GameObjects.Sprite;
   dustFrontSprite?: Phaser.GameObjects.Sprite;
+  crownSpriteLeft?: Phaser.GameObjects.Image;
+  crownSpriteRight?: Phaser.GameObjects.Image;
   nameText: Phaser.GameObjects.Text;
   characterKey: string;
   betAmount: number;
@@ -224,15 +226,46 @@ export class PlayerManager {
     // Show names immediately for both bots and real players
     nameText.setVisible(true);
 
+    // Create crown sprites for boss characters (white PNG tinted gold)
+    // Position on both sides of the name text
+    let crownSpriteLeft: Phaser.GameObjects.Image | undefined;
+    let crownSpriteRight: Phaser.GameObjects.Image | undefined;
+    if (participant.isBoss && this.scene.textures.exists("crown")) {
+      // Left crown
+      crownSpriteLeft = this.scene.add.image(0, 0, "crown");
+      crownSpriteLeft.setOrigin(1, 0.5); // Right-center anchor (to align left of name)
+      crownSpriteLeft.setTint(0xffd700); // Gold tint
+      crownSpriteLeft.setScale(0.2); // Fixed small scale
+      crownSpriteLeft.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+      crownSpriteLeft.setX(-nameText.width / 2 - 3); // Left edge of name with spacing
+      crownSpriteLeft.setY(nameYOffset - 5);
+
+      // Right crown
+      crownSpriteRight = this.scene.add.image(0, 0, "crown");
+      crownSpriteRight.setOrigin(0, 0.5); // Left-center anchor (to align right of name)
+      crownSpriteRight.setTint(0xffd700); // Gold tint
+      crownSpriteRight.setScale(0.2); // Fixed small scale
+      crownSpriteRight.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+      crownSpriteRight.setX(nameText.width / 2 + 3); // Right edge of name with spacing
+      crownSpriteRight.setY(nameYOffset - 5);
+    }
+
     // Add sprites in correct order for layering (render order matters):
     // 1. Back dust (behind character)
     // 2. Character sprite (middle)
     // 3. Front dust (in front of character)
-    // 4. Name text (always on top)
+    // 4. Name text
+    // 5. Crowns (both sides of name, for boss) - rendered last so they're in front
     container.add(dustBackSprite);
     container.add(sprite);
     container.add(dustFrontSprite);
     container.add(nameText);
+    if (crownSpriteLeft) {
+      container.add(crownSpriteLeft);
+    }
+    if (crownSpriteRight) {
+      container.add(crownSpriteRight);
+    }
 
     // Consistent falling animation for all characters
     this.scene.tweens.add({
@@ -300,6 +333,8 @@ export class PlayerManager {
       sprite,
       dustBackSprite,
       dustFrontSprite,
+      crownSpriteLeft,
+      crownSpriteRight,
       nameText,
       characterKey: textureKey,
       betAmount: participant.betAmount,
@@ -434,6 +469,8 @@ export class PlayerManager {
             duration: 300,
             ease: "Power2",
           });
+
+          // Crown stays fixed next to name, no need to update
         }
       }
 
@@ -535,6 +572,8 @@ export class PlayerManager {
         participant.currentScaleTweens!.push(dustFrontTween);
       }
 
+      // Crown stays fixed next to name, no animation needed
+
       delay += kf.duration;
     });
   }
@@ -565,9 +604,18 @@ export class PlayerManager {
       // The offset compensates for transparent space at bottom of sprite
       const spriteOffset = winnerParticipant.sprite.y;
 
+      // Hide crowns during celebration (throne already has a crown)
+      if (winnerParticipant.crownSpriteLeft) {
+        winnerParticipant.crownSpriteLeft.setVisible(false);
+      }
+      if (winnerParticipant.crownSpriteRight) {
+        winnerParticipant.crownSpriteRight.setVisible(false);
+      }
+
       // Position container so winner sits on the throne seat
       // Throne is at centerY + 50, winner should sit slightly above center of throne
-      const targetThroneY = this.centerY + 100;
+      // Added +30 to shift the character down a bit
+      const targetThroneY = this.centerY + 130;
       const containerY = targetThroneY + spriteOffset;
 
       this.scene.tweens.add({

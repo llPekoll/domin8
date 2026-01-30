@@ -12,15 +12,18 @@ interface DebugCharacter {
   container: Phaser.GameObjects.Container;
   sprite: Phaser.GameObjects.Sprite;
   nameText: Phaser.GameObjects.Text;
+  crownSprite?: Phaser.GameObjects.Image;
   debugGraphics: Phaser.GameObjects.Graphics;
   characterKey: string;
   scale: number;
+  isBoss: boolean;
 }
 
 export class DebugCharScene extends Scene {
   private characters: DebugCharacter[] = [];
   private currentScale = 1.0;
   private scaleText!: Phaser.GameObjects.Text;
+  private showBossCrowns = true;
 
   constructor() {
     super("DebugCharScene");
@@ -33,11 +36,13 @@ export class DebugCharScene extends Scene {
     logger.game.info("[DebugCharScene] Creating scene with characters:", charactersData?.length);
 
     if (!charactersData || charactersData.length === 0) {
-      this.add.text(camera.centerX, camera.centerY, "No characters loaded", {
-        fontFamily: "monospace",
-        fontSize: "24px",
-        color: "#ff0000",
-      }).setOrigin(0.5);
+      this.add
+        .text(camera.centerX, camera.centerY, "No characters loaded", {
+          fontFamily: "monospace",
+          fontSize: "24px",
+          color: "#ff0000",
+        })
+        .setOrigin(0.5);
       return;
     }
 
@@ -96,27 +101,55 @@ export class DebugCharScene extends Scene {
       sprite.play(idleAnimKey);
     }
 
-    // Create name text
-    const nameText = this.add.text(0, feetGapScaled + 15, charData.name || characterKey, {
-      fontFamily: "monospace",
-      fontSize: "12px",
-      color: "#ffffff",
-      backgroundColor: "#000000aa",
-      padding: { x: 4, y: 2 },
-    }).setOrigin(0.5, 0);
+    // Create name text (same style as PlayerManager)
+    const nameYOffset = feetGapScaled + 10;
+    const nameText = this.add
+      .text(0, nameYOffset, charData.name || characterKey, {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color: "#ffffff",
+        backgroundColor: "#000000aa",
+        padding: { x: 4, y: 2 },
+      })
+      .setOrigin(0.5);
+
+    // All debug characters are "bosses" for testing crown display
+    const isBoss = true;
+
+    // Create crown sprite for boss characters (same as PlayerManager)
+    let crownSprite: Phaser.GameObjects.Image | undefined;
+    if (isBoss && this.textures.exists("crown")) {
+      crownSprite = this.add.image(0, 0, "crown");
+      crownSprite.setOrigin(0, 0.5);
+      crownSprite.setTint(0xffd700);
+      crownSprite.setScale(0.1);
+      crownSprite.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+      crownSprite.setAngle(30);
+      crownSprite.setX(nameText.width / 2 - 5);
+      crownSprite.setY(nameYOffset - 10);
+      crownSprite.setVisible(this.showBossCrowns);
+    }
 
     // Create debug graphics
     const debugGraphics = this.add.graphics();
 
-    container.add([sprite, nameText, debugGraphics]);
+    // Add in correct order: sprite, nameText, crown (on top), debugGraphics
+    container.add(sprite);
+    container.add(nameText);
+    if (crownSprite) {
+      container.add(crownSprite);
+    }
+    container.add(debugGraphics);
 
     const debugChar: DebugCharacter = {
       container,
       sprite,
       nameText,
+      crownSprite,
       debugGraphics,
       characterKey,
       scale: this.currentScale,
+      isBoss,
     };
 
     this.characters.push(debugChar);
@@ -126,22 +159,29 @@ export class DebugCharScene extends Scene {
     const camera = this.cameras.main;
 
     // Scale display
-    this.scaleText = this.add.text(camera.width - 20, 20, `Scale: ${this.currentScale.toFixed(2)}`, {
-      fontFamily: "monospace",
-      fontSize: "16px",
-      color: "#ffffff",
-      backgroundColor: "#000000cc",
-      padding: { x: 8, y: 4 },
-    }).setOrigin(1, 0);
+    this.scaleText = this.add
+      .text(camera.width - 20, 20, `Scale: ${this.currentScale.toFixed(2)}`, {
+        fontFamily: "monospace",
+        fontSize: "16px",
+        color: "#ffffff",
+        backgroundColor: "#000000cc",
+        padding: { x: 8, y: 4 },
+      })
+      .setOrigin(1, 0);
 
     // Instructions
-    this.add.text(20, 20, "Controls:\n[+] Scale up (+1 SOL)\n[-] Scale down\n[R] Reset scale\n[D] Toggle debug", {
-      fontFamily: "monospace",
-      fontSize: "14px",
-      color: "#aaaaaa",
-      backgroundColor: "#000000cc",
-      padding: { x: 8, y: 4 },
-    });
+    this.add.text(
+      20,
+      20,
+      "Controls:\n[+] Scale up (+1 SOL)\n[-] Scale down\n[R] Reset scale\n[D] Toggle debug\n[B] Toggle boss crowns",
+      {
+        fontFamily: "monospace",
+        fontSize: "14px",
+        color: "#aaaaaa",
+        backgroundColor: "#000000cc",
+        padding: { x: 8, y: 4 },
+      }
+    );
 
     // Keyboard controls
     this.input.keyboard?.on("keydown-PLUS", () => this.changeScale(0.5));
@@ -149,6 +189,7 @@ export class DebugCharScene extends Scene {
     this.input.keyboard?.on("keydown-MINUS", () => this.changeScale(-0.5));
     this.input.keyboard?.on("keydown-R", () => this.resetScale());
     this.input.keyboard?.on("keydown-D", () => this.toggleDebug());
+    this.input.keyboard?.on("keydown-B", () => this.toggleBossCrowns());
   }
 
   private changeScale(delta: number) {
@@ -189,6 +230,15 @@ export class DebugCharScene extends Scene {
   private toggleDebug() {
     this.characters.forEach((char) => {
       char.debugGraphics.setVisible(!char.debugGraphics.visible);
+    });
+  }
+
+  private toggleBossCrowns() {
+    this.showBossCrowns = !this.showBossCrowns;
+    this.characters.forEach((char) => {
+      if (char.crownSprite) {
+        char.crownSprite.setVisible(this.showBossCrowns);
+      }
     });
   }
 
