@@ -423,5 +423,85 @@ export default defineSchema({
   })
     .index("by_timestamp", ["timestamp"]) // For fetching recent messages
     .index("by_sender_and_time", ["senderWallet", "timestamp"]), // For rate limiting
+
+  // ============================================================================
+  // CHOP GAME TABLES (Timberman-style PVP skill game)
+  // ============================================================================
+
+  /**
+   * CHOP Lobbies - Track CHOP game lobbies
+   * Skill-based game where winner is determined by Convex game logic
+   */
+  chopLobbies: defineTable({
+    // Identifiers
+    lobbyId: v.number(), // Unique lobby ID from on-chain
+    lobbyPda: v.optional(v.string()), // Public key of the Lobby PDA (base58)
+    shareToken: v.string(), // 8-char unique token for sharing lobby URL
+
+    // Players
+    creator: v.string(), // Creator's wallet address (base58)
+    players: v.array(v.string()), // All players in lobby (max 2)
+
+    // Game state
+    betAmount: v.number(), // Bet amount per player (in lamports)
+    status: v.number(), // 0 = open, 1 = locked (playing), 2 = finished
+    winner: v.optional(v.string()), // Winner's wallet address (base58)
+
+    // Timestamps
+    createdAt: v.number(), // When lobby was created (Unix timestamp)
+    lockedAt: v.optional(v.number()), // When second player joined
+    finishedAt: v.optional(v.number()), // When game ended
+
+    // Server-generated tree pattern (anti-cheat)
+    // Array of branch positions: "l" = left, "r" = right, "" = no branch
+    branchPattern: v.optional(v.array(v.string())),
+
+    // Player game states (real-time during game)
+    playerStates: v.optional(
+      v.array(
+        v.object({
+          wallet: v.string(),
+          score: v.number(), // Number of successful chops
+          deathTime: v.optional(v.number()), // Timestamp when player died (hit branch/timeout)
+          isAlive: v.boolean(),
+          // Input replay data - for real-time spectating
+          inputs: v.array(
+            v.object({
+              t: v.number(), // Timestamp (ms from game start)
+              s: v.string(), // Side: "l" or "r"
+            })
+          ),
+        })
+      )
+    ),
+
+    // Prize info
+    totalPot: v.number(), // Total SOL in pot (both players' bets)
+    prizeAmount: v.optional(v.number()), // Actual prize won in lamports
+
+    // Transaction hashes
+    endGameTxHash: v.optional(v.string()), // Solana transaction hash for end_game
+  })
+    .index("by_status", ["status"]) // Query open lobbies (status = 0)
+    .index("by_creator", ["creator"]) // Query lobbies by creator
+    .index("by_status_and_created", ["status", "createdAt"]) // For pagination
+    .index("by_lobbyId", ["lobbyId"]) // Query specific lobby by ID
+    .index("by_shareToken", ["shareToken"]), // Fast lookup by share token
+
+  /**
+   * CHOP Leaderboard - Weekly high scores and stats
+   * Resets weekly, tracks best scores and wagering volume
+   */
+  chopLeaderboard: defineTable({
+    walletAddress: v.string(), // Player's wallet
+    weekStart: v.string(), // ISO date of week start "YYYY-MM-DD"
+    highScore: v.number(), // Best score this week
+    gamesPlayed: v.number(), // Total games played this week
+    gamesWon: v.number(), // Games won this week
+    totalWagered: v.number(), // Total SOL wagered in lamports
+    totalWon: v.number(), // Total SOL won in lamports
+  })
+    .index("by_wallet_and_week", ["walletAddress", "weekStart"])
+    .index("by_week_and_score", ["weekStart", "highScore"]),
 });
     

@@ -1,0 +1,20 @@
+[package]
+name = "chop_prgm"
+version = "0.1.0"
+description = "CHOP - Timberman-style PVP skill game on Solana"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "chop_prgm"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = "0.31.1"

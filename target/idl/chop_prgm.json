@@ -1,0 +1,596 @@
+{
+  "address": "4gNQMwQ7vxABctopEkyrxK9VkAqa8FBPtgHV7o1xnZqq",
+  "metadata": {
+    "name": "chop_prgm",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "CHOP - Timberman-style PVP skill game on Solana"
+  },
+  "instructions": [
+    {
+      "name": "cancel_lobby",
+      "docs": [
+        "Cancel a lobby (refund creator if no one has joined)"
+      ],
+      "discriminator": [
+        241,
+        47,
+        118,
+        95,
+        81,
+        67,
+        137,
+        13
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  111,
+                  112,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "lobby",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  111,
+                  112,
+                  95,
+                  108,
+                  111,
+                  98,
+                  98,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lobby.lobby_id",
+                "account": "ChopLobby"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_lobby",
+      "docs": [
+        "Create a new CHOP lobby (creator deposits SOL, waits for opponent)"
+      ],
+      "discriminator": [
+        116,
+        55,
+        74,
+        48,
+        40,
+        51,
+        135,
+        155
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  111,
+                  112,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "lobby",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  111,
+                  112,
+                  95,
+                  108,
+                  111,
+                  98,
+                  98,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config.lobby_count",
+                "account": "ChopConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "bet_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "end_game",
+      "docs": [
+        "End game and distribute funds (called by Convex backend with winner)",
+        "Winner is determined by skill-based game logic in Convex, not VRF"
+      ],
+      "discriminator": [
+        224,
+        135,
+        245,
+        99,
+        67,
+        175,
+        121,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  111,
+                  112,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "lobby",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  111,
+                  112,
+                  95,
+                  108,
+                  111,
+                  98,
+                  98,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lobby.lobby_id",
+                "account": "ChopLobby"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "docs": [
+            "Admin must match the config admin (Convex backend wallet)"
+          ],
+          "signer": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "creator",
+          "writable": true
+        },
+        {
+          "name": "winner_account",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "winner",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "initialize_config",
+      "docs": [
+        "Initialize the global configuration account"
+      ],
+      "discriminator": [
+        208,
+        127,
+        21,
+        1,
+        194,
+        190,
+        196,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  111,
+                  112,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "treasury"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "platform_fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "creator_fee_bps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "join_lobby",
+      "docs": [
+        "Join an existing lobby (player deposits matching SOL)"
+      ],
+      "discriminator": [
+        127,
+        102,
+        119,
+        190,
+        215,
+        223,
+        212,
+        159
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  111,
+                  112,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "lobby",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  104,
+                  111,
+                  112,
+                  95,
+                  108,
+                  111,
+                  98,
+                  98,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "lobby.lobby_id",
+                "account": "ChopLobby"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ChopConfig",
+      "discriminator": [
+        63,
+        130,
+        134,
+        182,
+        35,
+        252,
+        237,
+        214
+      ]
+    },
+    {
+      "name": "ChopLobby",
+      "discriminator": [
+        75,
+        251,
+        81,
+        67,
+        107,
+        154,
+        69,
+        28
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "LobbyNotFound",
+      "msg": "Lobby not found or invalid PDA"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidLobbyStatus",
+      "msg": "Lobby is not in the correct status"
+    },
+    {
+      "code": 6002,
+      "name": "LobbyFull",
+      "msg": "Lobby is already full"
+    },
+    {
+      "code": 6003,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds for bet"
+    },
+    {
+      "code": 6004,
+      "name": "BetBelowMinimum",
+      "msg": "Bet amount is below minimum required"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidFeeConfiguration",
+      "msg": "Fee configuration error: total fees exceed maximum"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidWinner",
+      "msg": "Winner must be a player in the lobby"
+    },
+    {
+      "code": 6007,
+      "name": "DistributionError",
+      "msg": "Fund distribution failed"
+    },
+    {
+      "code": 6008,
+      "name": "SelfPlayNotAllowed",
+      "msg": "Self-play not allowed: creator cannot join their own lobby"
+    },
+    {
+      "code": 6009,
+      "name": "LobbyNotTimedOut",
+      "msg": "Lobby has not timed out yet"
+    },
+    {
+      "code": 6010,
+      "name": "UnauthorizedAdmin",
+      "msg": "Unauthorized: only admin can perform this action"
+    },
+    {
+      "code": 6011,
+      "name": "UnauthorizedCancel",
+      "msg": "Unauthorized: only creator can cancel this lobby"
+    },
+    {
+      "code": 6012,
+      "name": "CannotCancelWithPlayers",
+      "msg": "Cannot cancel: lobby already has players"
+    }
+  ],
+  "types": [
+    {
+      "name": "ChopConfig",
+      "docs": [
+        "Global configuration account for the CHOP program"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "creator_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "lobby_count",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ChopLobby",
+      "docs": [
+        "A single CHOP lobby (skill-based game)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "lobby_id",
+            "type": "u64"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "bet_amount",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "locked_at",
+            "type": "i64"
+          },
+          {
+            "name": "players",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "total_pot",
+            "type": "u64"
+          },
+          {
+            "name": "winner",
+            "type": {
+              "option": "pubkey"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

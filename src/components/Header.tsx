@@ -101,12 +101,12 @@ export function Header() {
               >
                 1<span className="px-0.5">v</span>1
               </Link>
-              {/*<Link
-                to="/bloody"
-                className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"
+              <Link
+                to="/chop"
+                className="text-green-300 hover:text-green-200 transition-colors text-xs md:text-sm font-semibold"
               >
-                Bloody Bird
-              </Link>*/}
+                Chop
+              </Link>
               <Link
                 to="/referrals"
                 className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"

@@ -8,6 +8,7 @@ skip-lint = false
 [programs.devnet]
 domin8_1V1_prg = "CSj9CvC2ZZscGJDHJu8fCxxkTiJifWPZWiQCugxJkAad"
 domin8_prgm = "92LhoG1EGxWpRovjrjJ2vA8amNTHFZSTFr1EHUYWjkky"
+chop_prgm = "4gNQMwQ7vxABctopEkyrxK9VkAqa8FBPtgHV7o1xnZqq"
 
 [registry]
 url = "https://devnet.helius-rpc.com/?api-key=0df32d0b-da4f-49b3-b154-deaceac254c0"
