@@ -28,23 +28,23 @@ export class ChopGame extends Phaser.Scene {
   // - trunk1/trunk2: 1004x243 - trunk centered with transparent sides
   // - branch1: 1004x243 - branch LEFT + trunk center (use for left branches)
   // - branch2: 1004x243 - trunk center + branch RIGHT (use for right branches)
-  private readonly SCALE = 0.30;
+  private readonly SCALE = 0.3;
 
   // Full image dimensions scaled
-  private readonly IMG_WIDTH = Math.round(1004 * this.SCALE);    // ~301
-  private readonly IMG_HEIGHT = Math.round(243 * this.SCALE);    // ~73
-  private readonly STUMP_WIDTH = Math.round(385 * this.SCALE);   // ~116
-  private readonly STUMP_HEIGHT = Math.round(81 * this.SCALE);   // ~24
-  private readonly PLAYER_WIDTH = Math.round(422 * this.SCALE);  // ~127
+  private readonly IMG_WIDTH = Math.round(1004 * this.SCALE); // ~301
+  private readonly IMG_HEIGHT = Math.round(243 * this.SCALE); // ~73
+  private readonly STUMP_WIDTH = Math.round(385 * this.SCALE); // ~116
+  private readonly STUMP_HEIGHT = Math.round(81 * this.SCALE); // ~24
+  private readonly PLAYER_WIDTH = Math.round(422 * this.SCALE); // ~127
   private readonly PLAYER_HEIGHT = Math.round(413 * this.SCALE); // ~124
-  private readonly RIP_WIDTH = Math.round(90 * this.SCALE);      // ~27
-  private readonly RIP_HEIGHT = Math.round(100 * this.SCALE);    // ~30
+  private readonly RIP_WIDTH = Math.round(90 * this.SCALE); // ~27
+  private readonly RIP_HEIGHT = Math.round(100 * this.SCALE); // ~30
 
   // Visible trunk width (center third of 1004px image contains the trunk)
-  private readonly TRUNK_WIDTH = Math.round(335 * this.SCALE);   // ~100
+  private readonly TRUNK_WIDTH = Math.round(335 * this.SCALE); // ~100
 
   private readonly VISIBLE_SEGMENTS = 7;
-  private readonly GROUND_Y = Math.round(1394 * this.SCALE);     // ~418
+  private readonly GROUND_Y = Math.round(1394 * this.SCALE); // ~418
   private readonly TRUNK_X = CHOP_WIDTH / 2;
 
   // Branch pattern
@@ -124,8 +124,8 @@ export class ChopGame extends Phaser.Scene {
     const bg = this.add.image(CHOP_WIDTH / 2, CHOP_HEIGHT / 2, "chop-background");
     bg.setDisplaySize(CHOP_WIDTH, CHOP_HEIGHT);
 
-    // Stump
-    this.stump = this.add.image(centerX, this.GROUND_Y, "chop-stump");
+    // Stump (offset 1px right to align with trunk)
+    this.stump = this.add.image(centerX + 2, this.GROUND_Y, "chop-stump");
     this.stump.setDisplaySize(this.STUMP_WIDTH, this.STUMP_HEIGHT);
     this.stump.setOrigin(0.5, 0);
 
@@ -186,14 +186,19 @@ export class ChopGame extends Phaser.Scene {
     this.scoreText.setDepth(100);
 
     // Instructions
-    this.instructionText = this.add.text(centerX, CHOP_HEIGHT / 2 + 50, "Tap LEFT or RIGHT\nto start!", {
-      fontSize: "18px",
-      fontFamily: "Arial",
-      color: "#ffffff",
-      stroke: "#000000",
-      strokeThickness: 3,
-      align: "center",
-    });
+    this.instructionText = this.add.text(
+      centerX,
+      CHOP_HEIGHT / 2 + 50,
+      "Tap LEFT or RIGHT\nto start!",
+      {
+        fontSize: "18px",
+        fontFamily: "Arial",
+        color: "#ffffff",
+        stroke: "#000000",
+        strokeThickness: 3,
+        align: "center",
+      }
+    );
     this.instructionText.setOrigin(0.5);
     this.instructionText.setDepth(100);
 
@@ -251,7 +256,13 @@ export class ChopGame extends Phaser.Scene {
     this.timeBarBg.setStrokeStyle(2, 0x555555);
     this.timeBarBg.setDepth(90);
 
-    this.timeBarFill = this.add.rectangle(barX, barY + barHeight, barWidth - 4, barHeight - 4, 0x22c55e);
+    this.timeBarFill = this.add.rectangle(
+      barX,
+      barY + barHeight,
+      barWidth - 4,
+      barHeight - 4,
+      0x22c55e
+    );
     this.timeBarFill.setOrigin(0.5, 1);
     this.timeBarFill.setDepth(91);
   }
@@ -329,9 +340,9 @@ export class ChopGame extends Phaser.Scene {
       }
     });
 
-    // Check collision
-    const bottomSegment = this.treeSegments[0];
-    if (bottomSegment && bottomSegment.branchSide === side) {
+    // Check collision - player is at segment[1] level (one above the stump)
+    const playerSegment = this.treeSegments[1];
+    if (playerSegment && playerSegment.branchSide === side) {
       this.handleDeath();
       return;
     }
@@ -341,7 +352,7 @@ export class ChopGame extends Phaser.Scene {
     this.scoreText.setText(this.score.toString());
     this.timeRemaining = Math.min(100, this.timeRemaining + this.TIME_REFILL_AMOUNT);
 
-    this.shiftTree();
+    this.shiftTree(side);
 
     this.eventBus.emit("chop:input", {
       timestamp: Date.now() - this.gameStartTime,
@@ -350,20 +361,58 @@ export class ChopGame extends Phaser.Scene {
     });
   }
 
-  private shiftTree() {
+  private shiftTree(chopSide: "l" | "r") {
     const centerX = this.TRUNK_X;
 
-    // Remove bottom segment
+    // Remove bottom segment and animate it flying off (includes branch if any)
     const removed = this.treeSegments.shift();
     if (removed) {
-      removed.trunk.destroy();
+      const trunk = removed.trunk;
+
+      // Kick direction is opposite to chop side
+      const kickDirection = chopSide === "l" ? 1 : -1;
+      const targetX = trunk.x + kickDirection * 300;
+      const targetAngle = kickDirection * 90;
+
+      // Animate the chopped segment flying off with parabola motion
+      const startY = trunk.y;
+
+      // Horizontal + rotation
+      this.tweens.add({
+        targets: trunk,
+        x: targetX,
+        angle: targetAngle,
+        duration: 600,
+        ease: "Power1",
+      });
+
+      // Vertical parabola: up then down
+      this.tweens.add({
+        targets: trunk,
+        y: startY - 80,
+        duration: 200,
+        ease: "Sine.easeOut",
+        onComplete: () => {
+          this.tweens.add({
+            targets: trunk,
+            y: startY + 300,
+            duration: 400,
+            ease: "Sine.easeIn",
+            onComplete: () => {
+              trunk.destroy();
+            },
+          });
+        },
+      });
     }
 
-    // Shift remaining segments down
-    this.treeSegments.forEach((segment, i) => {
-      const y = this.GROUND_Y - (i + 1) * this.IMG_HEIGHT;
-      segment.trunk.y = y;
-      segment.trunk.setDepth(10 + i);
+    // Shift remaining segments down with a slight delay
+    this.time.delayedCall(120, () => {
+      this.treeSegments.forEach((segment, i) => {
+        const y = this.GROUND_Y - (i + 1) * this.IMG_HEIGHT;
+        segment.trunk.y = y;
+        segment.trunk.setDepth(10 + i);
+      });
     });
 
     // Add new segment at top
