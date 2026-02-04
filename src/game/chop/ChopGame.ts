@@ -35,10 +35,8 @@ export class ChopGame extends Phaser.Scene {
   private readonly IMG_HEIGHT = Math.round(243 * this.SCALE); // ~73
   private readonly STUMP_WIDTH = Math.round(385 * this.SCALE); // ~116
   private readonly STUMP_HEIGHT = Math.round(81 * this.SCALE); // ~24
-  private readonly PLAYER_WIDTH = Math.round(422 * this.SCALE); // ~127
-  private readonly PLAYER_HEIGHT = Math.round(413 * this.SCALE); // ~124
-  private readonly RIP_WIDTH = Math.round(90 * this.SCALE); // ~27
-  private readonly RIP_HEIGHT = Math.round(100 * this.SCALE); // ~30
+  private readonly RIP_WIDTH = Math.round(90 * this.SCALE * 3); // ~49
+  private readonly RIP_HEIGHT = Math.round(100 * this.SCALE * 3); // ~54
 
   // Visible trunk width (center third of 1004px image contains the trunk)
   private readonly TRUNK_WIDTH = Math.round(335 * this.SCALE); // ~100
@@ -425,7 +423,8 @@ export class ChopGame extends Phaser.Scene {
     this.gameState = "gameover";
 
     this.player.setVisible(false);
-    this.ripImage.setPosition(this.player.x, this.player.y - 40);
+    const ripOffsetX = this.playerSide === "l" ? -15 : 15;
+    this.ripImage.setPosition(this.player.x + ripOffsetX, this.player.y - 10);
     this.ripImage.setVisible(true);
     this.gameOverText.setVisible(true);
 

@@ -17,9 +17,12 @@ export function ChopPage() {
   const [betAmount, setBetAmount] = useState("0.01");
   const [isCreating, setIsCreating] = useState(false);
 
+  const [joiningLobbyId, setJoiningLobbyId] = useState<number | null>(null);
+
   // Convex
   const openLobbies = useQuery(api.chopLobbies.getOpenLobbies) || [];
   const createLobbyInDb = useMutation(api.chopLobbies.createLobbyInDb);
+  const joinLobbyInDb = useMutation(api.chopLobbies.joinLobbyInDb);
 
   // Initialize game
   useEffect(() => {
@@ -77,6 +80,27 @@ export function ChopPage() {
     }
   }, [connected, publicKey, betAmount, createLobbyInDb]);
 
+  // Join lobby
+  const handleJoinLobby = useCallback(async (lobbyId: number) => {
+    if (!connected || !publicKey) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+
+    setJoiningLobbyId(lobbyId);
+    try {
+      await joinLobbyInDb({
+        lobbyId,
+        player: publicKey.toString(),
+      });
+      toast.success("Joined lobby! Game starting...");
+    } catch (error) {
+      toast.error("Failed to join lobby");
+    } finally {
+      setJoiningLobbyId(null);
+    }
+  }, [connected, publicKey, joinLobbyInDb]);
+
   const truncateWallet = (wallet: string) => `${wallet.slice(0, 4)}...${wallet.slice(-4)}`;
 
   return (
@@ -131,25 +155,44 @@ export function ChopPage() {
           <div className="bg-gray-900/50 border border-gray-700/50 rounded-xl p-4">
             <h3 className="text-sm font-bold text-gray-200 mb-3">Open Games</h3>
             <div className="space-y-2">
-              {openLobbies.map((lobby) => (
-                <div
-                  key={lobby._id}
-                  className="bg-gray-800/50 border border-gray-700/30 rounded-lg p-3 flex items-center justify-between"
-                >
-                  <div>
-                    <p className="text-white text-sm font-medium">
-                      {truncateWallet(lobby.creator)}
-                    </p>
-                    <p className="text-gray-400 text-xs">Waiting...</p>
+              {openLobbies.map((lobby) => {
+                const isOwnLobby = publicKey && lobby.creator === publicKey.toString();
+                const isJoining = joiningLobbyId === lobby.lobbyId;
+
+                return (
+                  <div
+                    key={lobby._id}
+                    className="bg-gray-800/50 border border-gray-700/30 rounded-lg p-3"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-white text-sm font-medium">
+                          {truncateWallet(lobby.creator)}
+                        </p>
+                        <p className="text-gray-400 text-xs">Waiting...</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-green-400 text-sm font-bold">
+                          {(lobby.betAmount / 1e9).toFixed(3)}
+                        </span>
+                        <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
+                      </div>
+                    </div>
+                    {connected && !isOwnLobby && (
+                      <button
+                        onClick={() => handleJoinLobby(lobby.lobbyId)}
+                        disabled={isJoining}
+                        className="w-full px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-lg text-sm disabled:opacity-50"
+                      >
+                        {isJoining ? "Joining..." : "Join Game"}
+                      </button>
+                    )}
+                    {isOwnLobby && (
+                      <p className="text-center text-xs text-gray-500">Your lobby</p>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-400 text-sm font-bold">
-                      {(lobby.betAmount / 1e9).toFixed(3)}
-                    </span>
-                    <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {openLobbies.length === 0 && (
                 <p className="text-gray-500 text-sm text-center py-4">
                   No open games
