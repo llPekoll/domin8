@@ -1,5 +1,11 @@
 import Phaser from "phaser";
-import { getChopEventBus, getChopBranchPattern, CHOP_WIDTH, CHOP_HEIGHT } from "./index";
+import {
+  getChopEventBus,
+  getChopBranchPattern,
+  getChopHighScore,
+  CHOP_WIDTH,
+  CHOP_HEIGHT,
+} from "./index";
 
 type GameState = "waiting" | "countdown" | "playing" | "gameover";
 
@@ -14,6 +20,7 @@ export class ChopGame extends Phaser.Scene {
 
   // Game state
   private gameState: GameState = "waiting";
+  private inputEnabled = false; // Must be enabled by chop:start event
   private score = 0;
   public playerSide: "l" | "r" = "l";
   private isAlive = true;
@@ -55,19 +62,45 @@ export class ChopGame extends Phaser.Scene {
   private playerRightX = 0;
 
   // Time bar
-  private timeBarFill!: Phaser.GameObjects.Rectangle;
-  private timeBarBg!: Phaser.GameObjects.Rectangle;
+  private timeBarBg!: Phaser.GameObjects.Image;
+  private timeBarFill!: Phaser.GameObjects.Image;
+  private timeBarContainer!: Phaser.GameObjects.Image;
   private timeRemaining = 100;
-  private readonly TIME_DECAY_RATE = 12;
-  private readonly TIME_REFILL_AMOUNT = 10;
+  private readonly TIME_REFILL_AMOUNT = 8;
+
+  // Brutal difficulty curve - quick deaths, 1000 is legendary
+  // Target: casual dies ~40-60, good players ~150-200, 1000 is inhuman
+  private readonly DIFFICULTY_TIERS = [
+    { maxScore: 29, decay: 12 }, // Warm-up
+    { maxScore: 59, decay: 18 }, // Getting tough
+    { maxScore: 99, decay: 25 }, // Serious
+    { maxScore: 149, decay: 35 }, // Hard
+    { maxScore: 249, decay: 50 }, // Very hard
+    { maxScore: 499, decay: 70 }, // Expert only
+    { maxScore: 749, decay: 100 }, // Near impossible
+    { maxScore: 999, decay: 150 }, // Inhuman
+    { maxScore: Infinity, decay: 250 }, // Unplayable (1000+)
+  ];
 
   // UI
   private scoreText!: Phaser.GameObjects.Text;
+  private highScoreText!: Phaser.GameObjects.Text;
   private countdownText!: Phaser.GameObjects.Text;
   private gameOverText!: Phaser.GameObjects.Text;
   private ripImage!: Phaser.GameObjects.Image;
   private stump!: Phaser.GameObjects.Image;
   private instructionText!: Phaser.GameObjects.Text;
+
+  // High score tracking
+  private highScore = 0;
+  private hasBeatHighScore = false;
+
+  // Confetti particles
+  private confettiEmitter: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
+
+  // Sounds
+  private chopSound!: Phaser.Sound.BaseSound;
+  private deathSound!: Phaser.Sound.BaseSound;
 
   constructor() {
     super("ChopGame");
@@ -78,6 +111,7 @@ export class ChopGame extends Phaser.Scene {
     const globalPattern = getChopBranchPattern();
 
     this.gameState = "waiting";
+    this.inputEnabled = false; // Disabled until chop:start event
     this.score = 0;
     this.playerSide = "l";
     this.isAlive = true;
@@ -86,6 +120,10 @@ export class ChopGame extends Phaser.Scene {
     this.treeSegments = [];
 
     this.branchPattern = globalPattern || this.generateDefaultPattern();
+
+    // Get high score from global state
+    this.highScore = getChopHighScore();
+    this.hasBeatHighScore = false;
   }
 
   private generateDefaultPattern(): string[] {
@@ -183,22 +221,31 @@ export class ChopGame extends Phaser.Scene {
     this.scoreText.setOrigin(0.5);
     this.scoreText.setDepth(100);
 
-    // Instructions
-    this.instructionText = this.add.text(
-      centerX,
-      CHOP_HEIGHT / 2 + 50,
-      "Tap LEFT or RIGHT\nto start!",
-      {
-        fontSize: "18px",
-        fontFamily: "Arial",
-        color: "#ffffff",
-        stroke: "#000000",
-        strokeThickness: 3,
-        align: "center",
-      }
-    );
+    // High score target (shown on right side)
+    const highScoreLabel = this.highScore > 0 ? `#1: ${this.highScore}` : "";
+    this.highScoreText = this.add.text(CHOP_WIDTH - 10, 25, highScoreLabel, {
+      fontSize: "14px",
+      fontFamily: "Arial",
+      color: "#fbbf24",
+      stroke: "#000000",
+      strokeThickness: 3,
+    });
+    this.highScoreText.setOrigin(1, 0);
+    this.highScoreText.setDepth(100);
+    this.highScoreText.setAlpha(0.8);
+
+    // Instructions (hidden by default, shown during gameplay)
+    this.instructionText = this.add.text(centerX, CHOP_HEIGHT / 2 + 50, "", {
+      fontSize: "18px",
+      fontFamily: "Arial",
+      color: "#ffffff",
+      stroke: "#000000",
+      strokeThickness: 3,
+      align: "center",
+    });
     this.instructionText.setOrigin(0.5);
     this.instructionText.setDepth(100);
+    this.instructionText.setVisible(false);
 
     // Countdown
     this.countdownText = this.add.text(centerX, CHOP_HEIGHT / 2, "3", {
@@ -232,37 +279,48 @@ export class ChopGame extends Phaser.Scene {
     // Input
     this.setupInput();
 
+    // Create confetti particle system (hidden initially)
+    this.createConfettiEmitter();
+
     // Events
     this.eventBus.on("chop:start", this.startCountdown, this);
     this.eventBus.on("chop:restart", this.restartGame, this);
+    this.eventBus.on("chop:continue", this.continueGame, this);
+    this.eventBus.on("chop:highscore", this.updateHighScore, this);
 
     this.events.on(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.eventBus.off("chop:start", this.startCountdown, this);
       this.eventBus.off("chop:restart", this.restartGame, this);
+      this.eventBus.off("chop:continue", this.continueGame, this);
+      this.eventBus.off("chop:highscore", this.updateHighScore, this);
     });
+
+    // Initialize sounds
+    this.chopSound = this.sound.add("chop-sound", { volume: 0.5 });
+    this.deathSound = this.sound.add("chop-death", { volume: 0.7 });
 
     this.eventBus.emit("chop:ready");
   }
 
   private createTimeBar() {
-    const barX = 22;
-    const barY = 70;
-    const barWidth = 16;
-    const barHeight = this.GROUND_Y - barY - 30;
+    const barY = 18;
+    const centerX = this.cameras.main.width / 2;
 
-    this.timeBarBg = this.add.rectangle(barX, barY + barHeight / 2, barWidth, barHeight, 0x333333);
-    this.timeBarBg.setStrokeStyle(2, 0x555555);
+    // Layer 1 (bottom): Dark background - centered
+    this.timeBarBg = this.add.image(centerX, barY, "chop-bar-black");
     this.timeBarBg.setDepth(90);
 
-    this.timeBarFill = this.add.rectangle(
-      barX,
-      barY + barHeight,
-      barWidth - 4,
-      barHeight - 4,
-      0x22c55e
-    );
-    this.timeBarFill.setOrigin(0.5, 1);
+    // Layer 2 (middle): Fill bar - tinted green to red
+    // Align with the black background (add padding for frame)
+    this.timeBarFill = this.add.image(centerX, barY, "chop-bar");
+    this.timeBarFill.setOrigin(0, 0.5); // Origin at left so it shrinks from right
+    this.timeBarFill.setX(centerX - this.timeBarBg.width / 2 - 4); // Align left edge
     this.timeBarFill.setDepth(91);
+    this.timeBarFill.setTint(0x22c55e); // Start green
+
+    // Layer 3 (top): Yellow frame/container - centered
+    this.timeBarContainer = this.add.image(centerX, barY, "chop-bar-container");
+    this.timeBarContainer.setDepth(92);
   }
 
   private createInitialTree() {
@@ -316,8 +374,8 @@ export class ChopGame extends Phaser.Scene {
   }
 
   private handleChop(side: "l" | "r") {
-    if (this.gameState === "waiting") {
-      this.startCountdown();
+    // Input must be enabled by chop:start event from React UI
+    if (!this.inputEnabled) {
       return;
     }
 
@@ -349,6 +407,14 @@ export class ChopGame extends Phaser.Scene {
     this.score++;
     this.scoreText.setText(this.score.toString());
     this.timeRemaining = Math.min(100, this.timeRemaining + this.TIME_REFILL_AMOUNT);
+
+    // Check if beat high score
+    if (this.highScore > 0 && this.score > this.highScore && !this.hasBeatHighScore) {
+      this.triggerNewHighScoreCelebration();
+    }
+
+    // Play chop sound
+    this.chopSound.play();
 
     this.shiftTree(side);
 
@@ -422,6 +488,9 @@ export class ChopGame extends Phaser.Scene {
     this.isAlive = false;
     this.gameState = "gameover";
 
+    // Play death sound
+    this.deathSound.play();
+
     this.player.setVisible(false);
     const ripOffsetX = this.playerSide === "l" ? -15 : 15;
     this.ripImage.setPosition(this.player.x + ripOffsetX, this.player.y - 10);
@@ -442,9 +511,11 @@ export class ChopGame extends Phaser.Scene {
   }
 
   private startCountdown() {
+    console.log("startCountdown called - gameState:", this.gameState);
     if (this.gameState !== "waiting") return;
 
     this.gameState = "countdown";
+    this.inputEnabled = true; // Enable input when countdown starts
     this.instructionText.setVisible(false);
     this.countdownText.setVisible(true);
 
@@ -480,28 +551,201 @@ export class ChopGame extends Phaser.Scene {
     this.scene.restart();
   }
 
+  private continueGame(data: { score: number }) {
+    // Resume from current score without resetting
+    this.isAlive = true;
+    this.gameState = "playing";
+    this.inputEnabled = true;
+    this.timeRemaining = 100;
+    this.gameStartTime = Date.now();
+
+    // Reset time bar visual
+    this.timeBarFill.setScale(1, 1);
+    this.timeBarFill.setTint(0x22c55e);
+
+    // Keep the score from data (in case it differs)
+    if (data?.score !== undefined) {
+      this.score = data.score;
+      this.scoreText.setText(this.score.toString());
+    }
+
+    // Hide game over UI
+    this.gameOverText.setVisible(false);
+    this.ripImage.setVisible(false);
+
+    // Restore player
+    this.player.setVisible(true);
+    this.player.play("man-idle");
+
+    // Regenerate tree with safe starting segments
+    this.rebuildTreeForContinue();
+
+    this.eventBus.emit("chop:playing");
+  }
+
+  private rebuildTreeForContinue() {
+    // Clear existing tree segments
+    this.treeSegments.forEach((segment) => {
+      segment.trunk.destroy();
+    });
+    this.treeSegments = [];
+
+    // Regenerate pattern from current index with safe start
+    // Ensure first 2 segments have no branches for safety
+    const patternLength = this.branchPattern.length;
+    this.branchPattern[this.currentPatternIndex % patternLength] = "";
+    this.branchPattern[(this.currentPatternIndex + 1) % patternLength] = "";
+
+    // Rebuild visible tree
+    const centerX = this.TRUNK_X;
+    for (let i = 0; i < this.VISIBLE_SEGMENTS; i++) {
+      this.addTreeSegment(centerX, i);
+    }
+  }
+
+  private createConfettiEmitter() {
+    // Create a simple colored rectangle texture for confetti
+    const graphics = this.make.graphics({ x: 0, y: 0 });
+
+    // Create multiple colored confetti textures
+    const colors = [0xfbbf24, 0xef4444, 0x22c55e, 0x3b82f6, 0xa855f7, 0xf97316];
+    colors.forEach((color, i) => {
+      graphics.fillStyle(color);
+      graphics.fillRect(i * 8, 0, 6, 8);
+    });
+    graphics.generateTexture("confetti", 48, 8);
+    graphics.destroy();
+
+    // Create particle emitter
+    this.confettiEmitter = this.add.particles(0, 0, "confetti", {
+      frame: { frames: [0, 1, 2, 3, 4, 5], cycle: true },
+      x: { min: 0, max: CHOP_WIDTH },
+      y: -20,
+      lifespan: 3000,
+      speedY: { min: 100, max: 200 },
+      speedX: { min: -50, max: 50 },
+      scale: { start: 1, end: 0.5 },
+      rotate: { min: 0, max: 360 },
+      gravityY: 100,
+      quantity: 3,
+      frequency: 50,
+      emitting: false,
+    });
+    this.confettiEmitter.setDepth(150);
+  }
+
+  private triggerNewHighScoreCelebration() {
+    if (this.hasBeatHighScore) return;
+    this.hasBeatHighScore = true;
+
+    // Update high score display
+    this.highScoreText.setText("NEW #1!");
+    this.highScoreText.setColor("#22c55e");
+    this.highScoreText.setFontSize(16);
+
+    // Scale bump on score text
+    this.tweens.add({
+      targets: this.scoreText,
+      scale: 1.5,
+      duration: 150,
+      yoyo: true,
+      ease: "Back.easeOut",
+      onComplete: () => {
+        // Flash the score gold
+        this.scoreText.setColor("#fbbf24");
+        this.time.delayedCall(300, () => {
+          if (this.isAlive) {
+            this.scoreText.setColor("#ffffff");
+          }
+        });
+      },
+    });
+
+    // Start confetti
+    if (this.confettiEmitter) {
+      this.confettiEmitter.start();
+      // Stop after 2 seconds
+      this.time.delayedCall(2000, () => {
+        this.confettiEmitter?.stop();
+      });
+    }
+
+    // Camera flash (gold)
+    this.cameras.main.flash(
+      300,
+      251,
+      191,
+      36,
+      true,
+      (_cam: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+        if (progress === 1) {
+          // Flash complete
+        }
+      }
+    );
+
+    // Emit event for React UI
+    this.eventBus.emit("chop:newhighscore", { score: this.score });
+  }
+
+  private updateHighScore(score: number) {
+    this.highScore = score;
+    if (score > 0 && !this.hasBeatHighScore) {
+      this.highScoreText.setText(`#1: ${score}`);
+    }
+  }
+
   update(_time: number, delta: number) {
     if (this.gameState !== "playing" || !this.isAlive) {
       return;
     }
 
-    this.timeRemaining -= (this.TIME_DECAY_RATE * delta) / 1000;
+    // Brutal difficulty curve - find current tier based on score
+    const tier = this.DIFFICULTY_TIERS.find((t) => this.score <= t.maxScore)!;
+    const currentDecayRate = tier.decay;
 
-    const barY = 70;
-    const maxHeight = this.GROUND_Y - barY - 34;
-    const fillHeight = Math.max(0, (this.timeRemaining / 100) * maxHeight);
-    this.timeBarFill.setSize(12, fillHeight);
+    this.timeRemaining -= (currentDecayRate * delta) / 1000;
 
-    if (this.timeRemaining < 25) {
-      this.timeBarFill.setFillStyle(0xef4444);
-    } else if (this.timeRemaining < 50) {
-      this.timeBarFill.setFillStyle(0xf59e0b);
-    } else {
-      this.timeBarFill.setFillStyle(0x22c55e);
-    }
+    // Scale the bar width based on time remaining
+    const fillPercent = Math.max(0, this.timeRemaining / 100);
+    this.timeBarFill.setScale(fillPercent, 1);
+
+    // Gradual color transition: green (100%) -> yellow (50%) -> red (0%)
+    const tintColor = this.getGradientColor(fillPercent);
+    this.timeBarFill.setTint(tintColor);
 
     if (this.timeRemaining <= 0) {
       this.handleDeath();
     }
+  }
+
+  /**
+   * Get gradient color from green (1.0) -> yellow (0.7) -> red (0.3)
+   * Turns red faster for more urgency
+   */
+  private getGradientColor(percent: number): number {
+    let r: number, g: number, b: number;
+
+    if (percent > 0.7) {
+      // Green to Yellow (100% -> 70%)
+      const t = (percent - 0.7) / 0.3; // 1.0 at 100%, 0.0 at 70%
+      r = Math.round(255 * (1 - t) + 34 * t); // 255 -> 34 (0x22)
+      g = Math.round(245 * (1 - t) + 197 * t); // 245 -> 197 (0xc5)
+      b = Math.round(0 * (1 - t) + 94 * t); // 0 -> 94 (0x5e)
+    } else if (percent > 0.3) {
+      // Yellow to Orange (70% -> 30%)
+      const t = (percent - 0.3) / 0.4; // 1.0 at 70%, 0.0 at 30%
+      r = Math.round(239 * (1 - t) + 255 * t); // Keep red high
+      g = Math.round(120 * (1 - t) + 245 * t); // 245 -> 120
+      b = Math.round(50 * (1 - t) + 0 * t); // Stay low
+    } else {
+      // Orange to Red (30% -> 0%)
+      const t = percent / 0.3; // 1.0 at 30%, 0.0 at 0%
+      r = 239; // Stay red
+      g = Math.round(68 * (1 - t) + 120 * t); // 120 -> 68
+      b = Math.round(68 * (1 - t) + 50 * t); // 50 -> 68
+    }
+
+    return (r << 16) | (g << 8) | b;
   }
 }

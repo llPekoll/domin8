@@ -503,5 +503,128 @@ export default defineSchema({
   })
     .index("by_wallet_and_week", ["walletAddress", "weekStart"])
     .index("by_week_and_score", ["weekStart", "highScore"]),
+
+  /**
+   * CHOP Solo Sessions - Track solo mode games with pay-to-continue
+   * User pays 0.1 SOL to start, can pay to continue on death
+   */
+  chopSoloSessions: defineTable({
+    walletAddress: v.string(), // Player's wallet
+    sessionId: v.string(), // Unique session ID
+    startedAt: v.number(), // When session started
+    endedAt: v.optional(v.number()), // When session ended (null if active)
+    isActive: v.boolean(), // Is session still active
+    currentScore: v.number(), // Current score in this game
+    highScore: v.number(), // Highest score reached across all games in session
+    continueCount: v.number(), // Number of times player paid to continue (after 10 lives exhausted)
+    totalPaid: v.number(), // Total SOL paid (start + continues) in lamports
+    // Lives system: 10 games per payment
+    livesRemaining: v.number(), // Lives left (starts at 10, -1 per death, refills on continue payment)
+    gamesPlayed: v.number(), // Total games played in this session
+    // Payment tracking
+    startPaymentTx: v.optional(v.string()), // TX hash for initial payment
+    continuePaymentTxs: v.array(v.string()), // TX hashes for continue payments
+    // Server-generated branch pattern (anti-cheat)
+    branchPattern: v.optional(v.array(v.string())), // ["l", "r", "", ...] - only backend knows full pattern
+    currentPatternIndex: v.optional(v.number()), // Current position in pattern
+    // Input tracking for bot detection - stored per game
+    games: v.optional(v.array(v.object({
+      gameNumber: v.number(), // Which game in the session (1-10, then continues)
+      score: v.number(), // Final score for this game
+      startedAt: v.number(), // When this game started
+      endedAt: v.number(), // When this game ended (death)
+      inputs: v.array(v.object({
+        t: v.number(), // Timestamp (ms from game start)
+        s: v.string(), // Side: "l" or "r"
+      })),
+    }))),
+    // Current game inputs (moved to games[] on death)
+    currentGameInputs: v.optional(v.array(v.object({
+      t: v.number(),
+      s: v.string(),
+    }))),
+    currentGameStartedAt: v.optional(v.number()), // When current game started
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_wallet_active", ["walletAddress", "isActive"])
+    .index("by_session", ["sessionId"]),
+
+  /**
+   * CHOP Bot Detection Flags - Track suspicious accounts
+   * Updated by daily cron job analyzing input patterns
+   */
+  chopBotDetection: defineTable({
+    walletAddress: v.string(),
+    sessionId: v.string(), // Which session was flagged
+    flaggedAt: v.number(), // When flagged
+    reason: v.string(), // "perfect_timing" | "inhuman_speed" | "pattern_match"
+    confidence: v.number(), // 0-100 confidence score
+    analyzed: v.boolean(), // Has admin reviewed this flag
+    action: v.optional(v.string()), // "banned" | "cleared" | null
+    // Evidence
+    avgReactionTime: v.optional(v.number()), // Average ms between chops
+    minReactionTime: v.optional(v.number()), // Fastest chop
+    timingVariance: v.optional(v.number()), // Std deviation of timing
+    perfectChops: v.optional(v.number()), // Chops within "perfect" window
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_session", ["sessionId"])
+    .index("by_flagged_at", ["flaggedAt"])
+    .index("by_analyzed", ["analyzed"]),
+
+  /**
+   * CHOP Solo All-Time Leaderboard - Track best solo scores ever
+   */
+  chopSoloLeaderboard: defineTable({
+    walletAddress: v.string(),
+    highScore: v.number(), // Best solo score ever
+    totalGames: v.number(), // Total solo games played
+    totalContinues: v.number(), // Total continues purchased
+    totalSpent: v.number(), // Total SOL spent on solo mode (lamports)
+    lastPlayedAt: v.number(), // Last time played solo
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_high_score", ["highScore"]),
+
+  /**
+   * CHOP Weekly Jackpots - Track weekly prize pools
+   * Runs Saturday to Saturday, real-time counter
+   */
+  chopJackpots: defineTable({
+    weekId: v.string(), // "2024-W06" (ISO week format)
+    weekStart: v.number(), // Saturday 00:00 UTC timestamp
+    weekEnd: v.number(), // Next Saturday 00:00 UTC timestamp
+    totalPool: v.number(), // Incremented on every payment (lamports)
+    totalSessions: v.number(), // Number of sessions started this week
+    totalContinues: v.number(), // Number of continues purchased this week
+    status: v.string(), // "active" | "ended" | "paid"
+    // Snapshot at week end (top 20 players)
+    leaderboardSnapshot: v.optional(
+      v.array(
+        v.object({
+          walletAddress: v.string(),
+          highScore: v.number(),
+          rank: v.number(),
+        })
+      )
+    ),
+    // Payout tracking (manual by admin)
+    winners: v.optional(
+      v.array(
+        v.object({
+          walletAddress: v.string(),
+          rank: v.number(),
+          amount: v.number(), // Prize in lamports
+          paidAt: v.optional(v.number()), // When admin paid out
+          txHash: v.optional(v.string()), // Transaction hash
+        })
+      )
+    ),
+    createdAt: v.number(),
+    endedAt: v.optional(v.number()), // When week was closed
+  })
+    .index("by_weekId", ["weekId"])
+    .index("by_status", ["status"])
+    .index("by_weekEnd", ["weekEnd"]),
 });
     

@@ -105,6 +105,21 @@ export const getPlayerLobbies = query({
 });
 
 /**
+ * Get active/locked lobbies (status = 1, game in progress)
+ */
+export const getActiveLobbies = query({
+  args: {},
+  handler: async (ctx) => {
+    const lobbies = await ctx.db
+      .query("chopLobbies")
+      .withIndex("by_status", (q) => q.eq("status", 1))
+      .collect();
+
+    return lobbies;
+  },
+});
+
+/**
  * Get completed lobbies (status = 2)
  */
 export const getCompletedLobbies = query({
@@ -579,5 +594,87 @@ export const _getPlayingLobbies = internalQuery({
       .query("chopLobbies")
       .withIndex("by_status", (q) => q.eq("status", 1))
       .collect();
+  },
+});
+
+// ============================================================================
+// ADMIN / CLEANUP MUTATIONS
+// ============================================================================
+
+/**
+ * Force close a stuck lobby (admin/debug use)
+ * Sets status to 2 (finished) without determining winner
+ */
+export const forceCloseLobby = mutation({
+  args: {
+    lobbyId: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const lobby = await ctx.db
+      .query("chopLobbies")
+      .withIndex("by_lobbyId", (q) => q.eq("lobbyId", args.lobbyId))
+      .first();
+
+    if (!lobby) {
+      throw new Error(`Lobby ${args.lobbyId} not found`);
+    }
+
+    await ctx.db.patch(lobby._id, {
+      status: 2, // Force to finished
+      finishedAt: Date.now(),
+    });
+
+    return true;
+  },
+});
+
+/**
+ * Delete a lobby entirely (admin/debug use)
+ */
+export const deleteLobby = mutation({
+  args: {
+    lobbyId: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const lobby = await ctx.db
+      .query("chopLobbies")
+      .withIndex("by_lobbyId", (q) => q.eq("lobbyId", args.lobbyId))
+      .first();
+
+    if (lobby) {
+      await ctx.db.delete(lobby._id);
+    }
+
+    return true;
+  },
+});
+
+/**
+ * Clean up stale active lobbies (older than 1 hour)
+ */
+export const cleanupStaleLobbies = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+
+    // Find active lobbies (status=1) older than 1 hour
+    const activeLobbies = await ctx.db
+      .query("chopLobbies")
+      .withIndex("by_status", (q) => q.eq("status", 1))
+      .collect();
+
+    const staleLobbies = activeLobbies.filter(
+      (lobby) => (lobby.lockedAt || lobby.createdAt) < oneHourAgo
+    );
+
+    // Force close them
+    for (const lobby of staleLobbies) {
+      await ctx.db.patch(lobby._id, {
+        status: 2,
+        finishedAt: Date.now(),
+      });
+    }
+
+    return { closedCount: staleLobbies.length };
   },
 });

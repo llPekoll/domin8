@@ -16,6 +16,37 @@ export const CHOP_HEIGHT = BASE_HEIGHT * CHOP_SCALE; // 534
 // Global state
 let globalEventBus: Phaser.Events.EventEmitter | null = null;
 let globalBranchPattern: string[] | undefined = undefined;
+let globalHighScore: number = 0;
+
+// Callback for server-validated chops (solo mode anti-cheat)
+export type ChopCallback = (side: "l" | "r", timestamp: number) => Promise<{
+  success: boolean;
+  died?: boolean;
+  score?: number;
+  nextBranches?: string[];
+  error?: string;
+}>;
+let globalChopCallback: ChopCallback | undefined = undefined;
+
+export function setChopCallback(callback: ChopCallback | undefined): void {
+  globalChopCallback = callback;
+}
+
+export function getChopCallback(): ChopCallback | undefined {
+  return globalChopCallback;
+}
+
+export function setChopHighScore(score: number): void {
+  globalHighScore = score;
+  // Also emit event if game is running
+  if (globalEventBus) {
+    globalEventBus.emit("chop:highscore", score);
+  }
+}
+
+export function getChopHighScore(): number {
+  return globalHighScore;
+}
 
 export function getChopEventBus(): Phaser.Events.EventEmitter {
   if (!globalEventBus) {
@@ -72,6 +103,8 @@ export function createChopGame(parent: HTMLElement, branchPattern?: string[]) {
     game.destroy(true);
     globalEventBus = null;
     globalBranchPattern = undefined;
+    globalHighScore = 0;
+    globalChopCallback = undefined;
   };
 
   return { game, events, destroy };

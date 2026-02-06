@@ -100,4 +100,39 @@ crons.interval(
   internal.botExecutor.executeBots
 );
 
+/**
+ * CHOP BOT DETECTION - Daily analysis of solo mode input patterns
+ *
+ * Runs once per day to:
+ * 1. Analyze all solo sessions from last 24 hours
+ * 2. Flag suspicious patterns (inhuman timing, perfect consistency)
+ * 3. Store flags for admin review
+ *
+ * Detection signals:
+ * - Reaction times < 80ms (human minimum ~80ms)
+ * - Very low timing variance (bots are unnaturally consistent)
+ * - High ratio of "perfect" timing between chops
+ */
+crons.daily(
+  "chop-bot-detection",
+  { hourUTC: 4, minuteUTC: 0 }, // Run at 4:00 AM UTC daily
+  internal.chopBotDetection.analyzeRecentSessions
+);
+
+/**
+ * CHOP WEEKLY JACKPOT - Saturday midnight UTC snapshot
+ *
+ * Runs every Saturday at 00:00 UTC to:
+ * 1. End the current week's jackpot
+ * 2. Snapshot the leaderboard (top 20 players)
+ * 3. Create new jackpot for the upcoming week
+ *
+ * Payouts are done manually by admin after validation.
+ */
+crons.weekly(
+  "chop-jackpot-weekly-snapshot",
+  { dayOfWeek: "saturday", hourUTC: 0, minuteUTC: 0 },
+  internal.chopJackpot.endWeekAndSnapshot
+);
+
 export default crons;

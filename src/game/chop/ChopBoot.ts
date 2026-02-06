@@ -65,6 +65,10 @@ export class ChopBoot extends Phaser.Scene {
     this.load.image("chop-bar", "/assets/chop/bar.png");
     this.load.image("chop-bar-black", "/assets/chop/bar_black.png");
     this.load.image("chop-bar-container", "/assets/chop/bar_container.png");
+
+    // Sounds
+    this.load.audio("chop-sound", "/assets/sounds/chop/chop.wav");
+    this.load.audio("chop-death", "/assets/sounds/chop/death.wav");
   }
 
   create() {
