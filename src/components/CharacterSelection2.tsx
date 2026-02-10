@@ -188,7 +188,7 @@ const CharacterSelection2 = memo(function CharacterSelection({
       <div className="fixed bottom-0 left-0 z-50">
         {/* Container with charSelect.png background */}
         <div
-          className="bg-black/40 relative w-[160px] h-[280px] flex flex-row items-start justify-between p-4 pl-1 backdrop-blur-sm rounded-tr-lg shadow-lg border-t border-r border-amber-500/30"
+          className="bg-black/40 relative w-40 h-[280px] flex flex-row items-start justify-between p-4 pl-1 backdrop-blur-sm rounded-tr-lg shadow-lg border-t border-r border-amber-500/30"
           style={{
             backgroundSize: "100% 100%",
             backgroundRepeat: "no-repeat",

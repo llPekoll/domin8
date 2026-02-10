@@ -81,7 +81,7 @@ export function PotDisplayPanel() {
           {/* Stats Container */}
           <div className="flex items-center gap-6">
             {/* Total Pot */}
-            <div className="flex flex-col items-center justify-center min-w-[140px]">
+            <div className="flex flex-col items-center justify-center min-w-35">
               <div className="text-amber-400 text-xs uppercase tracking-wider font-semibold mb-1">
                 Total Pot
               </div>
@@ -94,7 +94,7 @@ export function PotDisplayPanel() {
             <div className="w-px h-16 bg-amber-500/30" />
 
             {/* Player Count */}
-            <div className="flex flex-col items-center justify-center min-w-[100px]">
+            <div className="flex flex-col items-center justify-center min-w-25">
               <div className="text-amber-400 text-xs uppercase tracking-wider font-semibold mb-1">
                 Players
               </div>
@@ -108,7 +108,7 @@ export function PotDisplayPanel() {
 
             {/* Player Win Chance (only show if player has bet) */}
             {playerWinChance > 0 && (
-              <div className="flex flex-col items-center justify-center min-w-[120px]">
+              <div className="flex flex-col items-center justify-center min-w-30">
                 <div className="text-green-400 text-xs uppercase tracking-wider font-semibold mb-1">
                   Your Chance
                 </div>

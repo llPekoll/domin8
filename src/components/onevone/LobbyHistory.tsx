@@ -45,7 +45,7 @@ export function LobbyHistory({ lobbies, maxLobbies = MAX_LOBBIES_DEFAULT }: Lobb
     return (
       <div className="space-y-4">
         <h2 className="text-xl font-bold text-amber-100">RECENT BATTLES</h2>
-        <div className="text-center py-12 bg-gradient-to-b from-amber-900/20 to-amber-950/20 rounded-xl border border-amber-700/30">
+        <div className="text-center py-12 bg-linear-to-b from-amber-900/20 to-amber-950/20 rounded-xl border border-amber-700/30">
           <p className="text-amber-400/60 text-sm">No battles yet</p>
         </div>
       </div>
@@ -68,7 +68,7 @@ export function LobbyHistory({ lobbies, maxLobbies = MAX_LOBBIES_DEFAULT }: Lobb
           return (
             <div
               key={lobby._id}
-              className="bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 rounded-xl p-4 hover:border-gray-600/50 transition-colors"
+              className="bg-linear-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 rounded-xl p-4 hover:border-gray-600/50 transition-colors"
             >
               <div className="flex items-center justify-between">
                 {/* Player A */}
@@ -77,8 +77,8 @@ export function LobbyHistory({ lobbies, maxLobbies = MAX_LOBBIES_DEFAULT }: Lobb
                     <div
                       className={`w-10 h-10 rounded-full border-2 flex items-center justify-center overflow-hidden ${
                         isPlayerAWinner
-                          ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
-                          : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                          ? "bg-linear-to-br from-amber-500 to-amber-700 border-amber-400"
+                          : "bg-linear-to-br from-gray-600 to-gray-800 border-gray-500/50"
                       }`}
                     >
                       <span className="text-white font-bold">
@@ -120,8 +120,8 @@ export function LobbyHistory({ lobbies, maxLobbies = MAX_LOBBIES_DEFAULT }: Lobb
                     <div
                       className={`w-10 h-10 rounded-full border-2 flex items-center justify-center overflow-hidden ${
                         isPlayerBWinner
-                          ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
-                          : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                          ? "bg-linear-to-br from-amber-500 to-amber-700 border-amber-400"
+                          : "bg-linear-to-br from-gray-600 to-gray-800 border-gray-500/50"
                       }`}
                     >
                       <span className="text-white font-bold">
@@ -145,11 +145,11 @@ export function LobbyHistory({ lobbies, maxLobbies = MAX_LOBBIES_DEFAULT }: Lobb
                       <div
                         className={`w-5 h-5 rounded-full flex items-center justify-center ${
                           isPlayerAWinner || isPlayerBWinner
-                            ? "bg-gradient-to-br from-amber-500 to-amber-700"
+                            ? "bg-linear-to-br from-amber-500 to-amber-700"
                             : "bg-gray-700"
                         }`}
                       >
-                        <span className="text-white text-[10px] font-bold">
+                        <span className="text-white text-2.5 font-bold">
                           {isPlayerAWinner
                             ? lobby.playerA.slice(0, 1).toUpperCase()
                             : isPlayerBWinner

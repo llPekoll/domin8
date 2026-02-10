@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { usePrivyWallet } from "../../hooks/usePrivyWallet";
+import { useActiveWallet } from "../../contexts/ActiveWalletContext";
 import { useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
@@ -23,7 +23,7 @@ export function CreateLobby({
   onCharacterChange,
   onLobbyCreated,
 }: CreateLobbyProps) {
-  const { connected, publicKey, wallet } = usePrivyWallet();
+  const { connected, activePublicKey: publicKey, activeWallet: wallet } = useActiveWallet();
   const createLobbyAction = useAction(api.lobbies.createLobby);
 
   const [betAmount, setBetAmount] = useState<number>(DEFAULT_BET_AMOUNT_SOL);

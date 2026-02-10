@@ -500,8 +500,21 @@ export class GlobalGameStateManager {
         : this.currentGameState.winner.toBase58?.()
       : null;
 
-    // Tell Game scene to start battle animations (include winner for early kick-out)
-    EventBus.emit("start-battle-phase", { winner: winnerStr });
+    // Get winning bet index from current game state
+    const winningBetIndex = this.currentGameState?.winningBetIndex
+      ? typeof this.currentGameState.winningBetIndex === "object" &&
+        this.currentGameState.winningBetIndex.toNumber
+        ? this.currentGameState.winningBetIndex.toNumber()
+        : Number(this.currentGameState.winningBetIndex)
+      : null;
+
+    logger.game.debug("[GlobalGameStateManager] ⚔️ Winner info", {
+      winner: winnerStr,
+      winningBetIndex,
+    });
+
+    // Tell Game scene to start battle animations (include winner + bet index for precise kick-out)
+    EventBus.emit("start-battle-phase", { winner: winnerStr, winningBetIndex });
 
     // Transition to CELEBRATING after battle duration
     setTimeout(() => {
@@ -543,8 +556,16 @@ export class GlobalGameStateManager {
     const winnerStr =
       typeof gameState.winner === "string" ? gameState.winner : gameState.winner.toBase58?.();
 
+    // Get winning bet index
+    const winningBetIndex = gameState.winningBetIndex
+      ? typeof gameState.winningBetIndex === "object" && gameState.winningBetIndex.toNumber
+        ? gameState.winningBetIndex.toNumber()
+        : Number(gameState.winningBetIndex)
+      : null;
+
     EventBus.emit("start-celebration", {
       winner: winnerStr,
+      winningBetIndex,
       remainingTime: this.CELEBRATION_DURATION - elapsedTime,
     });
 

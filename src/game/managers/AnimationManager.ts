@@ -83,10 +83,14 @@ export class AnimationManager {
     // Play victory sound when winner celebration starts
     SoundManager.playVictory(this.scene, 0.6);
 
+    // Use camera center for consistent positioning across all scenes
+    const sceneCenterX = this.scene.cameras.main.centerX;
+    const sceneCenterY = this.scene.cameras.main.centerY;
+
     // Create dark background overlay for focus
     const backgroundOverlay = this.scene.add.rectangle(
-      this.centerX,
-      this.centerY,
+      sceneCenterX,
+      sceneCenterY,
       this.scene.scale.width,
       this.scene.scale.height,
       0x000000
@@ -102,7 +106,8 @@ export class AnimationManager {
       ease: "Power2",
     });
 
-    const throne = this.scene.add.image(this.centerX, this.centerY + 50, "throne");
+    // Position throne at center + 50 offset (winner will sit at center + 130)
+    const throne = this.scene.add.image(sceneCenterX, sceneCenterY + 50, "throne");
     throne.setDepth(90); // Behind winner (winner is at ~100+)
     throne.setScale(RESOLUTION_SCALE);
     throne.setAlpha(0);

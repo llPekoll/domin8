@@ -30,7 +30,7 @@ export function NFTCharacterCard({
     >
       {/* NFT Badge */}
       <div className="absolute top-2 right-2 z-10">
-        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg">
+        <div className="bg-linear-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg">
           <span>{character.nftCollectionName ?? "Special Character"}</span>
         </div>
       </div>
@@ -58,7 +58,7 @@ export function NFTCharacterCard({
 
         {/* Selection Indicator */}
         {isSelected && !isLocked && (
-          <div className="mt-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold py-2 rounded-lg text-center shadow-lg">
+          <div className="mt-3 bg-linear-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold py-2 rounded-lg text-center shadow-lg">
             ✓ Selected
           </div>
         )}

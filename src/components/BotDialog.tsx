@@ -33,7 +33,7 @@ export function BotDialog({ open, onOpenChange }: BotDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-[750px] p-0 bg-gradient-to-b from-indigo-950/98 to-slate-950/98 backdrop-blur-md border border-indigo-500/40 overflow-hidden"
+        className="sm:max-w-[750px] p-0 bg-linear-to-b from-indigo-950/98 to-slate-950/98 backdrop-blur-md border border-indigo-500/40 overflow-hidden"
       >
         {/* Custom close button */}
         <button
@@ -45,7 +45,7 @@ export function BotDialog({ open, onOpenChange }: BotDialogProps) {
 
         <div className="flex min-h-[550px]">
           {/* Sidebar Navigation */}
-          <div className="w-[160px] bg-black/40 border-r border-indigo-500/30 py-4 flex flex-col">
+          <div className="w-40 bg-black/40 border-r border-indigo-500/30 py-4 flex flex-col">
             <div className="px-4 mb-4 flex items-center gap-2">
               <Bot className="w-5 h-5 text-indigo-400" />
               <h2 className="text-indigo-300 text-sm font-semibold uppercase tracking-wider">

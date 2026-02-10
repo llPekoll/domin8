@@ -7,7 +7,7 @@ export function GameStatePage() {
 
   if (loading && !gameState) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
         <div className="flex items-center gap-3 text-white">
           <RefreshCw className="w-6 h-6 animate-spin" />
           <span className="text-lg">Loading blockchain data...</span>
@@ -18,7 +18,7 @@ export function GameStatePage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-linear-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
         <div className="bg-red-900/20 border border-red-500 rounded-lg p-6 max-w-md">
           <div className="flex items-center gap-3 text-red-400 mb-2">
             <AlertCircle className="w-6 h-6" />
@@ -37,7 +37,7 @@ export function GameStatePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white p-6">
+    <div className="min-h-screen bg-linear-to-br from-slate-900 via-purple-900 to-slate-900 text-white p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">

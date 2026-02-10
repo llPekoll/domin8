@@ -9,7 +9,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { Program, BN } from "@coral-xyz/anchor";
-import { usePrivyWallet } from "./usePrivyWallet";
+import { useActiveWallet } from "../contexts/ActiveWalletContext";
 import { useAssets } from "../contexts/AssetsContext";
 import idl from "../../target/idl/domin8_prgm.json";
 import { logger } from "../lib/logger";
@@ -81,7 +81,7 @@ function transformGameData(raw: any, mapData?: any): ActiveGameState {
 }
 
 export function useActiveGame() {
-  const { walletAddress, wallet } = usePrivyWallet();
+  const { activeWalletAddress: walletAddress, activeWallet: wallet } = useActiveWallet();
   const { getMapById } = useAssets();
 
   // Use shared connection instance

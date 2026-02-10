@@ -20,8 +20,8 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
     switch (rank) {
       case 1:
         return {
-          bg: "bg-gradient-to-r from-yellow-900/50 via-yellow-700/30 to-yellow-900/50",
-          rankBg: "bg-gradient-to-br from-yellow-400 via-yellow-300 to-yellow-500 text-yellow-900",
+          bg: "bg-linear-to-r from-yellow-900/50 via-yellow-700/30 to-yellow-900/50",
+          rankBg: "bg-linear-to-br from-yellow-400 via-yellow-300 to-yellow-500 text-yellow-900",
           glow: "shadow-[0_0_12px_rgba(234,179,8,0.5)]",
           nameColor: "text-yellow-100",
           statsColor: "text-yellow-200",
@@ -29,8 +29,8 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
         };
       case 2:
         return {
-          bg: "bg-gradient-to-r from-slate-700/40 via-slate-500/25 to-slate-700/40",
-          rankBg: "bg-gradient-to-br from-slate-300 via-slate-200 to-slate-400 text-slate-800",
+          bg: "bg-linear-to-r from-slate-700/40 via-slate-500/25 to-slate-700/40",
+          rankBg: "bg-linear-to-br from-slate-300 via-slate-200 to-slate-400 text-slate-800",
           glow: "",
           nameColor: "text-slate-100",
           statsColor: "text-slate-200",
@@ -38,8 +38,8 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
         };
       case 3:
         return {
-          bg: "bg-gradient-to-r from-amber-900/40 via-amber-700/25 to-amber-900/40",
-          rankBg: "bg-gradient-to-br from-amber-500 via-amber-400 to-amber-600 text-amber-950",
+          bg: "bg-linear-to-r from-amber-900/40 via-amber-700/25 to-amber-900/40",
+          rankBg: "bg-linear-to-br from-amber-500 via-amber-400 to-amber-600 text-amber-950",
           glow: "",
           nameColor: "text-amber-100",
           statsColor: "text-amber-200",
@@ -94,7 +94,7 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-[700px] bg-gradient-to-b from-indigo-950/98 to-slate-950/98 backdrop-blur-md border border-indigo-500/40 max-h-[80vh]"
+        className="sm:max-w-[700px] bg-linear-to-b from-indigo-950/98 to-slate-950/98 backdrop-blur-md border border-indigo-500/40 max-h-[80vh]"
       >
         {/* Custom close button */}
         <button
@@ -180,7 +180,7 @@ export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps
                       <td className="py-3">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`font-semibold text-lg truncate max-w-[140px] ${style.nameColor}`}
+                            className={`font-semibold text-lg truncate max-w-35 ${style.nameColor}`}
                           >
                             {player.displayName}
                           </span>

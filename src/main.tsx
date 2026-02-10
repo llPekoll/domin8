@@ -9,6 +9,7 @@ import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
 import { AssetsProvider } from "./contexts/AssetsContext";
 import { PlayerNamesProvider } from "./contexts/PlayerNamesContext";
+import { ActiveWalletProvider } from "./contexts/ActiveWalletContext";
 import { Analytics } from "@vercel/analytics/react";
 
 const isAndroid = /Android/i.test(navigator.userAgent);
@@ -124,13 +125,16 @@ createRoot(document.getElementById("root")!).render(
             // },
           }}
         >
-          <PlayerNamesProvider>
-            <Root />
-          </PlayerNamesProvider>
+          <ActiveWalletProvider>
+            <PlayerNamesProvider>
+              <Root />
+            </PlayerNamesProvider>
+          </ActiveWalletProvider>
         </PrivyProvider>
       </AssetsProvider>
       <Toaster
         position="top-right"
+        closeButton
         toastOptions={{
           style: {
             fontFamily: '"metal-slug", "Press Start 2P"',

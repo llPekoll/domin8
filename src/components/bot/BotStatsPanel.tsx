@@ -60,8 +60,8 @@ export function BotStatsPanel() {
       <div
         className={`rounded-lg p-6 text-center ${
           isProfit
-            ? "bg-gradient-to-r from-green-900/40 to-emerald-900/40 border border-green-500/40"
-            : "bg-gradient-to-r from-red-900/40 to-rose-900/40 border border-red-500/40"
+            ? "bg-linear-to-r from-green-900/40 to-emerald-900/40 border border-green-500/40"
+            : "bg-linear-to-r from-red-900/40 to-rose-900/40 border border-red-500/40"
         }`}
       >
         <div className="flex items-center justify-center gap-2 mb-2">

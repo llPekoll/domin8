@@ -613,14 +613,17 @@ export class PlayerManager {
       }
 
       // Position container so winner sits on the throne seat
-      // Throne is at centerY + 50, winner should sit slightly above center of throne
-      // Added +30 to shift the character down a bit
-      const targetThroneY = this.centerY + 130;
+      // Use scene camera center for consistent positioning across all scenes
+      // Throne is at sceneCenter + 50, winner sits on the throne seat
+      // The +80 offset positions the character's feet on the throne seat
+      const sceneCenter = this.scene.cameras.main.centerY;
+      const throneY = sceneCenter + 50; // Throne position (matching AnimationManager)
+      const targetThroneY = throneY + 80; // Winner sits on throne seat
       const containerY = targetThroneY + spriteOffset;
 
       this.scene.tweens.add({
         targets: winnerParticipant.container,
-        x: this.centerX,
+        x: this.scene.cameras.main.centerX,
         y: containerY,
         duration: 1000,
         ease: "Power2.easeInOut",

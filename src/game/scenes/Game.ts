@@ -217,65 +217,115 @@ export class Game extends Scene {
     });
 
     // Listen for battle phase start
-    EventBus.on("start-battle-phase", ({ winner }: { winner: string | null }) => {
-      logger.game.debug("[Game] ⚔️ Battle phase triggered", { winner });
+    EventBus.on(
+      "start-battle-phase",
+      ({ winner, winningBetIndex }: { winner: string | null; winningBetIndex: number | null }) => {
+        logger.game.debug("[Game] ⚔️ Battle phase triggered", { winner, winningBetIndex });
 
-      // Remove arena masks before battle starts
-      this.removeArenaMasks();
+        // Remove arena masks before battle starts
+        this.removeArenaMasks();
 
-      const participantsMap = this.playerManager.getParticipants();
-      if (participantsMap.size > 0) {
-        this.animationManager.startBattlePhaseSequence(this.playerManager);
+        const participantsMap = this.playerManager.getParticipants();
+        if (participantsMap.size > 0) {
+          this.animationManager.startBattlePhaseSequence(this.playerManager);
 
-        // Kick out losers after they run to center (moveParticipantsToCenter takes 400-600ms)
-        if (winner) {
-          this.time.delayedCall(700, () => {
-            const participants = this.playerManager.getParticipants();
+          // Kick out losers after they run to center (moveParticipantsToCenter takes 400-600ms)
+          if (winner) {
+            this.time.delayedCall(700, () => {
+              const participants = this.playerManager.getParticipants();
 
-            // Mark all non-winners as eliminated
-            logger.game.debug("[Game] 🎯 Marking elimination status", {
-              winner,
-              participantCount: participants.size,
-            });
-            participants.forEach((participant: any) => {
-              const isWinner = participant.id === winner || participant.playerId === winner;
-              participant.eliminated = !isWinner;
-              logger.game.debug("[Game] 👤 Participant status", {
-                id: participant.id,
-                playerId: participant.playerId,
-                isWinner,
-                eliminated: participant.eliminated,
+              // Construct the winning participant's odid:
+              // - Boss: odid = walletAddress (no bet index suffix)
+              // - Non-boss: odid = walletAddress_betIndex
+              // We need to check if winner is the boss (odid = wallet) or a regular player (odid = wallet_betIndex)
+              const winnerOdidWithBetIndex =
+                winningBetIndex !== null ? `${winner}_${winningBetIndex}` : null;
+
+              // Mark all non-winners as eliminated
+              logger.game.debug("[Game] 🎯 Marking elimination status", {
+                winner,
+                winningBetIndex,
+                winnerOdidWithBetIndex,
+                participantCount: participants.size,
               });
+
+              participants.forEach((participant: any) => {
+                // Check if this participant is THE winning bet (not just same wallet)
+                // For boss: participant.id === winner (boss odid is just the wallet address)
+                // For non-boss: participant.id === `${winner}_${winningBetIndex}`
+                const isWinningBet =
+                  participant.id === winner || // Boss case (odid = wallet)
+                  participant.id === winnerOdidWithBetIndex; // Non-boss case (odid = wallet_betIndex)
+
+                participant.eliminated = !isWinningBet;
+                logger.game.debug("[Game] 👤 Participant status", {
+                  id: participant.id,
+                  playerId: participant.playerId,
+                  isBoss: participant.isBoss,
+                  isWinningBet,
+                  eliminated: participant.eliminated,
+                });
+              });
+
+              // Get explosion center from map config
+              const mapConfig = this.playerManager.getMapData()?.spawnConfiguration;
+              const explosionCenterX = mapConfig
+                ? mapConfig.centerX * RESOLUTION_SCALE
+                : this.scale.width / 2;
+              const explosionCenterY = mapConfig
+                ? mapConfig.centerY * RESOLUTION_SCALE
+                : this.scale.height / 2;
+
+              // Kick out losers with staggered timing
+              this.animationManager.explodeParticipantsOutward(
+                participants,
+                explosionCenterX,
+                explosionCenterY,
+                true
+              );
             });
-
-            // Get explosion center from map config
-            const mapConfig = this.playerManager.getMapData()?.spawnConfiguration;
-            const explosionCenterX = mapConfig ? mapConfig.centerX * RESOLUTION_SCALE : this.scale.width / 2;
-            const explosionCenterY = mapConfig ? mapConfig.centerY * RESOLUTION_SCALE : this.scale.height / 2;
-
-            // Kick out losers with staggered timing
-            this.animationManager.explodeParticipantsOutward(participants, explosionCenterX, explosionCenterY, true);
-          });
+          }
         }
       }
-    });
+    );
 
     // Listen for celebration start
     EventBus.on(
       "start-celebration",
-      ({ winner, remainingTime }: { winner: string; remainingTime: number }) => {
-        logger.game.debug("[Game] 🎉 Celebration triggered", { winner, remainingTime });
+      ({
+        winner,
+        winningBetIndex,
+        remainingTime,
+      }: {
+        winner: string;
+        winningBetIndex: number | null;
+        remainingTime: number;
+      }) => {
+        logger.game.debug("[Game] 🎉 Celebration triggered", { winner, winningBetIndex, remainingTime });
 
-        // Find winner participant
+        // Find winner participant using the specific winning bet index
         const participants = Array.from(this.playerManager.getParticipants().values());
+
+        // Construct the winning participant's odid:
+        // - Boss: odid = walletAddress (no bet index suffix)
+        // - Non-boss: odid = walletAddress_betIndex
+        const winnerOdidWithBetIndex = winningBetIndex !== null ? `${winner}_${winningBetIndex}` : null;
+
         const winnerParticipant = participants.find(
-          (p) => p.id === winner || p.playerId === winner
+          (p) =>
+            p.id === winner || // Boss case (odid = wallet)
+            p.id === winnerOdidWithBetIndex // Non-boss case (odid = wallet_betIndex)
         );
 
         if (winnerParticipant) {
           this.animationManager.startResultsPhaseSequence(this.playerManager, winnerParticipant);
         } else {
-          logger.game.warn("[Game] ⚠️ Winner not found in participants:", winner);
+          logger.game.warn("[Game] ⚠️ Winner not found in participants:", {
+            winner,
+            winningBetIndex,
+            winnerOdidWithBetIndex,
+            participantIds: participants.map((p) => p.id),
+          });
         }
       }
     );

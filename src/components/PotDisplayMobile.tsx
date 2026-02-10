@@ -39,7 +39,7 @@ export function PotDisplayMobile() {
   // Don't show if no game or no participants
   if (isLoading || !activeGame || participantsCount === 0) {
     return (
-      <div className="flex-shrink-0 bg-amber-950/50 border-b border-amber-500/20 px-4 py-2">
+      <div className="shrink-0 bg-amber-950/50 border-b border-amber-500/20 px-4 py-2">
         <div className="flex items-center justify-center text-amber-400/50 text-sm">
           Waiting for players...
         </div>
@@ -48,7 +48,7 @@ export function PotDisplayMobile() {
   }
 
   return (
-    <div className="flex-shrink-0 bg-gradient-to-r from-amber-950/80 to-amber-900/80 border-b border-amber-500/30 px-4 py-2">
+    <div className="shrink-0 bg-linear-to-r from-amber-950/80 to-amber-900/80 border-b border-amber-500/30 px-4 py-2">
       <div className="flex items-center justify-between">
         {/* Total Pot */}
         <div className="flex items-center gap-2">

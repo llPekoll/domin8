@@ -9,6 +9,16 @@ import { logger } from "../lib/logger";
 import { EventBus } from "../game/EventBus";
 import { getLevelInfo } from "../../convex/xpConstants";
 
+// Re-export useActiveWallet for components that want wallet switching
+export { useActiveWallet } from "../contexts/ActiveWalletContext";
+
+/**
+ * Hook for accessing wallet state from Privy.
+ *
+ * Note: For components that need wallet switching between embedded/external,
+ * use the useActiveWallet hook from contexts/ActiveWalletContext instead.
+ * This hook provides the embedded wallet by default for backward compatibility.
+ */
 export function usePrivyWallet() {
   const { ready, authenticated, user } = usePrivy();
   const { wallets } = useWallets();

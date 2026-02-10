@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { usePrivyWallet } from "../../hooks/usePrivyWallet";
+import { useActiveWallet } from "../../contexts/ActiveWalletContext";
 import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
@@ -37,7 +37,7 @@ export function LobbyList({
   onLobbyJoined,
   onLobbySelected,
 }: LobbyListProps) {
-  const { connected, wallet, publicKey } = usePrivyWallet();
+  const { connected, activeWallet: wallet, activePublicKey: publicKey } = useActiveWallet();
   const joinLobbyAction = useAction(api.lobbies.joinLobby);
   const [joiningLobbies, setJoiningLobbies] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState<"open" | "my">("open");
@@ -265,7 +265,7 @@ export function LobbyList({
 
       {/* Games List */}
       {displayedLobbies.length === 0 ? (
-        <div className="text-center py-12 bg-gradient-to-r from-gray-900/80 to-gray-950/80 rounded-xl border border-gray-700/50">
+        <div className="text-center py-12 bg-linear-to-r from-gray-900/80 to-gray-950/80 rounded-xl border border-gray-700/50">
           <p className="text-gray-300 mb-2 font-medium">
             {activeTab === "open" ? "No open games at the moment" : "You have no active games"}
           </p>
@@ -286,8 +286,8 @@ export function LobbyList({
                 key={lobby._id}
                 className={`rounded-xl p-4 cursor-pointer transition-all ${
                   lobby.isPrivate
-                    ? "bg-gradient-to-r from-purple-900/40 to-purple-950/40 border border-purple-500/30 hover:border-purple-400/50"
-                    : "bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 hover:border-amber-600/50"
+                    ? "bg-linear-to-r from-purple-900/40 to-purple-950/40 border border-purple-500/30 hover:border-purple-400/50"
+                    : "bg-linear-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 hover:border-amber-600/50"
                 }`}
                 onClick={() => onLobbySelected?.(lobby.lobbyId)}
               >
@@ -297,14 +297,14 @@ export function LobbyList({
                     <div className="relative">
                       <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center overflow-hidden ${
                         activeTab === "my"
-                          ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
-                          : "bg-gradient-to-br from-amber-600 to-amber-800 border-amber-500/50"
+                          ? "bg-linear-to-br from-amber-500 to-amber-700 border-amber-400"
+                          : "bg-linear-to-br from-amber-600 to-amber-800 border-amber-500/50"
                       }`}>
                         <span className="text-white font-bold text-lg">
                           {playerAName[0].toUpperCase()}
                         </span>
                       </div>
-                      <div className="absolute -bottom-1 -right-1 bg-amber-600 text-[10px] text-white font-bold px-1.5 py-0.5 rounded-full border border-amber-400">
+                      <div className="absolute -bottom-1 -right-1 bg-amber-600 text-2.5 text-white font-bold px-1.5 py-0.5 rounded-full border border-amber-400">
                         {lobby.characterA || 1}
                       </div>
                     </div>
@@ -329,7 +329,7 @@ export function LobbyList({
                       <div className="w-12 h-12 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center">
                         <span className="text-gray-500 text-2xl">?</span>
                       </div>
-                      <div className="absolute -bottom-1 -right-1 bg-gray-700 text-[10px] text-gray-400 font-bold px-1.5 py-0.5 rounded-full border border-gray-600">
+                      <div className="absolute -bottom-1 -right-1 bg-gray-700 text-2.5 text-gray-400 font-bold px-1.5 py-0.5 rounded-full border border-gray-600">
                         ?
                       </div>
                     </div>
@@ -361,7 +361,7 @@ export function LobbyList({
                           !selectedCharacter ||
                           lobby.playerA === currentPlayerWallet
                         }
-                        className="px-6 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all"
+                        className="px-6 py-2 bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all"
                       >
                         {joiningLobbies.has(lobby.lobbyId) ? "Joining..." : "Join"}
                       </button>

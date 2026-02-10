@@ -86,7 +86,7 @@ export function NFTCharacterModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lvw max-h-[85vh] overflow-y-auto bg-gradient-to-b from-amber-950/98 to-amber-900/98 border-1 border-purple-500/50 backdrop-blur-sm [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-amber-950/30 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gradient-to-b [&::-webkit-scrollbar-thumb]:from-purple-600 [&::-webkit-scrollbar-thumb]:to-purple-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border [&::-webkit-scrollbar-thumb]:border-purple-500/30 hover:[&::-webkit-scrollbar-thumb]:from-purple-500 hover:[&::-webkit-scrollbar-thumb]:to-purple-600 [&::-webkit-scrollbar-corner]:bg-amber-950/30">
+      <DialogContent className="max-w-lvw max-h-[85vh] overflow-y-auto bg-linear-to-b from-amber-950/98 to-amber-900/98 border-1 border-purple-500/50 backdrop-blur-sm [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-amber-950/30 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-linear-to-b [&::-webkit-scrollbar-thumb]:from-purple-600 [&::-webkit-scrollbar-thumb]:to-purple-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border [&::-webkit-scrollbar-thumb]:border-purple-500/30 hover:[&::-webkit-scrollbar-thumb]:from-purple-500 hover:[&::-webkit-scrollbar-thumb]:to-purple-600 [&::-webkit-scrollbar-corner]:bg-amber-950/30">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="text-2xl font-bold text-amber-100 flex items-center gap-2">
@@ -186,7 +186,7 @@ export function NFTCharacterModal({
           </Button>
           <Button
             onClick={handleSave}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold"
+            className="bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold"
           >
             Save Selection ({tempSelected.length})
           </Button>

@@ -64,11 +64,11 @@ export function ConnectWalletMobile() {
   return (
     <div className="fixed inset-0 z-[60] pointer-events-none">
       {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/40 to-black/60 pointer-events-none"></div>
+      <div className="absolute inset-0 bg-linear-to-b from-black/50 via-black/40 to-black/60 pointer-events-none"></div>
 
       {/* Centered CTA Card */}
       <div className="absolute inset-0 flex items-center justify-center p-2 pointer-events-none">
-        <div className="bg-gradient-to-b from-gray-900/95 to-black/95 backdrop-blur-xl border-2 border-amber-500/50 rounded-xl shadow-2xl w-full max-w-sm p-3 pointer-events-auto">
+        <div className="bg-linear-to-b from-gray-900/95 to-black/95 backdrop-blur-xl border-2 border-amber-500/50 rounded-xl shadow-2xl w-full max-w-sm p-3 pointer-events-auto">
           {/* Logo - smaller */}
           <div className="flex justify-center mb-3">
             <img src="/assets/logo.webp" alt="Domin8 Logo" className="h-10 w-auto object-contain" />
@@ -77,7 +77,7 @@ export function ConnectWalletMobile() {
           {/* Simple image carousel - swipeable */}
           <div className="relative mb-4">
             <div
-              className="relative overflow-hidden rounded-lg bg-gradient-to-br from-amber-900/30 to-orange-900/30 border border-amber-700/40"
+              className="relative overflow-hidden rounded-lg bg-linear-to-br from-amber-900/30 to-orange-900/30 border border-amber-700/40"
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
@@ -87,7 +87,7 @@ export function ConnectWalletMobile() {
                 style={{ transform: `translateX(-${currentSlide * 100}%)` }}
               >
                 {carouselSlides.map((slide, index) => (
-                  <div key={index} className="w-full flex-shrink-0">
+                  <div key={index} className="w-full shrink-0">
                     <div className="aspect-video">
                       <img
                         src={slide.image}
@@ -123,9 +123,9 @@ export function ConnectWalletMobile() {
           <div className="w-full text-center mx-auto">
             <Button
               onClick={handleConnect}
-              className=" w-1/2  bg-gradient-to-r from-amber-500 via-orange-600 to-amber-500 hover:from-amber-400 hover:via-orange-500 hover:to-amber-400 text-white font-black py-3 text-base shadow-xl transition-all uppercase tracking-wider overflow-hidden group active:scale-95"
+              className=" w-1/2  bg-linear-to-r from-amber-500 via-orange-600 to-amber-500 hover:from-amber-400 hover:via-orange-500 hover:to-amber-400 text-white font-black py-3 text-base shadow-xl transition-all uppercase tracking-wider overflow-hidden group active:scale-95"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+              <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/30 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
               <Sparkles className="w-4 h-4 mr-1.5 inline-block animate-pulse" />
               Connect Wallet
               <Sparkles className="w-4 h-4 ml-1.5 inline-block animate-pulse" />

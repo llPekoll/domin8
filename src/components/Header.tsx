@@ -1,4 +1,4 @@
-import { usePrivyWallet } from "../hooks/usePrivyWallet";
+import { useActiveWallet } from "../contexts/ActiveWalletContext";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useState, useEffect, useRef } from "react";
@@ -16,8 +16,16 @@ import { getXpProgressInfo } from "../lib/xpUtils";
 import { Link } from "react-router-dom";
 
 export function Header() {
-  const { connected, publicKey, externalWalletAddress, solBalance, isLoadingBalance } =
-    usePrivyWallet();
+  const {
+    connected,
+    activePublicKey: publicKey,
+    activeWalletAddress,
+    externalWalletAddress,
+    embeddedWalletAddress,
+    solBalance,
+    isLoadingBalance,
+    isUsingExternalWallet,
+  } = useActiveWallet();
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
   const [showLeaderboardDialog, setShowLeaderboardDialog] = useState(false);
@@ -40,24 +48,24 @@ export function Header() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Player data is always keyed by embedded wallet address for consistency
   const playerData = useQuery(
     api.players.getPlayer,
-    connected && publicKey ? { walletAddress: publicKey.toString() } : "skip"
+    connected && embeddedWalletAddress ? { walletAddress: embeddedWalletAddress } : "skip"
   );
 
   // Get current game state directly from blockchain (not Convex)
   // const { activeGame: currentRoundState } = useActiveGame();
 
-  // Create player with random name on first connect
+  // Create player with random name on first connect (always use embedded wallet as primary key)
   useEffect(() => {
-    if (connected && publicKey && playerData === null && !hasAttemptedCreation) {
+    if (connected && embeddedWalletAddress && playerData === null && !hasAttemptedCreation) {
       const randomName = generateRandomName();
-      const walletAddr = publicKey.toString();
 
       setHasAttemptedCreation(true);
 
       createPlayer({
-        walletAddress: walletAddr,
+        walletAddress: embeddedWalletAddress,
         displayName: randomName,
         externalWalletAddress: externalWalletAddress || undefined,
       })
@@ -74,7 +82,7 @@ export function Header() {
     if (!connected) {
       setHasAttemptedCreation(false);
     }
-  }, [connected, publicKey, playerData, hasAttemptedCreation, createPlayer, externalWalletAddress]);
+  }, [connected, embeddedWalletAddress, playerData, hasAttemptedCreation, createPlayer, externalWalletAddress]);
 
   return (
     <>
@@ -83,7 +91,7 @@ export function Header() {
         <div className="w-full bg-gray-950/90 px-3 md:px-6 py-1 backdrop-blur-sm shadow-sm shadow-indigo-500/20">
           <div className="flex items-center justify-between gap-2 md:gap-6">
             {/* Logo */}
-            <div className="flex items-center flex-shrink-0">
+            <div className="flex items-center shrink-0">
               <img src="/assets/logo.webp" alt="Enrageded" className="h-8 md:h-12 w-auto" />
             </div>
 
@@ -116,12 +124,12 @@ export function Header() {
             </div>
 
             {/* Right Side - User Controls */}
-            <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
+            <div className="flex items-center gap-2 md:gap-4 shrink-0">
               {/* Sound Control - Hidden on mobile */}
               <div className="hidden md:block">
                 <SoundControl
                   onSettingsClick={
-                    connected && publicKey
+                    connected && embeddedWalletAddress
                       ? () => {
                           setProfileDefaultTab("sound");
                           setShowProfileDialog(true);
@@ -144,10 +152,10 @@ export function Header() {
                     return (
                       <button
                         onClick={() => setShowLeaderboardDialog(true)}
-                        className="flex flex-col hover:bg-indigo-800/30 px-1.5 md:px-2 py-1 rounded-lg transition-all cursor-pointer group min-w-[80px] md:min-w-[120px]"
+                        className="flex flex-col hover:bg-indigo-800/30 px-1.5 md:px-2 py-1 rounded-lg transition-all cursor-pointer group min-w-20 md:min-w-30"
                         title={xpProgress ? `${xpProgress.levelTitle} - ${xpProgress.xpToNextLevel} XP to next level` : "View Leaderboard"}
                       >
-                        <div className="text-[10px] md:text-xs text-indigo-400/80 leading-tight group-hover:text-indigo-300/90">
+                        <div className="text-2.5 md:text-xs text-indigo-400/80 leading-tight group-hover:text-indigo-300/90">
                           Level
                         </div>
                         <div className="text-indigo-200 font-bold text-sm md:text-base flex items-center gap-1 leading-tight group-hover:text-indigo-100">
@@ -168,11 +176,11 @@ export function Header() {
                           <div className="w-full mt-1">
                             <div className="h-1.5 bg-indigo-900/60 rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 rounded-full transition-all duration-500"
+                                className="h-full bg-linear-to-r from-yellow-500 via-yellow-400 to-yellow-300 rounded-full transition-all duration-500"
                                 style={{ width: `${xpProgress.progress}%` }}
                               />
                             </div>
-                            <div className="text-[8px] md:text-[9px] text-indigo-400/70 mt-0.5 text-center hidden md:block">
+                            <div className="text-2 md:text-2.5 text-indigo-400/70 mt-0.5 text-center hidden md:block">
                               {xpProgress.xpToNextLevel.toLocaleString()} XP to Lv.{(playerData?.level ?? 1) + 1}
                             </div>
                           </div>
@@ -180,8 +188,8 @@ export function Header() {
                         {/* Max Level indicator */}
                         {xpProgress && xpProgress.xpToNextLevel === 0 && (
                           <div className="w-full mt-1">
-                            <div className="h-1.5 bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 rounded-full" />
-                            <div className="text-[8px] md:text-[9px] text-yellow-400/80 mt-0.5 text-center hidden md:block">
+                            <div className="h-1.5 bg-linear-to-r from-yellow-500 via-yellow-400 to-yellow-300 rounded-full" />
+                            <div className="text-2 md:text-2.5 text-yellow-400/80 mt-0.5 text-center hidden md:block">
                               MAX LEVEL
                             </div>
                           </div>
@@ -193,68 +201,101 @@ export function Header() {
                   {/* Divider - Hidden on mobile */}
                   <div className="hidden md:block h-8 w-px bg-indigo-500/30"></div>
 
-                  {/* Wallet Balance with Dropdown */}
+                  {/* Wallet Balance with Dropdown (only for embedded wallet) */}
                   <div className="relative" ref={balanceMenuRef}>
-                    <button
-                      onClick={() => setShowBalanceMenu(!showBalanceMenu)}
-                      className="flex flex-col hover:bg-indigo-800/30 px-1.5 md:px-2 py-1 rounded-lg transition-all cursor-pointer group"
-                    >
-                      <div className="text-[10px] md:text-xs text-indigo-400/80 leading-tight group-hover:text-indigo-300/90">
-                        Balance
+                    {isUsingExternalWallet ? (
+                      /* External wallet - just show balance, no dropdown */
+                      <div className="flex flex-col px-1.5 md:px-2 py-1">
+                        <div className="text-2.5 md:text-xs text-indigo-400/80 leading-tight">
+                          Balance
+                        </div>
+                        <div className="text-indigo-200 font-bold text-sm md:text-base flex items-center gap-1 leading-tight">
+                          {isLoadingBalance ? (
+                            <span className="text-xs md:text-sm">...</span>
+                          ) : solBalance !== null ? (
+                            <>
+                              <img
+                                src="/sol-logo.svg"
+                                alt="SOL"
+                                className="w-3 h-3"
+                                style={{
+                                  filter:
+                                    "brightness(0) saturate(100%) invert(81%) sepia(13%) saturate(891%) hue-rotate(196deg) brightness(95%) contrast(92%)",
+                                }}
+                              />
+                              <span className="hidden md:inline">{solBalance.toFixed(4)}</span>
+                              <span className="md:hidden">{solBalance.toFixed(2)}</span>
+                            </>
+                          ) : (
+                            <span className="text-xs md:text-sm">--</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-indigo-200 font-bold text-sm md:text-base flex items-center gap-1 leading-tight group-hover:text-indigo-100">
-                        {isLoadingBalance ? (
-                          <span className="text-xs md:text-sm">...</span>
-                        ) : solBalance !== null ? (
-                          <>
-                            <img
-                              src="/sol-logo.svg"
-                              alt="SOL"
-                              className="w-3 h-3"
-                              style={{
-                                filter:
-                                  "brightness(0) saturate(100%) invert(81%) sepia(13%) saturate(891%) hue-rotate(196deg) brightness(95%) contrast(92%)",
-                              }}
-                            />
-                            <span className="hidden md:inline">{solBalance.toFixed(4)}</span>
-                            <span className="md:hidden">{solBalance.toFixed(2)}</span>
-                            <ChevronDown
-                              className={`w-3 h-3 transition-transform ${showBalanceMenu ? "rotate-180" : ""}`}
-                            />
-                          </>
-                        ) : (
-                          <span className="text-xs md:text-sm">--</span>
-                        )}
-                      </div>
-                    </button>
+                    ) : (
+                      /* Embedded wallet - show dropdown with Add Funds / Withdraw */
+                      <>
+                        <button
+                          onClick={() => setShowBalanceMenu(!showBalanceMenu)}
+                          className="flex flex-col hover:bg-indigo-800/30 px-1.5 md:px-2 py-1 rounded-lg transition-all cursor-pointer group"
+                        >
+                          <div className="text-2.5 md:text-xs text-indigo-400/80 leading-tight group-hover:text-indigo-300/90">
+                            Balance
+                          </div>
+                          <div className="text-indigo-200 font-bold text-sm md:text-base flex items-center gap-1 leading-tight group-hover:text-indigo-100">
+                            {isLoadingBalance ? (
+                              <span className="text-xs md:text-sm">...</span>
+                            ) : solBalance !== null ? (
+                              <>
+                                <img
+                                  src="/sol-logo.svg"
+                                  alt="SOL"
+                                  className="w-3 h-3"
+                                  style={{
+                                    filter:
+                                      "brightness(0) saturate(100%) invert(81%) sepia(13%) saturate(891%) hue-rotate(196deg) brightness(95%) contrast(92%)",
+                                  }}
+                                />
+                                <span className="hidden md:inline">{solBalance.toFixed(4)}</span>
+                                <span className="md:hidden">{solBalance.toFixed(2)}</span>
+                                <ChevronDown
+                                  className={`w-3 h-3 transition-transform ${showBalanceMenu ? "rotate-180" : ""}`}
+                                />
+                              </>
+                            ) : (
+                              <span className="text-xs md:text-sm">--</span>
+                            )}
+                          </div>
+                        </button>
 
-                    {/* Dropdown Menu */}
-                    {showBalanceMenu && (
-                      <div className="absolute top-full right-0 mt-2 w-44 bg-indigo-950/95 border border-indigo-500/40 rounded-lg shadow-lg backdrop-blur-md overflow-hidden z-50">
-                        <button
-                          onClick={() => {
-                            if (publicKey) {
-                              void handleAddFunds(publicKey.toString());
-                            }
-                            setShowBalanceMenu(false);
-                          }}
-                          className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-indigo-800/50 transition-colors text-indigo-100"
-                        >
-                          <Plus className="w-4 h-4 text-green-400" />
-                          <span>Add Funds</span>
-                        </button>
-                        <div className="h-px bg-indigo-500/30" />
-                        <button
-                          onClick={() => {
-                            setShowWithdrawDialog(true);
-                            setShowBalanceMenu(false);
-                          }}
-                          className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-indigo-800/50 transition-colors text-indigo-100"
-                        >
-                          <ArrowUpRight className="w-4 h-4 text-orange-400" />
-                          <span>Withdraw</span>
-                        </button>
-                      </div>
+                        {/* Dropdown Menu - only for embedded wallet */}
+                        {showBalanceMenu && (
+                          <div className="absolute top-full right-0 mt-2 w-44 bg-indigo-950/95 border border-indigo-500/40 rounded-lg shadow-lg backdrop-blur-md overflow-hidden z-50">
+                            <button
+                              onClick={() => {
+                                if (activeWalletAddress) {
+                                  void handleAddFunds(activeWalletAddress);
+                                }
+                                setShowBalanceMenu(false);
+                              }}
+                              className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-indigo-800/50 transition-colors text-indigo-100"
+                            >
+                              <Plus className="w-4 h-4 text-green-400" />
+                              <span>Add Funds</span>
+                            </button>
+                            <div className="h-px bg-indigo-500/30" />
+                            <button
+                              onClick={() => {
+                                setShowWithdrawDialog(true);
+                                setShowBalanceMenu(false);
+                              }}
+                              className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-indigo-800/50 transition-colors text-indigo-100"
+                            >
+                              <ArrowUpRight className="w-4 h-4 text-orange-400" />
+                              <span>Withdraw</span>
+                            </button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -288,12 +329,12 @@ export function Header() {
       </header>
 
       {/* Render modals outside header */}
-      {showProfileDialog && publicKey && (
+      {showProfileDialog && embeddedWalletAddress && (
         <ProfileDialog
           open={showProfileDialog}
           onOpenChange={setShowProfileDialog}
           currentName={playerData?.displayName}
-          walletAddress={publicKey.toString()}
+          walletAddress={embeddedWalletAddress}
           defaultTab={profileDefaultTab}
         />
       )}

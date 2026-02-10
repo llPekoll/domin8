@@ -37,7 +37,7 @@ export function LevelUpNotification() {
         ${isVisible ? "opacity-100 scale-100" : "opacity-0 scale-90"}`}
     >
       <div
-        className="bg-gradient-to-br from-indigo-900/95 to-purple-900/95
+        className="bg-linear-to-br from-indigo-900/95 to-purple-900/95
         backdrop-blur-md border-2 border-yellow-400 rounded-2xl p-6 text-center
         shadow-[0_0_60px_rgba(234,179,8,0.4)] animate-pulse"
       >

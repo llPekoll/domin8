@@ -163,7 +163,7 @@ export function ProfileDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-[650px] p-0 bg-gradient-to-b from-indigo-950/98 to-slate-950/98 backdrop-blur-md border border-indigo-500/40 overflow-hidden"
+        className="sm:max-w-[650px] p-0 bg-linear-to-b from-indigo-950/98 to-slate-950/98 backdrop-blur-md border border-indigo-500/40 overflow-hidden"
       >
         {/* Custom close button */}
         <button
@@ -175,7 +175,7 @@ export function ProfileDialog({
 
         <div className="flex min-h-[450px]">
           {/* Sidebar Navigation */}
-          <div className="w-[140px] bg-black/40 border-r border-indigo-500/30 py-4 flex flex-col">
+          <div className="w-35 bg-black/40 border-r border-indigo-500/30 py-4 flex flex-col">
             <div className="px-3 mb-4">
               <h2 className="text-indigo-300 text-xs font-semibold uppercase tracking-wider">
                 Settings
@@ -223,10 +223,10 @@ export function ProfileDialog({
                   const isMaxLevel = progressInfo.xpToNextLevel === 0;
 
                   return (
-                    <div className="bg-gradient-to-br from-indigo-900/50 to-purple-900/30 rounded-xl p-4">
+                    <div className="bg-linear-to-br from-indigo-900/50 to-purple-900/30 rounded-xl p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-yellow-500 via-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-yellow-500/30">
+                          <div className="w-12 h-12 rounded-lg bg-linear-to-br from-yellow-500 via-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-yellow-500/30">
                             <Star className="w-7 h-7 text-yellow-900" fill="currentColor" />
                           </div>
                           <div>
@@ -266,14 +266,14 @@ export function ProfileDialog({
                           <div
                             className={`h-full rounded-full transition-all duration-700 ${
                               isMaxLevel
-                                ? "bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-500"
-                                : "bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-400"
+                                ? "bg-linear-to-r from-yellow-500 via-amber-400 to-yellow-500"
+                                : "bg-linear-to-r from-indigo-500 via-purple-500 to-indigo-400"
                             }`}
                             style={{ width: `${progressInfo.progress}%` }}
                           />
                         </div>
                         {!isMaxLevel && (
-                          <div className="flex justify-between text-[10px] text-indigo-500">
+                          <div className="flex justify-between text-2.5 text-indigo-500">
                             <span>Lv.{xpInfo.level}</span>
                             <span>{progressInfo.nextLevelTitle}</span>
                           </div>
@@ -320,7 +320,7 @@ export function ProfileDialog({
                         </div>
                       </div>
                     </div>
-                    <div className="bg-black/30 rounded-md border border-indigo-500/40 max-h-[180px] overflow-y-auto">
+                    <div className="bg-black/30 rounded-md border border-indigo-500/40 max-h-45 overflow-y-auto">
                       {recentGames === undefined ? (
                         <div className="text-center py-4 text-indigo-400/60 text-sm">
                           Loading...
@@ -388,7 +388,7 @@ export function ProfileDialog({
                         </div>
                       </div>
                     </div>
-                    <div className="bg-black/30 rounded-md border border-amber-500/40 max-h-[180px] overflow-y-auto">
+                    <div className="bg-black/30 rounded-md border border-amber-500/40 max-h-45 overflow-y-auto">
                       {playerLobbies === undefined ? (
                         <div className="text-center py-4 text-indigo-400/60 text-sm">
                           Loading...
@@ -423,7 +423,7 @@ export function ProfileDialog({
                                   <span className="text-xs text-indigo-400">
                                     {formatTimestampMs(lobby.resolvedAt ?? lobby.createdAt)}
                                   </span>
-                                  <span className="text-xs text-indigo-500 truncate max-w-[80px]">
+                                  <span className="text-xs text-indigo-500 truncate max-w-20">
                                     vs {opponent ? `${opponent.slice(0, 4)}...` : "?"}
                                   </span>
                                 </div>
@@ -448,7 +448,7 @@ export function ProfileDialog({
                   <Button
                     type="submit"
                     disabled={isUpdating}
-                    className="w-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold disabled:from-gray-600 disabled:to-gray-700 disabled:opacity-50"
+                    className="w-full bg-linear-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold disabled:from-gray-600 disabled:to-gray-700 disabled:opacity-50"
                   >
                     {isUpdating ? "Updating..." : "Save Changes"}
                   </Button>

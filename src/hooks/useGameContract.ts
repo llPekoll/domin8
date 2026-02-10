@@ -27,8 +27,7 @@
  */
 
 import { useCallback, useMemo } from "react";
-import { usePrivyWallet } from "./usePrivyWallet";
-import { useWallets } from "@privy-io/react-auth/solana";
+import { useActiveWallet } from "../contexts/ActiveWalletContext";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { EventBus } from "../game/EventBus";
@@ -505,8 +504,13 @@ export interface GameConfig {
 }
 
 export const useGameContract = () => {
-  const { connected, publicKey, walletAddress } = usePrivyWallet();
-  const { wallets } = useWallets();
+  const {
+    connected,
+    activePublicKey: publicKey,
+    activeWalletAddress: walletAddress,
+    activeWallet: selectedWallet,
+    embeddedWalletAddress,
+  } = useActiveWallet();
 
   // Convex mutation for awarding points
   const awardPoints = useMutation(api.players.awardPoints);
@@ -516,11 +520,6 @@ export const useGameContract = () => {
 
   // Convex mutation for tracking referral revenue
   const updateReferralRevenue = useMutation(api.referrals.updateReferralRevenue);
-
-  // Get selected wallet (first Solana wallet from Privy)
-  const selectedWallet = useMemo(() => {
-    return wallets.length > 0 ? wallets[0] : null;
-  }, [wallets]);
 
   // RPC connection (use shared connection with confirmed commitment)
   const connection = getSharedConnection();
@@ -784,9 +783,11 @@ export const useGameContract = () => {
         });
 
         // Award points for the bet (1 point per 0.001 SOL)
+        // Use embedded wallet for player data consistency
+        const playerWalletAddress = embeddedWalletAddress || publicKey.toString();
         try {
           await awardPoints({
-            walletAddress: publicKey.toString(),
+            walletAddress: playerWalletAddress,
             amountLamports: amountLamports,
           });
           logger.solana.debug("[placeBet] Points awarded for bet");
@@ -798,7 +799,7 @@ export const useGameContract = () => {
         // Award XP for the bet (+10 base + bet bonus + daily bonus)
         try {
           const xpResult = await awardXpForBet({
-            walletAddress: publicKey.toString(),
+            walletAddress: playerWalletAddress,
             betAmountLamports: amountLamports,
           });
           logger.solana.debug("[placeBet] XP awarded for bet:", xpResult);
@@ -818,7 +819,7 @@ export const useGameContract = () => {
         // Track referral revenue if this user was referred
         try {
           await updateReferralRevenue({
-            userId: publicKey.toString(),
+            userId: playerWalletAddress,
             betAmount: amountLamports,
           });
           logger.solana.debug("[placeBet] Referral revenue tracked");
@@ -862,6 +863,7 @@ export const useGameContract = () => {
       awardPoints,
       awardXpForBet,
       updateReferralRevenue,
+      embeddedWalletAddress,
     ]
   );
 

@@ -71,10 +71,10 @@ export function HeaderMobile() {
 
   return (
     <>
-      <header className="flex-shrink-0 bg-gray-950/90 backdrop-blur-sm relative z-50">
+      <header className="shrink-0 bg-gray-950/90 backdrop-blur-sm relative z-50">
         <div className="flex items-center justify-between px-3 py-1">
           {/* Logo */}
-          <div className="flex items-center flex-shrink-0">
+          <div className="flex items-center shrink-0">
             <img src="/assets/logo.webp" alt="Enrageded" className="h-8 w-auto" />
           </div>
 
@@ -107,7 +107,7 @@ export function HeaderMobile() {
           </div>
 
           {/* Right Side - User Controls */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {connected && (
               <>
                 {/* Wallet Balance with Dropdown */}
@@ -116,7 +116,7 @@ export function HeaderMobile() {
                     onClick={() => setShowBalanceMenu(!showBalanceMenu)}
                     className="flex flex-col hover:bg-indigo-800/30 px-1.5 py-1 rounded-lg transition-all cursor-pointer group"
                   >
-                    <div className="text-[10px] text-indigo-400/80 leading-tight group-hover:text-indigo-300/90">
+                    <div className="text-2.5 text-indigo-400/80 leading-tight group-hover:text-indigo-300/90">
                       Balance
                     </div>
                     <div className="text-indigo-200 font-bold text-sm flex items-center gap-1 leading-tight group-hover:text-indigo-100">

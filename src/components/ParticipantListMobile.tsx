@@ -87,7 +87,7 @@ export function ParticipantListMobile() {
               </span>
               {participant.isOwn && <span className="text-green-400 text-xs">(You)</span>}
               {participant.isHost && (
-                <div className="inline-flex items-center gap-0.5 bg-gradient-to-r from-yellow-500/90 to-amber-600/90 px-1.5 py-0.5 rounded text-xs font-bold text-amber-950">
+                <div className="inline-flex items-center gap-0.5 bg-linear-to-r from-yellow-500/90 to-amber-600/90 px-1.5 py-0.5 rounded text-xs font-bold text-amber-950">
                   <Crown className="w-3 h-3 fill-current" />
                   <span>HOST</span>
                 </div>

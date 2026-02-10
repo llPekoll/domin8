@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, memo } from "react";
 import { useQuery, useAction } from "convex/react";
-import { usePrivyWallet } from "../hooks/usePrivyWallet";
+import { useActiveWallet } from "../contexts/ActiveWalletContext";
 import { useGameContract } from "../hooks/useGameContract";
 import { useActiveGame } from "../hooks/useActiveGame";
 import { useFundWallet } from "../hooks/useFundWallet";
@@ -40,8 +40,16 @@ const BettingPanel = memo(function BettingPanel({
   bossLockedCharacterId = null,
   onBossFirstBet,
 }: BettingPanelProps) {
-  const { connected, publicKey, solBalance, isLoadingBalance, externalWalletAddress } =
-    usePrivyWallet();
+  const {
+    connected,
+    activePublicKey: publicKey,
+    activeWalletAddress,
+    solBalance,
+    isLoadingBalance,
+    externalWalletAddress,
+    embeddedWalletAddress,
+    isUsingExternalWallet,
+  } = useActiveWallet();
   const { placeBet, validateBet } = useGameContract();
   const { handleAddFunds } = useFundWallet();
 
@@ -49,10 +57,10 @@ const BettingPanel = memo(function BettingPanel({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [botDialogOpen, setBotDialogOpen] = useState(false);
 
-  // Memoize wallet address to prevent unnecessary re-queries
+  // Memoize wallet address to prevent unnecessary re-queries (use embedded for player data)
   const walletAddress = useMemo(
-    () => (connected && publicKey ? publicKey.toString() : null),
-    [connected, publicKey]
+    () => embeddedWalletAddress,
+    [embeddedWalletAddress]
   );
 
   // NFT character checking
@@ -400,12 +408,12 @@ const BettingPanel = memo(function BettingPanel({
         </div>
 
         {/* Greyed Out Betting Panel */}
-        <div className="flex items-center justify-between bg-gradient-to-b from-gray-800/30 to-gray-900/30 backdrop-blur-xs rounded-xl shadow-2xl shadow-gray-900/50 min-w-[560px] px-2 py-2 space-x-1 relative overflow-hidden border-2 border-gray-700/30">
+        <div className="flex items-center justify-between bg-linear-to-b from-gray-800/30 to-gray-900/30 backdrop-blur-xs rounded-xl shadow-2xl shadow-gray-900/50 min-w-[560px] px-2 py-2 space-x-1 relative overflow-hidden border-2 border-gray-700/30">
           {/* Overlay with prominent Add Funds button */}
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-10 flex items-center justify-center">
             <button
               onClick={() => walletAddress && handleAddFunds(walletAddress)}
-              className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-xl font-bold text-xl uppercase tracking-wider transition-all shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+              className="flex items-center gap-3 px-8 py-4 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-xl font-bold text-xl uppercase tracking-wider transition-all shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
             >
               <Plus className="w-6 h-6" />
               Add Funds to Play
@@ -501,7 +509,7 @@ const BettingPanel = memo(function BettingPanel({
         </p>
 
         {/* Greyed Out Betting Panel */}
-        <div className="flex items-center justify-between bg-gradient-to-b from-gray-800/30 to-gray-900/30 backdrop-blur-xs rounded-xl shadow-2xl shadow-gray-900/50 min-w-[560px] px-2 py-2 space-x-1 relative overflow-hidden border-2 border-gray-700/30">
+        <div className="flex items-center justify-between bg-linear-to-b from-gray-800/30 to-gray-900/30 backdrop-blur-xs rounded-xl shadow-2xl shadow-gray-900/50 min-w-[560px] px-2 py-2 space-x-1 relative overflow-hidden border-2 border-gray-700/30">
           {/* Greyed out content */}
           <div className="relative w-1/5 opacity-30">
             <img
@@ -589,7 +597,7 @@ const BettingPanel = memo(function BettingPanel({
       {/* Bot Dialog */}
       <BotDialog open={botDialogOpen} onOpenChange={setBotDialogOpen} />
 
-      <div className="flex items-center justify-between bg-gradient-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-xl shadow-2xl shadow-amber-900/50 min-w-[560px] px-2 py-2 space-x-1">
+      <div className="flex items-center justify-between bg-linear-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-xl shadow-2xl shadow-amber-900/50 min-w-[560px] px-2 py-2 space-x-1">
         <div className="relative w-1/5">
           <button
             onClick={handleClearBet}
@@ -641,7 +649,7 @@ const BettingPanel = memo(function BettingPanel({
           </button>
           <button
             onClick={() => setBetAmount(Math.min(solBalance - 0.001, MAX_BET_AMOUNT).toFixed(3))}
-            className={`cursor-pointer py-1.5 bg-gradient-to-b from-amber-500 to-amber-900 hover:to-amber-600/80  rounded-lg text-amber-300 text-2xl  transition-colors ${styles.shineButton}`}
+            className={`cursor-pointer py-1.5 bg-linear-to-b from-amber-500 to-amber-900 hover:to-amber-600/80  rounded-lg text-amber-300 text-2xl  transition-colors ${styles.shineButton}`}
           >
             All-In
           </button>
@@ -653,14 +661,14 @@ const BettingPanel = memo(function BettingPanel({
           disabled={isSubmitting || !canPlaceBet || !selectedCharacter}
           className={`
             text-2xl cursor-pointer flex justify-center items-center w-1/3 py-2
-            bg-gradient-to-b from-amber-500 to-amber-700
+            bg-linear-to-b from-amber-500 to-amber-700
             hover:to-amber-800 hover:text-amber-300
             disabled:from-gray-600 disabled:to-gray-700
             rounded-lg font-bold text-amber-100 uppercase tracking-wider
             transition-all duration-100
             hover:shadow-[0_5px_0_0_rgba(0,0,0,0.3)]
             active:shadow-[0_2px_0_0_rgba(0,0,0,0.3)]
-            active:translate-y-[8px]
+            active:translate-y-2
             disabled:opacity-50 disabled:cursor-not-allowed
             disabled:shadow-[0_4px_0_0_rgba(75,85,99,0.7)]
             ${styles.shineButton}

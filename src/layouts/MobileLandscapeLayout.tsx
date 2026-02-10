@@ -50,7 +50,7 @@ export function MobileLandscapeLayout({
       </div>
 
       {/* Right Sidebar - Controls (40%) */}
-      <div className="w-[40%] max-w-[320px] flex flex-col bg-black/60 border-l border-amber-500/20">
+      <div className="w-[40%] max-w-80 flex flex-col bg-black/60 border-l border-amber-500/20">
         {/* Character Carousel */}
         <CharacterCarouselMobile onCharacterSelected={onCharacterSelected} />
 
