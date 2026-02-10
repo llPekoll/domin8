@@ -36,14 +36,12 @@ export class PlayerManager {
   private scene: Scene;
   private participants: Map<string, GameParticipant> = new Map();
   private centerX: number;
-  private centerY: number;
   private currentMap: any = null;
   private readonly BASE_SCALE_MULTIPLIER = 1.0; // Scale multiplier (0.01 SOL = 3x, 10 SOL = 13x)
 
-  constructor(scene: Scene, centerX: number, centerY: number) {
+  constructor(scene: Scene, centerX: number, _centerY: number) {
     this.scene = scene;
     this.centerX = centerX;
-    this.centerY = centerY;
   }
 
   setMapData(mapData: any) {

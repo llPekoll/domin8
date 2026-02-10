@@ -43,12 +43,10 @@ const BettingPanel = memo(function BettingPanel({
   const {
     connected,
     activePublicKey: publicKey,
-    activeWalletAddress,
     solBalance,
     isLoadingBalance,
     externalWalletAddress,
     embeddedWalletAddress,
-    isUsingExternalWallet,
   } = useActiveWallet();
   const { placeBet, validateBet } = useGameContract();
   const { handleAddFunds } = useFundWallet();

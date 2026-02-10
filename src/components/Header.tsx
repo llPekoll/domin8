@@ -18,7 +18,6 @@ import { Link } from "react-router-dom";
 export function Header() {
   const {
     connected,
-    activePublicKey: publicKey,
     activeWalletAddress,
     externalWalletAddress,
     embeddedWalletAddress,
