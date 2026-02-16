@@ -86,6 +86,7 @@ export function LastWinnerCard() {
                   animation="idle"
                   size={80}
                   scale={3}
+                  offsetY={35}
                 />
               )}
             </div>

@@ -3,6 +3,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 interface SpriteFrame {
   filename: string;
   frame: { x: number; y: number; w: number; h: number };
+  spriteSourceSize: { x: number; y: number; w: number; h: number };
+  sourceSize: { w: number; h: number };
   duration: number;
 }
 
@@ -20,8 +22,9 @@ interface SpriteMetadata {
   };
 }
 
-// Cache for loaded sprite metadata
+// Cache for loaded sprite metadata and images
 const metadataCache: Record<string, SpriteMetadata | null> = {};
+const imageCache: Record<string, HTMLImageElement> = {};
 
 interface SpriteAnimatorProps {
   /** Asset path from character data (e.g., "/characters/orc.png") */
@@ -47,12 +50,13 @@ export function SpriteAnimator({
   className = "",
 }: SpriteAnimatorProps) {
   const [metadata, setMetadata] = useState<SpriteMetadata | null>(null);
-  const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
   const frameIndexRef = useRef<number>(0);
 
-  // Derive paths from assetPath (e.g., "/characters/orc.png" -> "/assets/characters/orc.png")
+  // Derive paths from assetPath
   const pngPath = assetPath ? `/assets${assetPath}` : "";
   const jsonPath = assetPath ? `/assets${assetPath.replace(".png", ".json")}` : "";
   const cacheKey = assetPath || "";
@@ -88,7 +92,24 @@ export function SpriteAnimator({
     return () => {
       cancelled = true;
     };
-  }, [cacheKey, jsonPath]);
+  }, [cacheKey, jsonPath, assetPath]);
+
+  // Load spritesheet image
+  useEffect(() => {
+    if (!pngPath) return;
+
+    if (imageCache[cacheKey]) {
+      setImage(imageCache[cacheKey]);
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      imageCache[cacheKey] = img;
+      setImage(img);
+    };
+    img.src = pngPath;
+  }, [pngPath, cacheKey]);
 
   // Get animation frame range
   const frameTag = metadata?.meta?.frameTags?.find(
@@ -97,11 +118,59 @@ export function SpriteAnimator({
   const startFrame = frameTag?.from ?? 0;
   const endFrame = frameTag?.to ?? (metadata?.frames?.length ? metadata.frames.length - 1 : 0);
 
-  // Animation loop
-  const animate = useCallback(
-    (timestamp: number) => {
-      if (!metadata?.frames) return;
+  // Draw a frame onto the canvas — same approach as Phaser:
+  // Fixed canvas size = sourceSize, trimmed frame placed at spriteSourceSize offset
+  const drawFrame = useCallback(
+    (frameIndex: number) => {
+      const canvas = canvasRef.current;
+      if (!canvas || !metadata?.frames || !image) return;
 
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const frame = metadata.frames[frameIndex];
+      if (!frame) return;
+
+      // sourceSize = the original untrimmed canvas (e.g., 64x60) — FIXED, never changes
+      const { w: srcW, h: srcH } = frame.sourceSize;
+
+      // Set canvas to scaled sourceSize
+      canvas.width = srcW * scale;
+      canvas.height = srcH * scale;
+
+      // Disable smoothing for crisp pixel art (like Phaser's NEAREST filter)
+      ctx.imageSmoothingEnabled = false;
+
+      // Clear the canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // frame = where the trimmed pixels are in the spritesheet PNG
+      const { x: sheetX, y: sheetY, w: frameW, h: frameH } = frame.frame;
+
+      // spriteSourceSize = where to place the trimmed pixels within the sourceSize canvas
+      const { x: destX, y: destY } = frame.spriteSourceSize;
+
+      // Draw trimmed frame at the correct offset within the fixed canvas
+      ctx.drawImage(
+        image,
+        sheetX, sheetY, frameW, frameH,           // source rect from spritesheet
+        destX * scale, destY * scale,              // destination offset (spriteSourceSize)
+        frameW * scale, frameH * scale             // destination size
+      );
+    },
+    [metadata, image, scale]
+  );
+
+  // Animation loop
+  useEffect(() => {
+    if (!metadata?.frames || metadata.frames.length === 0 || !image) return;
+
+    // Reset to start frame
+    frameIndexRef.current = startFrame;
+    lastFrameTimeRef.current = 0;
+    drawFrame(startFrame);
+
+    const animate = (timestamp: number) => {
       if (!lastFrameTimeRef.current) {
         lastFrameTimeRef.current = timestamp;
       }
@@ -112,23 +181,12 @@ export function SpriteAnimator({
       if (timestamp - lastFrameTimeRef.current >= frameDuration) {
         const nextFrame = frameIndexRef.current + 1;
         frameIndexRef.current = nextFrame > endFrame ? startFrame : nextFrame;
-        setCurrentFrameIndex(frameIndexRef.current);
+        drawFrame(frameIndexRef.current);
         lastFrameTimeRef.current = timestamp;
       }
 
       animationRef.current = requestAnimationFrame(animate);
-    },
-    [metadata, startFrame, endFrame]
-  );
-
-  // Start animation
-  useEffect(() => {
-    if (!metadata?.frames || metadata.frames.length === 0) return;
-
-    // Reset to start frame
-    frameIndexRef.current = startFrame;
-    setCurrentFrameIndex(startFrame);
-    lastFrameTimeRef.current = 0;
+    };
 
     animationRef.current = requestAnimationFrame(animate);
 
@@ -138,10 +196,10 @@ export function SpriteAnimator({
         animationRef.current = null;
       }
     };
-  }, [metadata, startFrame, animate]);
+  }, [metadata, image, startFrame, endFrame, drawFrame]);
 
-  // Show loading spinner while loading, or empty if no assetPath
-  if (!assetPath || !metadata?.frames) {
+  // Show loading spinner while loading
+  if (!assetPath || !metadata?.frames || !image) {
     return (
       <div
         className={`flex items-center justify-center ${className}`}
@@ -154,33 +212,23 @@ export function SpriteAnimator({
     );
   }
 
-  const frame = metadata.frames[currentFrameIndex];
-  if (!frame?.frame) return null;
-
-  const { x, y, w, h } = frame.frame;
-  const { w: sheetW, h: sheetH } = metadata.meta.size;
-
-  // Scale the sprite
-  const scaledW = w * scale;
-  const scaledH = h * scale;
-  const scaledSheetW = sheetW * scale;
-  const scaledSheetH = sheetH * scale;
-  const scaledX = x * scale;
-  const scaledY = y * scale;
+  // Get sourceSize for the canvas dimensions
+  const firstFrame = metadata.frames[0];
+  const canvasW = firstFrame.sourceSize.w * scale;
+  const canvasH = firstFrame.sourceSize.h * scale;
 
   return (
     <div
       className={`flex items-end justify-center overflow-visible ${className}`}
       style={{ width: size, height: size }}
     >
-      <div
+      <canvas
+        ref={canvasRef}
+        width={canvasW}
+        height={canvasH}
         style={{
-          width: scaledW,
-          height: scaledH,
-          backgroundImage: `url(${pngPath})`,
-          backgroundPosition: `-${scaledX}px -${scaledY}px`,
-          backgroundSize: `${scaledSheetW}px ${scaledSheetH}px`,
-          backgroundRepeat: "no-repeat",
+          width: canvasW,
+          height: canvasH,
           imageRendering: "pixelated",
           transform: offsetY !== 0 ? `translateY(${offsetY}px)` : undefined,
         }}

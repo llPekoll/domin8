@@ -141,6 +141,7 @@ export function CharacterCarouselMobile({ onCharacterSelected }: CharacterCarous
                   animation="idle"
                   size={48}
                   scale={1.2}
+                  offsetY={12}
                 />
 
                 {/* Lock overlay */}

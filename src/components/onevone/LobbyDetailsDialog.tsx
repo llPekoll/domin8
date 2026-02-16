@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { EventBus } from "../../game/EventBus";
 import { logger } from "../../lib/logger";
 import { useAssets } from "../../contexts/AssetsContext";
-import { useActiveWallet } from "../../contexts/ActiveWalletContext";
+import { usePrivyWallet } from "../../hooks/usePrivyWallet";
 import { usePrivy } from "@privy-io/react-auth";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -15,7 +15,7 @@ import { OneVOnePreloader } from "../../game/scenes/OneVOnePreloader";
 import { OneVOneScene } from "../../game/scenes/OneVOneScene";
 import { setCharactersData, setAllMapsData, STAGE_WIDTH, STAGE_HEIGHT } from "../../game/main";
 import { LogIn, ChevronLeft, ChevronRight } from "lucide-react";
-import { SpriteAnimator } from "../SpriteAnimator";
+
 
 interface LobbyData {
   _id: string;
@@ -69,7 +69,7 @@ export function LobbyDetailsDialog({
   onDoubleDown,
 }: LobbyDetailsDialogProps) {
   const { characters, maps } = useAssets();
-  const { connected, activePublicKey: publicKey, solBalance } = useActiveWallet();
+  const { connected, publicKey, solBalance } = usePrivyWallet();
   const { login, ready } = usePrivy();
 
   // Check if user has enough balance to join (amount is in lamports)
@@ -631,7 +631,7 @@ export function LobbyDetailsDialog({
         showCloseButton={showCloseButton}
       >
         {/* Header */}
-        <DialogHeader className="p-3 pr-12 bg-linear-to-r from-amber-900/90 to-amber-950/90 border-b border-amber-700/50">
+        <DialogHeader className="p-3 pr-12 bg-gradient-to-r from-amber-900/90 to-amber-950/90 border-b border-amber-700/50">
           <DialogTitle className="text-lg font-bold text-amber-200 flex items-center justify-between">
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
@@ -705,7 +705,7 @@ export function LobbyDetailsDialog({
 
         {/* Footer during fighting - just show back button */}
         {arenaState === "fighting" && (
-          <div className="p-4 bg-linear-to-b from-amber-900/50 to-amber-950/50 border-t border-amber-700/50">
+          <div className="p-4 bg-gradient-to-b from-amber-900/50 to-amber-950/50 border-t border-amber-700/50">
             <div className="text-center flex flex-col items-center gap-2">
               <button
                 onClick={onClose}
@@ -719,7 +719,7 @@ export function LobbyDetailsDialog({
 
         {/* Results Actions - show win/lose UI with actual prize and win streak */}
         {arenaState === "results" && fightResult && (
-          <div className="p-4 bg-linear-to-b from-amber-900/50 to-amber-950/50 border-t border-amber-700/50">
+          <div className="p-4 bg-gradient-to-b from-amber-900/50 to-amber-950/50 border-t border-amber-700/50">
             {fightResult.isUserWinner ? (
               <div className="flex flex-col items-center gap-3 max-w-sm mx-auto">
                 {/* Prize display */}
@@ -741,7 +741,7 @@ export function LobbyDetailsDialog({
                 {onDoubleDown && (
                   <button
                     onClick={handleDoubleDownClick}
-                    className="w-full py-3 bg-linear-to-b from-amber-500 to-amber-700 hover:to-amber-800 text-amber-100 font-bold rounded-lg transform hover:scale-105 transition-all shadow-lg"
+                    className="w-full py-3 bg-gradient-to-b from-amber-500 to-amber-700 hover:to-amber-800 text-amber-100 font-bold rounded-lg transform hover:scale-105 transition-all shadow-lg"
                   >
                     🔥 DOUBLE DOWN! (Bet {formatAmount(prizeAmount)} SOL)
                   </button>
@@ -794,7 +794,7 @@ export function LobbyDetailsDialog({
           arenaState === "waiting" ||
           arenaState === "opponent-joining" ||
           arenaState === "vrf-pending") && (
-          <div className="p-4 bg-linear-to-b from-amber-900/50 to-amber-950/50 border-t border-amber-700/30">
+          <div className="p-4 bg-gradient-to-b from-amber-900/50 to-amber-950/50 border-t border-amber-700/30">
             <div className="flex gap-3 mb-3">
               <div className="bg-black/50 px-4 py-2 rounded-lg border border-amber-700/50 text-center flex-1">
                 <p className="text-xs text-amber-400/70">Player A</p>
@@ -829,7 +829,7 @@ export function LobbyDetailsDialog({
                     <button
                       onClick={login}
                       disabled={!ready}
-                      className="w-full bg-linear-to-b from-amber-500 to-amber-700 hover:to-amber-800 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-amber-100 font-bold py-2 px-4 rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
+                      className="w-full bg-gradient-to-b from-amber-500 to-amber-700 hover:to-amber-800 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-amber-100 font-bold py-2 px-4 rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2"
                     >
                       <LogIn className="h-4 w-4" />
                       Connect Wallet to Join
@@ -849,15 +849,16 @@ export function LobbyDetailsDialog({
                           <ChevronLeft className="w-4 h-4 text-amber-300" />
                         </button>
 
-                        <div className="flex items-center gap-2 w-30 justify-center">
+                        <div className="flex items-center gap-2 w-[120px] justify-center">
                           {localSelectedCharacter && (
                             <>
-                              <div className="w-8 shrink-0 flex items-center justify-center">
-                                <SpriteAnimator
-                                  assetPath={localSelectedCharacter.assetPath}
-                                  animation="idle"
-                                  size={32}
-                                  scale={1.5}
+                              <div className="w-8 flex-shrink-0 flex items-center justify-center">
+                                <img
+                                  src={`/assets${localSelectedCharacter.assetPath.replace(".png", ".gif")}`}
+                                  alt={localSelectedCharacter.name}
+                                  className="w-[32px] h-[32px] object-contain"
+                                  style={{ imageRendering: "pixelated" }}
+                                  draggable={false}
                                 />
                               </div>
                               <span className="text-amber-100 font-bold text-xs uppercase truncate">
@@ -889,7 +890,7 @@ export function LobbyDetailsDialog({
                         }
                       }}
                       disabled={!localSelectedCharacter || isJoining || !hasEnoughBalance}
-                      className="w-full bg-linear-to-b from-amber-500 to-amber-700 hover:to-amber-800 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-amber-100 font-bold py-2 px-4 rounded-lg transition-colors shadow-lg"
+                      className="w-full bg-gradient-to-b from-amber-500 to-amber-700 hover:to-amber-800 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-amber-100 font-bold py-2 px-4 rounded-lg transition-colors shadow-lg"
                     >
                       {isJoining ? "Joining..." : `Join Battle (${formatAmount(lobby.amount)} SOL)`}
                     </button>

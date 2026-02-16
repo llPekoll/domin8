@@ -18,7 +18,7 @@ interface CharacterSelectionProps {
   isBoss?: boolean; // Show boss indicator
 }
 
-const CharacterSelection2 = memo(function CharacterSelection({
+const CharacterSelect = memo(function CharacterSelect({
   onCharacterSelected,
   isLocked = false,
   lockedCharacterId,
@@ -210,6 +210,7 @@ const CharacterSelection2 = memo(function CharacterSelection({
                     animation="idle"
                     size={140}
                     scale={4}
+                    offsetY={50}
                   />
                 </div>
 
@@ -311,8 +312,8 @@ const CharacterSelection2 = memo(function CharacterSelection({
         open={showNFTModal}
         onOpenChange={setShowNFTModal}
         selectedCharacters={[]}
-        onSelectCharacters={() => {}}
-        onNFTCharacterSelected={() => {}}
+        onSelectCharacters={() => { }}
+        onNFTCharacterSelected={() => { }}
         unlockedCharacters={unlockedCharacters}
         isLoading={isLoadingNFTs}
         error={nftError}
@@ -324,4 +325,4 @@ const CharacterSelection2 = memo(function CharacterSelection({
   );
 });
 
-export { CharacterSelection2 };
+export { CharacterSelect };

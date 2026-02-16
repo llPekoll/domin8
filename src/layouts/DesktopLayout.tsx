@@ -1,7 +1,7 @@
 import { RefObject } from "react";
 import { IRefPhaserGame, PhaserGame } from "../PhaserGame";
 import { Header } from "../components/Header";
-import { CharacterSelection2 } from "../components/CharacterSelection2";
+import { CharacterSelect } from "../components/CharacterSelect";
 import { BettingPanel } from "../components/BettingPanel";
 import { MultiParticipantPanel } from "../components/MultiParticipantPanel";
 import { PotDisplayPanel } from "../components/PotDisplayPanel";
@@ -60,7 +60,7 @@ export function DesktopLayout({
       <LevelUpNotification />
 
       {/* Character Selection Carousel - Bottom Left */}
-      <CharacterSelection2
+      <CharacterSelect
         onCharacterSelected={onCharacterSelected}
         isLocked={isBoss && bossFirstBetPlaced}
         lockedCharacterId={bossLockedCharacterId}
