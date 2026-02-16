@@ -34,7 +34,7 @@
         \"relation\": [\"delegate_permission/common.handle_all_urls\"],
         \"target\": {
             \"namespace\": \"web\",
-            \"site\": \"https://dev.domin8.fun\"
+            \"site\": \"https://domin8.fun\"
         }
     }]
     

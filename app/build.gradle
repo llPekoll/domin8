@@ -21,12 +21,12 @@ plugins {
 }
 
 def twaManifest = [
-    applicationId: 'fun.domin8.dev.twa',
-    hostName: 'dev.domin8.fun', // The domain being opened in the TWA.
+    applicationId: 'fun.domin8.twa',
+    hostName: 'domin8.fun', // The domain being opened in the TWA.
     launchUrl: '/', // The start path for the TWA. Must be relative to the domain.
     name: 'Domin8', // The application name.
     launcherName: 'D8', // The name shown on the Android Launcher.
-    themeColor: '#000000', // The color used for the status bar.
+    themeColor: '#1A1A1A', // The color used for the status bar.
     themeColorDark: '#000000', // The color used for the dark status bar.
     navigationColor: '#000000', // The color used for the navigation bar.
     navigationColorDark: '#000000', // The color used for the dark navbar.
@@ -52,13 +52,13 @@ def twaManifest = [
 
 android {
     compileSdkVersion 36
-    namespace "fun.domin8.dev.twa"
+    namespace "fun.domin8.twa"
     defaultConfig {
-        applicationId "fun.domin8.dev.twa"
+        applicationId "fun.domin8.twa"
         minSdkVersion 21
         targetSdkVersion 35
-        versionCode 3
-        versionName "1.1"
+        versionCode 1
+        versionName "1"
 
         // The name for the application
         resValue "string", "appName", twaManifest.name
@@ -76,12 +76,12 @@ android {
             // The URL the Web Manifest for the Progressive Web App that the TWA points to. This
             // is used by Chrome OS and Meta Quest to open the Web version of the PWA instead of
             // the TWA, as it will probably give a better user experience for non-mobile devices.
-            resValue "string", "webManifestUrl", 'https://dev.domin8.fun/manifest.json'
+            resValue "string", "webManifestUrl", 'https://domin8.fun/manifest.json'
         
 
         
             // This is used by Meta Quest.
-            resValue "string", "fullScopeUrl", 'https://dev.domin8.fun/'
+            resValue "string", "fullScopeUrl", 'https://domin8.fun/'
         
 
         

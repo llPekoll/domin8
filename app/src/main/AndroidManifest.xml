@@ -20,7 +20,7 @@
      application, the package attribute will need to reflect the correct path in order to use
      the abbreviated format. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="fun.domin8.dev.twa">
+    package="fun.domin8.twa">
 
     
         <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
@@ -79,7 +79,6 @@
         <activity android:name="LauncherActivity"
             android:alwaysRetainTaskState="true"
             android:label="@string/launcherName"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:exported="true">
             <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL"
                 android:value="@string/launchUrl" />

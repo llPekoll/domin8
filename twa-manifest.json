@@ -1,10 +1,10 @@
 {
-  "packageId": "fun.domin8.dev.twa",
-  "host": "dev.domin8.fun",
+  "packageId": "fun.domin8.twa",
+  "host": "domin8.fun",
   "name": "Domin8",
   "launcherName": "D8",
   "display": "standalone",
-  "themeColor": "#000000",
+  "themeColor": "#1A1A1A",
   "themeColorDark": "#000000",
   "navigationColor": "#000000",
   "navigationColorDark": "#000000",
@@ -13,18 +13,18 @@
   "backgroundColor": "#000000",
   "enableNotifications": true,
   "startUrl": "/",
-  "iconUrl": "https://dev.domin8.fun/android-chrome-512x512.png",
-  "maskableIconUrl": "https://dev.domin8.fun/android-chrome-512x512.png",
+  "iconUrl": "https://domin8.fun/android-chrome-512x512.png",
+  "maskableIconUrl": "https://domin8.fun/android-chrome-512x512.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "/Users/peko/work/domin8/android.keystore",
     "alias": "android"
   },
-  "appVersionName": "1.1",
-  "appVersionCode": 3,
+  "appVersionName": "1",
+  "appVersionCode": 1,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
-  "webManifestUrl": "https://dev.domin8.fun/manifest.json",
+  "webManifestUrl": "https://domin8.fun/manifest.json",
   "fallbackType": "customtabs",
   "features": {},
   "alphaDependencies": {
@@ -33,15 +33,19 @@
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
-  "fullScopeUrl": "https://dev.domin8.fun/",
+  "fullScopeUrl": "https://domin8.fun/",
   "minSdkVersion": 21,
   "orientation": "any",
-  "fingerprints": [],
+  "fingerprints": [
+    {
+      "value": "87:E2:32:CB:AE:B2:54:13:7A:C8:A6:E5:72:38:F0:A9:D8:06:45:BE:3C:2D:10:13:A2:A0:28:18:7A:3E:18:EC"
+    }
+  ],
   "additionalTrustedOrigins": [],
   "retainedBundles": [],
   "protocolHandlers": [],
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "1.1"
+  "appVersion": "1"
 }
