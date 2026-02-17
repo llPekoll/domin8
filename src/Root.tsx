@@ -5,6 +5,9 @@ import { OneVOnePage } from "./pages/OneVOnePage";
 import { ReferralPage } from "./pages/ReferralPage";
 import { FlappyPage } from "./pages/FlappyPage";
 import { DebugCharPage } from "./pages/DebugCharPage";
+import { LicensePage } from "./pages/LicensePage";
+import { CopyrightPage } from "./pages/CopyrightPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
 
 export function Root() {
   return (
@@ -16,6 +19,9 @@ export function Root() {
         <Route path="/bloody" element={<FlappyPage />} />
         <Route path="/referrals" element={<ReferralPage />} />
         <Route path="/debugchar" element={<DebugCharPage />} />
+        <Route path="/license" element={<LicensePage />} />
+        <Route path="/copyright" element={<CopyrightPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
       </Routes>
     </BrowserRouter>
   );

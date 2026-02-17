@@ -81,7 +81,13 @@ createRoot(document.getElementById("root")!).render(
               accentColor: "#6366f1",
               showWalletLoginFirst: !isAndroid, // On Android, show email first; on desktop show wallet first
               walletChainType: "solana-only",
-              // Don't restrict walletList - let all detected wallets show (including MWA)
+              // Explicitly show all Solana wallets on both mobile and desktop
+              walletList: [
+                "detected_solana_wallets",
+                "phantom",
+                "coinbase_wallet",
+                "wallet_connect",
+              ],
             },
             externalWallets: {
               solana: {
