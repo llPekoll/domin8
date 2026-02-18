@@ -3,6 +3,8 @@ import StartGame, { setCharactersData, setAllMapsData, setDemoMapData } from "./
 import { EventBus } from "./game/EventBus";
 import { useAssets } from "./contexts/AssetsContext";
 import { GlobalGameStateManager } from "./game/managers/GlobalGameStateManager";
+import { useMutation } from "convex/react";
+import { api } from "../convex/_generated/api";
 
 export interface IRefPhaserGame {
   game: Phaser.Game | null;
@@ -19,9 +21,13 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
 ) {
   const game = useRef<Phaser.Game | null>(null);
   const gameStateManager = useRef<GlobalGameStateManager | null>(null);
+  const hasRecordedArenaView = useRef(false);
 
   // Fetch all data from assets context (shared across app)
   const { characters, maps: allMaps } = useAssets();
+
+  // Presence bot: record when user views the arena
+  const recordArenaView = useMutation(api.presenceBotMutations.recordArenaView);
 
   // Select random map client-side for demo mode (only recalculate when map count changes)
   const demoMap = useMemo(() => {
@@ -62,6 +68,15 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
     if (game.current) {
       gameStateManager.current = new GlobalGameStateManager(game.current);
       console.log("✅ [PhaserGame] GlobalGameStateManager initialized with Phaser lifecycle");
+    }
+
+    // Record arena view for presence bot (only once per session)
+    if (!hasRecordedArenaView.current) {
+      hasRecordedArenaView.current = true;
+      recordArenaView().catch((err) => {
+        console.error("[PhaserGame] Failed to record arena view:", err);
+      });
+      console.log("👀 [PhaserGame] Arena view recorded for presence bot");
     }
 
     if (typeof ref === "function") {

@@ -423,5 +423,18 @@ export default defineSchema({
   })
     .index("by_timestamp", ["timestamp"]) // For fetching recent messages
     .index("by_sender_and_time", ["senderWallet", "timestamp"]), // For rate limiting
+
+  // ============================================================================
+  // PRESENCE BOT TABLE
+  // ============================================================================
+
+  /**
+   * Presence Bot Spawns - Track which game rounds have had a bot spawned
+   * One bot max per round - triggered when user views arena and no players exist
+   */
+  presenceBotSpawns: defineTable({
+    roundId: v.number(), // Game round ID
+    spawnedAt: v.number(), // Unix timestamp when bot was spawned
+  }).index("by_round", ["roundId"]),
 });
     
