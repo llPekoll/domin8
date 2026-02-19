@@ -1,9 +1,11 @@
 .anchor
+.github
+android
+app
+gradle
+migrations
 programs
 seed
-tests
-.github
-migrations
 test-ledger
 target/debug
 target/deploy
@@ -11,3 +13,4 @@ target/release
 target/rust-analyzer/flycheck0
 target/sbpf-solana-solana
 target/.rustc_info.json
+tests
