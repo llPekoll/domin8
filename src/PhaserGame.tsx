@@ -5,6 +5,7 @@ import { useAssets } from "./contexts/AssetsContext";
 import { GlobalGameStateManager } from "./game/managers/GlobalGameStateManager";
 import { useMutation } from "convex/react";
 import { api } from "../convex/_generated/api";
+import { usePrivyWallet } from "./hooks/usePrivyWallet";
 
 export interface IRefPhaserGame {
   game: Phaser.Game | null;
@@ -25,6 +26,9 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
 
   // Fetch all data from assets context (shared across app)
   const { characters, maps: allMaps } = useAssets();
+
+  // Get wallet connection status - only trigger presence bot if user is connected
+  const { connected: isWalletConnected } = usePrivyWallet();
 
   // Presence bot: record when user views the arena
   const recordArenaView = useMutation(api.presenceBotMutations.recordArenaView);
@@ -70,15 +74,6 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
       console.log("✅ [PhaserGame] GlobalGameStateManager initialized with Phaser lifecycle");
     }
 
-    // Record arena view for presence bot (only once per session)
-    if (!hasRecordedArenaView.current) {
-      hasRecordedArenaView.current = true;
-      recordArenaView().catch((err) => {
-        console.error("[PhaserGame] Failed to record arena view:", err);
-      });
-      console.log("👀 [PhaserGame] Arena view recorded for presence bot");
-    }
-
     if (typeof ref === "function") {
       ref({ game: game.current, scene: null });
     } else if (ref) {
@@ -104,6 +99,18 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
       }
     };
   }, [ref, isDataReady, characters, allMaps, demoMap]);
+
+  // Presence bot: record arena view when user connects (triggers 5s delayed bot spawn on backend)
+  // This effect runs when: data is ready (game initialized) AND user wallet is connected
+  useEffect(() => {
+    if (!hasRecordedArenaView.current && isWalletConnected && isDataReady) {
+      hasRecordedArenaView.current = true;
+      recordArenaView().catch((err) => {
+        console.error("[PhaserGame] Failed to record arena view:", err);
+      });
+      console.log("👀 [PhaserGame] Arena view recorded for presence bot (user connected)");
+    }
+  }, [isWalletConnected, isDataReady, recordArenaView]);
 
   useEffect(() => {
     EventBus.on("current-scene-ready", (scene_instance: Phaser.Scene) => {

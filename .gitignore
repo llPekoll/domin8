@@ -1,7 +1,7 @@
 /node_modules
 .github
-
-
+app
+gradle
 
 convex/_generated
 test-output.log

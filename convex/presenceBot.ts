@@ -31,6 +31,7 @@ import { GAME_STATUS } from "./constants";
 
 const RPC_ENDPOINT = process.env.SOLANA_RPC_ENDPOINT;
 const PRESENCE_BOT_PRIVATE_KEY = process.env.PRESENCE_BOT_PRIVATE_KEY || "";
+const PRESENCE_BOT_ENABLED = process.env.PRESENCE_BOT_ENABLED !== "false"; // Enabled by default, set to "false" to disable
 
 // Bot configuration
 const BOT_BET_MIN_SOL = 0.001;
@@ -169,6 +170,12 @@ export const checkAndSpawnBot = internalAction({
   args: {},
   handler: async (ctx) => {
     console.log("[PresenceBot] Checking if bot should spawn...");
+
+    // Check if presence bot is enabled via env var
+    if (!PRESENCE_BOT_ENABLED) {
+      console.log("[PresenceBot] Presence bot disabled via PRESENCE_BOT_ENABLED=false, skipping");
+      return;
+    }
 
     // Check if bot wallet is configured
     if (!PRESENCE_BOT_PRIVATE_KEY) {
