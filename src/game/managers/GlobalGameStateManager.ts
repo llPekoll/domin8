@@ -79,7 +79,6 @@ export class GlobalGameStateManager {
 
   constructor(game: PhaserGame) {
     this.game = game;
-    logger.game.debug("[GlobalGameStateManager] 🎬 Initialized");
     this.setupEventListeners();
     this.startCountdownTimer(); // ✅ Start local timer immediately
   }
@@ -94,8 +93,6 @@ export class GlobalGameStateManager {
     this.countdownInterval = setInterval(() => {
       this.checkLocalCountdown();
     }, 1000); // Check every second
-
-    logger.game.debug("[GlobalGameStateManager] ⏱️ Local countdown timer started");
   }
 
   /**
@@ -112,11 +109,6 @@ export class GlobalGameStateManager {
 
     // Detect countdown ending (transition from >0 to 0)
     if (countdownSeconds === 0 && this.lastCountdownSeconds > 0) {
-      logger.game.debug("=".repeat(60));
-      logger.game.debug("[GlobalGameStateManager] ⏰ LOCAL COUNTDOWN REACHED 0!");
-      logger.game.debug("[GlobalGameStateManager] 🎲 Transitioning to VRF_PENDING");
-      logger.game.debug("=".repeat(60));
-
       // Transition to VRF_PENDING (wait for winner from blockchain)
       this.currentPhase = GamePhase.VRF_PENDING;
       EventBus.emit("game-phase-changed", GamePhase.VRF_PENDING);
@@ -126,93 +118,46 @@ export class GlobalGameStateManager {
   }
 
   private setupEventListeners() {
-    logger.game.debug(`[GlobalGameStateManager] [${Date.now()}] Setting up event listeners`);
-
     // ✅ Listen to blockchain updates from App.tsx
     // Note: Preloader handles initial scene selection, we only handle runtime updates
-    EventBus.on("blockchain-state-update", (data: { gameState: any; bossWallet: string | null }) => {
-      logger.game.debug(
-        `[GlobalGameStateManager] [${Date.now()}] 📥 blockchain-state-update event received`
-      );
-      // Store bossWallet for use when updating Game scene
-      this.bossWallet = data.bossWallet;
-      this.handleBlockchainUpdate(data.gameState);
-    });
+    EventBus.on(
+      "blockchain-state-update",
+      (data: { gameState: any; bossWallet: string | null }) => {
+        // Store bossWallet for use when updating Game scene
+        this.bossWallet = data.bossWallet;
+        this.handleBlockchainUpdate(data.gameState);
+      }
+    );
 
     // Note: Player names are now handled via unified participants-update event
     // which goes directly to Game.ts (no need to relay through GlobalGameStateManager)
 
     // Listen for Preloader complete event (Preloader now handles initial scene selection)
     EventBus.on("preloader-complete", () => {
-      logger.game.debug(
-        `[GlobalGameStateManager] [${Date.now()}] 🎨 preloader-complete event received`
-      );
-      logger.game.debug(
-        "[GlobalGameStateManager] Preloader started initial scene, we'll handle runtime updates"
-      );
       // No action needed - Preloader already started the correct scene
       // We only handle runtime blockchain updates now
     });
 
     // Listen for scene ready event to update Game scene with blockchain state
     EventBus.on("current-scene-ready", (scene: any) => {
-      const timestamp = Date.now();
-      logger.game.debug(
-        `[GlobalGameStateManager] [${timestamp}] 🎬 Scene ready:`,
-        scene.scene.key,
-        {
-          hasPendingState: !!this.pendingInitialGameState,
-          isFirstUpdate: this.isFirstUpdate,
-          isTransitioning: this.isTransitioning,
-        }
-      );
-
       // ✅ If Game scene just started and we have pending state (from MapCarousel→Game transition), update it
       if (scene.scene.key === "Game" && this.pendingInitialGameState && !this.isTransitioning) {
-        logger.game.debug(
-          `[GlobalGameStateManager] [${timestamp}] ✅ Updating Game scene with pending state`,
-          {
-            hasBets: !!this.pendingInitialGameState.bets,
-            betCount: this.pendingInitialGameState.bets?.length || 0,
-            hasWallets: !!this.pendingInitialGameState.wallets,
-            walletCount: this.pendingInitialGameState.wallets?.length || 0,
-          }
-        );
         this.updateActiveSceneWithGameState(this.pendingInitialGameState);
         this.pendingInitialGameState = null; // Clear pending state
       }
     });
-
-    logger.game.debug("[GlobalGameStateManager] Event listeners established");
   }
 
   /**
    * Main entry point: handle blockchain state updates
    */
   private handleBlockchainUpdate(gameState: any) {
-    const timestamp = Date.now();
-    logger.game.debug(`[GlobalGameStateManager] [${timestamp}] 🔗 Blockchain state received`, {
-      hasGameState: !!gameState,
-      status: gameState?.status,
-      isFirstUpdate: this.isFirstUpdate,
-      hasBets: !!gameState?.bets,
-      betCount: gameState?.bets?.length || 0,
-    });
-
     // ✅ Guard: Ignore updates while Preloader is active
     // Preloader reads activeGameData directly, no need to coordinate via events
     const activeScenes = this.game.scene.getScenes(true);
     const activeSceneKey = activeScenes[0]?.scene.key;
-    logger.game.debug(`[GlobalGameStateManager] [${timestamp}] Active scene check:`, {
-      activeSceneCount: activeScenes.length,
-      activeSceneKey,
-      isPreloaderOrBoot: activeSceneKey === "Preloader" || activeSceneKey === "Boot",
-    });
 
     if (activeSceneKey === "Preloader" || activeSceneKey === "Boot") {
-      logger.game.debug(
-        `[GlobalGameStateManager] [${timestamp}] ⏸️ Ignoring update - Preloader is active (will read activeGameData directly)`
-      );
       return; // Just ignore, Preloader handles initial state
     }
 
@@ -229,9 +174,6 @@ export class GlobalGameStateManager {
     // ✅ On first update after Preloader, just update the scene data (Preloader already started the scene)
     if (this.isFirstUpdate) {
       this.isFirstUpdate = false;
-      logger.game.debug(
-        `[GlobalGameStateManager] [${timestamp}] First runtime update, updating scene with game state`
-      );
       this.currentPhase = targetPhase;
       EventBus.emit("game-phase-changed", targetPhase);
 
@@ -257,7 +199,6 @@ export class GlobalGameStateManager {
    */
   private determinePhaseFromState(gameState: any): GamePhase {
     if (!gameState) {
-      logger.game.debug("[GlobalGameStateManager] No game state → IDLE");
       return GamePhase.IDLE;
     }
 
@@ -266,15 +207,6 @@ export class GlobalGameStateManager {
     const isInsertCoin = status === 2 || status === "waiting" || status === "Waiting"; // No bets yet
     const isOpen = status === 0 || status === "open" || status === "Open"; // Bets placed, countdown active
     const hasWinner = this.checkHasWinner(gameState);
-
-    logger.game.debug("[GlobalGameStateManager] 🔍 Phase detection:", {
-      status,
-      isInsertCoin,
-      isOpen,
-      hasWinner,
-      hasBets: !!gameState.bets,
-      betCount: gameState.bets?.length || 0,
-    });
 
     // Get timing info
     const endTimestamp = gameState.endTimestamp || gameState.endDate;
@@ -295,32 +227,25 @@ export class GlobalGameStateManager {
 
     // 1. If winner exists and within 15s celebration window → CELEBRATING
     if (hasWinner && celebrationElapsed >= 0 && celebrationElapsed < this.CELEBRATION_DURATION) {
-      logger.game.debug(
-        `[GlobalGameStateManager] 🎉 Phase: CELEBRATING (${celebrationElapsed}ms elapsed)`
-      );
       return GamePhase.CELEBRATING;
     }
 
     // 2. If game ended but no winner yet → VRF_PENDING
     if (gameHasEnded && !hasWinner) {
-      logger.game.debug("[GlobalGameStateManager] ⏳ Phase: VRF_PENDING");
       return GamePhase.VRF_PENDING;
     }
 
     // 3. If status=2 (WAITING, no bets yet) → INSERT_COIN
     if (isInsertCoin) {
-      logger.game.debug("[GlobalGameStateManager] 🪙 Phase: INSERT_COIN");
       return GamePhase.INSERT_COIN;
     }
 
     // 4. If status=0 (OPEN, has bets) and game hasn't ended → WAITING
     if (isOpen && !gameHasEnded) {
-      logger.game.debug("[GlobalGameStateManager] ⏰ Phase: WAITING");
       return GamePhase.WAITING;
     }
 
     // 5. Default → IDLE (show demo)
-    logger.game.debug("[GlobalGameStateManager] 😴 Phase: IDLE (default)");
     return GamePhase.IDLE;
   }
 
@@ -350,18 +275,12 @@ export class GlobalGameStateManager {
     if (oldPhase === GamePhase.CELEBRATING || oldPhase === GamePhase.FIGHTING) {
       // During battle/celebration, ignore blockchain updates that might show VRF_PENDING
       if (targetPhase === GamePhase.VRF_PENDING || targetPhase === GamePhase.INSERT_COIN) {
-        logger.game.debug(`[GlobalGameStateManager] 🛡️ Protecting ${oldPhase} from ${targetPhase}`);
         return; // Don't transition
       }
     }
 
     // ✅ Special case: VRF_PENDING + winner arrives → Go to FIGHTING
     if (oldPhase === GamePhase.VRF_PENDING && this.checkHasWinner(gameState)) {
-      logger.game.debug("=".repeat(60));
-      logger.game.debug("[GlobalGameStateManager] 🏆 WINNER ARRIVED!");
-      logger.game.debug("[GlobalGameStateManager] ⚔️ Transitioning VRF_PENDING → FIGHTING");
-      logger.game.debug("=".repeat(60));
-
       this.currentGameState = gameState; // Store for later phases
       this.currentPhase = GamePhase.FIGHTING;
       EventBus.emit("game-phase-changed", GamePhase.FIGHTING);
@@ -376,8 +295,6 @@ export class GlobalGameStateManager {
       return;
     }
 
-    logger.game.debug(`[GlobalGameStateManager] 🔄 Phase transition: ${oldPhase} → ${targetPhase}`);
-
     const previousPhase = this.currentPhase;
     this.currentPhase = targetPhase;
 
@@ -388,16 +305,6 @@ export class GlobalGameStateManager {
     // Game scene will be started via transition and needs data when ready
     if (previousPhase === GamePhase.IDLE && targetPhase !== GamePhase.IDLE) {
       this.pendingInitialGameState = gameState;
-      logger.game.debug(
-        "[GlobalGameStateManager] 📦 Stored pending game state for MapCarousel→Game transition",
-        {
-          hasBets: !!gameState?.bets,
-          betCount: gameState?.bets?.length || 0,
-          hasWallets: !!gameState?.wallets,
-          walletCount: gameState?.wallets?.length || 0,
-          status: gameState?.status,
-        }
-      );
     }
 
     // Handle scene transitions
@@ -416,7 +323,6 @@ export class GlobalGameStateManager {
 
     const elapsed = Date.now() - this.celebrationStartTime;
     if (elapsed >= this.CELEBRATION_DURATION) {
-      logger.game.debug("[GlobalGameStateManager] 🎉 Celebration complete, starting cleanup");
       this.currentPhase = GamePhase.CLEANUP;
       EventBus.emit("game-phase-changed", GamePhase.CLEANUP);
       this.startCleanupSequence();
@@ -431,9 +337,6 @@ export class GlobalGameStateManager {
     // MapCarousel will spin, land on the selected map, wait 3.5s, then transition to Game.
     // We do NOT auto-transition here to avoid racing with MapCarousel's animation.
     if (oldPhase === GamePhase.IDLE && newPhase !== GamePhase.IDLE) {
-      logger.game.debug(
-        "[GlobalGameStateManager] 🎰 IDLE → Game: MapCarousel handles transition (not us)"
-      );
       // Don't call transitionToGame() - MapCarousel will do it after spin animation
       return;
     }
@@ -491,8 +394,6 @@ export class GlobalGameStateManager {
 
     this.battleSequenceStarted = true;
 
-    logger.game.debug("[GlobalGameStateManager] ⚔️ Starting battle sequence (3s)");
-
     // Get winner from current game state
     const winnerStr = this.currentGameState?.winner
       ? typeof this.currentGameState.winner === "string"
@@ -508,21 +409,12 @@ export class GlobalGameStateManager {
         : Number(this.currentGameState.winningBetIndex)
       : null;
 
-    logger.game.debug("[GlobalGameStateManager] ⚔️ Winner info", {
-      winner: winnerStr,
-      winningBetIndex,
-    });
-
     // Tell Game scene to start battle animations (include winner + bet index for precise kick-out)
     EventBus.emit("start-battle-phase", { winner: winnerStr, winningBetIndex });
 
     // Transition to CELEBRATING after battle duration
     setTimeout(() => {
       if (this.currentPhase === GamePhase.FIGHTING) {
-        logger.game.debug(
-          "[GlobalGameStateManager] ⚔️ Battle complete, transitioning to CELEBRATING"
-        );
-
         this.currentPhase = GamePhase.CELEBRATING;
         EventBus.emit("game-phase-changed", GamePhase.CELEBRATING);
 
@@ -543,11 +435,6 @@ export class GlobalGameStateManager {
   private startCelebrationSequence(gameState: any, elapsedTime: number = 0) {
     if (this.celebrationSequenceStarted) return;
     if (!this.checkHasWinner(gameState)) return;
-
-    logger.game.debug("[GlobalGameStateManager] 🎉 Starting celebration", {
-      elapsedTime,
-      remainingTime: this.CELEBRATION_DURATION - elapsedTime,
-    });
 
     this.celebrationSequenceStarted = true;
     this.celebrationStartTime = Date.now() - elapsedTime;
@@ -572,7 +459,6 @@ export class GlobalGameStateManager {
     // ✅ Schedule cleanup to run after celebration ends
     const remainingTime = this.CELEBRATION_DURATION - elapsedTime;
     setTimeout(() => {
-      logger.game.debug("[GlobalGameStateManager] 🎉 Celebration time elapsed, starting cleanup");
       this.startCleanupSequence();
     }, remainingTime);
   }
@@ -581,8 +467,6 @@ export class GlobalGameStateManager {
    * Start cleanup sequence
    */
   private startCleanupSequence() {
-    logger.game.debug("[GlobalGameStateManager] 🧹 Starting cleanup - direct swipe to carousel");
-
     // Set phase to CLEANUP
     this.currentPhase = GamePhase.CLEANUP;
     EventBus.emit("game-phase-changed", GamePhase.CLEANUP);
@@ -609,7 +493,6 @@ export class GlobalGameStateManager {
     if (!gameScene?.scene.isActive()) return;
     if (this.isTransitioning) return;
 
-    logger.game.debug("[GlobalGameStateManager] 🎬 Transitioning: Game → MapCarousel");
     this.isTransitioning = true;
 
     // Create wipe transition effect
@@ -637,13 +520,6 @@ export class GlobalGameStateManager {
   private updateActiveSceneWithGameState(gameState: any) {
     const activeScenes = this.game.scene.getScenes(true);
 
-    logger.game.debug("[GlobalGameStateManager] 🔄 updateActiveSceneWithGameState called", {
-      activeSceneCount: activeScenes.length,
-      activeSceneKey: activeScenes[0]?.scene.key,
-      hasBets: !!gameState?.bets,
-      betCount: gameState?.bets?.length || 0,
-    });
-
     if (activeScenes.length === 0) {
       logger.game.warn("[GlobalGameStateManager] ⚠️ No active scenes found!");
       return;
@@ -654,9 +530,6 @@ export class GlobalGameStateManager {
 
     // Only Game scene needs blockchain data
     if (sceneKey === "Game") {
-      logger.game.debug("[GlobalGameStateManager] ✅ Calling Game.updateGameState()", {
-        bossWallet: this.bossWallet,
-      });
       (activeScene as any).updateGameState?.(gameState, this.bossWallet);
     } else {
       logger.game.debug("[GlobalGameStateManager] ⏭️ Skipping update - active scene is", sceneKey);
@@ -671,12 +544,10 @@ export class GlobalGameStateManager {
     if (this.countdownInterval) {
       clearInterval(this.countdownInterval);
       this.countdownInterval = null;
-      logger.game.debug("[GlobalGameStateManager] ⏱️ Countdown timer stopped");
     }
 
     EventBus.off("blockchain-state-update");
     EventBus.off("current-scene-ready");
     EventBus.off("preloader-complete");
-    logger.game.debug("[GlobalGameStateManager] 🗑️ Destroyed");
   }
 }

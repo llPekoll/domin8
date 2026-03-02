@@ -63,6 +63,12 @@ export class PlayerManager {
   addParticipant(participant: any) {
     const participantId = participant._id || participant.id;
 
+    // Guard: check if scene is still valid (not destroyed)
+    if (!this.scene || !this.scene.add) {
+      logger.game.warn("[PlayerManager] Scene not available, skipping addParticipant");
+      return;
+    }
+
     logger.game.debug("[PlayerManager] addParticipant called", {
       id: participantId,
       existingCount: this.participants.size,

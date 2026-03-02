@@ -47,28 +47,11 @@ export class BackgroundManager {
     // Load config
     const config = loadBackgroundConfig(id);
     if (!config) {
-      logger.game.error(
-        `[BackgroundManager] ❌ Config not found for ID ${id}. Check bg${id}.ts exists.`
-      );
       return;
     }
 
-    logger.game.debug("[BackgroundManager] Config loaded:", {
-      id: config.id,
-      name: config.name,
-      type: config.type,
-      textureKey: config.textureKey,
-      assetPath: config.assetPath,
-    });
-
     // Verify texture was loaded by Preloader
     if (!this.scene.textures.exists(config.textureKey)) {
-      logger.game.error(`[BackgroundManager] ❌ Texture '${config.textureKey}' not loaded!`, {
-        hint: `Check Preloader.ts includes bg${id} in backgroundIds array`,
-        configFile: `bg${id}.ts`,
-        assetPath: config.assetPath,
-        availableTextures: this.scene.textures.getTextureKeys(),
-      });
       return;
     }
 
@@ -80,8 +63,6 @@ export class BackgroundManager {
    * Create background game object from config
    */
   private createBackgroundFromConfig(config: BackgroundConfig): void {
-    logger.game.debug("[BackgroundManager] Creating background:", config.type);
-
     // Clean up old background
     this.destroyBackground();
 
@@ -103,13 +84,6 @@ export class BackgroundManager {
       if (config.clickable?.enabled) {
         this.setupClickable(config);
       }
-
-      logger.game.debug("[BackgroundManager] ✅ Background created:", {
-        type: config.type,
-        width: this.background.width,
-        height: this.background.height,
-        clickable: !!config.clickable?.enabled,
-      });
     }
 
     // Create overlays if configured
@@ -122,7 +96,6 @@ export class BackgroundManager {
    * Create static image background
    */
   private createStaticBackground(config: BackgroundConfig): void {
-    logger.game.debug("[BackgroundManager] Creating static image:", config.textureKey);
     this.background = this.scene.add.image(this.centerX, this.centerY, config.textureKey);
   }
 
@@ -130,8 +103,6 @@ export class BackgroundManager {
    * Create animated sprite background
    */
   private createAnimatedBackground(config: BackgroundConfig): void {
-    logger.game.debug("[BackgroundManager] Creating animated sprite:", config.textureKey);
-
     // Create sprite
     const sprite = this.scene.add.sprite(this.centerX, this.centerY, config.textureKey);
     this.background = sprite;
@@ -140,14 +111,6 @@ export class BackgroundManager {
     if (config.animations?.idle) {
       const animConfig = config.animations.idle;
       const animKey = `${config.textureKey}_idle`;
-
-      logger.game.debug("[BackgroundManager] Setting up animation:", {
-        key: animKey,
-        prefix: animConfig.prefix,
-        suffix: animConfig.suffix,
-        frames: `${animConfig.start}-${animConfig.end}`,
-        frameRate: animConfig.frameRate,
-      });
 
       // Create animation definition if it doesn't exist
       if (!this.scene.anims.exists(animKey)) {
@@ -163,8 +126,6 @@ export class BackgroundManager {
             frameRate: animConfig.frameRate,
             repeat: -1, // Loop forever
           });
-
-          logger.game.debug(`[BackgroundManager] Animation '${animKey}' created successfully`);
         } catch (error) {
           logger.game.error(`[BackgroundManager] Failed to create animation '${animKey}':`, error);
           return;
@@ -174,7 +135,6 @@ export class BackgroundManager {
       // Play the animation
       try {
         sprite.play(animKey);
-        logger.game.debug(`[BackgroundManager] ✅ Playing animation '${animKey}'`);
       } catch (error) {
         logger.game.error(`[BackgroundManager] Failed to play animation '${animKey}':`, error);
       }
@@ -192,20 +152,16 @@ export class BackgroundManager {
     this.background.setInteractive({ cursor: "pointer" });
 
     this.background.on("pointerdown", () => {
-      logger.game.debug("[BackgroundManager] Background clicked");
-
       if (!config.clickable) return;
 
       switch (config.clickable.action) {
         case "url":
           if (config.clickable.url) {
-            logger.game.debug("[BackgroundManager] Opening URL:", config.clickable.url);
             window.open(config.clickable.url, "_blank");
           }
           break;
         case "custom":
           if (config.clickable.onClickHandler) {
-            logger.game.debug("[BackgroundManager] Executing custom handler");
             config.clickable.onClickHandler(this.scene);
           }
           break;
@@ -213,8 +169,6 @@ export class BackgroundManager {
           break;
       }
     });
-
-    logger.game.debug("[BackgroundManager] ✅ Clickable setup complete");
   }
 
   /**
@@ -243,8 +197,6 @@ export class BackgroundManager {
    * Create overlays from config
    */
   private createOverlays(overlayConfigs: OverlayConfig[]): void {
-    logger.game.debug("[BackgroundManager] Creating overlays:", overlayConfigs.length);
-
     overlayConfigs.forEach((overlayConfig) => {
       // Verify texture exists
       if (!this.scene.textures.exists(overlayConfig.textureKey)) {
@@ -329,11 +281,6 @@ export class BackgroundManager {
       overlay.play(idleAnimKey);
 
       this.overlays.push(overlay);
-
-      logger.game.debug("[BackgroundManager] ✅ Overlay created:", {
-        textureKey: overlayConfig.textureKey,
-        clickable: !!overlayConfig.clickable,
-      });
     });
   }
 
@@ -342,7 +289,6 @@ export class BackgroundManager {
    */
   private destroyBackground(): void {
     if (this.background) {
-      logger.game.debug("[BackgroundManager] Destroying old background");
       this.background.destroy();
       this.background = null;
     }

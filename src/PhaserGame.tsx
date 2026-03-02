@@ -71,7 +71,6 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
     // Initialize GlobalGameStateManager ONCE with Phaser game lifecycle
     if (game.current) {
       gameStateManager.current = new GlobalGameStateManager(game.current);
-      console.log("✅ [PhaserGame] GlobalGameStateManager initialized with Phaser lifecycle");
     }
 
     if (typeof ref === "function") {
@@ -83,12 +82,11 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
     return () => {
       // Clean up global reference
       (window as any).phaserGame = undefined;
-      
+
       // Cleanup GlobalGameStateManager before destroying game
       if (gameStateManager.current) {
         gameStateManager.current.destroy();
         gameStateManager.current = null;
-        console.log("🗑️ [PhaserGame] GlobalGameStateManager destroyed");
       }
 
       if (game.current) {

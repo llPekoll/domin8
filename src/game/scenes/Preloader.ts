@@ -1,9 +1,7 @@
 import { Scene } from "phaser";
 import {
-  currentMapData,
   charactersData,
   allMapsData,
-  demoMapData,
   activeGameData,
   blockchainDataReady,
   GAME_STATUS,
@@ -156,26 +154,18 @@ export class Preloader extends Scene {
 
     // Check if data is available (should always be true due to PhaserGame.tsx guard)
     if (!charactersData || charactersData.length === 0) {
-      logger.game.error("[Preloader] No characters data available! This should not happen.");
+      alert("[Preloader] No characters data available! This should not happen.");
       return;
     }
     if (!allMapsData || allMapsData.length === 0) {
-      logger.game.error("[Preloader] No maps data available!");
+      alert("[Preloader] No maps data available!");
       return;
     }
-
-    logger.game.debug("[Preloader] Data check passed:", {
-      charactersCount: charactersData.length,
-      mapsCount: allMapsData.length,
-      demoMap: demoMapData?.name,
-      currentMap: currentMapData?.name || "none",
-    });
 
     // Load all character sprites dynamically from database
     charactersData.forEach((character) => {
       const key = character.name.toLowerCase().replace(/\s+/g, "-");
       const jsonPath = character.assetPath.replace(".png", ".json");
-      logger.game.debug("[Preloader] Loading character atlas:", key, character.assetPath);
       this.load.atlas(key, character.assetPath, jsonPath);
       // Also load JSON separately with a different key so we can access frameTags in create()
       this.load.json(`${key}-json`, jsonPath);
@@ -185,48 +175,20 @@ export class Preloader extends Scene {
     // Get map IDs from database to know which backgrounds to load
     const backgroundIds = allMapsData.map((map) => map.id);
 
-    console.log("🎨🎨🎨 PRELOADER: About to load backgrounds, IDs:", backgroundIds);
-    logger.game.debug("[Preloader] 🎨 Starting to load background configs from maps...");
-
     backgroundIds.forEach((id) => {
-      console.log(`🔍 PRELOADER: Loading background ID ${id}...`);
       const bgConfig = loadBackgroundConfig(id);
 
       if (!bgConfig) {
         console.error(`❌ PRELOADER: Failed to load config for ID ${id}`);
-        logger.game.error(`[Preloader] ❌ Failed to load config for background ID ${id}`);
         return;
       }
-
-      console.log(`✅ PRELOADER: Config loaded for bg${id}:`, bgConfig);
-      logger.game.debug(`[Preloader] ✅ Config loaded for bg${id}:`, {
-        name: bgConfig.name,
-        textureKey: bgConfig.textureKey,
-        assetPath: bgConfig.assetPath,
-        type: bgConfig.type,
-      });
 
       if (bgConfig.type === "animated") {
         // Load as atlas for animated backgrounds
         const jsonPath = bgConfig.assetPath.replace(".png", ".json");
 
-        logger.game.debug(`[Preloader] 📦 Loading animated atlas:`, {
-          textureKey: bgConfig.textureKey,
-          pngPath: bgConfig.assetPath,
-          jsonPath: jsonPath,
-          fullPngPath: `assets/${bgConfig.assetPath}`,
-          fullJsonPath: `assets/${jsonPath}`,
-        });
-
         this.load.atlas(bgConfig.textureKey, bgConfig.assetPath, jsonPath);
-        console.log(`📦 PRELOADER: load.atlas() called for '${bgConfig.textureKey}'`);
       } else {
-        // Load as image for static backgrounds
-        logger.game.debug(
-          `[Preloader] 🖼️ Loading static image:`,
-          bgConfig.textureKey,
-          bgConfig.assetPath
-        );
         this.load.image(bgConfig.textureKey, bgConfig.assetPath);
       }
 
@@ -234,18 +196,11 @@ export class Preloader extends Scene {
       if (bgConfig.overlays && bgConfig.overlays.length > 0) {
         bgConfig.overlays.forEach((overlay) => {
           const overlayJsonPath = overlay.assetPath.replace(".png", ".json");
-          logger.game.debug(`[Preloader] 🎭 Loading overlay atlas:`, {
-            textureKey: overlay.textureKey,
-            pngPath: overlay.assetPath,
-            jsonPath: overlayJsonPath,
-          });
+
           this.load.atlas(overlay.textureKey, overlay.assetPath, overlayJsonPath);
-          console.log(`🎭 PRELOADER: load.atlas() called for overlay '${overlay.textureKey}'`);
         });
       }
     });
-
-    logger.game.debug("[Preloader] 🎨 Background configs queued for loading");
 
     // Load VFX assets
     this.load.atlas("explosion-fullscreen", "vfx/fight-effect.png", "vfx/fight-effect.json");
@@ -313,7 +268,6 @@ export class Preloader extends Scene {
     // Log load errors for debugging
     this.load.on("loaderror", (file: any) => {
       console.error("❌❌❌ PRELOADER LOAD ERROR:", file.key, file.src, file);
-      logger.game.error("[Preloader] Failed to load file:", file.key, file.src);
     });
   }
 
@@ -325,43 +279,24 @@ export class Preloader extends Scene {
       return;
     }
 
-    // Create animations for all characters dynamically by parsing frameTags from JSON atlas
-    logger.game.debug("[Preloader] Creating animations for", charactersData.length, "characters");
-    console.log(
-      "✅ [Preloader] Starting animation creation for",
-      charactersData.length,
-      "characters"
-    );
-
     charactersData.forEach((character) => {
       const key = character.name.toLowerCase().replace(/\s+/g, "-");
-      console.log(`✅ [Preloader] Processing character: ${character.name}, key: ${key}`);
 
       // Get the JSON atlas data from cache (loaded with -json suffix)
       const jsonData = this.cache.json.get(`${key}-json`);
-      console.log(
-        `✅ [Preloader] JSON data for ${key}:`,
-        jsonData ? "FOUND" : "NOT FOUND",
-        jsonData
-      );
 
       if (!jsonData) {
-        logger.game.warn(`[Preloader] No JSON data found for ${key}, skipping animation creation`);
         console.error(`❌ [Preloader] No JSON data found for ${key}`);
         return;
       }
 
       // Parse frameTags from the JSON metadata
       const frameTags = jsonData?.meta?.frameTags || [];
-      console.log(`✅ [Preloader] frameTags for ${key}:`, frameTags.length, frameTags);
 
       if (frameTags.length === 0) {
-        logger.game.warn(`[Preloader] No frameTags found in ${key}.json, skipping`);
-        console.error(`❌ [Preloader] No frameTags found in ${key}.json`);
+        console.error(`❌ [Preloadr] No frameTags found in ${key}.json`);
         return;
       }
-
-      logger.game.debug(`[Preloader] Found ${frameTags.length} frameTags for ${character.name}`);
 
       // Determine frame naming convention from first frame
       const frames = jsonData?.frames || [];
@@ -387,18 +322,12 @@ export class Preloader extends Scene {
         prefix = firstFrameName.substring(0, firstFrameName.lastIndexOf(" ")) + " ";
       }
 
-      console.log(`✅ [Preloader] Frame naming for ${key}: prefix="${prefix}", suffix="${suffix}"`);
-
       // Helper function to determine if animation should loop
       const shouldLoop = (animName: string) => ["idle", "win", "run"].includes(animName);
 
       // Helper function to create a single animation
-      const createAnimation = (animName: string, frameTag: any, isFallback = false) => {
+      const createAnimation = (animName: string, frameTag: any, _isFallback = false) => {
         const animKey = `${key}-${animName}`;
-
-        console.log(
-          `✅ [Preloader] Creating ${isFallback ? "fallback " : ""}animation: ${animKey}, frames ${frameTag.from}-${frameTag.to}`
-        );
 
         this.anims.create({
           key: animKey,
@@ -411,11 +340,6 @@ export class Preloader extends Scene {
           frameRate: 10,
           repeat: shouldLoop(animName) ? -1 : 0,
         });
-
-        console.log(`✅ [Preloader] Animation created: ${animKey}`);
-        logger.game.debug(
-          `[Preloader] Created ${isFallback ? "fallback " : ""}animation: ${animKey} (frames ${frameTag.from}-${frameTag.to})`
-        );
       };
 
       // Store idle animation for fallback and create animations from frameTags
@@ -567,25 +491,20 @@ export class Preloader extends Scene {
           if (gameStatus === GAME_STATUS.WAITING) {
             // Game created by backend, waiting for first bet
             // Show Game scene with "Insert Coin" mode
-            logger.game.info("[Preloader] Starting Game scene (WAITING - Insert Coin mode)");
             this.scene.start("Game", { mode: "insert-coin" });
           } else if (gameStatus === GAME_STATUS.OPEN) {
             // Game has bets, countdown is running
             // Show Game scene with active betting
-            logger.game.info("[Preloader] Starting Game scene (OPEN - Active betting)");
             this.scene.start("Game", { mode: "betting" });
           } else if (gameStatus === GAME_STATUS.CLOSED) {
             // Game ended, show MapCarousel for next game selection
-            logger.game.info("[Preloader] Starting MapCarousel (CLOSED - Game ended)");
             this.scene.start("MapCarousel");
           } else {
             // Unknown status, default to MapCarousel
-            logger.game.warn("[Preloader] Unknown game status:", gameStatus);
             this.scene.start("MapCarousel");
           }
         } else {
           // No active game data, show MapCarousel
-          logger.game.info("[Preloader] Starting MapCarousel (No active game)");
           this.scene.start("MapCarousel");
         }
 

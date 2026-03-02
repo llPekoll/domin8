@@ -104,10 +104,6 @@ export default function App() {
   useEffect(() => {
     const currentRoundId = currentRoundState?.gameRound?.toString() || null;
     if (currentRoundId !== lastRoundId) {
-      console.log("🔄 [ROUND CHANGE] Resetting boss state:", {
-        oldRoundId: lastRoundId,
-        newRoundId: currentRoundId,
-      });
       setLastRoundId(currentRoundId);
       setBossFirstBetPlaced(false);
       setBossLockedCharacterId(null);
@@ -169,7 +165,6 @@ export default function App() {
   useEffect(() => {
     const walletAddress = publicKey?.toBase58() || null;
     setCurrentUserWallet(walletAddress);
-    console.log(`👤 [App] Current user wallet set:`, walletAddress);
   }, [publicKey]);
 
   // Emit boss wallet info to Phaser game scene

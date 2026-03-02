@@ -2,7 +2,6 @@ import { createContext, useContext, ReactNode, useEffect, useState } from "react
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useActiveGame } from "../hooks/useActiveGame";
-import { logger } from "../lib/logger";
 
 const PlayerNamesContext = createContext<any>(undefined);
 
@@ -23,8 +22,6 @@ export function PlayerNamesProvider({ children }: { children: ReactNode }) {
       .filter((addr, index, self) => self.indexOf(addr) === index);
 
     setWalletAddresses(addresses);
-    
-    logger.game.debug("[PlayerNamesContext] Extracted wallet addresses:", addresses.length);
   }, [activeGame]);
 
   // Fetch player names for all wallet addresses
@@ -37,9 +34,7 @@ export function PlayerNamesProvider({ children }: { children: ReactNode }) {
   // from Convex (names resolved server-side). This context is only used by React components.
 
   return (
-    <PlayerNamesContext.Provider value={{ playerNames }}>
-      {children}
-    </PlayerNamesContext.Provider>
+    <PlayerNamesContext.Provider value={{ playerNames }}>{children}</PlayerNamesContext.Provider>
   );
 }
 

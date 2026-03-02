@@ -11,29 +11,8 @@ import { AssetsProvider } from "./contexts/AssetsContext";
 import { PlayerNamesProvider } from "./contexts/PlayerNamesContext";
 import { ActiveWalletProvider } from "./contexts/ActiveWalletContext";
 import { Analytics } from "@vercel/analytics/react";
-import { Capacitor } from "@capacitor/core";
-import { App as CapacitorApp } from "@capacitor/app";
 
 const isAndroid = /Android/i.test(navigator.userAgent);
-const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-const isCapacitor = Capacitor.isNativePlatform();
-console.log("[App] User Agent:", navigator.userAgent);
-console.log("[App] Is Android:", isAndroid);
-console.log("[App] Is Mobile:", isMobile);
-console.log("[App] Is Capacitor:", isCapacitor);
-
-// Handle deep links in Capacitor
-if (isCapacitor) {
-  CapacitorApp.addListener("appUrlOpen", (event) => {
-    console.log("[Capacitor] Deep link received:", event.url);
-    // The MWA library will handle wallet responses automatically
-    // Just need to make sure the URL is processed
-    if (event.url) {
-      // Dispatch custom event for wallet adapters to catch
-      window.dispatchEvent(new CustomEvent("capacitor-deep-link", { detail: event.url }));
-    }
-  });
-}
 
 // Register MWA on Android (detect via user agent for PWA/web support)
 if (isAndroid) {
