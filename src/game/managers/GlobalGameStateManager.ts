@@ -225,19 +225,20 @@ export class GlobalGameStateManager {
 
     // Phase decision tree (order matters!)
 
-    // 1. If winner exists and within 15s celebration window → CELEBRATING
+    // 1. If status=2 (WAITING, no bets yet) → INSERT_COIN
+    // Must check before VRF_PENDING because a new game may carry stale endTimestamp
+    if (isInsertCoin) {
+      return GamePhase.INSERT_COIN;
+    }
+
+    // 2. If winner exists and within 15s celebration window → CELEBRATING
     if (hasWinner && celebrationElapsed >= 0 && celebrationElapsed < this.CELEBRATION_DURATION) {
       return GamePhase.CELEBRATING;
     }
 
-    // 2. If game ended but no winner yet → VRF_PENDING
+    // 3. If game ended but no winner yet → VRF_PENDING
     if (gameHasEnded && !hasWinner) {
       return GamePhase.VRF_PENDING;
-    }
-
-    // 3. If status=2 (WAITING, no bets yet) → INSERT_COIN
-    if (isInsertCoin) {
-      return GamePhase.INSERT_COIN;
     }
 
     // 4. If status=0 (OPEN, has bets) and game hasn't ended → WAITING

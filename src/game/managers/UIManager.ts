@@ -227,8 +227,7 @@ export class UIManager {
       this.winnerContainer.setAlpha(1); // Reset alpha in case it was faded
       this.phaseText.setVisible(true);
       this.phaseText.setText(`🏆 YOU WON ${winnerPrize} SOL!`);
-      this.subText.setVisible(true);
-      this.subText.setText("Restarting in 4s...");
+      this.subText.setVisible(false);
 
       // Show multiplier with punchy animation
       this.showMultiplier(multiplier);

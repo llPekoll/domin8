@@ -1,8 +1,7 @@
 import { useState, useCallback, useMemo, memo } from "react";
-import { useQuery, useAction } from "convex/react";
+import { useAction } from "convex/react";
 import { useActiveWallet } from "../contexts/ActiveWalletContext";
 import { useGameContract } from "../hooks/useGameContract";
-import { useActiveGame } from "../hooks/useActiveGame";
 import { useFundWallet } from "../hooks/useFundWallet";
 import { useNFTCharacters } from "../hooks/useNFTCharacters";
 import { api } from "../../convex/_generated/api";
@@ -10,11 +9,12 @@ import { toast } from "sonner";
 import { EventBus } from "../game/EventBus";
 import { logger } from "../lib/logger";
 import { useAssets } from "../contexts/AssetsContext";
+import { useGamePhase, isBettingPhase } from "../hooks/useGamePhase";
 import type { Character } from "../types/character";
 import styles from "./ButtonShine.module.css";
 import { Plus, Wallet, Eraser } from "lucide-react";
-import { BotControlTab } from "./BotControlTab";
-import { BotDialog } from "./BotDialog";
+// import { BotControlTab } from "./BotControlTab";
+// import { BotDialog } from "./BotDialog";
 import { SocialLinks } from "./SocialLinks";
 
 // Betting limits
@@ -50,10 +50,11 @@ const BettingPanel = memo(function BettingPanel({
   } = useActiveWallet();
   const { placeBet, validateBet } = useGameContract();
   const { handleAddFunds } = useFundWallet();
+  const gamePhase = useGamePhase();
 
   const [betAmount, setBetAmount] = useState<string>(DEFAULT_BET_AMOUNT.toString());
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [botDialogOpen, setBotDialogOpen] = useState(false);
+  // const [botDialogOpen, setBotDialogOpen] = useState(false);
 
   // Memoize wallet address to prevent unnecessary re-queries (use embedded for player data)
   const walletAddress = useMemo(
@@ -67,48 +68,8 @@ const BettingPanel = memo(function BettingPanel({
   // NFT verification action (checks cached database, no blockchain scan)
   const verifyCachedNFT = useAction(api.nftHolderScanner.verifyCachedNFTOwnership);
 
-  // Get player data
-  const playerData = useQuery(api.players.getPlayer, walletAddress ? { walletAddress } : "skip");
-
   // Get maps from assets context
   const { maps: allMaps, characters: allCharacters } = useAssets();
-
-  // Get current game state directly from blockchain
-  const { activeGame } = useActiveGame();
-
-  // Derive game state from blockchain
-  const canPlaceBet = useMemo(() => {
-    if (!activeGame) return true; // No game = can create new one
-
-    // Status: 0 = open/waiting, 1 = closed/determining winner, 2 = finished
-    const gameStatus = activeGame.status;
-    const betCount = activeGame.betCount || 0;
-
-    // Special case: Stuck/empty game (any status with 0 bets) - allow betting to create new game
-    if (betCount === 0) {
-      logger.ui.debug("[canPlaceBet] Empty game detected - allowing bet to create new game");
-      return true;
-    }
-
-    // Allow betting if game is finished (to create new round)
-    if (gameStatus === 2) return true;
-
-    // Block betting if game is determining winner (and has bets)
-    if (gameStatus === 1) return false;
-
-    // If game is open (status 0), check if betting window is still open
-    if (gameStatus === 0) {
-      const currentTime = Math.floor(Date.now() / 1000);
-      const endTimestamp =
-        activeGame.endTimestamp?.toNumber() || activeGame.endDate?.toNumber() || 0;
-      const timeRemaining = endTimestamp - currentTime;
-
-      return timeRemaining > 0; // Can bet if time remaining
-    }
-
-    // Default: don't allow betting for unknown statuses
-    return false;
-  }, [activeGame]);
 
   // Check if balance is insufficient
   const hasInsufficientBalance = useMemo(() => {
@@ -146,31 +107,17 @@ const BettingPanel = memo(function BettingPanel({
   };
 
   const handlePlaceBet = useCallback(async () => {
-    if (!connected || !publicKey || !playerData || !selectedCharacter) {
-      toast.error("Please wait for data to load or select a character");
+    if (!connected || !publicKey) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+    if (!selectedCharacter) {
+      toast.error("Please select a character first");
       return;
     }
 
     // Play insert coin sound via Phaser
     EventBus.emit("play-insert-coin-sound");
-
-    // Check if player can place bet based on blockchain game state
-    // Smart contract constants.rs: OPEN=0, CLOSED=1, WAITING=2
-    if (!canPlaceBet && activeGame) {
-      const status = activeGame.status;
-      if (status === 1) {
-        // GAME_STATUS_CLOSED = 1 - Game ended, wait for next round
-        toast.error("Game has ended, please wait for next round...");
-        return;
-      } else if (status === 2) {
-        // GAME_STATUS_WAITING = 2 - Game waiting for first bet, allow betting!
-        logger.ui.debug("Game waiting for bets, placing first bet");
-        // Continue to place bet (don't return)
-      } else {
-        toast.error("Cannot place bet at this time");
-        return;
-      }
-    }
 
     const amount = parseFloat(betAmount);
     if (isNaN(amount) || amount < MIN_BET_AMOUNT || amount > MAX_BET_AMOUNT) {
@@ -360,11 +307,8 @@ const BettingPanel = memo(function BettingPanel({
   }, [
     connected,
     publicKey,
-    playerData,
     selectedCharacter,
     betAmount,
-    canPlaceBet,
-    activeGame,
     placeBet,
     validateBet,
     onBetPlaced,
@@ -379,6 +323,11 @@ const BettingPanel = memo(function BettingPanel({
 
   // Don't render if not connected
   if (!connected) {
+    return null;
+  }
+
+  // Hide entire panel during non-betting phases (fighting, celebrating, VRF pending, cleanup)
+  if (!isBettingPhase(gamePhase)) {
     return null;
   }
 
@@ -589,11 +538,11 @@ const BettingPanel = memo(function BettingPanel({
           </div>
         </div>
         <SocialLinks />
-        <BotControlTab onClick={() => setBotDialogOpen(true)} />
+        {/* <BotControlTab onClick={() => setBotDialogOpen(true)} /> */}
       </div>
 
-      {/* Bot Dialog */}
-      <BotDialog open={botDialogOpen} onOpenChange={setBotDialogOpen} />
+      {/* Bot Dialog - disabled for now */}
+      {/* <BotDialog open={botDialogOpen} onOpenChange={setBotDialogOpen} /> */}
 
       <div className="flex items-center justify-between bg-linear-to-b from-amber-900/50 to-amber-950/50 backdrop-blur-xs rounded-xl shadow-2xl shadow-amber-900/50 min-w-[560px] px-2 py-2 space-x-1">
         <div className="relative w-1/5">
@@ -656,7 +605,7 @@ const BettingPanel = memo(function BettingPanel({
         {/* Place bet button with arcade press effect */}
         <button
           onClick={() => void handlePlaceBet()}
-          disabled={isSubmitting || !canPlaceBet || !selectedCharacter}
+          disabled={isSubmitting || !selectedCharacter}
           className={`
             text-2xl cursor-pointer flex justify-center items-center w-1/3 py-2
             bg-linear-to-b from-amber-500 to-amber-700
@@ -677,9 +626,7 @@ const BettingPanel = memo(function BettingPanel({
             ? "Select"
             : isSubmitting
               ? "Inserting..."
-              : !canPlaceBet
-                ? "Closed"
-                : "Insert coin"}
+              : "Insert coin"}
         </button>
       </div>
     </div>
