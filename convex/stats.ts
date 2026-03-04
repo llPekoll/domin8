@@ -216,6 +216,45 @@ export const getAllTimeStats = query({
 });
 
 /**
+ * Get platform stats: TVL (total SOL wagered) and platform earnings (house fees)
+ * TVL = sum of all game pots
+ * Earnings = 5% of multi-player game pots (single player = 0% fee)
+ */
+export const getPlatformStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const gameRounds = await ctx.db
+      .query("gameRoundStates")
+      .withIndex("by_status_and_round", (q) => q.eq("status", "finished"))
+      .collect();
+
+    let totalLamports = 0;
+    let earningsLamports = 0;
+    const processedRounds = new Set<number>();
+
+    for (const round of gameRounds) {
+      if (processedRounds.has(round.roundId)) continue;
+      processedRounds.add(round.roundId);
+
+      const pot = round.totalPot || 0;
+      totalLamports += pot;
+
+      // Multi-player games (2+ unique wallets) have 5% house fee
+      const uniqueWallets = round.wallets?.length ?? 0;
+      if (uniqueWallets > 1) {
+        earningsLamports += Math.floor(pot * 0.05);
+      }
+    }
+
+    return {
+      tvlSOL: totalLamports / LAMPORTS_PER_SOL,
+      earningsSOL: earningsLamports / LAMPORTS_PER_SOL,
+      gamesCount: processedRounds.size,
+    };
+  },
+});
+
+/**
  * Get boss info (previous winner's wallet and character)
  * Returns the wallet address and character ID of the previous game winner
  * Used to determine if current user is the "Boss" with special privileges
