@@ -13,7 +13,7 @@ import { logger } from "../lib/logger";
 import { useFundWallet } from "../hooks/useFundWallet";
 import { Plus, ArrowUpRight, ChevronDown, User } from "lucide-react";
 import { getXpProgressInfo } from "../lib/xpUtils";
-import { Link } from "react-router-dom";
+
 
 export function Header() {
   const {
@@ -94,33 +94,7 @@ export function Header() {
               <img src="/assets/logo.webp" alt="Enrageded" className="h-8 md:h-12 w-auto" />
             </div>
 
-            {/* Center - Navigation Links */}
-            <div className="flex-1 flex gap-3 md:gap-6">
-              <Link
-                to="/"
-                className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"
-              >
-                Arena
-              </Link>
-              <Link
-                to="/1v1"
-                className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"
-              >
-                1<span className="px-0.5">v</span>1
-              </Link>
-              {/*<Link
-                to="/bloody"
-                className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"
-              >
-                Bloody Bird
-              </Link>*/}
-              <Link
-                to="/referrals"
-                className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"
-              >
-                Referrals
-              </Link>
-            </div>
+            <div className="flex-1" />
 
             {/* Right Side - User Controls */}
             <div className="flex items-center gap-2 md:gap-4 shrink-0">

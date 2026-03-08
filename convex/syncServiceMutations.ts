@@ -2,8 +2,43 @@
  * Sync Service Mutations - Database operations for blockchain sync
  */
 import { internalMutation, internalQuery } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { GAME_STATUS } from "./constants";
+
+/**
+ * Increment platform stats when a game finishes
+ * Called from upsertGameState when a new "finished" state is inserted
+ */
+export const incrementPlatformStats = internalMutation({
+  args: {
+    potLamports: v.number(),
+    uniqueWallets: v.number(),
+  },
+  handler: async (ctx, { potLamports, uniqueWallets }) => {
+    const existing = await ctx.db
+      .query("platformStats")
+      .withIndex("by_key", (q) => q.eq("key", "global"))
+      .first();
+
+    const houseFee = uniqueWallets > 1 ? Math.floor(potLamports * 0.05) : 0;
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        totalPotLamports: existing.totalPotLamports + potLamports,
+        earningsLamports: existing.earningsLamports + houseFee,
+        gamesCount: existing.gamesCount + 1,
+      });
+    } else {
+      await ctx.db.insert("platformStats", {
+        key: "global",
+        totalPotLamports: potLamports,
+        earningsLamports: houseFee,
+        gamesCount: 1,
+      });
+    }
+  },
+});
 
 /**
  * Upsert game state from blockchain to database
@@ -128,6 +163,14 @@ export const upsertGameState = internalMutation({
       // Create new state
       await db.insert("gameRoundStates", gameData);
       console.log(`[Sync Mutations] Created game ${roundId} (status: ${status}, map: ${gameRound.map})`);
+
+      // Increment platform stats when a finished game is first recorded
+      if (status === "finished" && gameData.totalPot) {
+        await ctx.runMutation(internal.syncServiceMutations.incrementPlatformStats, {
+          potLamports: gameData.totalPot,
+          uniqueWallets: gameData.wallets?.length ?? 0,
+        });
+      }
     }
   },
 });

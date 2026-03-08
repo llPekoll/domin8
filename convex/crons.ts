@@ -40,18 +40,13 @@ const crons = cronJobs();
  * When a game is OPEN with endTimestamp set, schedules jobs at exact times.
  * This is simpler and more reliable than webhook-driven scheduling.
  */
-crons.interval(
-  "game-loop-scheduler",
-  { seconds: 50 },
-  internal.syncService.checkAndEndOpenGames
-);
+crons.interval("game-loop-scheduler", { seconds: 50 }, internal.syncService.checkAndEndOpenGames);
 
-
-crons.interval(
-  "sync-1v1-stuck-lobbies",
-  { seconds: 30 },
-  internal.lobbiesActions.syncLobbyFromBlockchain
-)
+// crons.interval(
+//   "sync-1v1-stuck-lobbies",
+//   { seconds: 30 },
+//   internal.lobbiesActions.syncLobbyFromBlockchain
+// )
 /**
  * Scheduled jobs cleanup - removes old completed/failed jobs
  * Runs every 6 hours to clean up jobs older than 7 days
@@ -94,10 +89,10 @@ crons.interval(
  * - Budget limits and strategy conditions are met
  * - Bot hasn't already bet this round
  */
-crons.interval(
-  "bot-executor",
-  { seconds: 15 },
-  internal.botExecutor.executeBots
-);
+// crons.interval(
+//   "bot-executor",
+//   { seconds: 15 },
+//   internal.botExecutor.executeBots
+// );
 
 export default crons;

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
+
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useFundWallet } from "../hooks/useFundWallet";
 import { PrivyWalletButton } from "./PrivyWalletButton";
@@ -78,33 +78,7 @@ export function HeaderMobile() {
             <img src="/assets/logo.webp" alt="Enrageded" className="h-8 w-auto" />
           </div>
 
-          {/* Navigation Links */}
-          <div className="flex-1 flex gap-3 ml-3">
-            <Link
-              to="/"
-              className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs font-semibold"
-            >
-              Arena
-            </Link>
-            <Link
-              to="/1v1"
-              className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs font-semibold"
-            >
-              1<span className="px-0.5">v</span>1
-            </Link>
-            {/*<Link
-              to="/bloody"
-              className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"
-            >
-              Bloody Bird
-            </Link>*/}
-            <Link
-              to="/referrals"
-              className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"
-            >
-              Referrals
-            </Link>
-          </div>
+          <div className="flex-1" />
 
           {/* Right Side - User Controls */}
           <div className="flex items-center gap-2 shrink-0">

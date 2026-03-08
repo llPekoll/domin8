@@ -6,20 +6,24 @@ import { useAssets } from "../contexts/AssetsContext";
 import { useMemo } from "react";
 import { isMobile, isTablet } from "react-device-detect";
 
-function PlatformStats() {
-  const stats = useQuery(api.stats.getPlatformStats);
-  if (!stats) return null;
-
-  const tvl = stats.tvlSOL + 40;
-  const gain = stats.earningsSOL + 2;
-
-  return (
-    <p className="text-white/60 text-lg flex justify-end gap-4">
-      <span>TVL <span className="text-purple-300">+{tvl.toFixed(1)}</span></span>
-      <span>Gain <span className="text-green-300">+{gain.toFixed(1)}</span></span>
-    </p>
-  );
-}
+// function PlatformStats() {
+//   const stats = useQuery(api.stats.getPlatformStats);
+//   if (!stats) return null;
+//
+//   const tvl = stats.tvlSOL + 40;
+//   const gain = stats.earningsSOL + 2;
+//
+//   return (
+//     <p className="text-white/60 text-lg flex justify-end gap-4">
+//       <span>
+//         Volume <span className="text-purple-300">+{tvl.toFixed(1)}</span>
+//       </span>
+//       <span>
+//         Gain <span className="text-green-300">+{gain.toFixed(1)}</span>
+//       </span>
+//     </p>
+//   );
+// }
 
 export function LastWinnerCard() {
   const lastFinishedGame = useQuery(api.stats.getLastFinishedGame);
@@ -35,7 +39,8 @@ export function LastWinnerCard() {
   const characterData = useMemo(() => {
     if (!lastFinishedGame?.characterName || !characters) return null;
     return characters.find(
-      (char: { name: string }) => char.name.toLowerCase() === lastFinishedGame.characterName.toLowerCase()
+      (char: { name: string }) =>
+        char.name.toLowerCase() === lastFinishedGame.characterName.toLowerCase()
     );
   }, [lastFinishedGame?.characterName, characters]);
 
@@ -137,10 +142,8 @@ export function LastWinnerCard() {
         </CardContent>
       </Card>
       <div className="mr-6 -space-y-1">
-        <PlatformStats />
-        <p className="text-white/60 text-lg flex justify-end">
-          Round #{lastFinishedGame.roundId}
-        </p>
+        {/* <PlatformStats /> */}
+        <p className="text-white/60 text-lg flex justify-end">Round #{lastFinishedGame.roundId}</p>
       </div>
     </div>
   );

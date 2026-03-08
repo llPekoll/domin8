@@ -1,4 +1,4 @@
-import { query, internalQuery } from "./_generated/server";
+import { query, internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
@@ -217,10 +217,33 @@ export const getAllTimeStats = query({
 
 /**
  * Get platform stats: TVL (total SOL wagered) and platform earnings (house fees)
- * TVL = sum of all game pots
- * Earnings = 5% of multi-player game pots (single player = 0% fee)
+ * Reads from the incremental platformStats table (single row lookup)
  */
 export const getPlatformStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const stats = await ctx.db
+      .query("platformStats")
+      .withIndex("by_key", (q) => q.eq("key", "global"))
+      .first();
+
+    if (!stats) {
+      return { tvlSOL: 0, earningsSOL: 0, gamesCount: 0 };
+    }
+
+    return {
+      tvlSOL: stats.totalPotLamports / LAMPORTS_PER_SOL,
+      earningsSOL: stats.earningsLamports / LAMPORTS_PER_SOL,
+      gamesCount: stats.gamesCount,
+    };
+  },
+});
+
+/**
+ * One-time backfill: compute platformStats from all existing finished games
+ * Run once after deploying the platformStats table, then remove
+ */
+export const backfillPlatformStats = internalMutation({
   args: {},
   handler: async (ctx) => {
     const gameRounds = await ctx.db
@@ -228,7 +251,7 @@ export const getPlatformStats = query({
       .withIndex("by_status_and_round", (q) => q.eq("status", "finished"))
       .collect();
 
-    let totalLamports = 0;
+    let totalPotLamports = 0;
     let earningsLamports = 0;
     const processedRounds = new Set<number>();
 
@@ -237,20 +260,32 @@ export const getPlatformStats = query({
       processedRounds.add(round.roundId);
 
       const pot = round.totalPot || 0;
-      totalLamports += pot;
+      totalPotLamports += pot;
 
-      // Multi-player games (2+ unique wallets) have 5% house fee
       const uniqueWallets = round.wallets?.length ?? 0;
       if (uniqueWallets > 1) {
         earningsLamports += Math.floor(pot * 0.05);
       }
     }
 
-    return {
-      tvlSOL: totalLamports / LAMPORTS_PER_SOL,
-      earningsSOL: earningsLamports / LAMPORTS_PER_SOL,
+    // Delete existing row if any
+    const existing = await ctx.db
+      .query("platformStats")
+      .withIndex("by_key", (q) => q.eq("key", "global"))
+      .first();
+    if (existing) {
+      await ctx.db.delete(existing._id);
+    }
+
+    await ctx.db.insert("platformStats", {
+      key: "global",
+      totalPotLamports,
+      earningsLamports,
       gamesCount: processedRounds.size,
-    };
+    });
+
+    console.log(`[Backfill] Platform stats: TVL=${totalPotLamports / 1e9} SOL, Earnings=${earningsLamports / 1e9} SOL, Games=${processedRounds.size}`);
+    return { totalPotLamports, earningsLamports, gamesCount: processedRounds.size };
   },
 });
 

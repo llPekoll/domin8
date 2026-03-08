@@ -262,6 +262,21 @@ export default defineSchema({
     
 
   // ============================================================================
+  // PLATFORM STATS TABLE (incremental, not recomputed)
+  // ============================================================================
+
+  /**
+   * Platform Stats - Running totals for TVL and earnings
+   * Single row, updated incrementally when each game finishes
+   */
+  platformStats: defineTable({
+    key: v.string(), // Always "global" - single row
+    totalPotLamports: v.number(), // Sum of all game pots (TVL)
+    earningsLamports: v.number(), // Sum of house fees (5% of multi-player pots)
+    gamesCount: v.number(), // Total finished games
+  }).index("by_key", ["key"]),
+
+  // ============================================================================
   // AUTO-BETTING BOT TABLES
   // ============================================================================
 
