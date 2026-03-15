@@ -97,13 +97,13 @@ export function ProfileDialog({
 
   // Filter and sort 1v1 lobbies - only resolved ones (status 3), most recent first
   const recent1v1Games = (playerLobbies?.all ?? [])
-    .filter((lobby) => lobby.status === 3 && lobby.winner)
-    .sort((a, b) => (b.resolvedAt ?? b.createdAt) - (a.resolvedAt ?? a.createdAt))
+    .filter((lobby: any) => lobby.status === 3 && lobby.winner)
+    .sort((a: any, b: any) => (b.resolvedAt ?? b.createdAt) - (a.resolvedAt ?? a.createdAt))
     .slice(0, 20);
 
   // Calculate 1v1 stats from displayed games
-  const total1v1Wins = recent1v1Games.filter((lobby) => lobby.winner === walletAddress).length;
-  const total1v1Losses = recent1v1Games.filter((lobby) => lobby.winner !== walletAddress).length;
+  const total1v1Wins = recent1v1Games.filter((lobby: any) => lobby.winner === walletAddress).length;
+  const total1v1Losses = recent1v1Games.filter((lobby: any) => lobby.winner !== walletAddress).length;
 
   // Calculate arena stats from displayed games (not stored playerData which includes refunds)
   const totalWins = recentGames?.filter((g) => g.isWinner).length ?? 0;
@@ -428,7 +428,7 @@ export function ProfileDialog({
                         </div>
                       ) : (
                         <div className="divide-y divide-amber-500/20">
-                          {recent1v1Games.map((lobby) => {
+                          {recent1v1Games.map((lobby: any) => {
                             const isWinner = lobby.winner === walletAddress;
                             const opponent =
                               lobby.playerA === walletAddress ? lobby.playerB : lobby.playerA;

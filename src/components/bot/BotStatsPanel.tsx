@@ -117,7 +117,7 @@ export function BotStatsPanel() {
                 </tr>
               </thead>
               <tbody>
-                {recentPerformance.slice(0, 10).map((bet, idx) => (
+                {recentPerformance.slice(0, 10).map((bet: any, idx: any) => (
                   <tr
                     key={idx}
                     className="border-t border-indigo-500/20 hover:bg-indigo-900/20"

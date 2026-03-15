@@ -259,7 +259,7 @@ export function BotPurchasePanel() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {tiers.map((tier) => (
+        {tiers.map((tier: any) => (
           <TierCard
             key={tier.id}
             tier={tier.id as BotTier}
