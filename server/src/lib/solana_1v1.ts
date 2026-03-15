@@ -4,9 +4,9 @@ import { Connection, PublicKey, Keypair, Transaction, VersionedTransaction } fro
 import { Buffer } from "buffer";
 import bs58 from "bs58";
 
-// Import the 1v1 IDL type
-import type { Domin81v1Prgm } from "../../../target/types/domin8_1v1_prgm";
-import IDL from "../../../target/idl/domin8_1v1_prgm.json";
+// Import the 1v1 IDL
+import IDL from "./idl/domin8_1v1_prgm.json";
+type Domin81v1Prgm = any;
 
 export const PDA_SEEDS_1V1 = {
   CONFIG: Buffer.from("domin8_1v1_config"),

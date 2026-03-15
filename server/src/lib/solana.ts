@@ -13,9 +13,9 @@ import { GameConfig, GameRound, DOMIN8_PROGRAM_ID, PDA_SEEDS, BetInfoStruct } fr
 import { Buffer } from "buffer";
 import bs58 from "bs58";
 
-// Import the IDL type
-import type { Domin8Prgm } from "../../../target/types/domin8_prgm";
-import IDL from "../../../target/idl/domin8_prgm.json";
+// Import the IDL
+import IDL from "./idl/domin8_prgm.json";
+type Domin8Prgm = any;
 
 // Simple NodeWallet implementation for server-side use
 class NodeWallet implements anchor.Wallet {
