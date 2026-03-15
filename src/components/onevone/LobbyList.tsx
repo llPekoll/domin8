@@ -1,7 +1,6 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useActiveWallet } from "../../contexts/ActiveWalletContext";
-import { useAction, useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { useSocket, socketRequest } from "../../lib/socket";
 import { toast } from "sonner";
 import { logger } from "../../lib/logger";
 import type { Character } from "../../types/character";
@@ -38,7 +37,16 @@ export function LobbyList({
   onLobbySelected,
 }: LobbyListProps) {
   const { connected, activeWallet: wallet, activePublicKey: publicKey } = useActiveWallet();
-  const joinLobbyAction = useAction(api.lobbies.joinLobby);
+  const { socket } = useSocket();
+  const joinLobbyAction = useCallback(
+    async (args: any) => {
+      if (!socket) throw new Error("Not connected");
+      const res = await socketRequest(socket, "join-lobby", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
+  );
   const [joiningLobbies, setJoiningLobbies] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState<"open" | "my">("open");
   
@@ -58,11 +66,17 @@ export function LobbyList({
     return [...new Set(openLobbies.map((lobby) => lobby.playerA))];
   }, [openLobbies]);
 
-  // Fetch player names for all playerA wallets
-  const playerNames = useQuery(
-    api.players.getPlayersByWallets,
-    playerAWallets.length > 0 ? { walletAddresses: playerAWallets } : "skip"
-  );
+  // Fetch player names for all playerA wallets via socket
+  const [playerNames, setPlayerNames] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (!socket || playerAWallets.length === 0) {
+      setPlayerNames(null);
+      return;
+    }
+    socketRequest(socket, "get-players-by-wallets", { walletAddresses: playerAWallets }).then((res) => {
+      if (res.success) setPlayerNames(res.data);
+    });
+  }, [socket, playerAWallets.join(",")]);
 
   // Create a lookup map for quick access
   const playerNameMap = useMemo(() => {

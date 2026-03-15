@@ -195,8 +195,16 @@ export function useActiveGame() {
 
   // Fetch and subscribe to active_game using shared WebSocket
   useEffect(() => {
+    console.log("🔴🔴🔴 [PEKO_DEBUG] SUBSCRIPTION EFFECT FIRED 🔴🔴🔴", {
+      hasProgram: !!program,
+      programId: program?.programId?.toBase58() ?? "NULL",
+      hasActiveGamePDA: !!activeGamePDA,
+      activeGamePDA: activeGamePDA?.toBase58() ?? "NULL",
+      hasConnection: !!connection,
+      connectionEndpoint: connection?.rpcEndpoint ?? "NULL",
+    });
     if (!program || !activeGamePDA || !connection) {
-      logger.solana.debug("[DOMIN8] ⚠️ Missing dependencies for game fetch", {
+      console.log("🔴🔴🔴 [PEKO_DEBUG] BAILING - MISSING DEPS 🔴🔴🔴", {
         hasProgram: !!program,
         hasActiveGamePDA: !!activeGamePDA,
         hasConnection: !!connection,
@@ -232,9 +240,13 @@ export function useActiveGame() {
 
     // Subscribe to updates via shared manager
     const unsubscribe = sharedSubscription.subscribe((accountInfo) => {
+      console.log("🔴🔴🔴 [PEKO_DEBUG] SUBSCRIPTION CALLBACK FIRED 🔴🔴🔴", {
+        dataLength: accountInfo.data.length,
+      });
       try {
         if (accountInfo.data.length > 0) {
           const decodedGameData = (program.coder.accounts as any).decode("domin8Game", accountInfo.data);
+          console.log("🔴🔴🔴 [PEKO_DEBUG] DECODED GAME DATA 🔴🔴🔴", decodedGameData);
           setRawGameData(decodedGameData);
           setIsLoading(false);
           logger.solana.debug("[DOMIN8] 🔄 Active game updated (via shared subscription):", decodedGameData);
@@ -258,6 +270,19 @@ export function useActiveGame() {
       unsubscribe();
     };
   }, [program?.programId.toString(), activeGamePDA?.toString(), connection?.rpcEndpoint]);
+
+  // PEKO_DEBUG: Log every render of useActiveGame with full state
+  useEffect(() => {
+    console.log("🔴🔴🔴 [PEKO_DEBUG useActiveGame] CURRENT STATE 🔴🔴🔴", {
+      activeGame,
+      isLoading,
+      activeGamePDA: activeGamePDA?.toBase58() ?? null,
+      rawGameData,
+      mapData,
+      hasProgram: !!program,
+      walletAddress,
+    });
+  }, [activeGame, isLoading, activeGamePDA, rawGameData, mapData, program, walletAddress]);
 
   return {
     activeGame,

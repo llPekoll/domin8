@@ -1,9 +1,8 @@
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useSocket, socketRequest } from "../lib/socket";
 import { Card, CardContent } from "./ui/card";
 import { SpriteAnimator } from "./SpriteAnimator";
 import { useAssets } from "../contexts/AssetsContext";
-import { useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { isMobile, isTablet } from "react-device-detect";
 
 // function PlatformStats() {
@@ -26,14 +25,26 @@ import { isMobile, isTablet } from "react-device-detect";
 // }
 
 export function LastWinnerCard() {
-  const lastFinishedGame = useQuery(api.stats.getLastFinishedGame);
+  const { socket } = useSocket();
   const { characters } = useAssets();
 
-  // Get display name for the winner
-  const playerInfo = useQuery(
-    api.players.getPlayer,
-    lastFinishedGame?.winnerAddress ? { walletAddress: lastFinishedGame.winnerAddress } : "skip"
-  );
+  // Fetch last finished game via socket
+  const [lastFinishedGame, setLastFinishedGame] = useState<any>(null);
+  useEffect(() => {
+    if (!socket) return;
+    socketRequest(socket, "get-last-finished-game").then((res) => {
+      if (res.success) setLastFinishedGame(res.data);
+    });
+  }, [socket]);
+
+  // Get display name for the winner via socket
+  const [playerInfo, setPlayerInfo] = useState<any>(null);
+  useEffect(() => {
+    if (!socket || !lastFinishedGame?.winnerAddress) return;
+    socketRequest(socket, "get-player", { walletAddress: lastFinishedGame.winnerAddress }).then((res) => {
+      if (res.success) setPlayerInfo(res.data);
+    });
+  }, [socket, lastFinishedGame?.winnerAddress]);
 
   // Find character data by name to get assetPath
   const characterData = useMemo(() => {

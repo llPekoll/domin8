@@ -5,8 +5,7 @@ import { ChatPanel } from "../components/ChatPanel";
 import { CreateLobby } from "../components/onevone/CreateLobby";
 import { LobbyDetailsDialog } from "../components/onevone/LobbyDetailsDialog";
 import { useActiveWallet } from "../contexts/ActiveWalletContext";
-import { useQuery, useAction } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useSocket, socketRequest } from "../lib/socket";
 import { toast } from "sonner";
 import { logger } from "../lib/logger";
 import { useAssets } from "../contexts/AssetsContext";
@@ -36,8 +35,25 @@ interface LobbyData {
 export function OneVOnePage() {
   const { connected, activePublicKey: publicKey, activeWallet: wallet } = useActiveWallet();
   const { characters } = useAssets();
-  const createLobbyAction = useAction(api.lobbies.createLobby);
-  const joinLobbyAction = useAction(api.lobbies.joinLobby);
+  const { socket } = useSocket();
+  const createLobbyAction = useCallback(
+    async (args: any) => {
+      if (!socket) throw new Error("Not connected");
+      const res = await socketRequest(socket, "create-lobby", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
+  );
+  const joinLobbyAction = useCallback(
+    async (args: any) => {
+      if (!socket) throw new Error("Not connected");
+      const res = await socketRequest(socket, "join-lobby", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
+  );
   const [searchParams, setSearchParams] = useSearchParams();
   // Sync characters to Phaser's global state for game scenes
   useEffect(() => {
@@ -70,10 +86,22 @@ export function OneVOnePage() {
 
   // Get open lobbies from Convex (real-time updates)
   // Pass current player wallet so they can see their own private lobbies
-  const openLobbiesQuery = useQuery(
-    api.lobbies.getOpenLobbies,
-    currentPlayerWallet ? { currentPlayerWallet } : {}
-  );
+  const [openLobbiesQuery, setOpenLobbiesQuery] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (!socket) return;
+    const args = currentPlayerWallet ? { currentPlayerWallet } : {};
+    socketRequest(socket, "get-open-lobbies", args).then((res) => {
+      if (res.success) setOpenLobbiesQuery(res.data);
+    });
+    // Listen for real-time lobby updates
+    const handleLobbyUpdate = () => {
+      socketRequest(socket, "get-open-lobbies", args).then((res) => {
+        if (res.success) setOpenLobbiesQuery(res.data);
+      });
+    };
+    socket.on("lobby-updated", handleLobbyUpdate);
+    return () => { socket.off("lobby-updated", handleLobbyUpdate); };
+  }, [socket, currentPlayerWallet]);
   const openLobbies = useMemo(() => openLobbiesQuery || [], [openLobbiesQuery]);
 
   // Debug: Log lobby data including characterA
@@ -92,14 +120,26 @@ export function OneVOnePage() {
     }
   }, [openLobbies]);
 
-  // Get lobby by share token (for URL-based access)
-  const sharedLobby = useQuery(
-    api.lobbies.getLobbyByShareToken,
-    shareToken ? { shareToken } : "skip"
-  );
+  // Get lobby by share token (for URL-based access) via socket
+  const [sharedLobby, setSharedLobby] = useState<any>(null);
+  useEffect(() => {
+    if (!socket || !shareToken) {
+      setSharedLobby(null);
+      return;
+    }
+    socketRequest(socket, "get-lobby-by-share-token", { shareToken }).then((res) => {
+      if (res.success) setSharedLobby(res.data);
+    });
+  }, [socket, shareToken]);
 
-  // Get completed lobbies for history
-  const completedLobbiesQuery = useQuery(api.lobbies.getCompletedLobbies, { limit: 20 });
+  // Get completed lobbies for history via socket
+  const [completedLobbiesQuery, setCompletedLobbiesQuery] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (!socket) return;
+    socketRequest(socket, "get-completed-lobbies", { limit: 20 }).then((res) => {
+      if (res.success) setCompletedLobbiesQuery(res.data);
+    });
+  }, [socket]);
   const completedLobbies = useMemo(() => completedLobbiesQuery || [], [completedLobbiesQuery]);
 
   // Filtered and sorted lobbies
@@ -177,11 +217,17 @@ export function OneVOnePage() {
     return Array.from(wallets);
   }, [openLobbies, completedLobbies, sharedLobby]);
 
-  // Fetch player display names for all wallets
-  const playerNames = useQuery(
-    api.players.getPlayersByWallets,
-    allWalletAddresses.length > 0 ? { walletAddresses: allWalletAddresses } : "skip"
-  );
+  // Fetch player display names for all wallets via socket
+  const [playerNames, setPlayerNames] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (!socket || allWalletAddresses.length === 0) {
+      setPlayerNames(null);
+      return;
+    }
+    socketRequest(socket, "get-players-by-wallets", { walletAddresses: allWalletAddresses }).then((res) => {
+      if (res.success) setPlayerNames(res.data);
+    });
+  }, [socket, allWalletAddresses.join(",")]);
 
   // Helper function to get display name or truncated wallet
   const getPlayerDisplayName = useCallback(
@@ -199,11 +245,25 @@ export function OneVOnePage() {
     [playerNames]
   );
 
-  // Get specific lobby state when in arena (for real-time updates during fight)
-  const lobbyStateQuery = useQuery(
-    api.lobbies.getLobbyState,
-    activeLobbyId !== null ? { lobbyId: activeLobbyId } : "skip"
-  );
+  // Get specific lobby state when in arena (for real-time updates during fight) via socket
+  const [lobbyStateQuery, setLobbyStateQuery] = useState<any>(null);
+  useEffect(() => {
+    if (!socket || activeLobbyId === null) {
+      setLobbyStateQuery(null);
+      return;
+    }
+    socketRequest(socket, "get-lobby-state", { lobbyId: activeLobbyId }).then((res) => {
+      if (res.success) setLobbyStateQuery(res.data);
+    });
+    // Listen for real-time lobby state updates
+    const handleStateUpdate = (data: any) => {
+      if (data.lobbyId === activeLobbyId) {
+        setLobbyStateQuery(data);
+      }
+    };
+    socket.on("lobby-state-updated", handleStateUpdate);
+    return () => { socket.off("lobby-state-updated", handleStateUpdate); };
+  }, [socket, activeLobbyId]);
 
   // Only use the lobby state if modal is open
   const activeLobbyState = arenaModalOpen && activeLobbyId !== null ? lobbyStateQuery : null;

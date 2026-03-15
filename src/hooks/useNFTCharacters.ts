@@ -1,7 +1,6 @@
-import { useQuery, useAction } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useState, useEffect, useCallback } from "react";
+import { useSocket, socketRequest } from "../lib/socket";
 import type { Character } from "../types/character";
-import { useState } from "react";
 
 /**
  * Hook to check NFT ownership and return unlocked exclusive characters
@@ -15,19 +14,40 @@ export function useNFTCharacters(
   externalWalletAddress: string | null,
   embeddedWalletAddress?: string | null
 ) {
+  const { socket } = useSocket();
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [allExclusiveChars, setAllExclusiveChars] = useState<any[] | null>(null);
+  const [allHolders, setAllHolders] = useState<any[] | null>(null);
 
-  // Get all exclusive characters from Convex
-  const allExclusiveChars = useQuery(api.characters.getExclusiveCharacters);
+  const walletAddresses = [externalWalletAddress, embeddedWalletAddress].filter(Boolean) as string[];
 
-  // Get all holder data for all collections at once
-  const allHolders = useQuery(api.nftHolderScanner.getAllHoldersForWallets, {
-    walletAddresses: [externalWalletAddress, embeddedWalletAddress].filter(Boolean) as string[],
-  });
+  // Fetch exclusive characters
+  useEffect(() => {
+    if (!socket) return;
 
-  // Manual refresh action
-  const manualRefresh = useAction(api.nftHolderScanner.manualRefreshWalletNFTs);
+    socketRequest(socket, "get-exclusive-characters").then((res) => {
+      if (res.success) {
+        setAllExclusiveChars(res.data ?? []);
+      }
+    });
+  }, [socket]);
+
+  // Fetch holder data for wallets
+  useEffect(() => {
+    if (!socket || walletAddresses.length === 0) {
+      setAllHolders([]);
+      return;
+    }
+
+    socketRequest(socket, "get-all-holders-for-wallets", {
+      walletAddresses,
+    }).then((res) => {
+      if (res.success) {
+        setAllHolders(res.data ?? []);
+      }
+    });
+  }, [socket, externalWalletAddress, embeddedWalletAddress]);
 
   // Calculate unlocked characters based on cached data
   const unlockedCharacters: Character[] = [];
@@ -39,7 +59,7 @@ export function useNFTCharacters(
 
       // Check if any of the user's wallets own NFTs from this collection
       const ownsNFT = allHolders.some(
-        (holder) => holder.collectionAddress === character.nftCollection
+        (holder: any) => holder.collectionAddress === character.nftCollection
       );
 
       if (ownsNFT) {
@@ -52,12 +72,8 @@ export function useNFTCharacters(
    * Manual refresh function for users who just bought NFTs
    * Rate-limited to once every 5 minutes per wallet
    */
-  const refreshNFTStatus = async () => {
-    const walletsToCheck = [externalWalletAddress, embeddedWalletAddress].filter(
-      (addr): addr is string => Boolean(addr)
-    );
-
-    if (walletsToCheck.length === 0 || !allExclusiveChars) {
+  const refreshNFTStatus = useCallback(async () => {
+    if (!socket || walletAddresses.length === 0 || !allExclusiveChars) {
       return;
     }
 
@@ -66,19 +82,19 @@ export function useNFTCharacters(
 
     try {
       // Refresh each wallet for each collection
-      for (const walletAddr of walletsToCheck) {
+      for (const walletAddr of walletAddresses) {
         for (const character of allExclusiveChars) {
           if (!character.nftCollection) continue;
 
           try {
-            const result = await manualRefresh({
+            const res = await socketRequest(socket, "manual-refresh-wallet-nfts", {
               walletAddress: walletAddr,
               collectionAddress: character.nftCollection,
             });
 
-            if (result.rateLimited) {
-              console.log(`[useNFTCharacters] Rate limited: ${result.error}`);
-              setError(result.error);
+            if (res.success && res.data?.rateLimited) {
+              console.log(`[useNFTCharacters] Rate limited: ${res.data.error}`);
+              setError(res.data.error);
               break;
             }
           } catch (err) {
@@ -86,13 +102,21 @@ export function useNFTCharacters(
           }
         }
       }
+
+      // Re-fetch holder data after refresh
+      const holdersRes = await socketRequest(socket, "get-all-holders-for-wallets", {
+        walletAddresses,
+      });
+      if (holdersRes.success) {
+        setAllHolders(holdersRes.data ?? []);
+      }
     } catch (err) {
       console.error("Manual refresh failed:", err);
       setError("Failed to refresh NFT status");
     } finally {
       setRefreshing(false);
     }
-  };
+  }, [socket, walletAddresses, allExclusiveChars]);
 
   return {
     unlockedCharacters,

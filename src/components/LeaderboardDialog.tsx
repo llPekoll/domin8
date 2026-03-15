@@ -1,6 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useState, useEffect } from "react";
+import { useSocket, socketRequest } from "../lib/socket";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Trophy, X } from "lucide-react";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
@@ -13,8 +12,17 @@ interface LeaderboardDialogProps {
 
 export function LeaderboardDialog({ open, onOpenChange }: LeaderboardDialogProps) {
   const { publicKey } = usePrivyWallet();
+  const { socket } = useSocket();
   const [sortBy, setSortBy] = useState<"points" | "level">("level");
-  const leaderboard = useQuery(api.players.getLeaderboard, { limit: 50, sortBy });
+  const [leaderboard, setLeaderboard] = useState<any[] | undefined>(undefined);
+
+  useEffect(() => {
+    if (!socket) return;
+    socketRequest(socket, "get-leaderboard", { limit: 50, sortBy }).then((res) => {
+      if (res.success) setLeaderboard(res.data);
+      else setLeaderboard([]);
+    });
+  }, [socket, sortBy]);
 
   const getRankStyle = (rank: number) => {
     switch (rank) {

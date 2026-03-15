@@ -52,3 +52,9 @@ app/build/
 *.aab
 *.idsig
 *.keystore
+
+# Convex backup
+convex-backup
+
+# Server
+server/node_modules

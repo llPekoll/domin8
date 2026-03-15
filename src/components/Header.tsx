@@ -1,7 +1,6 @@
 import { useActiveWallet } from "../contexts/ActiveWalletContext";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { useState, useEffect, useRef } from "react";
+import { useSocket, socketRequest } from "../lib/socket";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { ProfileDialog } from "./ProfileDialog";
 import { WithdrawDialog } from "./WithdrawDialog";
 import { LeaderboardDialog } from "./LeaderboardDialog";
@@ -33,8 +32,9 @@ export function Header() {
   const [profileDefaultTab, setProfileDefaultTab] = useState<"profile" | "sound">("profile");
   const balanceMenuRef = useRef<HTMLDivElement>(null);
 
-  const createPlayer = useMutation(api.players.createPlayer);
+  const { socket } = useSocket();
   const { handleAddFunds } = useFundWallet();
+  const [playerData, setPlayerData] = useState<any>(null);
 
   // Close balance menu when clicking outside
   useEffect(() => {
@@ -47,14 +47,28 @@ export function Header() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Player data is always keyed by embedded wallet address for consistency
-  const playerData = useQuery(
-    api.players.getPlayer,
-    connected && embeddedWalletAddress ? { walletAddress: embeddedWalletAddress } : "skip"
-  );
+  // Fetch player data via socket
+  useEffect(() => {
+    if (!socket || !connected || !embeddedWalletAddress) {
+      setPlayerData(null);
+      return;
+    }
+    socketRequest(socket, "get-player", { walletAddress: embeddedWalletAddress }).then((res) => {
+      if (res.success) setPlayerData(res.data);
+      else setPlayerData(null);
+    });
+  }, [socket, connected, embeddedWalletAddress]);
 
-  // Get current game state directly from blockchain (not Convex)
-  // const { activeGame: currentRoundState } = useActiveGame();
+  // Create player mutation via socket
+  const createPlayer = useCallback(
+    async (args: { walletAddress: string; displayName: string; externalWalletAddress?: string }) => {
+      if (!socket) throw new Error("Not connected");
+      const res = await socketRequest(socket, "create-player", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
+  );
 
   // Create player with random name on first connect (always use embedded wallet as primary key)
   useEffect(() => {

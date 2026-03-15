@@ -1,12 +1,10 @@
-import type { Id } from "../../convex/_generated/dataModel";
-
 /**
- * Shared Character type that matches the Convex database schema
- * Includes _creationTime which Convex automatically adds to all documents
+ * Shared Character type that matches the database schema
+ * Includes _creationTime which is automatically added to all documents
  */
 export interface Character {
-  _id: Id<"characters">;
-  _creationTime: number; // Convex automatically adds this
+  _id: string;
+  _creationTime: number;
   id: number; // Blockchain ID
   name: string;
   assetPath: string;

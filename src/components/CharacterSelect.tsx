@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, memo, useRef } from "react";
-import { useQuery } from "convex/react";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useNFTCharacters } from "../hooks/useNFTCharacters";
-import { api } from "../../convex/_generated/api";
+import { useSocket, socketRequest } from "../lib/socket";
 import { toast } from "sonner";
 // import { BadgeCheck, Star, ChevronLeft, ChevronRight, Lock, Crown } from "lucide-react";
 import { ChevronLeft, ChevronRight, Lock, Crown } from "lucide-react";
@@ -53,8 +52,15 @@ const CharacterSelect = memo(function CharacterSelect({
     }
   }, [nftError]);
 
-  // Get all exclusive characters for modal
-  const allExclusiveChars = useQuery(api.characters.getExclusiveCharacters);
+  // Get all exclusive characters for modal via socket
+  const { socket } = useSocket();
+  const [allExclusiveChars, setAllExclusiveChars] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (!socket) return;
+    socketRequest(socket, "get-exclusive-characters").then((res) => {
+      if (res.success) setAllExclusiveChars(res.data);
+    });
+  }, [socket]);
 
   // Show ALL characters (both regular and NFT-gated)
   // Sort: unlocked characters first, locked characters at the end

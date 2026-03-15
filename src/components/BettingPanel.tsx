@@ -1,10 +1,9 @@
 import { useState, useCallback, useMemo, memo } from "react";
-import { useAction } from "convex/react";
 import { useActiveWallet } from "../contexts/ActiveWalletContext";
 import { useGameContract } from "../hooks/useGameContract";
 import { useFundWallet } from "../hooks/useFundWallet";
 import { useNFTCharacters } from "../hooks/useNFTCharacters";
-import { api } from "../../convex/_generated/api";
+import { useSocket, socketRequest } from "../lib/socket";
 import { toast } from "sonner";
 import { EventBus } from "../game/EventBus";
 import { logger } from "../lib/logger";
@@ -65,8 +64,17 @@ const BettingPanel = memo(function BettingPanel({
   // NFT character checking
   const { unlockedCharacters } = useNFTCharacters(externalWalletAddress, walletAddress);
 
-  // NFT verification action (checks cached database, no blockchain scan)
-  const verifyCachedNFT = useAction(api.nftHolderScanner.verifyCachedNFTOwnership);
+  // NFT verification via socket (checks cached database, no blockchain scan)
+  const { socket } = useSocket();
+  const verifyCachedNFT = useCallback(
+    async (args: { walletAddress: string; collectionAddress: string }) => {
+      if (!socket) return null;
+      const res = await socketRequest(socket, "verify-cached-nft-ownership", args);
+      if (res.success) return res.data;
+      return null;
+    },
+    [socket]
+  );
 
   // Get maps from assets context
   const { maps: allMaps, characters: allCharacters } = useAssets();

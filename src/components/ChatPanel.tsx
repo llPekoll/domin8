@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useSocket, socketRequest } from "../lib/socket";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { Send, Trophy, MessageCircle, GripHorizontal } from "lucide-react";
 
@@ -73,15 +72,45 @@ export function ChatPanel({ fullHeight = false, embedded = false, resizable = fa
     };
   }, [isResizing, height]);
 
-  // Fetch messages with real-time updates
-  const messages = useQuery(api.chat.getRecentMessages) || [];
-  const sendMessage = useMutation(api.chat.sendMessage);
+  const { socket } = useSocket();
 
-  // Get player data for display name
-  const playerData = useQuery(
-    api.players.getPlayer,
-    walletAddress ? { walletAddress } : "skip"
+  // Fetch messages with real-time updates via socket
+  const [messages, setMessages] = useState<any[]>([]);
+  useEffect(() => {
+    if (!socket) return;
+    // Initial fetch
+    socketRequest(socket, "get-recent-messages").then((res) => {
+      if (res.success) setMessages(res.data || []);
+    });
+    // Listen for real-time message updates
+    const handleNewMessage = (msg: any) => {
+      setMessages((prev) => [...prev, msg]);
+    };
+    socket.on("chat-message", handleNewMessage);
+    return () => {
+      socket.off("chat-message", handleNewMessage);
+    };
+  }, [socket]);
+
+  // Send message via socket
+  const sendMessage = useCallback(
+    async (args: { walletAddress: string; message: string; displayName?: string }) => {
+      if (!socket) throw new Error("Not connected");
+      const res = await socketRequest(socket, "send-message", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
   );
+
+  // Get player data for display name via socket
+  const [playerData, setPlayerData] = useState<any>(null);
+  useEffect(() => {
+    if (!socket || !walletAddress) return;
+    socketRequest(socket, "get-player", { walletAddress }).then((res) => {
+      if (res.success) setPlayerData(res.data);
+    });
+  }, [socket, walletAddress]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {

@@ -1,10 +1,9 @@
-import { forwardRef, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { forwardRef, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
 import StartGame, { setCharactersData, setAllMapsData, setDemoMapData } from "./game/main";
 import { EventBus } from "./game/EventBus";
 import { useAssets } from "./contexts/AssetsContext";
 import { GlobalGameStateManager } from "./game/managers/GlobalGameStateManager";
-import { useMutation } from "convex/react";
-import { api } from "../convex/_generated/api";
+import { useSocket, socketRequest } from "./lib/socket";
 import { usePrivyWallet } from "./hooks/usePrivyWallet";
 
 export interface IRefPhaserGame {
@@ -30,8 +29,12 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
   // Get wallet connection status - only trigger presence bot if user is connected
   const { connected: isWalletConnected } = usePrivyWallet();
 
-  // Presence bot: record when user views the arena
-  const recordArenaView = useMutation(api.presenceBotMutations.recordArenaView);
+  // Presence bot: record when user views the arena via socket
+  const { socket } = useSocket();
+  const recordArenaView = useCallback(async () => {
+    if (!socket) return;
+    await socketRequest(socket, "record-arena-view");
+  }, [socket]);
 
   // Select random map client-side for demo mode (only recalculate when map count changes)
   const demoMap = useMemo(() => {

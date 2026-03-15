@@ -1,6 +1,5 @@
-import { useEffect, useRef } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useSocket, socketRequest } from "../lib/socket";
 import { logger } from "../lib/logger";
 import { generateRandomName } from "../lib/nameGenerator";
 import { useReferralTracking } from "./useReferralTracking";
@@ -18,20 +17,49 @@ export function useAutoCreatePlayer(
   publicKey: string | null,
   externalWalletAddress?: string
 ) {
-  // Get player data
-  const playerData = useQuery(
-    api.players.getPlayerWithCharacter,
-    connected && publicKey ? { walletAddress: publicKey } : "skip"
-  );
+  const { socket } = useSocket();
 
-  // Create player mutation
-  const createPlayerMutation = useMutation(api.players.createPlayer);
+  // Player data fetched via socket
+  const [playerData, setPlayerData] = useState<any>(undefined);
 
   // Referral tracking
   const { trackReferral, hasReferralCode } = useReferralTracking();
 
   // Track which wallets we've already processed to avoid duplicates
   const processedWalletsRef = useRef<Set<string>>(new Set());
+
+  // Fetch player data when wallet connects
+  useEffect(() => {
+    if (!socket || !connected || !publicKey) {
+      setPlayerData(undefined);
+      return;
+    }
+
+    socketRequest(socket, "get-player-with-character", { walletAddress: publicKey }).then(
+      (res) => {
+        if (res.success) {
+          setPlayerData(res.data ?? null);
+        } else {
+          setPlayerData(null);
+        }
+      }
+    );
+  }, [socket, connected, publicKey]);
+
+  // Create player mutation via socket
+  const createPlayerMutation = useCallback(
+    async (args: {
+      walletAddress: string;
+      displayName: string;
+      externalWalletAddress?: string;
+    }) => {
+      if (!socket) return;
+      const res = await socketRequest(socket, "create-player", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
+  );
 
   // Auto-create player when wallet connects and player doesn't exist
   useEffect(() => {
@@ -52,9 +80,9 @@ export function useAutoCreatePlayer(
           logger.ui.info("Existing player detected, attempting to track referral...");
           const success = await trackReferral(publicKey);
           if (success) {
-            logger.ui.info("✅ Referral tracked for existing player!");
+            logger.ui.info("Referral tracked for existing player!");
           } else {
-            logger.ui.warn("❌ Could not track referral (may already be referred)");
+            logger.ui.warn("Could not track referral (may already be referred)");
           }
         }
       };
@@ -96,9 +124,9 @@ export function useAutoCreatePlayer(
           logger.ui.info("Tracking referral for new player...");
           const success = await trackReferral(publicKey);
           if (success) {
-            logger.ui.info("✅ Referral tracked successfully!");
+            logger.ui.info("Referral tracked successfully!");
           } else {
-            logger.ui.error("❌ Failed to track referral!");
+            logger.ui.error("Failed to track referral!");
           }
         }
       } catch (error) {

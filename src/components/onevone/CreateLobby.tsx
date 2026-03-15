@@ -1,7 +1,6 @@
 import { useState, useCallback } from "react";
 import { useActiveWallet } from "../../contexts/ActiveWalletContext";
-import { useAction } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { useSocket, socketRequest } from "../../lib/socket";
 import { toast } from "sonner";
 import { logger } from "../../lib/logger";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -24,7 +23,16 @@ export function CreateLobby({
   onLobbyCreated,
 }: CreateLobbyProps) {
   const { connected, activePublicKey: publicKey, activeWallet: wallet } = useActiveWallet();
-  const createLobbyAction = useAction(api.lobbies.createLobby);
+  const { socket } = useSocket();
+  const createLobbyAction = useCallback(
+    async (args: any) => {
+      if (!socket) throw new Error("Not connected");
+      const res = await socketRequest(socket, "create-lobby", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
+  );
 
   const [betAmount, setBetAmount] = useState<number>(DEFAULT_BET_AMOUNT_SOL);
   const [isPrivate, setIsPrivate] = useState(false);

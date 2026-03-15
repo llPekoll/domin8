@@ -14,14 +14,13 @@
  *
  * Flow:
  * 1. useActiveGame provides real-time blockchain data
- * 2. When bets change, we call syncFromBlockchain mutation
- * 3. Convex resolves names and stores participants
- * 4. useQuery subscribes to participants table for updates
+ * 2. When bets change, we call syncFromBlockchain via socket
+ * 3. Server resolves names and stores participants
+ * 4. We listen for participant updates via socket events
  */
 
-import { useEffect, useRef } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useEffect, useRef, useState } from "react";
+import { useSocket, socketRequest } from "../lib/socket";
 import { useActiveGame } from "./useActiveGame";
 
 export interface GameParticipant {
@@ -40,20 +39,23 @@ export interface GameParticipant {
 }
 
 export function useGameParticipants() {
+  const { socket } = useSocket();
   const { activeGame } = useActiveGame();
-  const syncFromBlockchain = useMutation(api.currentGameParticipants.syncFromBlockchain);
 
   // Track last synced state to avoid duplicate syncs
   const lastSyncKeyRef = useRef<string>("");
   const hasSyncedOnceRef = useRef<boolean>(false);
 
+  const [participants, setParticipants] = useState<GameParticipant[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const gameRound = activeGame?.gameRound
     ? Number(activeGame.gameRound.toString())
     : 0;
 
-  // Sync participants to Convex when blockchain data changes OR on initial load
+  // Sync participants to server when blockchain data changes
   useEffect(() => {
-    if (!activeGame?.bets || !activeGame?.wallets || activeGame.bets.length === 0) {
+    if (!socket || !activeGame?.bets || !activeGame?.wallets || activeGame.bets.length === 0) {
       return;
     }
 
@@ -70,7 +72,7 @@ export function useGameParticipants() {
     lastSyncKeyRef.current = syncKey;
     hasSyncedOnceRef.current = true;
 
-    // Convert blockchain data to format expected by mutation
+    // Convert blockchain data to format expected by server
     const bets = activeGame.bets.map((b) => ({
       walletIndex: b.walletIndex,
       amount: Number(b.amount.toString()),
@@ -80,28 +82,59 @@ export function useGameParticipants() {
 
     const wallets = activeGame.wallets.map((w) => w.toBase58());
 
-    console.log(`[useGameParticipants] 🔄 Syncing ${bets.length} bets to Convex (round ${gameRound})`);
+    console.log(`[useGameParticipants] Syncing ${bets.length} bets to server (round ${gameRound})`);
 
-    // Sync to Convex (fire and forget - useQuery will update when data arrives)
-    // Note: bossWallet is resolved server-side to avoid race conditions
-    syncFromBlockchain({
+    // Sync to server - response includes fresh participants
+    socketRequest(socket, "sync-participants-from-blockchain", {
       gameRound,
       bets,
       wallets,
+    }).then((res) => {
+      if (res.success && res.data?.participants) {
+        setParticipants(res.data.participants as GameParticipant[]);
+        setIsLoading(false);
+      }
     }).catch((err) => {
       console.error("[useGameParticipants] Sync failed:", err);
     });
-  }, [activeGame?.bets, activeGame?.wallets, gameRound, syncFromBlockchain]);
+  }, [socket, activeGame?.bets, activeGame?.wallets, gameRound]);
 
-  // Subscribe to participants for current game round
-  const participants = useQuery(
-    api.currentGameParticipants.getParticipants,
-    gameRound > 0 ? { gameRound } : "skip"
-  );
+  // Fetch participants when game round changes
+  useEffect(() => {
+    if (!socket || gameRound <= 0) {
+      setParticipants([]);
+      setIsLoading(false);
+      return;
+    }
+
+    socketRequest(socket, "get-participants", { gameRound }).then((res) => {
+      if (res.success && res.data) {
+        setParticipants(res.data as GameParticipant[]);
+      }
+      setIsLoading(false);
+    });
+  }, [socket, gameRound]);
+
+  // Listen for real-time participant updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleParticipantsUpdate = (data: { gameRound: number; participants: GameParticipant[] }) => {
+      if (data.gameRound === gameRound) {
+        setParticipants(data.participants);
+      }
+    };
+
+    socket.on("participants-updated", handleParticipantsUpdate);
+
+    return () => {
+      socket.off("participants-updated", handleParticipantsUpdate);
+    };
+  }, [socket, gameRound]);
 
   return {
-    participants: (participants ?? []) as GameParticipant[],
-    isLoading: participants === undefined,
+    participants,
+    isLoading,
     gameRound,
   };
 }

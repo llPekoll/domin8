@@ -1,12 +1,22 @@
-import { createContext, useContext, ReactNode } from "react";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { createContext, useContext, ReactNode, useState, useEffect } from "react";
+import { useSocket, socketRequest } from "../lib/socket";
 
 const AssetsContext = createContext<any>(undefined);
 
 export function AssetsProvider({ children }: { children: ReactNode }) {
-  const characters = useQuery(api.characters.getActiveCharacters);
-  const maps = useQuery(api.maps.getAllActiveMaps);
+  const { socket } = useSocket();
+  const [characters, setCharacters] = useState<any[] | undefined>(undefined);
+  const [maps, setMaps] = useState<any[] | undefined>(undefined);
+
+  useEffect(() => {
+    if (!socket) return;
+    socketRequest(socket, "get-active-characters").then((res) => {
+      if (res.success) setCharacters(res.data);
+    });
+    socketRequest(socket, "get-all-active-maps").then((res) => {
+      if (res.success) setMaps(res.data);
+    });
+  }, [socket]);
 
   const getMapById = (mapId: number) => {
     return maps?.find((map) => map.id === mapId) || null;

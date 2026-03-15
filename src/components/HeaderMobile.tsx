@@ -1,12 +1,11 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useFundWallet } from "../hooks/useFundWallet";
 import { PrivyWalletButton } from "./PrivyWalletButton";
 import { ProfileDialog } from "./ProfileDialog";
 import { WithdrawDialog } from "./WithdrawDialog";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useSocket, socketRequest } from "../lib/socket";
 import { toast } from "sonner";
 import { generateRandomName } from "../lib/nameGenerator";
 import { logger } from "../lib/logger";
@@ -23,7 +22,8 @@ export function HeaderMobile() {
   const [hasAttemptedCreation, setHasAttemptedCreation] = useState(false);
   const balanceMenuRef = useRef<HTMLDivElement>(null);
 
-  const createPlayer = useMutation(api.players.createPlayer);
+  const { socket } = useSocket();
+  const [playerData, setPlayerData] = useState<any>(null);
 
   // Close balance menu when clicking outside
   useEffect(() => {
@@ -36,9 +36,27 @@ export function HeaderMobile() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const playerData = useQuery(
-    api.players.getPlayer,
-    connected && publicKey ? { walletAddress: publicKey.toString() } : "skip"
+  // Fetch player data via socket
+  useEffect(() => {
+    if (!socket || !connected || !publicKey) {
+      setPlayerData(null);
+      return;
+    }
+    socketRequest(socket, "get-player", { walletAddress: publicKey.toString() }).then((res) => {
+      if (res.success) setPlayerData(res.data);
+      else setPlayerData(null);
+    });
+  }, [socket, connected, publicKey]);
+
+  // Create player mutation via socket
+  const createPlayer = useCallback(
+    async (args: { walletAddress: string; displayName: string; externalWalletAddress?: string }) => {
+      if (!socket) throw new Error("Not connected");
+      const res = await socketRequest(socket, "create-player", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
   );
 
   // Create player with random name on first connect

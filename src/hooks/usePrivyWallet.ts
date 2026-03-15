@@ -1,13 +1,16 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { useWallets } from "@privy-io/react-auth/solana";
 import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { useState, useEffect, useRef } from "react";
-import { useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useSocket, socketRequest } from "../lib/socket";
 import { getSharedConnection } from "../lib/sharedConnection";
 import { logger } from "../lib/logger";
 import { EventBus } from "../game/EventBus";
-import { getLevelInfo } from "../../convex/xpConstants";
+import { LEVEL_THRESHOLDS } from "../lib/xpUtils";
+
+function getLevelInfo(level: number) {
+  return LEVEL_THRESHOLDS.find((l) => l.level === level) || LEVEL_THRESHOLDS[0];
+}
 
 // Re-export useActiveWallet for components that want wallet switching
 export { useActiveWallet } from "../contexts/ActiveWalletContext";
@@ -26,8 +29,18 @@ export function usePrivyWallet() {
   const [isLoadingBalance, setIsLoadingBalance] = useState<boolean>(false);
   const dailyLoginClaimedRef = useRef<string | null>(null);
 
-  // Convex mutation for daily login XP
-  const claimDailyLoginXp = useMutation(api.players.claimDailyLoginXp);
+  const { socket } = useSocket();
+
+  // Socket-based daily login XP claim
+  const claimDailyLoginXp = useCallback(
+    async (args: { walletAddress: string }) => {
+      if (!socket) return { awarded: false };
+      const res = await socketRequest(socket, "claim-daily-login-xp", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
+  );
 
   const solanaWallet = wallets[0];
   const walletAddress = solanaWallet?.address;
@@ -59,7 +72,7 @@ export function usePrivyWallet() {
       try {
         const result = await claimDailyLoginXp({ walletAddress });
 
-        if (result.awarded) {
+        if (result?.awarded) {
           logger.solana.info("[usePrivyWallet] Daily login XP claimed:", result);
 
           // Emit level-up event if player leveled up
@@ -173,17 +186,8 @@ export function usePrivyWallet() {
     } finally {
       setIsLoadingBalance(false);
     }
-   
+
   };
-  // Debug: Log what we're returning
-  // console.log('[DEBUG] usePrivyWallet returning:', {
-  //   connected,
-  //   walletAddress,
-  //   externalWalletAddress,
-  //   externalWalletAccountType,
-  //   ready,
-  //   linkedAccountsCount: user?.linkedAccounts?.length || 0
-  // });
 
   return {
       connected,

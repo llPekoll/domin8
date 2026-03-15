@@ -2,12 +2,11 @@
  * React Hook for Bot Purchase Operations
  *
  * Handles purchasing bot tiers. Users can own multiple bots (one of each tier)
- * and switch between them. Payment is sent to the treasury wallet, then recorded in Convex.
+ * and switch between them. Payment is sent to the treasury wallet, then recorded via socket.
  */
 
-import { useCallback } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useCallback, useState, useEffect } from "react";
+import { useSocket, socketRequest } from "../lib/socket";
 import { usePrivyWallet } from "./usePrivyWallet";
 import { useWallets } from "@privy-io/react-auth/solana";
 import {
@@ -41,21 +40,39 @@ const SOLANA_NETWORK = import.meta.env.VITE_SOLANA_NETWORK || "devnet";
 export function useBotPurchase() {
   const { connected, publicKey, walletAddress, solBalance } = usePrivyWallet();
   const { wallets } = useWallets();
+  const { socket } = useSocket();
 
-  // Queries
-  const activePurchase = useQuery(
-    api.botPurchases.getUserBotPurchase,
-    walletAddress ? { walletAddress } : "skip"
-  );
-  const allPurchases = useQuery(
-    api.botPurchases.getAllUserBots,
-    walletAddress ? { walletAddress } : "skip"
-  );
-  const tierInfo = useQuery(api.botPurchases.getBotTierInfo, {});
+  // State for queries
+  const [activePurchase, setActivePurchase] = useState<any>(null);
+  const [allPurchases, setAllPurchases] = useState<any[]>([]);
+  const [tierInfo, setTierInfo] = useState<any>(null);
 
-  // Mutations
-  const recordPurchase = useMutation(api.botPurchases.purchaseBot);
-  const setActiveBotMutation = useMutation(api.botPurchases.setActiveBot);
+  // Fetch active purchase
+  useEffect(() => {
+    if (!socket || !walletAddress) return;
+
+    socketRequest(socket, "get-user-bot-purchase", { walletAddress }).then((res) => {
+      if (res.success) setActivePurchase(res.data ?? null);
+    });
+  }, [socket, walletAddress]);
+
+  // Fetch all purchases
+  useEffect(() => {
+    if (!socket || !walletAddress) return;
+
+    socketRequest(socket, "get-all-user-bots", { walletAddress }).then((res) => {
+      if (res.success) setAllPurchases(res.data ?? []);
+    });
+  }, [socket, walletAddress]);
+
+  // Fetch tier info
+  useEffect(() => {
+    if (!socket) return;
+
+    socketRequest(socket, "get-bot-tier-info", {}).then((res) => {
+      if (res.success) setTierInfo(res.data ?? null);
+    });
+  }, [socket]);
 
   // Helper to check if user owns a specific tier
   const ownsTier = useCallback(
@@ -157,13 +174,26 @@ export function useBotPurchase() {
           };
         }
 
-        // Record purchase in database
-        await recordPurchase({
-          walletAddress,
-          tier,
-          transactionSignature: signature,
-          purchaseAmount: price,
-        });
+        // Record purchase in database via socket
+        if (socket) {
+          const recordRes = await socketRequest(socket, "purchase-bot", {
+            walletAddress,
+            tier,
+            transactionSignature: signature,
+            purchaseAmount: price,
+          });
+          if (!recordRes.success) {
+            return { success: false, error: recordRes.error || "Failed to record purchase" };
+          }
+
+          // Refresh purchases
+          socketRequest(socket, "get-all-user-bots", { walletAddress }).then((res) => {
+            if (res.success) setAllPurchases(res.data ?? []);
+          });
+          socketRequest(socket, "get-user-bot-purchase", { walletAddress }).then((res) => {
+            if (res.success) setActivePurchase(res.data ?? null);
+          });
+        }
 
         toast.success(`${tier.charAt(0).toUpperCase() + tier.slice(1)} Bot Purchased!`, {
           description: `Your bot is ready to configure.`,
@@ -176,7 +206,7 @@ export function useBotPurchase() {
         return { success: false, error: errorMessage };
       }
     },
-    [connected, publicKey, walletAddress, solBalance, ownsTier, wallets, recordPurchase]
+    [connected, publicKey, walletAddress, solBalance, ownsTier, wallets, socket]
   );
 
   /**
@@ -184,7 +214,7 @@ export function useBotPurchase() {
    */
   const setActiveBot = useCallback(
     async (tier: BotTier): Promise<{ success: boolean; error?: string }> => {
-      if (!walletAddress) {
+      if (!walletAddress || !socket) {
         return { success: false, error: "Wallet not connected" };
       }
 
@@ -193,7 +223,14 @@ export function useBotPurchase() {
       }
 
       try {
-        await setActiveBotMutation({ walletAddress, tier });
+        const res = await socketRequest(socket, "set-active-bot", { walletAddress, tier });
+        if (!res.success) throw new Error(res.error);
+
+        // Refresh active purchase
+        socketRequest(socket, "get-user-bot-purchase", { walletAddress }).then((r) => {
+          if (r.success) setActivePurchase(r.data ?? null);
+        });
+
         toast.success(`Switched to ${tier.charAt(0).toUpperCase() + tier.slice(1)} Bot!`);
         return { success: true };
       } catch (error) {
@@ -202,7 +239,7 @@ export function useBotPurchase() {
         return { success: false, error: errorMessage };
       }
     },
-    [walletAddress, ownsTier, setActiveBotMutation]
+    [walletAddress, ownsTier, socket]
   );
 
   /**

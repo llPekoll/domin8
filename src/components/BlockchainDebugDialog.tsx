@@ -3,25 +3,30 @@
  * Shows last winner info and current game state for debugging during development
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useActiveGame } from "../hooks/useActiveGame";
 import { X, Trophy, TrendingUp, Users, Clock, Coins, Share2 } from "lucide-react";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useSocket, socketRequest } from "../lib/socket";
 
 export function BlockchainDebugDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [jsonCopied, setJsonCopied] = useState(false);
   const { activeGame, activeGamePDA } = useActiveGame();
 
+  const { socket } = useSocket();
+
   // Get winner's display name if winner exists
   const winnerAddress = activeGame?.winner?.toString();
-  const winnerPlayer = useQuery(
-    api.players.getPlayer,
-    winnerAddress && winnerAddress !== "11111111111111111111111111111111"
-      ? { walletAddress: winnerAddress }
-      : "skip"
-  );
+  const [winnerPlayer, setWinnerPlayer] = useState<any>(null);
+  useEffect(() => {
+    if (!socket || !winnerAddress || winnerAddress === "11111111111111111111111111111111") {
+      setWinnerPlayer(null);
+      return;
+    }
+    socketRequest(socket, "get-player", { walletAddress: winnerAddress }).then((res) => {
+      if (res.success) setWinnerPlayer(res.data);
+    });
+  }, [socket, winnerAddress]);
 
   // Determine if we have a winner to show
   const hasWinner = useMemo(() => {

@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useState, useEffect, useCallback } from "react";
+import { useSocket, socketRequest } from "../lib/socket";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
@@ -46,7 +45,18 @@ export function ProfileDialog({
   const [fireSoundsMuted, setFireSoundsMuted] = useState(false);
   const [sfxMuted, setSfxMuted] = useState(false);
 
-  const updateDisplayName = useMutation(api.players.updateDisplayName);
+  const { socket } = useSocket();
+
+  // Update display name via socket
+  const updateDisplayName = useCallback(
+    async (args: { walletAddress: string; displayName: string }) => {
+      if (!socket) throw new Error("Not connected");
+      const res = await socketRequest(socket, "update-display-name", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
+  );
 
   // Initialize sound settings from SoundManager
   useEffect(() => {
@@ -57,14 +67,33 @@ export function ProfileDialog({
     setSfxMuted(SoundManager.isSfxMutedState());
   }, [open]);
 
-  // Fetch XP info
-  const xpInfo = useQuery(api.players.getPlayerXpInfo, { walletAddress });
+  // Fetch XP info via socket
+  const [xpInfo, setXpInfo] = useState<any>(null);
+  useEffect(() => {
+    if (!socket || !walletAddress) return;
+    socketRequest(socket, "get-player-xp-info", { walletAddress }).then((res) => {
+      if (res.success) setXpInfo(res.data);
+    });
+  }, [socket, walletAddress]);
 
-  // Fetch recent games
-  const recentGames = useQuery(api.players.getRecentGames, { walletAddress, limit: 10 });
+  // Fetch recent games via socket
+  const [recentGames, setRecentGames] = useState<any[] | undefined>(undefined);
+  useEffect(() => {
+    if (!socket || !walletAddress) return;
+    socketRequest(socket, "get-recent-games", { walletAddress, limit: 10 }).then((res) => {
+      if (res.success) setRecentGames(res.data);
+      else setRecentGames([]);
+    });
+  }, [socket, walletAddress]);
 
-  // Fetch 1v1 lobby history
-  const playerLobbies = useQuery(api.lobbies.getPlayerLobbies, { playerWallet: walletAddress });
+  // Fetch 1v1 lobby history via socket
+  const [playerLobbies, setPlayerLobbies] = useState<any>(undefined);
+  useEffect(() => {
+    if (!socket || !walletAddress) return;
+    socketRequest(socket, "get-player-lobbies", { playerWallet: walletAddress }).then((res) => {
+      if (res.success) setPlayerLobbies(res.data);
+    });
+  }, [socket, walletAddress]);
 
   // Filter and sort 1v1 lobbies - only resolved ones (status 3), most recent first
   const recent1v1Games = (playerLobbies?.all ?? [])

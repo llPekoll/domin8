@@ -40,6 +40,8 @@ class SharedGameSubscription {
   private subscribers: Set<AccountUpdateCallback> = new Set();
   private currentData: AccountInfo<Buffer> | null = null;
   private isConnecting: boolean = false;
+  private pollInterval: ReturnType<typeof setInterval> | null = null;
+  private static readonly POLL_INTERVAL_MS = 5000; // Fallback poll every 5s
 
   constructor(connection: Connection, activeGamePDA: PublicKey, program: Program) {
     this.connection = connection;
@@ -119,7 +121,13 @@ class SharedGameSubscription {
       });
 
       // Fetch current state first
+      console.log("🔴🔴🔴 [PEKO_DEBUG SharedSub] Fetching initial account info for PDA:", this.activeGamePDA.toBase58());
       const accountInfo = await this.connection.getAccountInfo(this.activeGamePDA);
+      console.log("🔴🔴🔴 [PEKO_DEBUG SharedSub] Initial fetch result:", {
+        hasData: !!accountInfo,
+        dataLength: accountInfo?.data?.length ?? 0,
+        owner: accountInfo?.owner?.toBase58() ?? "NULL",
+      });
       if (accountInfo) {
         this.currentData = accountInfo;
         this.notifySubscribers(accountInfo);
@@ -144,11 +152,60 @@ class SharedGameSubscription {
         subscriptionId: this.subscriptionId,
         subscriberCount: this.subscribers.size,
       });
+
+      // Start fallback polling to catch dropped WebSocket updates
+      this.startPolling();
     } catch (error) {
       logger.solana.error("[SharedSub] ❌ Failed to connect:", error);
       this.subscriptionId = null;
+      // Still start polling as fallback even if WebSocket fails
+      this.startPolling();
     } finally {
       this.isConnecting = false;
+    }
+  }
+
+  /**
+   * Start fallback polling (catches dropped WebSocket updates)
+   */
+  private startPolling() {
+    if (this.pollInterval) return;
+
+    this.pollInterval = setInterval(async () => {
+      try {
+        const accountInfo = await this.connection.getAccountInfo(this.activeGamePDA);
+        console.log("🔴🔴🔴 [PEKO_DEBUG SharedSub] Poll result:", {
+          hasData: !!accountInfo,
+          dataLength: accountInfo?.data?.length ?? 0,
+          currentDataLength: this.currentData?.data?.length ?? 0,
+        });
+        if (!accountInfo) return;
+
+        // Only notify if data actually changed
+        if (
+          !this.currentData ||
+          !accountInfo.data.equals(this.currentData.data)
+        ) {
+          logger.solana.debug("[SharedSub] 🔄 Poll detected change (WebSocket may have missed it)");
+          this.currentData = accountInfo;
+          this.notifySubscribers(accountInfo);
+        }
+      } catch (err) {
+        logger.solana.error("[SharedSub] ❌ Poll error:", err);
+      }
+    }, SharedGameSubscription.POLL_INTERVAL_MS);
+
+    logger.solana.debug("[SharedSub] ⏱️ Fallback polling started");
+  }
+
+  /**
+   * Stop fallback polling
+   */
+  private stopPolling() {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
+      logger.solana.debug("[SharedSub] ⏱️ Fallback polling stopped");
     }
   }
 
@@ -164,6 +221,7 @@ class SharedGameSubscription {
 
     void this.connection.removeAccountChangeListener(this.subscriptionId);
     this.subscriptionId = null;
+    this.stopPolling();
 
     logger.solana.debug("[SharedSub] ✅ WebSocket disconnected");
   }

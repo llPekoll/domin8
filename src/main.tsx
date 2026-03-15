@@ -1,6 +1,5 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Toaster } from "sonner";
 import "./index.css";
 import { Root } from "./Root.tsx";
@@ -10,6 +9,7 @@ import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
 import { AssetsProvider } from "./contexts/AssetsContext";
 import { PlayerNamesProvider } from "./contexts/PlayerNamesContext";
 import { ActiveWalletProvider } from "./contexts/ActiveWalletContext";
+import { SocketProvider } from "./lib/socket";
 import { Analytics } from "@vercel/analytics/react";
 
 const isAndroid = /Android/i.test(navigator.userAgent);
@@ -58,11 +58,9 @@ if (isAndroid) {
   console.log("[MWA] Skipped - isAndroid:", isAndroid);
 }
 
-const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL);
-
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ConvexProvider client={convex}>
+    <SocketProvider>
       <AssetsProvider>
         <PrivyProvider
           appId={import.meta.env.VITE_PRIVY_APP_ID}
@@ -154,7 +152,7 @@ createRoot(document.getElementById("root")!).render(
         }}
         theme="dark"
       />
-    </ConvexProvider>
+    </SocketProvider>
     <Analytics />
   </StrictMode>
 );
