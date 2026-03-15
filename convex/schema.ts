@@ -79,6 +79,12 @@ export default defineSchema({
     nftCollection: v.optional(v.string()), // NFT collection program address for special/exclusive characters
     nftCollectionName: v.optional(v.string()), // Human-readable name of the NFT collection
     isActive: v.boolean(),
+    // Visual configuration for in-game rendering
+    spriteOffsetY: v.optional(v.number()), // Y offset in pixels for in-game (default 0)
+    baseScale: v.optional(v.number()), // Base scale multiplier for in-game (default 1.0)
+    // Visual configuration for preview rendering (character selection + winner display)
+    previewOffsetY: v.optional(v.number()), // Y offset in pixels for preview (default 0)
+    previewScale: v.optional(v.number()), // Base scale multiplier for preview (default 1.0)
   }).index("by_active", ["isActive"]),
 
   /**
@@ -112,7 +118,15 @@ export default defineSchema({
     totalWins: v.number(),
     totalPoints: v.optional(v.number()), // Points earned from bets and prizes (1 point per 0.001 SOL)
     achievements: v.array(v.string()),
-  }).index("by_wallet", ["walletAddress"]),
+    // XP System fields
+    xp: v.optional(v.number()), // Total XP earned
+    level: v.optional(v.number()), // Current level (1-10)
+    currentWinStreak: v.optional(v.number()), // Consecutive wins for streak bonus
+    lastDailyLoginDate: v.optional(v.string()), // ISO date "YYYY-MM-DD" for daily login bonus
+    lastDailyBetDate: v.optional(v.string()), // ISO date "YYYY-MM-DD" for first bet of day bonus
+  })
+    .index("by_wallet", ["walletAddress"])
+    .index("by_xp", ["xp"]),
 
   // ============================================================================
   // REFERRAL SYSTEM TABLES
@@ -248,6 +262,21 @@ export default defineSchema({
     
 
   // ============================================================================
+  // PLATFORM STATS TABLE (incremental, not recomputed)
+  // ============================================================================
+
+  /**
+   * Platform Stats - Running totals for TVL and earnings
+   * Single row, updated incrementally when each game finishes
+   */
+  platformStats: defineTable({
+    key: v.string(), // Always "global" - single row
+    totalPotLamports: v.number(), // Sum of all game pots (TVL)
+    earningsLamports: v.number(), // Sum of house fees (5% of multi-player pots)
+    gamesCount: v.number(), // Total finished games
+  }).index("by_key", ["key"]),
+
+  // ============================================================================
   // AUTO-BETTING BOT TABLES
   // ============================================================================
 
@@ -357,6 +386,41 @@ export default defineSchema({
     .index("by_active", ["isActive"]), // Query active subscriptions for broadcast
 
   // ============================================================================
+  // CURRENT GAME PARTICIPANTS TABLE
+  // ============================================================================
+
+  /**
+   * Current Game Participants - Unified participant data for the active game
+   * One row per "character on screen":
+   * - Boss: ONE entry (character locked, betAmount = total of all bets)
+   * - Non-boss: ONE entry PER BET (each bet = separate character)
+   *
+   * Cleared when game ends and new game starts
+   */
+  currentGameParticipants: defineTable({
+    odid: v.string(), // Unique ID: walletAddress for boss, wallet_betIndex for others
+    walletAddress: v.string(),
+    displayName: v.string(), // Resolved player name or truncated wallet
+    gameRound: v.number(), // Which game round this belongs to
+
+    // Character info
+    characterId: v.number(), // Skin ID from blockchain
+    characterKey: v.string(), // Sprite key for Phaser (e.g., "warrior", "orc")
+
+    // Bet info
+    betIndex: v.number(), // Original index in blockchain bets array
+    betAmount: v.number(), // In SOL (boss: total, others: single bet)
+    position: v.array(v.number()), // [x, y] spawn position from blockchain
+
+    // Flags
+    isBoss: v.boolean(), // Previous winner gets special treatment
+    spawnIndex: v.number(), // For spawn position calculation
+  })
+    .index("by_gameRound", ["gameRound"])
+    .index("by_odid", ["odid"])
+    .index("by_walletAddress", ["walletAddress"]),
+
+  // ============================================================================
   // CHAT TABLES
   // ============================================================================
 
@@ -374,5 +438,18 @@ export default defineSchema({
   })
     .index("by_timestamp", ["timestamp"]) // For fetching recent messages
     .index("by_sender_and_time", ["senderWallet", "timestamp"]), // For rate limiting
+
+  // ============================================================================
+  // PRESENCE BOT TABLE
+  // ============================================================================
+
+  /**
+   * Presence Bot Spawns - Track which game rounds have had a bot spawned
+   * One bot max per round - triggered when user views arena and no players exist
+   */
+  presenceBotSpawns: defineTable({
+    roundId: v.number(), // Game round ID
+    spawnedAt: v.number(), // Unix timestamp when bot was spawned
+  }).index("by_round", ["roundId"]),
 });
     

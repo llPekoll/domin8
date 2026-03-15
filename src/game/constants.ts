@@ -26,8 +26,8 @@ export const GAME_TIMING = {
   /** Battle animation duration - 2 seconds */
   BATTLE_DURATION: 2_000,
 
-  /** Winner celebration duration - 5 seconds (then swipe to carousel) */
-  CELEBRATION_DURATION: 5_000,
+  /** Winner celebration duration - 10 seconds (then swipe to carousel) */
+  CELEBRATION_DURATION: 10_000,
 
   /** Cleanup/fade duration - 1 second */
   CLEANUP_DURATION: 1_000,

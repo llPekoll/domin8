@@ -79,7 +79,7 @@ ${gameUrl}
       <div className="pointer-events-auto">
         <button
           onClick={shareOnX}
-          className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all text-lg font-bold shadow-2xl shadow-purple-500/50 animate-bounce"
+          className="flex items-center gap-3 px-4 py-2 bg-linear-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all text-lg font-bold shadow-2xl shadow-purple-500/50 animate-bounce"
           style={{
             fontFamily: "metal-slug",
           }}

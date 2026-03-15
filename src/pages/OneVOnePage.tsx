@@ -4,9 +4,8 @@ import { Header } from "../components/Header";
 import { ChatPanel } from "../components/ChatPanel";
 import { CreateLobby } from "../components/onevone/CreateLobby";
 import { LobbyDetailsDialog } from "../components/onevone/LobbyDetailsDialog";
-import { usePrivyWallet } from "../hooks/usePrivyWallet";
-import { useQuery, useAction } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useActiveWallet } from "../contexts/ActiveWalletContext";
+import { useSocket, socketRequest } from "../lib/socket";
 import { toast } from "sonner";
 import { logger } from "../lib/logger";
 import { useAssets } from "../contexts/AssetsContext";
@@ -34,12 +33,29 @@ interface LobbyData {
 }
 
 export function OneVOnePage() {
-  const { connected, publicKey, wallet } = usePrivyWallet();
+  const { connected, activePublicKey: publicKey, activeWallet: wallet } = useActiveWallet();
   const { characters } = useAssets();
-  const createLobbyAction = useAction(api.lobbies.createLobby);
-  const joinLobbyAction = useAction(api.lobbies.joinLobby);
+  const { socket } = useSocket();
+  const createLobbyAction = useCallback(
+    async (args: any) => {
+      if (!socket) throw new Error("Not connected");
+      const res = await socketRequest(socket, "create-lobby", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
+  );
+  const joinLobbyAction = useCallback(
+    async (args: any) => {
+      if (!socket) throw new Error("Not connected");
+      const res = await socketRequest(socket, "join-lobby", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
+  );
   const [searchParams, setSearchParams] = useSearchParams();
-  // Sync characters to Phaser's global state for CharacterPreviewScene
+  // Sync characters to Phaser's global state for game scenes
   useEffect(() => {
     if (characters && characters.length > 0) {
       logger.game.debug("[OneVOnePage] Syncing characters to Phaser global state", {
@@ -70,30 +86,61 @@ export function OneVOnePage() {
 
   // Get open lobbies from Convex (real-time updates)
   // Pass current player wallet so they can see their own private lobbies
-  const openLobbies =
-    useQuery(api.lobbies.getOpenLobbies, currentPlayerWallet ? { currentPlayerWallet } : {}) || [];
+  const [openLobbiesQuery, setOpenLobbiesQuery] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (!socket) return;
+    const args = currentPlayerWallet ? { currentPlayerWallet } : {};
+    socketRequest(socket, "get-open-lobbies", args).then((res) => {
+      if (res.success) setOpenLobbiesQuery(res.data);
+    });
+    // Listen for real-time lobby updates
+    const handleLobbyUpdate = () => {
+      socketRequest(socket, "get-open-lobbies", args).then((res) => {
+        if (res.success) setOpenLobbiesQuery(res.data);
+      });
+    };
+    socket.on("lobby-updated", handleLobbyUpdate);
+    return () => { socket.off("lobby-updated", handleLobbyUpdate); };
+  }, [socket, currentPlayerWallet]);
+  const openLobbies = useMemo(() => openLobbiesQuery || [], [openLobbiesQuery]);
 
   // Debug: Log lobby data including characterA
   useEffect(() => {
     if (openLobbies.length > 0) {
-      console.log("[1v1 Debug] Open lobbies from Convex:", openLobbies.map(l => ({
-        lobbyId: l.lobbyId,
-        characterA: l.characterA,
-        characterB: l.characterB,
-        playerA: l.playerA?.slice(0, 8) + "...",
-        status: l.status,
-      })));
+      console.log(
+        "[1v1 Debug] Open lobbies from Convex:",
+        openLobbies.map((l) => ({
+          lobbyId: l.lobbyId,
+          characterA: l.characterA,
+          characterB: l.characterB,
+          playerA: l.playerA?.slice(0, 8) + "...",
+          status: l.status,
+        }))
+      );
     }
   }, [openLobbies]);
 
-  // Get lobby by share token (for URL-based access)
-  const sharedLobby = useQuery(
-    api.lobbies.getLobbyByShareToken,
-    shareToken ? { shareToken } : "skip"
-  );
+  // Get lobby by share token (for URL-based access) via socket
+  const [sharedLobby, setSharedLobby] = useState<any>(null);
+  useEffect(() => {
+    if (!socket || !shareToken) {
+      setSharedLobby(null);
+      return;
+    }
+    socketRequest(socket, "get-lobby-by-share-token", { shareToken }).then((res) => {
+      if (res.success) setSharedLobby(res.data);
+    });
+  }, [socket, shareToken]);
 
-  // Get completed lobbies for history
-  const completedLobbies = useQuery(api.lobbies.getCompletedLobbies, { limit: 20 }) || [];
+  // Get completed lobbies for history via socket
+  const [completedLobbiesQuery, setCompletedLobbiesQuery] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (!socket) return;
+    socketRequest(socket, "get-completed-lobbies", { limit: 20 }).then((res) => {
+      if (res.success) setCompletedLobbiesQuery(res.data);
+    });
+  }, [socket]);
+  const completedLobbies = useMemo(() => completedLobbiesQuery || [], [completedLobbiesQuery]);
 
   // Filtered and sorted lobbies
   const filteredOpenLobbies = useMemo(() => {
@@ -101,7 +148,7 @@ export function OneVOnePage() {
 
     // Filter by my games
     if (activeFilter === "my_games") {
-      filtered = filtered.filter(l => l.playerA === publicKey?.toString());
+      filtered = filtered.filter((l) => l.playerA === publicKey?.toString());
     }
 
     // Sort by price
@@ -126,8 +173,8 @@ export function OneVOnePage() {
 
     // Filter by my games
     if (activeFilter === "my_games") {
-      filtered = filtered.filter(l =>
-        l.playerA === publicKey?.toString() || l.playerB === publicKey?.toString()
+      filtered = filtered.filter(
+        (l) => l.playerA === publicKey?.toString() || l.playerB === publicKey?.toString()
       );
     }
 
@@ -170,11 +217,17 @@ export function OneVOnePage() {
     return Array.from(wallets);
   }, [openLobbies, completedLobbies, sharedLobby]);
 
-  // Fetch player display names for all wallets
-  const playerNames = useQuery(
-    api.players.getPlayersByWallets,
-    allWalletAddresses.length > 0 ? { walletAddresses: allWalletAddresses } : "skip"
-  );
+  // Fetch player display names for all wallets via socket
+  const [playerNames, setPlayerNames] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (!socket || allWalletAddresses.length === 0) {
+      setPlayerNames(null);
+      return;
+    }
+    socketRequest(socket, "get-players-by-wallets", { walletAddresses: allWalletAddresses }).then((res) => {
+      if (res.success) setPlayerNames(res.data);
+    });
+  }, [socket, allWalletAddresses.join(",")]);
 
   // Helper function to get display name or truncated wallet
   const getPlayerDisplayName = useCallback(
@@ -192,11 +245,25 @@ export function OneVOnePage() {
     [playerNames]
   );
 
-  // Get specific lobby state when in arena (for real-time updates during fight)
-  const lobbyStateQuery = useQuery(
-    api.lobbies.getLobbyState,
-    activeLobbyId !== null ? { lobbyId: activeLobbyId } : "skip"
-  );
+  // Get specific lobby state when in arena (for real-time updates during fight) via socket
+  const [lobbyStateQuery, setLobbyStateQuery] = useState<any>(null);
+  useEffect(() => {
+    if (!socket || activeLobbyId === null) {
+      setLobbyStateQuery(null);
+      return;
+    }
+    socketRequest(socket, "get-lobby-state", { lobbyId: activeLobbyId }).then((res) => {
+      if (res.success) setLobbyStateQuery(res.data);
+    });
+    // Listen for real-time lobby state updates
+    const handleStateUpdate = (data: any) => {
+      if (data.lobbyId === activeLobbyId) {
+        setLobbyStateQuery(data);
+      }
+    };
+    socket.on("lobby-state-updated", handleStateUpdate);
+    return () => { socket.off("lobby-state-updated", handleStateUpdate); };
+  }, [socket, activeLobbyId]);
 
   // Only use the lobby state if modal is open
   const activeLobbyState = arenaModalOpen && activeLobbyId !== null ? lobbyStateQuery : null;
@@ -268,16 +335,19 @@ export function OneVOnePage() {
     }
   }, [characters, characterIndex]);
 
-  const handleCharacterChange = useCallback((direction: "prev" | "next") => {
-    if (!characters || characters.length === 0) return;
-    setCharacterIndex(prev => {
-      if (direction === "prev") {
-        return prev === 0 ? characters.length - 1 : prev - 1;
-      } else {
-        return prev === characters.length - 1 ? 0 : prev + 1;
-      }
-    });
-  }, [characters]);
+  const handleCharacterChange = useCallback(
+    (direction: "prev" | "next") => {
+      if (!characters || characters.length === 0) return;
+      setCharacterIndex((prev) => {
+        if (direction === "prev") {
+          return prev === 0 ? characters.length - 1 : prev - 1;
+        } else {
+          return prev === characters.length - 1 ? 0 : prev + 1;
+        }
+      });
+    },
+    [characters]
+  );
 
   // When user creates a lobby, open the arena modal
   const handleLobbyCreated = useCallback((lobbyId: number) => {
@@ -339,9 +409,8 @@ export function OneVOnePage() {
       try {
         // Import utilities
         const { getSharedConnection } = await import("../lib/sharedConnection");
-        const { buildJoinLobbyTransaction, get1v1LobbyPDA } = await import(
-          "../lib/solana-1v1-transactions"
-        );
+        const { buildJoinLobbyTransaction, get1v1LobbyPDA } =
+          await import("../lib/solana-1v1-transactions");
 
         const connection = getSharedConnection();
         const currentWallet = publicKey.toString();
@@ -545,532 +614,342 @@ export function OneVOnePage() {
   );
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-b from-gray-950/90 via-gray-900/90 to-black/90">
+    <div className="min-h-screen w-full bg-linear-to-b from-gray-950/90 via-gray-900/90 to-black/90">
       <Header />
 
       {/* Main Content Area with Chat Sidebar */}
       <div className="pt-20 pb-8 px-3 md:px-6 flex gap-4">
         {/* Chat Sidebar - Left (sticky) */}
-        <div className="hidden lg:block w-[320px] flex-shrink-0 sticky top-20 self-start">
+        <div className="hidden lg:block w-80 shrink-0 sticky top-20 self-start">
           <ChatPanel embedded />
         </div>
 
         {/* Main Content */}
         <main className="flex-1 min-w-0">
-        {/* Games List - Single column for both connected and not connected */}
-        {connected && publicKey ? (
-          <div className="max-w-4xl mx-auto space-y-4">
-            {/* Header Section - Create Game */}
-            <CreateLobby
-              selectedCharacter={selectedCharacter}
-              characters={characters || []}
-              onCharacterChange={handleCharacterChange}
-              onLobbyCreated={handleLobbyCreated}
-            />
-            {/* Header with Filters */}
-            <div className="flex flex-col md:flex-row md:items-center gap-3">
-              {/* Title Row */}
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg md:text-xl font-bold text-amber-100">ALL GAMES</h2>
-                <span className="text-amber-400 font-mono text-sm">
-                  {filteredOpenLobbies.length + filteredCompletedLobbies.length}
-                </span>
-                <span className="hidden md:flex px-3 py-1 bg-amber-900/30 border border-amber-700/50 rounded-full text-amber-300 text-xs items-center gap-1">
-                  <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
-                  Payouts settled in SOL
-                </span>
-              </div>
+          {/* Games List - Single column for both connected and not connected */}
+          {connected && publicKey ? (
+            <div className="max-w-4xl mx-auto space-y-4">
+              {/* Header Section - Create Game */}
+              <CreateLobby
+                selectedCharacter={selectedCharacter}
+                characters={characters || []}
+                onCharacterChange={handleCharacterChange}
+                onLobbyCreated={handleLobbyCreated}
+              />
+              {/* Header with Filters */}
+              <div className="flex flex-col md:flex-row md:items-center gap-3">
+                {/* Title Row */}
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg md:text-xl font-bold text-amber-100">ALL GAMES</h2>
+                  <span className="text-amber-400 font-mono text-sm">
+                    {filteredOpenLobbies.length + filteredCompletedLobbies.length}
+                  </span>
+                  <span className="hidden md:flex px-3 py-1 bg-amber-900/30 border border-amber-700/50 rounded-full text-amber-300 text-xs items-center gap-1">
+                    <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
+                    Payouts settled in SOL
+                  </span>
+                </div>
 
-              {/* Spacer - only on desktop */}
-              <div className="hidden md:block flex-1"></div>
+                {/* Spacer - only on desktop */}
+                <div className="hidden md:block flex-1"></div>
 
-              {/* Filter Buttons - horizontal scroll on mobile */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                <button
-                  onClick={() => setActiveFilter("my_games")}
-                  className={`px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors whitespace-nowrap ${
-                    activeFilter === "my_games"
-                      ? "bg-amber-600 text-white"
-                      : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                  }`}
-                >
-                  My Games
-                </button>
-                <button
-                  onClick={() => setActiveFilter(activeFilter === "price_low" ? "price_high" : "price_low")}
-                  className={`px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap ${
-                    activeFilter === "price_low" || activeFilter === "price_high"
-                      ? "bg-amber-600 text-white"
-                      : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                  }`}
-                >
-                  Price
-                  {activeFilter === "price_low" && <span>↑</span>}
-                  {activeFilter === "price_high" && <span>↓</span>}
-                </button>
-                <button
-                  onClick={() => setActiveFilter(activeFilter === "newest" ? "oldest" : "newest")}
-                  className={`px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap ${
-                    activeFilter === "newest" || activeFilter === "oldest"
-                      ? "bg-amber-600 text-white"
-                      : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                  }`}
-                >
-                  Date
-                  {activeFilter === "newest" && <span>↓</span>}
-                  {activeFilter === "oldest" && <span>↑</span>}
-                </button>
-                {activeFilter !== "all" && (
+                {/* Filter Buttons - horizontal scroll on mobile */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
                   <button
-                    onClick={() => setActiveFilter("all")}
-                    className="px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors whitespace-nowrap"
+                    onClick={() => setActiveFilter("my_games")}
+                    className={`px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors whitespace-nowrap ${
+                      activeFilter === "my_games"
+                        ? "bg-amber-600 text-white"
+                        : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                    }`}
                   >
-                    Clear
+                    My Games
                   </button>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {/* My Open Lobbies First */}
-              {filteredOpenLobbies
-                .filter((l) => l.playerA === publicKey.toString() && l.status === 0)
-                .map((lobby) => (
-                  <div
-                    key={lobby._id}
-                    className={`rounded-xl p-3 md:p-4 cursor-pointer transition-all ${
-                      lobby.isPrivate
-                        ? "bg-gradient-to-r from-purple-900/40 to-purple-950/40 border border-purple-500/30 hover:border-purple-400/50"
-                        : "bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 hover:border-amber-600/50"
+                  <button
+                    onClick={() =>
+                      setActiveFilter(activeFilter === "price_low" ? "price_high" : "price_low")
+                    }
+                    className={`px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap ${
+                      activeFilter === "price_low" || activeFilter === "price_high"
+                        ? "bg-amber-600 text-white"
+                        : "bg-gray-800 text-gray-300 hover:bg-gray-700"
                     }`}
-                    onClick={() => handleLobbySelected(lobby.lobbyId)}
                   >
-                    {/* Mobile Layout */}
-                    <div className="flex md:hidden items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 border-2 border-amber-400 flex items-center justify-center flex-shrink-0">
-                          <span className="text-white font-bold text-sm">Y</span>
-                        </div>
-                        <span className="text-white font-semibold text-sm truncate">You</span>
-                        <span className="text-gray-500">⚔️</span>
-                        <span className="text-gray-500 text-sm italic">Waiting...</span>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <div className="flex items-center gap-1 bg-gray-800/80 px-2 py-1 rounded-lg">
-                          <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
-                          <span className="text-white font-bold text-sm">{(lobby.amount / 1e9).toFixed(3)}</span>
-                        </div>
-                        {lobby.isPrivate && <span className="text-purple-300 text-xs">🔒</span>}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const shareUrl = `${window.location.origin}/1v1?join=${lobby.shareToken}`;
-                            navigator.clipboard.writeText(shareUrl);
-                            toast.success("Share link copied!");
-                          }}
-                          className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg"
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
-                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                            <polyline points="16 6 12 2 8 6" />
-                            <line x1="12" y1="2" x2="12" y2="15" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Desktop Layout */}
-                    <div className="hidden md:flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className="relative">
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 border-2 border-amber-400 flex items-center justify-center">
-                            <span className="text-white font-bold text-lg">Y</span>
-                          </div>
-                          <div className="absolute -bottom-1 -right-1 bg-amber-600 text-[10px] text-white font-bold px-1.5 py-0.5 rounded-full border border-amber-400">
-                            {lobby.characterA || 1}
-                          </div>
-                        </div>
-                        <p className="text-white font-semibold">You</p>
-                      </div>
-                      <div className="px-4"><span className="text-2xl">⚔️</span></div>
-                      <div className="flex items-center gap-3 flex-1 justify-end">
-                        <p className="text-gray-500 font-semibold italic">Waiting...</p>
-                        <div className="w-12 h-12 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center">
-                          <span className="text-gray-500 text-2xl">?</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 ml-6">
-                        <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
-                          <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
-                          <span className="text-white font-bold">{(lobby.amount / 1e9).toFixed(3)}</span>
-                        </div>
-                        {lobby.isPrivate && (
-                          <span className="px-2 py-1 bg-purple-600/40 border border-purple-500/50 rounded text-purple-200 text-xs">🔒</span>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const shareUrl = `${window.location.origin}/1v1?join=${lobby.shareToken}`;
-                            navigator.clipboard.writeText(shareUrl);
-                            toast.success("Share link copied!");
-                          }}
-                          className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
-                        >
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
-                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                            <polyline points="16 6 12 2 8 6" />
-                            <line x1="12" y1="2" x2="12" y2="15" />
-                          </svg>
-                        </button>
-                        <button className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
-                            <circle cx="12" cy="12" r="3" />
-                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-              {/* Other Open Lobbies */}
-              {filteredOpenLobbies
-                .filter((l) => l.playerA !== publicKey.toString() && l.status === 0)
-                .map((lobby) => (
-                  <div
-                    key={lobby._id}
-                    className={`rounded-xl p-3 md:p-4 cursor-pointer transition-all ${
-                      lobby.isPrivate
-                        ? "bg-gradient-to-r from-purple-900/40 to-purple-950/40 border border-purple-500/30 hover:border-purple-400/50"
-                        : "bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 hover:border-amber-600/50"
+                    Price
+                    {activeFilter === "price_low" && <span>↑</span>}
+                    {activeFilter === "price_high" && <span>↓</span>}
+                  </button>
+                  <button
+                    onClick={() => setActiveFilter(activeFilter === "newest" ? "oldest" : "newest")}
+                    className={`px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap ${
+                      activeFilter === "newest" || activeFilter === "oldest"
+                        ? "bg-amber-600 text-white"
+                        : "bg-gray-800 text-gray-300 hover:bg-gray-700"
                     }`}
-                    onClick={() => handleLobbySelected(lobby.lobbyId)}
                   >
-                    {/* Mobile Layout */}
-                    <div className="flex md:hidden items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 border-2 border-amber-500/50 flex items-center justify-center flex-shrink-0">
-                          <span className="text-white font-bold text-sm">
-                            {getPlayerDisplayName(lobby.playerA).slice(0, 1).toUpperCase()}
-                          </span>
-                        </div>
-                        <span className="text-white font-semibold text-sm truncate max-w-[80px]">
-                          {getPlayerDisplayName(lobby.playerA)}
-                        </span>
-                        <span className="text-gray-500">⚔️</span>
-                        <span className="text-gray-500 text-sm">?</span>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <div className="flex items-center gap-1 bg-gray-800/80 px-2 py-1 rounded-lg">
-                          <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
-                          <span className="text-white font-bold text-sm">{(lobby.amount / 1e9).toFixed(3)}</span>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleLobbySelected(lobby.lobbyId);
-                          }}
-                          className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold text-sm rounded-lg"
-                        >
-                          Join
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Desktop Layout */}
-                    <div className="hidden md:flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className="relative">
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 border-2 border-amber-500/50 flex items-center justify-center">
-                            <span className="text-white font-bold text-lg">
-                              {getPlayerDisplayName(lobby.playerA).slice(0, 1).toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="absolute -bottom-1 -right-1 bg-amber-600 text-[10px] text-white font-bold px-1.5 py-0.5 rounded-full border border-amber-400">
-                            {lobby.characterA || 1}
-                          </div>
-                        </div>
-                        <p className="text-white font-semibold">{getPlayerDisplayName(lobby.playerA)}</p>
-                      </div>
-                      <div className="px-4"><span className="text-2xl">⚔️</span></div>
-                      <div className="flex items-center gap-3 flex-1 justify-end">
-                        <p className="text-gray-500 font-semibold italic">Waiting...</p>
-                        <div className="w-12 h-12 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center">
-                          <span className="text-gray-500 text-2xl">?</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 ml-6">
-                        <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
-                          <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
-                          <span className="text-white font-bold">{(lobby.amount / 1e9).toFixed(3)}</span>
-                        </div>
-                        {lobby.isPrivate && (
-                          <span className="px-2 py-1 bg-purple-600/40 border border-purple-500/50 rounded text-purple-200 text-xs">🔒</span>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleLobbySelected(lobby.lobbyId);
-                          }}
-                          className="px-6 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white font-semibold rounded-lg transition-all"
-                        >
-                          Join
-                        </button>
-                        <button className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
-                            <circle cx="12" cy="12" r="3" />
-                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-              {/* Completed Lobbies */}
-              {filteredCompletedLobbies.slice(0, 20).map((lobby) => {
-                const isPlayerAWinner = lobby.winner === lobby.playerA;
-                const isPlayerBWinner = lobby.winner === lobby.playerB;
-                const isCurrentUserPlayerA = lobby.playerA === publicKey?.toString();
-                const isCurrentUserPlayerB = lobby.playerB === publicKey?.toString();
-                const playerAName = getPlayerDisplayName(lobby.playerA, isCurrentUserPlayerA);
-                const playerBName = lobby.playerB
-                  ? getPlayerDisplayName(lobby.playerB, isCurrentUserPlayerB)
-                  : null;
-
-                return (
-                  <div
-                    key={lobby._id}
-                    className="bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 rounded-xl p-3 md:p-4 hover:border-amber-600/50 transition-colors cursor-pointer"
-                    onClick={() => handleLobbySelected(lobby.lobbyId)}
-                  >
-                    {/* Mobile Layout */}
-                    <div className="flex md:hidden items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="relative flex-shrink-0">
-                          <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
-                            isPlayerAWinner
-                              ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
-                              : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
-                          }`}>
-                            <span className="text-white font-bold text-sm">{playerAName.slice(0, 1).toUpperCase()}</span>
-                          </div>
-                          {isPlayerAWinner && <span className="absolute -top-1 -right-1 text-xs">👑</span>}
-                        </div>
-                        <span className={`text-sm truncate max-w-[60px] ${isPlayerAWinner ? "text-amber-300" : "text-gray-400"}`}>
-                          {playerAName}
-                        </span>
-                        {/* Win streak badge - show when Player A wins and has at least 2 consecutive wins */}
-                        {isPlayerAWinner && (lobby.winStreak ?? 0) >= 1 && (
-                          <span className="px-1.5 py-0.5 bg-gradient-to-r from-orange-600 to-red-600 rounded text-[10px] text-white font-bold whitespace-nowrap">
-                            🔥 {(lobby.winStreak ?? 0) + 1} streak
-                          </span>
-                        )}
-                        <span className="text-gray-500 opacity-60">⚔️</span>
-                        <span className={`text-sm truncate max-w-[60px] ${isPlayerBWinner ? "text-amber-300" : "text-gray-400"}`}>
-                          {playerBName ?? "---"}
-                        </span>
-                        <div className="relative flex-shrink-0">
-                          <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
-                            isPlayerBWinner
-                              ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
-                              : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
-                          }`}>
-                            <span className="text-white font-bold text-sm">{playerBName ? playerBName.slice(0, 1).toUpperCase() : "?"}</span>
-                          </div>
-                          {isPlayerBWinner && <span className="absolute -top-1 -right-1 text-xs">👑</span>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <div className="flex items-center gap-1 bg-gray-800/80 px-2 py-1 rounded-lg">
-                          <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
-                          <span className="text-white font-bold text-sm">{(lobby.amount / 1e9).toFixed(3)}</span>
-                        </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleLobbySelected(lobby.lobbyId); }}
-                          className="p-1.5 bg-gray-800 hover:bg-amber-700/50 rounded-lg"
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
-                            <circle cx="12" cy="12" r="3" />
-                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Desktop Layout */}
-                    <div className="hidden md:flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className="relative">
-                          <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${
-                            isPlayerAWinner
-                              ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
-                              : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
-                          }`}>
-                            <span className="text-white font-bold text-lg">{playerAName.slice(0, 1).toUpperCase()}</span>
-                          </div>
-                          {isPlayerAWinner && <div className="absolute -top-1 -right-1 text-sm">👑</div>}
-                        </div>
-                        <p className={`font-semibold ${isPlayerAWinner ? "text-amber-300" : "text-gray-400"}`}>{playerAName}</p>
-                        {/* Win streak badge - show when Player A wins and has at least 2 consecutive wins */}
-                        {isPlayerAWinner && (lobby.winStreak ?? 0) >= 1 && (
-                          <span className="px-2 py-1 bg-gradient-to-r from-orange-600 to-red-600 rounded text-xs text-white font-bold">
-                            🔥 {(lobby.winStreak ?? 0) + 1} Win Streak
-                          </span>
-                        )}
-                      </div>
-                      <div className="px-4"><span className="text-2xl opacity-60">⚔️</span></div>
-                      <div className="flex items-center gap-3 flex-1 justify-end">
-                        <p className={`font-semibold ${isPlayerBWinner ? "text-amber-300" : "text-gray-400"}`}>{playerBName ?? "---"}</p>
-                        <div className="relative">
-                          <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${
-                            isPlayerBWinner
-                              ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
-                              : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
-                          }`}>
-                            <span className="text-white font-bold text-lg">{playerBName ? playerBName.slice(0, 1).toUpperCase() : "?"}</span>
-                          </div>
-                          {isPlayerBWinner && <div className="absolute -top-1 -right-1 text-sm">👑</div>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 ml-6">
-                        <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
-                          <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
-                          <span className="text-white font-bold">{(lobby.amount / 1e9).toFixed(3)}</span>
-                        </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleLobbySelected(lobby.lobbyId); }}
-                          className="p-2 bg-gray-800 hover:bg-amber-700/50 rounded-lg transition-colors"
-                        >
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400 hover:text-amber-300">
-                            <circle cx="12" cy="12" r="3" />
-                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {filteredOpenLobbies.length === 0 && filteredCompletedLobbies.length === 0 && (
-                <div className="text-center py-12 bg-gray-900/50 rounded-xl border border-gray-700/30">
-                  <p className="text-gray-400">
-                    {activeFilter === "my_games"
-                      ? "You haven't created or joined any games yet."
-                      : "No games yet. Create one to get started!"}
-                  </p>
+                    Date
+                    {activeFilter === "newest" && <span>↓</span>}
+                    {activeFilter === "oldest" && <span>↑</span>}
+                  </button>
+                  {activeFilter !== "all" && (
+                    <button
+                      onClick={() => setActiveFilter("all")}
+                      className="px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors whitespace-nowrap"
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          /* Single column layout when not connected - show waiting games first, then resolved */
-          <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
-            {/* Not connected banner */}
-            <div className="p-3 md:p-4 bg-gradient-to-r from-amber-900/40 to-amber-950/40 border border-amber-700/50 rounded-xl">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                <div className="text-center md:text-left">
-                  <h1 className="text-2xl md:text-4xl font-black text-amber-200 tracking-wide">1V1 BATTLE</h1>
-                  <p className="text-amber-300/70 text-xs md:text-sm mt-1">
-                    Connect your wallet to create or join games
-                  </p>
-                </div>
-                <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-amber-600/20 border border-amber-500/30 rounded-lg">
-                  <span className="text-amber-400 text-sm">Payouts settled in SOL</span>
-                  <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
-                </div>
-              </div>
-            </div>
-
-            {/* Waiting Games (Open Lobbies) */}
-            <div className="space-y-3 md:space-y-4">
-              <div className="flex items-center gap-2 md:gap-3">
-                <h2 className="text-lg md:text-xl font-bold text-amber-100">ALL GAMES</h2>
-                <span className="text-amber-400 font-mono text-sm">
-                  {openLobbies.filter((l) => l.status === 0 && !l.isPrivate).length +
-                    completedLobbies.length}
-                </span>
-                <span className="hidden md:flex px-3 py-1 bg-amber-900/30 border border-amber-700/50 rounded-full text-amber-300 text-xs items-center gap-1">
-                  <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
-                  Payouts settled in SOL
-                </span>
               </div>
 
               <div className="space-y-3">
-                {/* Open Lobbies */}
-                {openLobbies
-                  .filter((l) => l.status === 0 && !l.isPrivate)
-                  .map((lobby) => {
-                    const playerAName = getPlayerDisplayName(lobby.playerA);
-                    return (
-                      <div
-                        key={lobby._id}
-                        className="bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 rounded-xl p-3 md:p-4 hover:border-amber-600/50 transition-colors"
-                      >
-                        {/* Mobile Layout */}
-                        <div className="flex md:hidden items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 border-2 border-amber-500/50 flex items-center justify-center flex-shrink-0">
-                              <span className="text-white font-bold text-sm">{playerAName.slice(0, 1).toUpperCase()}</span>
-                            </div>
-                            <span className="text-white font-semibold text-sm truncate max-w-[80px]">{playerAName}</span>
-                            <span className="text-gray-500">⚔️</span>
-                            <span className="text-gray-500 text-sm">?</span>
+                {/* My Open Lobbies First */}
+                {filteredOpenLobbies
+                  .filter((l) => l.playerA === publicKey.toString() && l.status === 0)
+                  .map((lobby) => (
+                    <div
+                      key={lobby._id}
+                      className={`rounded-xl p-3 md:p-4 cursor-pointer transition-all ${
+                        lobby.isPrivate
+                          ? "bg-linear-to-r from-purple-900/40 to-purple-950/40 border border-purple-500/30 hover:border-purple-400/50"
+                          : "bg-linear-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 hover:border-amber-600/50"
+                      }`}
+                      onClick={() => handleLobbySelected(lobby.lobbyId)}
+                    >
+                      {/* Mobile Layout */}
+                      <div className="flex md:hidden items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-8 h-8 rounded-full bg-linear-to-br from-amber-500 to-amber-700 border-2 border-amber-400 flex items-center justify-center shrink-0">
+                            <span className="text-white font-bold text-sm">Y</span>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <div className="flex items-center gap-1 bg-gray-800/80 px-2 py-1 rounded-lg">
-                              <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
-                              <span className="text-white font-bold text-sm">{(lobby.amount / 1e9).toFixed(3)}</span>
-                            </div>
-                            <button className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold text-sm rounded-lg">
-                              Join
-                            </button>
-                          </div>
+                          <span className="text-white font-semibold text-sm truncate">You</span>
+                          <span className="text-gray-500">⚔️</span>
+                          <span className="text-gray-500 text-sm italic">Waiting...</span>
                         </div>
-
-                        {/* Desktop Layout */}
-                        <div className="hidden md:flex items-center justify-between">
-                          <div className="flex items-center gap-3 flex-1">
-                            <div className="relative">
-                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-600 to-amber-800 border-2 border-amber-500/50 flex items-center justify-center overflow-hidden">
-                                <span className="text-white font-bold text-lg">{playerAName.slice(0, 1).toUpperCase()}</span>
-                              </div>
-                              <div className="absolute -bottom-1 -right-1 bg-amber-600 text-[10px] text-white font-bold px-1.5 py-0.5 rounded-full border border-amber-400">
-                                {lobby.characterA || 1}
-                              </div>
-                            </div>
-                            <p className="text-white font-semibold">{playerAName}</p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-1 bg-gray-800/80 px-2 py-1 rounded-lg">
+                            <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
+                            <span className="text-white font-bold text-sm">
+                              {(lobby.amount / 1e9).toFixed(3)}
+                            </span>
                           </div>
-                          <div className="px-4"><span className="text-2xl">⚔️</span></div>
-                          <div className="flex items-center gap-3 flex-1 justify-end">
-                            <p className="text-gray-500 font-semibold italic">Waiting...</p>
-                            <div className="w-12 h-12 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center">
-                              <span className="text-gray-500 text-2xl">?</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3 ml-6">
-                            <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
-                              <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
-                              <span className="text-white font-bold">{(lobby.amount / 1e9).toFixed(3)}</span>
-                            </div>
-                            <button className="px-6 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white font-semibold rounded-lg transition-all">
-                              Join
-                            </button>
-                            <button className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
-                                <circle cx="12" cy="12" r="3" />
-                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
-                              </svg>
-                            </button>
-                          </div>
+                          {lobby.isPrivate && <span className="text-purple-300 text-xs">🔒</span>}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const shareUrl = `${window.location.origin}/1v1?join=${lobby.shareToken}`;
+                              navigator.clipboard.writeText(shareUrl);
+                              toast.success("Share link copied!");
+                            }}
+                            className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg"
+                          >
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              className="text-gray-400"
+                            >
+                              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                              <polyline points="16 6 12 2 8 6" />
+                              <line x1="12" y1="2" x2="12" y2="15" />
+                            </svg>
+                          </button>
                         </div>
                       </div>
-                    );
-                  })}
+
+                      {/* Desktop Layout */}
+                      <div className="hidden md:flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="relative">
+                            <div className="w-12 h-12 rounded-full bg-linear-to-br from-amber-500 to-amber-700 border-2 border-amber-400 flex items-center justify-center">
+                              <span className="text-white font-bold text-lg">Y</span>
+                            </div>
+                            <div className="absolute -bottom-1 -right-1 bg-amber-600 text-2.5 text-white font-bold px-1.5 py-0.5 rounded-full border border-amber-400">
+                              {lobby.characterA || 1}
+                            </div>
+                          </div>
+                          <p className="text-white font-semibold">You</p>
+                        </div>
+                        <div className="px-4">
+                          <span className="text-2xl">⚔️</span>
+                        </div>
+                        <div className="flex items-center gap-3 flex-1 justify-end">
+                          <p className="text-gray-500 font-semibold italic">Waiting...</p>
+                          <div className="w-12 h-12 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center">
+                            <span className="text-gray-500 text-2xl">?</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 ml-6">
+                          <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
+                            <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
+                            <span className="text-white font-bold">
+                              {(lobby.amount / 1e9).toFixed(3)}
+                            </span>
+                          </div>
+                          {lobby.isPrivate && (
+                            <span className="px-2 py-1 bg-purple-600/40 border border-purple-500/50 rounded text-purple-200 text-xs">
+                              🔒
+                            </span>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const shareUrl = `${window.location.origin}/1v1?join=${lobby.shareToken}`;
+                              navigator.clipboard.writeText(shareUrl);
+                              toast.success("Share link copied!");
+                            }}
+                            className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+                          >
+                            <svg
+                              width="18"
+                              height="18"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              className="text-gray-400"
+                            >
+                              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                              <polyline points="16 6 12 2 8 6" />
+                              <line x1="12" y1="2" x2="12" y2="15" />
+                            </svg>
+                          </button>
+                          <button className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
+                            <svg
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              className="text-gray-400"
+                            >
+                              <circle cx="12" cy="12" r="3" />
+                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                {/* Other Open Lobbies */}
+                {filteredOpenLobbies
+                  .filter((l) => l.playerA !== publicKey.toString() && l.status === 0)
+                  .map((lobby) => (
+                    <div
+                      key={lobby._id}
+                      className={`rounded-xl p-3 md:p-4 cursor-pointer transition-all ${
+                        lobby.isPrivate
+                          ? "bg-linear-to-r from-purple-900/40 to-purple-950/40 border border-purple-500/30 hover:border-purple-400/50"
+                          : "bg-linear-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 hover:border-amber-600/50"
+                      }`}
+                      onClick={() => handleLobbySelected(lobby.lobbyId)}
+                    >
+                      {/* Mobile Layout */}
+                      <div className="flex md:hidden items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-8 h-8 rounded-full bg-linear-to-br from-amber-600 to-amber-800 border-2 border-amber-500/50 flex items-center justify-center shrink-0">
+                            <span className="text-white font-bold text-sm">
+                              {getPlayerDisplayName(lobby.playerA).slice(0, 1).toUpperCase()}
+                            </span>
+                          </div>
+                          <span className="text-white font-semibold text-sm truncate max-w-20">
+                            {getPlayerDisplayName(lobby.playerA)}
+                          </span>
+                          <span className="text-gray-500">⚔️</span>
+                          <span className="text-gray-500 text-sm">?</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-1 bg-gray-800/80 px-2 py-1 rounded-lg">
+                            <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
+                            <span className="text-white font-bold text-sm">
+                              {(lobby.amount / 1e9).toFixed(3)}
+                            </span>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleLobbySelected(lobby.lobbyId);
+                            }}
+                            className="px-3 py-1.5 bg-linear-to-r from-amber-500 to-amber-600 text-white font-semibold text-sm rounded-lg"
+                          >
+                            Join
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Desktop Layout */}
+                      <div className="hidden md:flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="relative">
+                            <div className="w-12 h-12 rounded-full bg-linear-to-br from-amber-600 to-amber-800 border-2 border-amber-500/50 flex items-center justify-center">
+                              <span className="text-white font-bold text-lg">
+                                {getPlayerDisplayName(lobby.playerA).slice(0, 1).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="absolute -bottom-1 -right-1 bg-amber-600 text-2.5 text-white font-bold px-1.5 py-0.5 rounded-full border border-amber-400">
+                              {lobby.characterA || 1}
+                            </div>
+                          </div>
+                          <p className="text-white font-semibold">
+                            {getPlayerDisplayName(lobby.playerA)}
+                          </p>
+                        </div>
+                        <div className="px-4">
+                          <span className="text-2xl">⚔️</span>
+                        </div>
+                        <div className="flex items-center gap-3 flex-1 justify-end">
+                          <p className="text-gray-500 font-semibold italic">Waiting...</p>
+                          <div className="w-12 h-12 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center">
+                            <span className="text-gray-500 text-2xl">?</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 ml-6">
+                          <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
+                            <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
+                            <span className="text-white font-bold">
+                              {(lobby.amount / 1e9).toFixed(3)}
+                            </span>
+                          </div>
+                          {lobby.isPrivate && (
+                            <span className="px-2 py-1 bg-purple-600/40 border border-purple-500/50 rounded text-purple-200 text-xs">
+                              🔒
+                            </span>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleLobbySelected(lobby.lobbyId);
+                            }}
+                            className="px-6 py-2 bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white font-semibold rounded-lg transition-all"
+                          >
+                            Join
+                          </button>
+                          <button className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
+                            <svg
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              className="text-gray-400"
+                            >
+                              <circle cx="12" cy="12" r="3" />
+                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
 
                 {/* Completed Lobbies */}
-                {completedLobbies.slice(0, 20).map((lobby) => {
+                {filteredCompletedLobbies.slice(0, 20).map((lobby) => {
                   const isPlayerAWinner = lobby.winner === lobby.playerA;
                   const isPlayerBWinner = lobby.winner === lobby.playerB;
                   const isCurrentUserPlayerA = lobby.playerA === publicKey?.toString();
@@ -1083,56 +962,85 @@ export function OneVOnePage() {
                   return (
                     <div
                       key={lobby._id}
-                      className="bg-gradient-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 rounded-xl p-3 md:p-4 hover:border-amber-600/50 transition-colors cursor-pointer"
+                      className="bg-linear-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 rounded-xl p-3 md:p-4 hover:border-amber-600/50 transition-colors cursor-pointer"
                       onClick={() => handleLobbySelected(lobby.lobbyId)}
                     >
                       {/* Mobile Layout */}
                       <div className="flex md:hidden items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
-                          <div className="relative flex-shrink-0">
-                            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
-                              isPlayerAWinner
-                                ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
-                                : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
-                            }`}>
-                              <span className="text-white font-bold text-sm">{playerAName.slice(0, 1).toUpperCase()}</span>
+                          <div className="relative shrink-0">
+                            <div
+                              className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
+                                isPlayerAWinner
+                                  ? "bg-linear-to-br from-amber-500 to-amber-700 border-amber-400"
+                                  : "bg-linear-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                              }`}
+                            >
+                              <span className="text-white font-bold text-sm">
+                                {playerAName.slice(0, 1).toUpperCase()}
+                              </span>
                             </div>
-                            {isPlayerAWinner && <span className="absolute -top-1 -right-1 text-xs">👑</span>}
+                            {isPlayerAWinner && (
+                              <span className="absolute -top-1 -right-1 text-xs">👑</span>
+                            )}
                           </div>
-                          <span className={`text-sm truncate max-w-[60px] ${isPlayerAWinner ? "text-amber-300" : "text-gray-400"}`}>
+                          <span
+                            className={`text-sm truncate max-w-15 ${isPlayerAWinner ? "text-amber-300" : "text-gray-400"}`}
+                          >
                             {playerAName}
                           </span>
                           {/* Win streak badge - show when Player A wins and has at least 2 consecutive wins */}
                           {isPlayerAWinner && (lobby.winStreak ?? 0) >= 1 && (
-                            <span className="px-1.5 py-0.5 bg-gradient-to-r from-orange-600 to-red-600 rounded text-[10px] text-white font-bold whitespace-nowrap">
+                            <span className="px-1.5 py-0.5 bg-linear-to-r from-orange-600 to-red-600 rounded text-2.5 text-white font-bold whitespace-nowrap">
                               🔥 {(lobby.winStreak ?? 0) + 1} streak
                             </span>
                           )}
                           <span className="text-gray-500 opacity-60">⚔️</span>
-                          <span className={`text-sm truncate max-w-[60px] ${isPlayerBWinner ? "text-amber-300" : "text-gray-400"}`}>
+                          <span
+                            className={`text-sm truncate max-w-15 ${isPlayerBWinner ? "text-amber-300" : "text-gray-400"}`}
+                          >
                             {playerBName ?? "---"}
                           </span>
-                          <div className="relative flex-shrink-0">
-                            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
-                              isPlayerBWinner
-                                ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
-                                : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
-                            }`}>
-                              <span className="text-white font-bold text-sm">{playerBName ? playerBName.slice(0, 1).toUpperCase() : "?"}</span>
+                          <div className="relative shrink-0">
+                            <div
+                              className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
+                                isPlayerBWinner
+                                  ? "bg-linear-to-br from-amber-500 to-amber-700 border-amber-400"
+                                  : "bg-linear-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                              }`}
+                            >
+                              <span className="text-white font-bold text-sm">
+                                {playerBName ? playerBName.slice(0, 1).toUpperCase() : "?"}
+                              </span>
                             </div>
-                            {isPlayerBWinner && <span className="absolute -top-1 -right-1 text-xs">👑</span>}
+                            {isPlayerBWinner && (
+                              <span className="absolute -top-1 -right-1 text-xs">👑</span>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-2 shrink-0">
                           <div className="flex items-center gap-1 bg-gray-800/80 px-2 py-1 rounded-lg">
                             <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
-                            <span className="text-white font-bold text-sm">{(lobby.amount / 1e9).toFixed(3)}</span>
+                            <span className="text-white font-bold text-sm">
+                              {(lobby.amount / 1e9).toFixed(3)}
+                            </span>
                           </div>
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleLobbySelected(lobby.lobbyId); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleLobbySelected(lobby.lobbyId);
+                            }}
                             className="p-1.5 bg-gray-800 hover:bg-amber-700/50 rounded-lg"
                           >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              className="text-gray-400"
+                            >
                               <circle cx="12" cy="12" r="3" />
                               <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
                             </svg>
@@ -1144,59 +1052,82 @@ export function OneVOnePage() {
                       <div className="hidden md:flex items-center justify-between">
                         <div className="flex items-center gap-3 flex-1">
                           <div className="relative">
-                            <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center overflow-hidden ${
-                              isPlayerAWinner
-                                ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
-                                : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
-                            }`}>
-                              <span className="text-white font-bold text-lg">{playerAName.slice(0, 1).toUpperCase()}</span>
+                            <div
+                              className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${
+                                isPlayerAWinner
+                                  ? "bg-linear-to-br from-amber-500 to-amber-700 border-amber-400"
+                                  : "bg-linear-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                              }`}
+                            >
+                              <span className="text-white font-bold text-lg">
+                                {playerAName.slice(0, 1).toUpperCase()}
+                              </span>
                             </div>
-                            <div className={`absolute -bottom-1 -right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${
-                              isPlayerAWinner ? "bg-amber-600 text-white border-amber-400" : "bg-gray-700 text-gray-300 border-gray-600"
-                            }`}>
-                              {lobby.characterA || 1}
-                            </div>
-                            {isPlayerAWinner && <div className="absolute -top-1 -right-1 text-sm">👑</div>}
+                            {isPlayerAWinner && (
+                              <div className="absolute -top-1 -right-1 text-sm">👑</div>
+                            )}
                           </div>
-                          <p className={`font-semibold ${isPlayerAWinner ? "text-amber-300" : "text-gray-400"}`}>{playerAName}</p>
+                          <p
+                            className={`font-semibold ${isPlayerAWinner ? "text-amber-300" : "text-gray-400"}`}
+                          >
+                            {playerAName}
+                          </p>
                           {/* Win streak badge - show when Player A wins and has at least 2 consecutive wins */}
                           {isPlayerAWinner && (lobby.winStreak ?? 0) >= 1 && (
-                            <span className="px-2 py-1 bg-gradient-to-r from-orange-600 to-red-600 rounded text-xs text-white font-bold">
+                            <span className="px-2 py-1 bg-linear-to-r from-orange-600 to-red-600 rounded text-xs text-white font-bold">
                               🔥 {(lobby.winStreak ?? 0) + 1} Win Streak
                             </span>
                           )}
                         </div>
-                        <div className="px-4"><span className="text-2xl opacity-60">⚔️</span></div>
+                        <div className="px-4">
+                          <span className="text-2xl opacity-60">⚔️</span>
+                        </div>
                         <div className="flex items-center gap-3 flex-1 justify-end">
-                          <p className={`font-semibold ${isPlayerBWinner ? "text-amber-300" : "text-gray-400"}`}>{playerBName ?? "---"}</p>
+                          <p
+                            className={`font-semibold ${isPlayerBWinner ? "text-amber-300" : "text-gray-400"}`}
+                          >
+                            {playerBName ?? "---"}
+                          </p>
                           <div className="relative">
-                            <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center overflow-hidden ${
-                              isPlayerBWinner
-                                ? "bg-gradient-to-br from-amber-500 to-amber-700 border-amber-400"
-                                : "bg-gradient-to-br from-gray-600 to-gray-800 border-gray-500/50"
-                            }`}>
-                              <span className="text-white font-bold text-lg">{playerBName ? playerBName.slice(0, 1).toUpperCase() : "?"}</span>
+                            <div
+                              className={`w-12 h-12 rounded-full border-2 flex items-center justify-center ${
+                                isPlayerBWinner
+                                  ? "bg-linear-to-br from-amber-500 to-amber-700 border-amber-400"
+                                  : "bg-linear-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                              }`}
+                            >
+                              <span className="text-white font-bold text-lg">
+                                {playerBName ? playerBName.slice(0, 1).toUpperCase() : "?"}
+                              </span>
                             </div>
-                            {lobby.playerB && (
-                              <div className={`absolute -bottom-1 -right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${
-                                isPlayerBWinner ? "bg-amber-600 text-white border-amber-400" : "bg-gray-700 text-gray-300 border-gray-600"
-                              }`}>
-                                {lobby.characterB || 1}
-                              </div>
+                            {isPlayerBWinner && (
+                              <div className="absolute -top-1 -right-1 text-sm">👑</div>
                             )}
-                            {isPlayerBWinner && <div className="absolute -top-1 -left-1 text-sm">👑</div>}
                           </div>
                         </div>
                         <div className="flex items-center gap-3 ml-6">
                           <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
                             <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
-                            <span className="text-white font-bold">{(lobby.amount / 1e9).toFixed(3)}</span>
+                            <span className="text-white font-bold">
+                              {(lobby.amount / 1e9).toFixed(3)}
+                            </span>
                           </div>
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleLobbySelected(lobby.lobbyId); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleLobbySelected(lobby.lobbyId);
+                            }}
                             className="p-2 bg-gray-800 hover:bg-amber-700/50 rounded-lg transition-colors"
                           >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400 hover:text-amber-300">
+                            <svg
+                              width="20"
+                              height="20"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              className="text-gray-400 hover:text-amber-300"
+                            >
                               <circle cx="12" cy="12" r="3" />
                               <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
                             </svg>
@@ -1207,16 +1138,364 @@ export function OneVOnePage() {
                   );
                 })}
 
-                {openLobbies.filter((l) => l.status === 0 && !l.isPrivate).length === 0 &&
-                  completedLobbies.length === 0 && (
-                    <div className="text-center py-12 bg-gray-900/50 rounded-xl border border-gray-700/30">
-                      <p className="text-gray-400">No games yet</p>
-                    </div>
-                  )}
+                {filteredOpenLobbies.length === 0 && filteredCompletedLobbies.length === 0 && (
+                  <div className="text-center py-12 bg-gray-900/50 rounded-xl border border-gray-700/30">
+                    <p className="text-gray-400">
+                      {activeFilter === "my_games"
+                        ? "You haven't created or joined any games yet."
+                        : "No games yet. Create one to get started!"}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        )}
+          ) : (
+            /* Single column layout when not connected - show waiting games first, then resolved */
+            <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
+              {/* Not connected banner */}
+              <div className="p-3 md:p-4 bg-linear-to-r from-amber-900/40 to-amber-950/40 border border-amber-700/50 rounded-xl">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                  <div className="text-center md:text-left">
+                    <h1 className="text-2xl md:text-4xl font-black text-amber-200 tracking-wide">
+                      1V1 BATTLE
+                    </h1>
+                    <p className="text-amber-300/70 text-xs md:text-sm mt-1">
+                      Connect your wallet to create or join games
+                    </p>
+                  </div>
+                  <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-amber-600/20 border border-amber-500/30 rounded-lg">
+                    <span className="text-amber-400 text-sm">Payouts settled in SOL</span>
+                    <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Waiting Games (Open Lobbies) */}
+              <div className="space-y-3 md:space-y-4">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <h2 className="text-lg md:text-xl font-bold text-amber-100">ALL GAMES</h2>
+                  <span className="text-amber-400 font-mono text-sm">
+                    {openLobbies.filter((l) => l.status === 0 && !l.isPrivate).length +
+                      completedLobbies.length}
+                  </span>
+                  <span className="hidden md:flex px-3 py-1 bg-amber-900/30 border border-amber-700/50 rounded-full text-amber-300 text-xs items-center gap-1">
+                    <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
+                    Payouts settled in SOL
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Open Lobbies */}
+                  {openLobbies
+                    .filter((l) => l.status === 0 && !l.isPrivate)
+                    .map((lobby) => {
+                      const playerAName = getPlayerDisplayName(lobby.playerA);
+                      return (
+                        <div
+                          key={lobby._id}
+                          className="bg-linear-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 rounded-xl p-3 md:p-4 hover:border-amber-600/50 transition-colors"
+                        >
+                          {/* Mobile Layout */}
+                          <div className="flex md:hidden items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-linear-to-br from-amber-600 to-amber-800 border-2 border-amber-500/50 flex items-center justify-center shrink-0">
+                                <span className="text-white font-bold text-sm">
+                                  {playerAName.slice(0, 1).toUpperCase()}
+                                </span>
+                              </div>
+                              <span className="text-white font-semibold text-sm truncate max-w-20">
+                                {playerAName}
+                              </span>
+                              <span className="text-gray-500">⚔️</span>
+                              <span className="text-gray-500 text-sm">?</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <div className="flex items-center gap-1 bg-gray-800/80 px-2 py-1 rounded-lg">
+                                <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
+                                <span className="text-white font-bold text-sm">
+                                  {(lobby.amount / 1e9).toFixed(3)}
+                                </span>
+                              </div>
+                              <button className="px-3 py-1.5 bg-linear-to-r from-amber-500 to-amber-600 text-white font-semibold text-sm rounded-lg">
+                                Join
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Desktop Layout */}
+                          <div className="hidden md:flex items-center justify-between">
+                            <div className="flex items-center gap-3 flex-1">
+                              <div className="relative">
+                                <div className="w-12 h-12 rounded-full bg-linear-to-br from-amber-600 to-amber-800 border-2 border-amber-500/50 flex items-center justify-center overflow-hidden">
+                                  <span className="text-white font-bold text-lg">
+                                    {playerAName.slice(0, 1).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div className="absolute -bottom-1 -right-1 bg-amber-600 text-2.5 text-white font-bold px-1.5 py-0.5 rounded-full border border-amber-400">
+                                  {lobby.characterA || 1}
+                                </div>
+                              </div>
+                              <p className="text-white font-semibold">{playerAName}</p>
+                            </div>
+                            <div className="px-4">
+                              <span className="text-2xl">⚔️</span>
+                            </div>
+                            <div className="flex items-center gap-3 flex-1 justify-end">
+                              <p className="text-gray-500 font-semibold italic">Waiting...</p>
+                              <div className="w-12 h-12 rounded-full bg-gray-800 border-2 border-dashed border-gray-600 flex items-center justify-center">
+                                <span className="text-gray-500 text-2xl">?</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 ml-6">
+                              <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
+                                <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
+                                <span className="text-white font-bold">
+                                  {(lobby.amount / 1e9).toFixed(3)}
+                                </span>
+                              </div>
+                              <button className="px-6 py-2 bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-white font-semibold rounded-lg transition-all">
+                                Join
+                              </button>
+                              <button className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
+                                <svg
+                                  width="20"
+                                  height="20"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  className="text-gray-400"
+                                >
+                                  <circle cx="12" cy="12" r="3" />
+                                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                  {/* Completed Lobbies */}
+                  {completedLobbies.slice(0, 20).map((lobby) => {
+                    const isPlayerAWinner = lobby.winner === lobby.playerA;
+                    const isPlayerBWinner = lobby.winner === lobby.playerB;
+                    const isCurrentUserPlayerA = lobby.playerA === publicKey?.toString();
+                    const isCurrentUserPlayerB = lobby.playerB === publicKey?.toString();
+                    const playerAName = getPlayerDisplayName(lobby.playerA, isCurrentUserPlayerA);
+                    const playerBName = lobby.playerB
+                      ? getPlayerDisplayName(lobby.playerB, isCurrentUserPlayerB)
+                      : null;
+
+                    return (
+                      <div
+                        key={lobby._id}
+                        className="bg-linear-to-r from-gray-900/80 to-gray-950/80 border border-gray-700/50 rounded-xl p-3 md:p-4 hover:border-amber-600/50 transition-colors cursor-pointer"
+                        onClick={() => handleLobbySelected(lobby.lobbyId)}
+                      >
+                        {/* Mobile Layout */}
+                        <div className="flex md:hidden items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="relative shrink-0">
+                              <div
+                                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
+                                  isPlayerAWinner
+                                    ? "bg-linear-to-br from-amber-500 to-amber-700 border-amber-400"
+                                    : "bg-linear-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                                }`}
+                              >
+                                <span className="text-white font-bold text-sm">
+                                  {playerAName.slice(0, 1).toUpperCase()}
+                                </span>
+                              </div>
+                              {isPlayerAWinner && (
+                                <span className="absolute -top-1 -right-1 text-xs">👑</span>
+                              )}
+                            </div>
+                            <span
+                              className={`text-sm truncate max-w-15 ${isPlayerAWinner ? "text-amber-300" : "text-gray-400"}`}
+                            >
+                              {playerAName}
+                            </span>
+                            {/* Win streak badge - show when Player A wins and has at least 2 consecutive wins */}
+                            {isPlayerAWinner && (lobby.winStreak ?? 0) >= 1 && (
+                              <span className="px-1.5 py-0.5 bg-linear-to-r from-orange-600 to-red-600 rounded text-2.5 text-white font-bold whitespace-nowrap">
+                                🔥 {(lobby.winStreak ?? 0) + 1} streak
+                              </span>
+                            )}
+                            <span className="text-gray-500 opacity-60">⚔️</span>
+                            <span
+                              className={`text-sm truncate max-w-15 ${isPlayerBWinner ? "text-amber-300" : "text-gray-400"}`}
+                            >
+                              {playerBName ?? "---"}
+                            </span>
+                            <div className="relative shrink-0">
+                              <div
+                                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${
+                                  isPlayerBWinner
+                                    ? "bg-linear-to-br from-amber-500 to-amber-700 border-amber-400"
+                                    : "bg-linear-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                                }`}
+                              >
+                                <span className="text-white font-bold text-sm">
+                                  {playerBName ? playerBName.slice(0, 1).toUpperCase() : "?"}
+                                </span>
+                              </div>
+                              {isPlayerBWinner && (
+                                <span className="absolute -top-1 -right-1 text-xs">👑</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-1 bg-gray-800/80 px-2 py-1 rounded-lg">
+                              <img src="/sol-logo.svg" alt="SOL" className="w-3 h-3" />
+                              <span className="text-white font-bold text-sm">
+                                {(lobby.amount / 1e9).toFixed(3)}
+                              </span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleLobbySelected(lobby.lobbyId);
+                              }}
+                              className="p-1.5 bg-gray-800 hover:bg-amber-700/50 rounded-lg"
+                            >
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                className="text-gray-400"
+                              >
+                                <circle cx="12" cy="12" r="3" />
+                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Desktop Layout */}
+                        <div className="hidden md:flex items-center justify-between">
+                          <div className="flex items-center gap-3 flex-1">
+                            <div className="relative">
+                              <div
+                                className={`w-12 h-12 rounded-full border-2 flex items-center justify-center overflow-hidden ${
+                                  isPlayerAWinner
+                                    ? "bg-linear-to-br from-amber-500 to-amber-700 border-amber-400"
+                                    : "bg-linear-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                                }`}
+                              >
+                                <span className="text-white font-bold text-lg">
+                                  {playerAName.slice(0, 1).toUpperCase()}
+                                </span>
+                              </div>
+                              <div
+                                className={`absolute -bottom-1 -right-1 text-2.5 font-bold px-1.5 py-0.5 rounded-full border ${
+                                  isPlayerAWinner
+                                    ? "bg-amber-600 text-white border-amber-400"
+                                    : "bg-gray-700 text-gray-300 border-gray-600"
+                                }`}
+                              >
+                                {lobby.characterA || 1}
+                              </div>
+                              {isPlayerAWinner && (
+                                <div className="absolute -top-1 -right-1 text-sm">👑</div>
+                              )}
+                            </div>
+                            <p
+                              className={`font-semibold ${isPlayerAWinner ? "text-amber-300" : "text-gray-400"}`}
+                            >
+                              {playerAName}
+                            </p>
+                            {/* Win streak badge - show when Player A wins and has at least 2 consecutive wins */}
+                            {isPlayerAWinner && (lobby.winStreak ?? 0) >= 1 && (
+                              <span className="px-2 py-1 bg-linear-to-r from-orange-600 to-red-600 rounded text-xs text-white font-bold">
+                                🔥 {(lobby.winStreak ?? 0) + 1} Win Streak
+                              </span>
+                            )}
+                          </div>
+                          <div className="px-4">
+                            <span className="text-2xl opacity-60">⚔️</span>
+                          </div>
+                          <div className="flex items-center gap-3 flex-1 justify-end">
+                            <p
+                              className={`font-semibold ${isPlayerBWinner ? "text-amber-300" : "text-gray-400"}`}
+                            >
+                              {playerBName ?? "---"}
+                            </p>
+                            <div className="relative">
+                              <div
+                                className={`w-12 h-12 rounded-full border-2 flex items-center justify-center overflow-hidden ${
+                                  isPlayerBWinner
+                                    ? "bg-linear-to-br from-amber-500 to-amber-700 border-amber-400"
+                                    : "bg-linear-to-br from-gray-600 to-gray-800 border-gray-500/50"
+                                }`}
+                              >
+                                <span className="text-white font-bold text-lg">
+                                  {playerBName ? playerBName.slice(0, 1).toUpperCase() : "?"}
+                                </span>
+                              </div>
+                              {lobby.playerB && (
+                                <div
+                                  className={`absolute -bottom-1 -right-1 text-2.5 font-bold px-1.5 py-0.5 rounded-full border ${
+                                    isPlayerBWinner
+                                      ? "bg-amber-600 text-white border-amber-400"
+                                      : "bg-gray-700 text-gray-300 border-gray-600"
+                                  }`}
+                                >
+                                  {lobby.characterB || 1}
+                                </div>
+                              )}
+                              {isPlayerBWinner && (
+                                <div className="absolute -top-1 -left-1 text-sm">👑</div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 ml-6">
+                            <div className="flex items-center gap-1 bg-gray-800/80 px-3 py-1.5 rounded-lg">
+                              <img src="/sol-logo.svg" alt="SOL" className="w-4 h-4" />
+                              <span className="text-white font-bold">
+                                {(lobby.amount / 1e9).toFixed(3)}
+                              </span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleLobbySelected(lobby.lobbyId);
+                              }}
+                              className="p-2 bg-gray-800 hover:bg-amber-700/50 rounded-lg transition-colors"
+                            >
+                              <svg
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                className="text-gray-400 hover:text-amber-300"
+                              >
+                                <circle cx="12" cy="12" r="3" />
+                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {openLobbies.filter((l) => l.status === 0 && !l.isPrivate).length === 0 &&
+                    completedLobbies.length === 0 && (
+                      <div className="text-center py-12 bg-gray-900/50 rounded-xl border border-gray-700/30">
+                        <p className="text-gray-400">No games yet</p>
+                      </div>
+                    )}
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
 

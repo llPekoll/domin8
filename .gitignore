@@ -1,7 +1,7 @@
 /node_modules
 .github
-
-
+app
+gradle
 
 convex/_generated
 test-output.log
@@ -52,3 +52,9 @@ app/build/
 *.aab
 *.idsig
 *.keystore
+
+# Convex backup
+convex-backup
+
+# Server
+server/node_modules

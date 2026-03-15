@@ -1,15 +1,46 @@
 import { usePrivy } from "@privy-io/react-auth";
 import { useWallets } from "@privy-io/react-auth/solana";
 import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useSocket, socketRequest } from "../lib/socket";
 import { getSharedConnection } from "../lib/sharedConnection";
 import { logger } from "../lib/logger";
+import { EventBus } from "../game/EventBus";
+import { LEVEL_THRESHOLDS } from "../lib/xpUtils";
 
+function getLevelInfo(level: number) {
+  return LEVEL_THRESHOLDS.find((l) => l.level === level) || LEVEL_THRESHOLDS[0];
+}
+
+// Re-export useActiveWallet for components that want wallet switching
+export { useActiveWallet } from "../contexts/ActiveWalletContext";
+
+/**
+ * Hook for accessing wallet state from Privy.
+ *
+ * Note: For components that need wallet switching between embedded/external,
+ * use the useActiveWallet hook from contexts/ActiveWalletContext instead.
+ * This hook provides the embedded wallet by default for backward compatibility.
+ */
 export function usePrivyWallet() {
   const { ready, authenticated, user } = usePrivy();
   const { wallets } = useWallets();
   const [solBalance, setSolBalance] = useState<number>(0);
   const [isLoadingBalance, setIsLoadingBalance] = useState<boolean>(false);
+  const dailyLoginClaimedRef = useRef<string | null>(null);
+
+  const { socket } = useSocket();
+
+  // Socket-based daily login XP claim
+  const claimDailyLoginXp = useCallback(
+    async (args: { walletAddress: string }) => {
+      if (!socket) return { awarded: false };
+      const res = await socketRequest(socket, "claim-daily-login-xp", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
+  );
 
   const solanaWallet = wallets[0];
   const walletAddress = solanaWallet?.address;
@@ -29,6 +60,39 @@ export function usePrivyWallet() {
       });
     }
   }, [user]);
+
+  // Claim daily login XP when wallet is connected
+  useEffect(() => {
+    if (!connected || !walletAddress) return;
+
+    // Prevent multiple claims for the same wallet in the same session
+    if (dailyLoginClaimedRef.current === walletAddress) return;
+
+    const claimLoginXp = async () => {
+      try {
+        const result = await claimDailyLoginXp({ walletAddress });
+
+        if (result?.awarded) {
+          logger.solana.info("[usePrivyWallet] Daily login XP claimed:", result);
+
+          // Emit level-up event if player leveled up
+          if (result.levelUp && result.newLevel) {
+            EventBus.emit("level-up", {
+              newLevel: result.newLevel,
+              levelTitle: getLevelInfo(result.newLevel).title,
+            });
+          }
+        }
+
+        // Mark as claimed for this session
+        dailyLoginClaimedRef.current = walletAddress;
+      } catch (error) {
+        logger.solana.error("[usePrivyWallet] Failed to claim daily login XP:", error);
+      }
+    };
+
+    void claimLoginXp();
+  }, [connected, walletAddress, claimDailyLoginXp]);
 
   // Get external wallet address (non-Privy wallet, e.g., Phantom)
   const externalWalletAccount = user?.linkedAccounts?.find(
@@ -122,17 +186,8 @@ export function usePrivyWallet() {
     } finally {
       setIsLoadingBalance(false);
     }
-   
+
   };
-  // Debug: Log what we're returning
-  // console.log('[DEBUG] usePrivyWallet returning:', {
-  //   connected,
-  //   walletAddress,
-  //   externalWalletAddress,
-  //   externalWalletAccountType,
-  //   ready,
-  //   linkedAccountsCount: user?.linkedAccounts?.length || 0
-  // });
 
   return {
       connected,

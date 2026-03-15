@@ -237,7 +237,6 @@ export class OneVOneScene extends Scene {
         key: characterKey,
       },
       spawnIndex: data.position === "left" ? 0 : 1,
-      isBot: false,
       eliminated: false,
       size: 1.5 * RESOLUTION_SCALE, // Slightly larger for visibility
       betAmount: 0,
@@ -332,12 +331,13 @@ export class OneVOneScene extends Scene {
       displayName: participant.displayName,
       betAmount: participant.betAmount || 0,
       size: scale,
-      isBot: false,
       eliminated: false,
       targetX: explicitPosition.x,
       targetY: explicitPosition.y,
       spawnIndex: participant.spawnIndex,
       flipX,
+      isBoss: false, // 1v1 doesn't have boss system
+      betCount: 1,
     };
 
     this.playerManager.getParticipants().set(participant._id, gameParticipant);
@@ -437,7 +437,6 @@ export class OneVOneScene extends Scene {
           key: charKeyA,
         },
         spawnIndex: 0,
-        isBot: false,
         eliminated: false,
         size: 1.5 * RESOLUTION_SCALE,
         betAmount: 0,
@@ -454,7 +453,6 @@ export class OneVOneScene extends Scene {
           key: charKeyB,
         },
         spawnIndex: 1,
-        isBot: false,
         eliminated: false,
         size: 1.5 * RESOLUTION_SCALE,
         betAmount: 0,

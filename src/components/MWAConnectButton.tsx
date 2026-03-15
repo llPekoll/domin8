@@ -110,9 +110,9 @@ export function MWAConnectButton({ onConnect, onError }: MWAConnectButtonProps) 
     <button
       onClick={handleConnect}
       disabled={isConnecting || !mwaWallet}
-      className="relative w-full flex items-center justify-center gap-3 px-4 py-4 bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:via-indigo-500 hover:to-purple-500 text-white font-bold text-lg rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:transform-none overflow-hidden group"
+      className="relative w-full flex items-center justify-center gap-3 px-4 py-4 bg-linear-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:via-indigo-500 hover:to-purple-500 text-white font-bold text-lg rounded-xl shadow-lg transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:transform-none overflow-hidden group"
     >
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+      <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
       <Wallet className="w-6 h-6" />
       <span>{isConnecting ? status : mwaWallet ? "Connect Seeker Wallet" : status}</span>
     </button>

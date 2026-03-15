@@ -79,6 +79,13 @@ export class SoundManager {
       this.initialize();
     }
 
+    // Skip non-looping sounds when audio context is suspended (tab not focused)
+    // Looping sounds (music/ambient) are handled separately via pause/resume
+    const soundManager = scene.sound as Phaser.Sound.WebAudioSoundManager;
+    if (soundManager.context && soundManager.context.state === "suspended" && !config?.loop) {
+      return null;
+    }
+
     // Calculate final volume
     const finalVolume = baseVolume * this.globalVolume;
 
@@ -118,6 +125,13 @@ export class SoundManager {
   static playSound(scene: Scene, key: string, baseVolume: number = 1.0) {
     if (!this.initialized) {
       this.initialize();
+    }
+
+    // Skip sounds when audio context is suspended (tab not focused)
+    // This prevents sounds from queuing and playing all at once when tab regains focus
+    const soundManager = scene.sound as Phaser.Sound.WebAudioSoundManager;
+    if (soundManager.context && soundManager.context.state === "suspended") {
+      return;
     }
 
     // Check global mute and SFX mute
@@ -217,12 +231,25 @@ export class SoundManager {
   }
 
   /**
+   * Play boss power-up sound (Mario-style power-up for boss additional bets)
+   */
+  static playBossPowerUp(scene: Scene, baseVolume: number = 0.6) {
+    this.playSound(scene, "boss-power-up", baseVolume);
+  }
+
+  /**
    * Play 5-second countdown sound (for final countdown)
    * Plays the intro sound after countdown finishes
    */
   static playCountdown5Sec(scene: Scene, baseVolume: number = 0.7) {
     if (!this.initialized) {
       this.initialize();
+    }
+
+    // Skip sounds when audio context is suspended (tab not focused)
+    const soundManager = scene.sound as Phaser.Sound.WebAudioSoundManager;
+    if (soundManager.context && soundManager.context.state === "suspended") {
+      return;
     }
 
     // Check global mute and SFX mute

@@ -1,5 +1,5 @@
 import { Lock } from "lucide-react";
-import { CharacterPreviewScene } from "./CharacterPreviewScene";
+import { SpriteAnimator } from "./SpriteAnimator";
 import type { Character } from "../types/character";
 
 interface NFTCharacterCardProps {
@@ -30,7 +30,7 @@ export function NFTCharacterCard({
     >
       {/* NFT Badge */}
       <div className="absolute top-2 right-2 z-10">
-        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg">
+        <div className="bg-linear-to-r from-purple-600 to-indigo-600 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg">
           <span>{character.nftCollectionName ?? "Special Character"}</span>
         </div>
       </div>
@@ -38,11 +38,11 @@ export function NFTCharacterCard({
       {/* Character Preview */}
       <div className="p-4">
         <div className="w-full h-32 mb-3 flex items-center justify-center bg-black/20 rounded-lg overflow-hidden">
-          <CharacterPreviewScene
-            characterId={character._id}
-            characterName={character.name}
-            width={128}
-            height={128}
+          <SpriteAnimator
+            assetPath={character.assetPath}
+            animation="idle"
+            size={128}
+            scale={4}
           />
         </div>
 
@@ -58,7 +58,7 @@ export function NFTCharacterCard({
 
         {/* Selection Indicator */}
         {isSelected && !isLocked && (
-          <div className="mt-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold py-2 rounded-lg text-center shadow-lg">
+          <div className="mt-3 bg-linear-to-r from-purple-600 to-indigo-600 text-white text-sm font-bold py-2 rounded-lg text-center shadow-lg">
             ✓ Selected
           </div>
         )}

@@ -500,7 +500,8 @@ export class MapCarousel extends Scene {
     });
   }
 
-  private onBlockchainUpdate(gameData: any) {
+  private onBlockchainUpdate(data: { gameState: any; bossWallet: string | null }) {
+    const gameData = data.gameState;
     if (this.targetMapId !== null) return; // Already targeting a map
     if (!this.isSpinning) return; // Not spinning anymore
 

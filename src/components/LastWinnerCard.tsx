@@ -1,19 +1,59 @@
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useSocket, socketRequest } from "../lib/socket";
 import { Card, CardContent } from "./ui/card";
-import { WinnerCharacterPreviewScene } from "./WinnerCharacterPreviewScene";
-import { useMemo } from "react";
+import { SpriteAnimator } from "./SpriteAnimator";
+import { useAssets } from "../contexts/AssetsContext";
+import { useState, useEffect, useMemo } from "react";
 import { isMobile, isTablet } from "react-device-detect";
 
+// function PlatformStats() {
+//   const stats = useQuery(api.stats.getPlatformStats);
+//   if (!stats) return null;
+//
+//   const tvl = stats.tvlSOL + 40;
+//   const gain = stats.earningsSOL + 2;
+//
+//   return (
+//     <p className="text-white/60 text-lg flex justify-end gap-4">
+//       <span>
+//         Volume <span className="text-purple-300">+{tvl.toFixed(1)}</span>
+//       </span>
+//       <span>
+//         Gain <span className="text-green-300">+{gain.toFixed(1)}</span>
+//       </span>
+//     </p>
+//   );
+// }
+
 export function LastWinnerCard() {
-  const lastFinishedGame = useQuery(api.stats.getLastFinishedGame);
-  console.log("[LastWinnerCard] lastFinishedGame:", lastFinishedGame, "characterName:", lastFinishedGame?.characterName);
-  // Get display name for the winner
-  const playerInfo = useQuery(
-    api.players.getPlayer,
-    // lastFinishedGame?.winnerAddress ? { walletAddress: lastFinishedGame.winnerAddress } : "skip"
-    lastFinishedGame?.winnerAddress ? { walletAddress: lastFinishedGame.winnerAddress } : "skip"
-  );
+  const { socket } = useSocket();
+  const { characters } = useAssets();
+
+  // Fetch last finished game via socket
+  const [lastFinishedGame, setLastFinishedGame] = useState<any>(null);
+  useEffect(() => {
+    if (!socket) return;
+    socketRequest(socket, "get-last-finished-game").then((res) => {
+      if (res.success) setLastFinishedGame(res.data);
+    });
+  }, [socket]);
+
+  // Get display name for the winner via socket
+  const [playerInfo, setPlayerInfo] = useState<any>(null);
+  useEffect(() => {
+    if (!socket || !lastFinishedGame?.winnerAddress) return;
+    socketRequest(socket, "get-player", { walletAddress: lastFinishedGame.winnerAddress }).then((res) => {
+      if (res.success) setPlayerInfo(res.data);
+    });
+  }, [socket, lastFinishedGame?.winnerAddress]);
+
+  // Find character data by name to get assetPath
+  const characterData = useMemo(() => {
+    if (!lastFinishedGame?.characterName || !characters) return null;
+    return characters.find(
+      (char: { name: string }) =>
+        char.name.toLowerCase() === lastFinishedGame.characterName.toLowerCase()
+    );
+  }, [lastFinishedGame?.characterName, characters]);
 
   const displayName = useMemo(() => {
     if (!lastFinishedGame) return null;
@@ -69,13 +109,17 @@ export function LastWinnerCard() {
 
           {/* Winner Info */}
           <div className="mt-7 flex items-center  bg-purple-900/20 rounded-lg  border border-purple-500/30">
-            {/* Character Avatar with Phaser Animation */}
-            <div className="relative w-20 h-20 flex-shrink-0">
-              <WinnerCharacterPreviewScene
-                characterName={lastFinishedGame.characterName}
-                width={128}
-                height={128}
-              />
+            {/* Character Avatar */}
+            <div className="relative w-20 h-20 shrink-0">
+              {characterData && (
+                <SpriteAnimator
+                  assetPath={characterData.assetPath}
+                  animation="idle"
+                  size={80}
+                  scale={3}
+                  offsetY={35}
+                />
+              )}
             </div>
 
             {/* Winner Details - Name and Bet */}
@@ -108,9 +152,10 @@ export function LastWinnerCard() {
           {/* Stats Row */}
         </CardContent>
       </Card>
-      <p className="text-white/60 text-lg flex justify-end mr-6">
-        Round #{lastFinishedGame.roundId}
-      </p>
+      <div className="mr-6 -space-y-1">
+        {/* <PlatformStats /> */}
+        <p className="text-white/60 text-lg flex justify-end">Round #{lastFinishedGame.roundId}</p>
+      </div>
     </div>
   );
 }

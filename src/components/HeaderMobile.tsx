@@ -1,12 +1,11 @@
-import { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useState, useRef, useEffect, useCallback } from "react";
+
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useFundWallet } from "../hooks/useFundWallet";
 import { PrivyWalletButton } from "./PrivyWalletButton";
 import { ProfileDialog } from "./ProfileDialog";
 import { WithdrawDialog } from "./WithdrawDialog";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useSocket, socketRequest } from "../lib/socket";
 import { toast } from "sonner";
 import { generateRandomName } from "../lib/nameGenerator";
 import { logger } from "../lib/logger";
@@ -23,7 +22,8 @@ export function HeaderMobile() {
   const [hasAttemptedCreation, setHasAttemptedCreation] = useState(false);
   const balanceMenuRef = useRef<HTMLDivElement>(null);
 
-  const createPlayer = useMutation(api.players.createPlayer);
+  const { socket } = useSocket();
+  const [playerData, setPlayerData] = useState<any>(null);
 
   // Close balance menu when clicking outside
   useEffect(() => {
@@ -36,9 +36,27 @@ export function HeaderMobile() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const playerData = useQuery(
-    api.players.getPlayer,
-    connected && publicKey ? { walletAddress: publicKey.toString() } : "skip"
+  // Fetch player data via socket
+  useEffect(() => {
+    if (!socket || !connected || !publicKey) {
+      setPlayerData(null);
+      return;
+    }
+    socketRequest(socket, "get-player", { walletAddress: publicKey.toString() }).then((res) => {
+      if (res.success) setPlayerData(res.data);
+      else setPlayerData(null);
+    });
+  }, [socket, connected, publicKey]);
+
+  // Create player mutation via socket
+  const createPlayer = useCallback(
+    async (args: { walletAddress: string; displayName: string; externalWalletAddress?: string }) => {
+      if (!socket) throw new Error("Not connected");
+      const res = await socketRequest(socket, "create-player", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
   );
 
   // Create player with random name on first connect
@@ -71,43 +89,17 @@ export function HeaderMobile() {
 
   return (
     <>
-      <header className="flex-shrink-0 bg-gray-950/90 backdrop-blur-sm relative z-50">
+      <header className="shrink-0 bg-gray-950/90 backdrop-blur-sm relative z-50">
         <div className="flex items-center justify-between px-3 py-1">
           {/* Logo */}
-          <div className="flex items-center flex-shrink-0">
+          <div className="flex items-center shrink-0">
             <img src="/assets/logo.webp" alt="Enrageded" className="h-8 w-auto" />
           </div>
 
-          {/* Navigation Links */}
-          <div className="flex-1 flex gap-3 ml-3">
-            <Link
-              to="/"
-              className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs font-semibold"
-            >
-              Arena
-            </Link>
-            <Link
-              to="/1v1"
-              className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs font-semibold"
-            >
-              1<span className="px-0.5">v</span>1
-            </Link>
-            {/*<Link
-              to="/bloody"
-              className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"
-            >
-              Bloody Bird
-            </Link>*/}
-            <Link
-              to="/referrals"
-              className="text-indigo-200 hover:text-indigo-100 transition-colors text-xs md:text-sm font-semibold"
-            >
-              Referrals
-            </Link>
-          </div>
+          <div className="flex-1" />
 
           {/* Right Side - User Controls */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {connected && (
               <>
                 {/* Wallet Balance with Dropdown */}
@@ -116,7 +108,7 @@ export function HeaderMobile() {
                     onClick={() => setShowBalanceMenu(!showBalanceMenu)}
                     className="flex flex-col hover:bg-indigo-800/30 px-1.5 py-1 rounded-lg transition-all cursor-pointer group"
                   >
-                    <div className="text-[10px] text-indigo-400/80 leading-tight group-hover:text-indigo-300/90">
+                    <div className="text-2.5 text-indigo-400/80 leading-tight group-hover:text-indigo-300/90">
                       Balance
                     </div>
                     <div className="text-indigo-200 font-bold text-sm flex items-center gap-1 leading-tight group-hover:text-indigo-100">

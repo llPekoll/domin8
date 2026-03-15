@@ -66,7 +66,7 @@ function TierCard({
 
   return (
     <div
-      className={`relative rounded-xl p-4 bg-gradient-to-b ${colors.gradient} border ${colors.border} flex flex-col h-full ${
+      className={`relative rounded-xl p-4 bg-linear-to-b ${colors.gradient} border ${colors.border} flex flex-col h-full ${
         isActive ? "ring-2 ring-offset-2 ring-offset-slate-900 ring-green-500" : ""
       } ${isOwned && !isActive ? "ring-1 ring-indigo-500/50" : ""}`}
     >
@@ -93,7 +93,7 @@ function TierCard({
       <ul className="space-y-2 mb-4 flex-1">
         {features.map((feature, idx) => (
           <li key={idx} className="flex items-start gap-2 text-sm text-gray-300">
-            <Check className={`w-4 h-4 ${colors.text} flex-shrink-0 mt-0.5`} />
+            <Check className={`w-4 h-4 ${colors.text} shrink-0 mt-0.5`} />
             <span>{feature}</span>
           </li>
         ))}
@@ -111,7 +111,7 @@ function TierCard({
         <Button
           onClick={onSetActive}
           disabled={isSwitching}
-          className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white"
+          className="w-full bg-linear-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white"
         >
           {isSwitching ? (
             <>
@@ -130,7 +130,7 @@ function TierCard({
         <Button
           onClick={onPurchase}
           disabled={!canAfford || isPurchasing}
-          className={`w-full bg-gradient-to-r ${colors.button} text-white`}
+          className={`w-full bg-linear-to-r ${colors.button} text-white`}
         >
           {isPurchasing ? (
             <>
@@ -284,7 +284,7 @@ export function BotPurchasePanel() {
           if (!open) setConfirmDialog({ open: false, tier: null });
         }}
       >
-        <DialogContent className="sm:max-w-[400px] bg-gradient-to-b from-slate-900 to-slate-950 border-amber-500/50">
+        <DialogContent className="sm:max-w-100 bg-linear-to-b from-slate-900 to-slate-950 border-amber-500/50">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-amber-400">
               <AlertTriangle className="w-5 h-5" />
@@ -323,7 +323,7 @@ export function BotPurchasePanel() {
             </Button>
             <Button
               onClick={handleConfirmedPurchase}
-              className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white"
+              className="bg-linear-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white"
             >
               Confirm Purchase
             </Button>

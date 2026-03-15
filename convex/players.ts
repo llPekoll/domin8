@@ -1,6 +1,15 @@
 import { mutation, query, action, internalQuery, internalMutation } from "./_generated/server";
 import { api } from "./_generated/api";
 import { v } from "convex/values";
+import {
+  XP_REWARDS,
+  calculateLevel,
+  getLevelInfo,
+  getXpProgressInfo,
+  calculateBetAmountXp,
+  calculateStreakBonusXp,
+  getTodayDateString,
+} from "./xpConstants";
 
 export const getPlayer = query({
   args: { walletAddress: v.string() },
@@ -450,6 +459,286 @@ export const awardPointsInternal = internalMutation({
   handler: awardPointsHandler,
 });
 
+// ============================================================================
+// XP SYSTEM MUTATIONS
+// ============================================================================
+
+/**
+ * Claim daily login XP (+25 XP once per day)
+ * Called when user connects their wallet
+ */
+export const claimDailyLoginXp = mutation({
+  args: {
+    walletAddress: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const today = getTodayDateString();
+
+    // Find player
+    const player = await ctx.db
+      .query("players")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", args.walletAddress))
+      .first();
+
+    // Check if already claimed today
+    if (player?.lastDailyLoginDate === today) {
+      return {
+        awarded: false,
+        reason: "already_claimed",
+        xp: player.xp ?? 0,
+        level: player.level ?? 1,
+      };
+    }
+
+    const xpToAward = XP_REWARDS.DAILY_LOGIN;
+    const currentXp = player?.xp ?? 0;
+    const newXp = currentXp + xpToAward;
+    const oldLevel = player?.level ?? calculateLevel(currentXp);
+    const newLevel = calculateLevel(newXp);
+
+    if (player) {
+      await ctx.db.patch(player._id, {
+        xp: newXp,
+        level: newLevel,
+        lastDailyLoginDate: today,
+        lastActive: Date.now(),
+      });
+    } else {
+      // Create new player with XP
+      await ctx.db.insert("players", {
+        walletAddress: args.walletAddress,
+        displayName: undefined,
+        externalWalletAddress: undefined,
+        lastActive: Date.now(),
+        totalGamesPlayed: 0,
+        totalWins: 0,
+        totalPoints: 0,
+        achievements: [],
+        xp: newXp,
+        level: newLevel,
+        currentWinStreak: 0,
+        lastDailyLoginDate: today,
+      });
+    }
+
+    return {
+      awarded: true,
+      xpAwarded: xpToAward,
+      newXp,
+      levelUp: newLevel > oldLevel,
+      oldLevel,
+      newLevel,
+    };
+  },
+});
+
+/**
+ * Award XP for placing a bet
+ * - Base: +10 XP
+ * - Bet amount bonus: +1 XP per 0.01 SOL
+ * - Daily first bet bonus: +50 XP (first bet of the day)
+ */
+export const awardXpForBet = mutation({
+  args: {
+    walletAddress: v.string(),
+    betAmountLamports: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const today = getTodayDateString();
+
+    // Find player
+    const player = await ctx.db
+      .query("players")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", args.walletAddress))
+      .first();
+
+    // Calculate XP
+    let totalXp = XP_REWARDS.PLACE_BET; // Base XP
+
+    // Bet amount bonus
+    const betBonus = calculateBetAmountXp(args.betAmountLamports);
+    totalXp += betBonus;
+
+    // Daily first bet bonus
+    const isFirstBetToday = !player?.lastDailyBetDate || player.lastDailyBetDate !== today;
+    if (isFirstBetToday) {
+      totalXp += XP_REWARDS.DAILY_FIRST_BET;
+    }
+
+    const currentXp = player?.xp ?? 0;
+    const newXp = currentXp + totalXp;
+    const oldLevel = player?.level ?? calculateLevel(currentXp);
+    const newLevel = calculateLevel(newXp);
+
+    if (player) {
+      await ctx.db.patch(player._id, {
+        xp: newXp,
+        level: newLevel,
+        lastDailyBetDate: today,
+        lastActive: Date.now(),
+      });
+    } else {
+      // Create new player
+      await ctx.db.insert("players", {
+        walletAddress: args.walletAddress,
+        displayName: undefined,
+        externalWalletAddress: undefined,
+        lastActive: Date.now(),
+        totalGamesPlayed: 0,
+        totalWins: 0,
+        totalPoints: 0,
+        achievements: [],
+        xp: newXp,
+        level: newLevel,
+        currentWinStreak: 0,
+        lastDailyBetDate: today,
+      });
+    }
+
+    return {
+      xpAwarded: totalXp,
+      baseXp: XP_REWARDS.PLACE_BET,
+      betBonus,
+      dailyBonusApplied: isFirstBetToday,
+      dailyBonus: isFirstBetToday ? XP_REWARDS.DAILY_FIRST_BET : 0,
+      newXp,
+      levelUp: newLevel > oldLevel,
+      oldLevel,
+      newLevel,
+      levelTitle: getLevelInfo(newLevel).title,
+    };
+  },
+});
+
+/**
+ * Award XP for winning a game (internal - called from gameScheduler)
+ * - Base: +100 XP
+ * - Streak bonus: +25 XP per consecutive win (capped at 5)
+ */
+export const awardXpForWin = internalMutation({
+  args: {
+    walletAddress: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Find player
+    const player = await ctx.db
+      .query("players")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", args.walletAddress))
+      .first();
+
+    // Increment streak
+    const currentStreak = (player?.currentWinStreak ?? 0) + 1;
+
+    // Calculate XP
+    let totalXp = XP_REWARDS.WIN_GAME; // Base win XP
+    const streakBonus = calculateStreakBonusXp(currentStreak);
+    totalXp += streakBonus;
+
+    const currentXp = player?.xp ?? 0;
+    const newXp = currentXp + totalXp;
+    const oldLevel = player?.level ?? calculateLevel(currentXp);
+    const newLevel = calculateLevel(newXp);
+
+    if (player) {
+      await ctx.db.patch(player._id, {
+        xp: newXp,
+        level: newLevel,
+        currentWinStreak: currentStreak,
+        lastActive: Date.now(),
+      });
+    } else {
+      // Create new player (shouldn't happen normally, but safety first)
+      await ctx.db.insert("players", {
+        walletAddress: args.walletAddress,
+        displayName: undefined,
+        externalWalletAddress: undefined,
+        lastActive: Date.now(),
+        totalGamesPlayed: 0,
+        totalWins: 0,
+        totalPoints: 0,
+        achievements: [],
+        xp: newXp,
+        level: newLevel,
+        currentWinStreak: currentStreak,
+      });
+    }
+
+    console.log(`[XP] Awarded ${totalXp} XP to winner ${args.walletAddress.slice(0, 8)}... (streak: ${currentStreak})`);
+
+    return {
+      xpAwarded: totalXp,
+      baseXp: XP_REWARDS.WIN_GAME,
+      streakBonus,
+      currentStreak,
+      newXp,
+      levelUp: newLevel > oldLevel,
+      oldLevel,
+      newLevel,
+    };
+  },
+});
+
+/**
+ * Reset win streak for non-winners (internal - called from gameScheduler)
+ */
+export const resetWinStreak = internalMutation({
+  args: {
+    walletAddresses: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    for (const walletAddress of args.walletAddresses) {
+      const player = await ctx.db
+        .query("players")
+        .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
+        .first();
+
+      if (player && (player.currentWinStreak ?? 0) > 0) {
+        await ctx.db.patch(player._id, {
+          currentWinStreak: 0,
+        });
+      }
+    }
+  },
+});
+
+/**
+ * Get player's XP info for progress bar display
+ */
+export const getPlayerXpInfo = query({
+  args: { walletAddress: v.string() },
+  handler: async (ctx, args) => {
+    const player = await ctx.db
+      .query("players")
+      .withIndex("by_wallet", (q) => q.eq("walletAddress", args.walletAddress))
+      .first();
+
+    if (!player) {
+      return {
+        xp: 0,
+        level: 1,
+        levelTitle: "Newcomer",
+        progress: 0,
+        xpToNextLevel: 500,
+        currentWinStreak: 0,
+      };
+    }
+
+    const xp = player.xp ?? 0;
+    const level = player.level ?? calculateLevel(xp);
+    const levelInfo = getLevelInfo(level);
+    const progressInfo = getXpProgressInfo(xp);
+
+    return {
+      xp,
+      level,
+      levelTitle: levelInfo.title,
+      progress: progressInfo.progress,
+      xpToNextLevel: progressInfo.xpToNextLevel,
+      currentWinStreak: player.currentWinStreak ?? 0,
+    };
+  },
+});
+
 /**
  * Get player statistics from game history
  * Calculates total wins and total winnings by querying finished games
@@ -554,28 +843,47 @@ export const getRecentGames = query({
 });
 
 /**
- * Get leaderboard (top players by points)
+ * Get leaderboard (top players by points or level)
  *
  * @param limit - Number of top players to return (default: 100)
- * @returns Array of players sorted by totalPoints (descending)
+ * @param sortBy - Sort criteria: "points" (default) or "level"
+ * @returns Array of players sorted by selected criteria (descending)
  */
 export const getLeaderboard = query({
   args: {
     limit: v.optional(v.number()),
+    sortBy: v.optional(v.string()), // "points" | "level"
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 100;
+    const sortBy = args.sortBy ?? "points";
 
-    // Get all players with points
+    // Get all players
     const allPlayers = await ctx.db.query("players").collect();
 
-    // Filter and sort by totalPoints (descending)
+    // Filter and sort based on criteria
     const topPlayers = allPlayers
-      .filter((player) => (player.totalPoints ?? 0) > 0)
-      .sort((a, b) => (b.totalPoints ?? 0) - (a.totalPoints ?? 0))
+      .filter((player) => {
+        if (sortBy === "level") {
+          // For level sort, include players with any XP or games
+          return (player.xp ?? 0) > 0 || player.totalGamesPlayed > 0;
+        }
+        // For points sort, include players with any points
+        return (player.totalPoints ?? 0) > 0;
+      })
+      .sort((a, b) => {
+        if (sortBy === "level") {
+          // Sort by level first, then by XP as tiebreaker
+          const levelDiff = (b.level ?? 1) - (a.level ?? 1);
+          if (levelDiff !== 0) return levelDiff;
+          return (b.xp ?? 0) - (a.xp ?? 0);
+        }
+        // Default: sort by points
+        return (b.totalPoints ?? 0) - (a.totalPoints ?? 0);
+      })
       .slice(0, limit);
 
-    // Return with rank
+    // Return with rank and level info
     return topPlayers.map((player, index) => ({
       rank: index + 1,
       walletAddress: player.walletAddress,
@@ -583,6 +891,10 @@ export const getLeaderboard = query({
       totalPoints: player.totalPoints ?? 0,
       totalWins: player.totalWins,
       totalGamesPlayed: player.totalGamesPlayed,
+      // Level info
+      xp: player.xp ?? 0,
+      level: player.level ?? 1,
+      levelTitle: getLevelInfo(player.level ?? 1).title,
     }));
   },
 });

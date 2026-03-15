@@ -2,10 +2,12 @@ import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { useActiveGame } from "../hooks/useActiveGame";
 import { useMemo } from "react";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { useGamePhase, isBettingPhase } from "../hooks/useGamePhase";
 
 export function PotDisplayPanel() {
   const { walletAddress } = usePrivyWallet();
   const { activeGame, isLoading } = useActiveGame();
+  const gamePhase = useGamePhase();
 
   // Calculate total pot
   const totalPot = useMemo(() => {
@@ -49,21 +51,14 @@ export function PotDisplayPanel() {
     return null;
   }
 
-  // Determine game status text
-  // Smart contract constants.rs: OPEN=0, CLOSED=1, WAITING=2
-  const getStatusText = () => {
-    if (!activeGame.winner && activeGame.status === 0) {
-      // GAME_STATUS_OPEN = 0 - Betting active
-      return "Place Your Bet Now!";
-    }
-    if (!activeGame.winner && activeGame.status === 2) {
-      // GAME_STATUS_WAITING = 2 - Waiting for first bet
-      return "Waiting for Players to Join";
-    }
-    return null;
-  };
-
-  const statusText = getStatusText();
+  // Only show status text during betting phases (synced with Phaser game phase)
+  const statusText = isBettingPhase(gamePhase)
+    ? activeGame.status === 0
+      ? "Place Your Bet Now!"
+      : activeGame.status === 2
+        ? "Waiting for Players to Join"
+        : null
+    : null;
 
   return (
     <div className="fixed top-12 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
@@ -81,7 +76,7 @@ export function PotDisplayPanel() {
           {/* Stats Container */}
           <div className="flex items-center gap-6">
             {/* Total Pot */}
-            <div className="flex flex-col items-center justify-center min-w-[140px]">
+            <div className="flex flex-col items-center justify-center min-w-35">
               <div className="text-amber-400 text-xs uppercase tracking-wider font-semibold mb-1">
                 Total Pot
               </div>
@@ -94,7 +89,7 @@ export function PotDisplayPanel() {
             <div className="w-px h-16 bg-amber-500/30" />
 
             {/* Player Count */}
-            <div className="flex flex-col items-center justify-center min-w-[100px]">
+            <div className="flex flex-col items-center justify-center min-w-25">
               <div className="text-amber-400 text-xs uppercase tracking-wider font-semibold mb-1">
                 Players
               </div>
@@ -108,7 +103,7 @@ export function PotDisplayPanel() {
 
             {/* Player Win Chance (only show if player has bet) */}
             {playerWinChance > 0 && (
-              <div className="flex flex-col items-center justify-center min-w-[120px]">
+              <div className="flex flex-col items-center justify-center min-w-30">
                 <div className="text-green-400 text-xs uppercase tracking-wider font-semibold mb-1">
                   Your Chance
                 </div>

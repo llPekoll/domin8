@@ -5,8 +5,7 @@ import { logger } from "../../lib/logger";
 import { useAssets } from "../../contexts/AssetsContext";
 import { usePrivyWallet } from "../../hooks/usePrivyWallet";
 import { usePrivy } from "@privy-io/react-auth";
-import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { useSocket, socketRequest } from "../../lib/socket";
 import { toast } from "sonner";
 import type { Character } from "../../types/character";
 import Phaser from "phaser";
@@ -15,7 +14,7 @@ import { OneVOnePreloader } from "../../game/scenes/OneVOnePreloader";
 import { OneVOneScene } from "../../game/scenes/OneVOneScene";
 import { setCharactersData, setAllMapsData, STAGE_WIDTH, STAGE_HEIGHT } from "../../game/main";
 import { LogIn, ChevronLeft, ChevronRight } from "lucide-react";
-import { SpriteAnimator } from "../SpriteAnimator";
+
 
 interface LobbyData {
   _id: string;
@@ -116,11 +115,18 @@ export function LobbyDetailsDialog({
     return wallets;
   }, [lobby]);
 
-  // Fetch player names for lobby participants
-  const playerNames = useQuery(
-    api.players.getPlayersByWallets,
-    lobbyWallets.length > 0 ? { walletAddresses: lobbyWallets } : "skip"
-  );
+  // Fetch player names for lobby participants via socket
+  const { socket } = useSocket();
+  const [playerNames, setPlayerNames] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (!socket || lobbyWallets.length === 0) {
+      setPlayerNames(null);
+      return;
+    }
+    socketRequest(socket, "get-players-by-wallets", { walletAddresses: lobbyWallets }).then((res) => {
+      if (res.success) setPlayerNames(res.data);
+    });
+  }, [socket, lobbyWallets.join(",")]);
 
   // Create a lookup map for quick access
   const playerNameMap = useMemo(() => {
@@ -853,11 +859,12 @@ export function LobbyDetailsDialog({
                           {localSelectedCharacter && (
                             <>
                               <div className="w-8 flex-shrink-0 flex items-center justify-center">
-                                <SpriteAnimator
-                                  name={localSelectedCharacter.name.toLowerCase()}
-                                  animation="idle"
-                                  size={32}
-                                  scale={1.5}
+                                <img
+                                  src={`/assets${localSelectedCharacter.assetPath.replace(".png", ".gif")}`}
+                                  alt={localSelectedCharacter.name}
+                                  className="w-[32px] h-[32px] object-contain"
+                                  style={{ imageRendering: "pixelated" }}
+                                  draggable={false}
                                 />
                               </div>
                               <span className="text-amber-100 font-bold text-xs uppercase truncate">

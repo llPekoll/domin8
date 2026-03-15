@@ -52,7 +52,7 @@ export function BotControlTab({ onClick }: BotControlTabProps) {
       onClick={onClick}
       className={`
         -mb-1 mr-4 flex items-center gap-2 px-4 py-2 rounded-t-lg transition-all
-        bg-gradient-to-b from-indigo-900/80 to-indigo-950/80
+        bg-linear-to-b from-indigo-900/80 to-indigo-950/80
         border border-b-0 ${getBorderColor()}
         hover:from-indigo-800/80 hover:to-indigo-900/80
         cursor-pointer

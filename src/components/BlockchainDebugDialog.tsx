@@ -3,25 +3,30 @@
  * Shows last winner info and current game state for debugging during development
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useActiveGame } from "../hooks/useActiveGame";
 import { X, Trophy, TrendingUp, Users, Clock, Coins, Share2 } from "lucide-react";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useSocket, socketRequest } from "../lib/socket";
 
 export function BlockchainDebugDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [jsonCopied, setJsonCopied] = useState(false);
   const { activeGame, activeGamePDA } = useActiveGame();
 
+  const { socket } = useSocket();
+
   // Get winner's display name if winner exists
   const winnerAddress = activeGame?.winner?.toString();
-  const winnerPlayer = useQuery(
-    api.players.getPlayer,
-    winnerAddress && winnerAddress !== "11111111111111111111111111111111"
-      ? { walletAddress: winnerAddress }
-      : "skip"
-  );
+  const [winnerPlayer, setWinnerPlayer] = useState<any>(null);
+  useEffect(() => {
+    if (!socket || !winnerAddress || winnerAddress === "11111111111111111111111111111111") {
+      setWinnerPlayer(null);
+      return;
+    }
+    socketRequest(socket, "get-player", { walletAddress: winnerAddress }).then((res) => {
+      if (res.success) setWinnerPlayer(res.data);
+    });
+  }, [socket, winnerAddress]);
 
   // Determine if we have a winner to show
   const hasWinner = useMemo(() => {
@@ -193,7 +198,7 @@ ${gameUrl}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {/* Last Winner - Primary Section */}
           {hasWinner ? (
-            <div className="bg-gradient-to-br from-yellow-500/20 to-amber-600/20 rounded-lg p-5 border-2 border-yellow-500/50 shadow-lg">
+            <div className="bg-linear-to-br from-yellow-500/20 to-amber-600/20 rounded-lg p-5 border-2 border-yellow-500/50 shadow-lg">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Trophy className="w-6 h-6 text-yellow-400" />
@@ -201,7 +206,7 @@ ${gameUrl}
                 </div>
                 <button
                   onClick={shareWinnerOnX}
-                  className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all text-sm font-semibold shadow-lg shadow-purple-500/30"
+                  className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all text-sm font-semibold shadow-lg shadow-purple-500/30"
                   title="Share winner on X"
                 >
                   <Share2 className="w-4 h-4" />
@@ -325,7 +330,7 @@ ${gameUrl}
                         import.meta.env.VITE_GAME_PROGRAM_ID || ""
                       );
                     }}
-                    className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors flex-shrink-0"
+                    className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors shrink-0"
                     title="Copy Program ID"
                   >
                     📋
@@ -342,7 +347,7 @@ ${gameUrl}
                     onClick={() => {
                       void navigator.clipboard.writeText(activeGamePDA?.toBase58() || "");
                     }}
-                    className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors flex-shrink-0"
+                    className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors shrink-0"
                     title="Copy Game PDA"
                   >
                     📋
@@ -413,7 +418,7 @@ function CompactStat({
 }) {
   return (
     <div className="flex items-center gap-2 bg-gray-700/30 rounded-lg p-2">
-      <div className="flex-shrink-0">{icon}</div>
+      <div className="shrink-0">{icon}</div>
       <div className="flex-1 min-w-0">
         <div className="text-xs text-gray-500">{label}</div>
         <div className="text-sm font-semibold text-gray-200 truncate">{value}</div>

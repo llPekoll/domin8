@@ -1,7 +1,7 @@
 import { RefObject } from "react";
 import { IRefPhaserGame, PhaserGame } from "../PhaserGame";
 import { Header } from "../components/Header";
-import { CharacterSelection2 } from "../components/CharacterSelection2";
+import { CharacterSelect } from "../components/CharacterSelect";
 import { BettingPanel } from "../components/BettingPanel";
 import { MultiParticipantPanel } from "../components/MultiParticipantPanel";
 import { PotDisplayPanel } from "../components/PotDisplayPanel";
@@ -10,6 +10,7 @@ import { LastWinnerCard } from "../components/LastWinnerCard";
 import { LandscapeEnforcer } from "../components/LandscapeEnforcer";
 import { ConnectWalletOverlay } from "../components/ConnectWalletOverlay";
 import { ChatPanel } from "../components/ChatPanel";
+import { LevelUpNotification } from "../components/LevelUpNotification";
 import type { Character } from "../types/character";
 
 interface DesktopLayoutProps {
@@ -18,6 +19,11 @@ interface DesktopLayoutProps {
   onCharacterSelected: (character: Character | null) => void;
   walletReady: boolean;
   connected: boolean;
+  // Boss-related props
+  isBoss: boolean;
+  bossFirstBetPlaced: boolean;
+  bossLockedCharacterId: number | null;
+  onBossFirstBet: (characterId: number) => void;
 }
 
 export function DesktopLayout({
@@ -26,6 +32,10 @@ export function DesktopLayout({
   onCharacterSelected,
   walletReady,
   connected,
+  isBoss,
+  bossFirstBetPlaced,
+  bossLockedCharacterId,
+  onBossFirstBet,
 }: DesktopLayoutProps) {
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -46,12 +56,26 @@ export function DesktopLayout({
       {/* Chat Panel - Top Left under Header (resizable) */}
       <ChatPanel resizable />
 
+      {/* Level Up Notification - Center overlay */}
+      <LevelUpNotification />
+
       {/* Character Selection Carousel - Bottom Left */}
-      <CharacterSelection2 onCharacterSelected={onCharacterSelected} />
+      <CharacterSelect
+        onCharacterSelected={onCharacterSelected}
+        isLocked={isBoss && bossFirstBetPlaced}
+        lockedCharacterId={bossLockedCharacterId}
+        isBoss={isBoss}
+      />
 
       {/* Betting Panel - Bottom Center */}
       <div className="fixed items-center bottom-4 left-1/2 -translate-x-1/2 z-50">
-        <BettingPanel selectedCharacter={selectedCharacter} />
+        <BettingPanel
+          selectedCharacter={selectedCharacter}
+          isBoss={isBoss}
+          bossFirstBetPlaced={bossFirstBetPlaced}
+          bossLockedCharacterId={bossLockedCharacterId}
+          onBossFirstBet={onBossFirstBet}
+        />
       </div>
 
       {/* Pot Display - Top Center */}

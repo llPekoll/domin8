@@ -1,8 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Header } from "../components/Header";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
-import { useQuery, useMutation, useAction } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useSocket, socketRequest } from "../lib/socket";
 import { Copy, Check, Users, TrendingUp, Trophy, Wallet, Clock, Mail, X, Loader2, ExternalLink, History } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 
@@ -15,10 +14,19 @@ export function ReferralPage() {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
-  const sendPayoutIssueEmail = useAction(api.email.sendPayoutIssueEmail);
+  const { socket } = useSocket();
+
+  const sendPayoutIssueEmail = useCallback(
+    async (args: any) => {
+      if (!socket) throw new Error("Not connected");
+      const res = await socketRequest(socket, "send-payout-issue-email", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
+  );
 
   // Get or create referral code
-  const getOrCreateCode = useMutation(api.referrals.getOrCreateReferralCode);
   const [referralData, setReferralData] = useState<{
     code: string;
     totalReferred: number;
@@ -29,35 +37,50 @@ export function ReferralPage() {
     lastPayoutAmount?: number;
   } | null>(null);
 
-  // Get referred users list
-  const referredUsers = useQuery(
-    api.referrals.getReferredUsers,
-    connected && publicKey ? { walletAddress: publicKey.toString() } : "skip"
-  );
-
-  // Get leaderboard
-  const leaderboard = useQuery(api.referrals.getLeaderboard, { limit: 100 });
-
-  // Get user's rank
-  const userRank = useQuery(
-    api.referrals.getUserRank,
-    connected && publicKey ? { walletAddress: publicKey.toString() } : "skip"
-  );
-
-  // Get payout history
-  const payoutHistory = useQuery(
-    api.referrals.getPayoutHistory,
-    connected && publicKey ? { walletAddress: publicKey.toString() } : "skip"
-  );
-
-  // Load referral code on mount
+  // Get referred users list via socket
+  const [referredUsers, setReferredUsers] = useState<any[] | null>(null);
   useEffect(() => {
-    if (connected && publicKey) {
-      void getOrCreateCode({ walletAddress: publicKey.toString() }).then((data) => {
-        setReferralData(data);
+    if (!socket || !connected || !publicKey) return;
+    socketRequest(socket, "get-referred-users", { walletAddress: publicKey.toString() }).then((res) => {
+      if (res.success) setReferredUsers(res.data);
+    });
+  }, [socket, connected, publicKey]);
+
+  // Get leaderboard via socket
+  const [leaderboard, setLeaderboard] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (!socket) return;
+    socketRequest(socket, "get-referral-leaderboard", { limit: 100 }).then((res) => {
+      if (res.success) setLeaderboard(res.data);
+    });
+  }, [socket]);
+
+  // Get user's rank via socket
+  const [userRank, setUserRank] = useState<any>(null);
+  useEffect(() => {
+    if (!socket || !connected || !publicKey) return;
+    socketRequest(socket, "get-referral-user-rank", { walletAddress: publicKey.toString() }).then((res) => {
+      if (res.success) setUserRank(res.data);
+    });
+  }, [socket, connected, publicKey]);
+
+  // Get payout history via socket
+  const [payoutHistory, setPayoutHistory] = useState<any[] | null>(null);
+  useEffect(() => {
+    if (!socket || !connected || !publicKey) return;
+    socketRequest(socket, "get-payout-history", { walletAddress: publicKey.toString() }).then((res) => {
+      if (res.success) setPayoutHistory(res.data);
+    });
+  }, [socket, connected, publicKey]);
+
+  // Load referral code on mount via socket
+  useEffect(() => {
+    if (connected && publicKey && socket) {
+      socketRequest(socket, "get-or-create-referral-code", { walletAddress: publicKey.toString() }).then((res) => {
+        if (res.success) setReferralData(res.data);
       });
     }
-  }, [connected, publicKey]); // Removed getOrCreateCode from dependencies to prevent infinite loop
+  }, [connected, publicKey, socket]);
 
   // Copy referral link to clipboard
   const handleCopyLink = async () => {

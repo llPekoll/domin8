@@ -38,7 +38,7 @@ export function FlappyPage() {
       {/* Main content area with chat sidebar */}
       <div className="fixed top-16 left-0 right-0 bottom-0 flex">
         {/* Chat Sidebar - Left (hidden on small screens) */}
-        <div className="hidden lg:block w-[320px] flex-shrink-0 p-4">
+        <div className="hidden lg:block w-80 shrink-0 p-4">
           <ChatPanel embedded />
         </div>
 
@@ -52,7 +52,7 @@ export function FlappyPage() {
         </div>
 
         {/* Empty spacer for balance on large screens */}
-        <div className="hidden lg:block w-[320px] flex-shrink-0" />
+        <div className="hidden lg:block w-80 shrink-0" />
       </div>
     </div>
   );

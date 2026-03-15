@@ -1,8 +1,10 @@
-import { forwardRef, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { forwardRef, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
 import StartGame, { setCharactersData, setAllMapsData, setDemoMapData } from "./game/main";
 import { EventBus } from "./game/EventBus";
 import { useAssets } from "./contexts/AssetsContext";
 import { GlobalGameStateManager } from "./game/managers/GlobalGameStateManager";
+import { useSocket, socketRequest } from "./lib/socket";
+import { usePrivyWallet } from "./hooks/usePrivyWallet";
 
 export interface IRefPhaserGame {
   game: Phaser.Game | null;
@@ -19,9 +21,20 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
 ) {
   const game = useRef<Phaser.Game | null>(null);
   const gameStateManager = useRef<GlobalGameStateManager | null>(null);
+  const hasRecordedArenaView = useRef(false);
 
   // Fetch all data from assets context (shared across app)
   const { characters, maps: allMaps } = useAssets();
+
+  // Get wallet connection status - only trigger presence bot if user is connected
+  const { connected: isWalletConnected } = usePrivyWallet();
+
+  // Presence bot: record when user views the arena via socket
+  const { socket } = useSocket();
+  const recordArenaView = useCallback(async () => {
+    if (!socket) return;
+    await socketRequest(socket, "record-arena-view");
+  }, [socket]);
 
   // Select random map client-side for demo mode (only recalculate when map count changes)
   const demoMap = useMemo(() => {
@@ -61,7 +74,6 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
     // Initialize GlobalGameStateManager ONCE with Phaser game lifecycle
     if (game.current) {
       gameStateManager.current = new GlobalGameStateManager(game.current);
-      console.log("✅ [PhaserGame] GlobalGameStateManager initialized with Phaser lifecycle");
     }
 
     if (typeof ref === "function") {
@@ -73,12 +85,11 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
     return () => {
       // Clean up global reference
       (window as any).phaserGame = undefined;
-      
+
       // Cleanup GlobalGameStateManager before destroying game
       if (gameStateManager.current) {
         gameStateManager.current.destroy();
         gameStateManager.current = null;
-        console.log("🗑️ [PhaserGame] GlobalGameStateManager destroyed");
       }
 
       if (game.current) {
@@ -89,6 +100,18 @@ export const PhaserGame = forwardRef<IRefPhaserGame, IProps>(function PhaserGame
       }
     };
   }, [ref, isDataReady, characters, allMaps, demoMap]);
+
+  // Presence bot: record arena view when user connects (triggers 5s delayed bot spawn on backend)
+  // This effect runs when: data is ready (game initialized) AND user wallet is connected
+  useEffect(() => {
+    if (!hasRecordedArenaView.current && isWalletConnected && isDataReady) {
+      hasRecordedArenaView.current = true;
+      recordArenaView().catch((err) => {
+        console.error("[PhaserGame] Failed to record arena view:", err);
+      });
+      console.log("👀 [PhaserGame] Arena view recorded for presence bot (user connected)");
+    }
+  }, [isWalletConnected, isDataReady, recordArenaView]);
 
   useEffect(() => {
     EventBus.on("current-scene-ready", (scene_instance: Phaser.Scene) => {

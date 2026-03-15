@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { EventBus } from "../../game/EventBus";
 import type { Character } from "../../types/character";
-import { usePrivyWallet } from "../../hooks/usePrivyWallet";
+import { useActiveWallet } from "../../contexts/ActiveWalletContext";
 
 interface LobbyData {
   _id: string;
@@ -29,7 +29,7 @@ export function OneVOneFightScene({
   onFightComplete,
   onDoubleDown,
 }: OneVOneFightSceneProps) {
-  const { publicKey } = usePrivyWallet();
+  const { activePublicKey: publicKey } = useActiveWallet();
   const containerRef = useRef<HTMLDivElement>(null);
   const [fightStarted, setFightStarted] = useState(false);
   const [fightResult, setFightResult] = useState<{
@@ -143,7 +143,7 @@ export function OneVOneFightScene({
                 <div className="space-y-3">
                   <button
                     onClick={() => onDoubleDown?.(prizeAmount)}
-                    className="w-full py-3 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white font-bold rounded-lg transform hover:scale-105 transition-all shadow-lg"
+                    className="w-full py-3 bg-linear-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white font-bold rounded-lg transform hover:scale-105 transition-all shadow-lg"
                   >
                     DOUBLE DOWN! (Bet {formatAmount(prizeAmount)} SOL)
                   </button>

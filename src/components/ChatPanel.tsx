@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useSocket, socketRequest } from "../lib/socket";
 import { usePrivyWallet } from "../hooks/usePrivyWallet";
 import { Send, Trophy, MessageCircle, GripHorizontal } from "lucide-react";
 
@@ -73,15 +72,45 @@ export function ChatPanel({ fullHeight = false, embedded = false, resizable = fa
     };
   }, [isResizing, height]);
 
-  // Fetch messages with real-time updates
-  const messages = useQuery(api.chat.getRecentMessages) || [];
-  const sendMessage = useMutation(api.chat.sendMessage);
+  const { socket } = useSocket();
 
-  // Get player data for display name
-  const playerData = useQuery(
-    api.players.getPlayer,
-    walletAddress ? { walletAddress } : "skip"
+  // Fetch messages with real-time updates via socket
+  const [messages, setMessages] = useState<any[]>([]);
+  useEffect(() => {
+    if (!socket) return;
+    // Initial fetch
+    socketRequest(socket, "get-recent-messages").then((res) => {
+      if (res.success) setMessages(res.data || []);
+    });
+    // Listen for real-time message updates
+    const handleNewMessage = (msg: any) => {
+      setMessages((prev) => [...prev, msg]);
+    };
+    socket.on("chat-message", handleNewMessage);
+    return () => {
+      socket.off("chat-message", handleNewMessage);
+    };
+  }, [socket]);
+
+  // Send message via socket
+  const sendMessage = useCallback(
+    async (args: { walletAddress: string; message: string; displayName?: string }) => {
+      if (!socket) throw new Error("Not connected");
+      const res = await socketRequest(socket, "send-message", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
   );
+
+  // Get player data for display name via socket
+  const [playerData, setPlayerData] = useState<any>(null);
+  useEffect(() => {
+    if (!socket || !walletAddress) return;
+    socketRequest(socket, "get-player", { walletAddress }).then((res) => {
+      if (res.success) setPlayerData(res.data);
+    });
+  }, [socket, walletAddress]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -130,10 +159,10 @@ export function ChatPanel({ fullHeight = false, embedded = false, resizable = fa
   const containerClasses = embedded
     ? "w-full h-full flex flex-col bg-black/60 backdrop-blur-sm rounded-lg border border-amber-500/30"
     : fullHeight
-      ? "fixed top-20 left-4 bottom-4 w-[320px] z-40 flex flex-col bg-black/60 backdrop-blur-sm rounded-lg border border-amber-500/30"
+      ? "fixed top-20 left-4 bottom-4 w-80 z-40 flex flex-col bg-black/60 backdrop-blur-sm rounded-lg border border-amber-500/30"
       : resizable
-        ? "fixed top-20 left-4 w-[320px] z-40 flex flex-col bg-black/60 backdrop-blur-sm rounded-lg border border-amber-500/30"
-        : "fixed top-20 left-4 w-[320px] z-40 flex flex-col bg-black/60 backdrop-blur-sm rounded-lg border border-amber-500/30";
+        ? "fixed top-20 left-4 w-80 z-40 flex flex-col bg-black/60 backdrop-blur-sm rounded-lg border border-amber-500/30"
+        : "fixed top-20 left-4 w-80 z-40 flex flex-col bg-black/60 backdrop-blur-sm rounded-lg border border-amber-500/30";
 
   const containerStyle = embedded
     ? { height: "calc(100vh - 120px)" }
@@ -151,7 +180,7 @@ export function ChatPanel({ fullHeight = false, embedded = false, resizable = fa
   return (
     <div className={containerClasses} style={containerStyle}>
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-amber-500/20 flex-shrink-0">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-amber-500/20 shrink-0">
         <MessageCircle className="w-5 h-5 text-amber-400" />
         <span className="text-amber-100 text-lg font-bold uppercase tracking-wider">
           Chat
@@ -172,7 +201,7 @@ export function ChatPanel({ fullHeight = false, embedded = false, resizable = fa
               {msg.type === "winner" ? (
                 // Winner announcement
                 <div className="flex items-start gap-2 py-2 px-2 rounded bg-amber-900/30 border border-amber-500/20">
-                  <Trophy className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                  <Trophy className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" />
                   <span className="text-yellow-300">{msg.message}</span>
                 </div>
               ) : (
@@ -192,7 +221,7 @@ export function ChatPanel({ fullHeight = false, embedded = false, resizable = fa
 
       {/* Input */}
       {connected ? (
-        <form onSubmit={handleSubmit} className="px-3 py-3 border-t border-amber-500/20 flex-shrink-0">
+        <form onSubmit={handleSubmit} className="px-3 py-3 border-t border-amber-500/20 shrink-0">
           {error && (
             <div className="text-red-400 text-sm mb-1 truncate">{error}</div>
           )}
@@ -218,7 +247,7 @@ export function ChatPanel({ fullHeight = false, embedded = false, resizable = fa
           </div>
         </form>
       ) : (
-        <div className="px-3 py-3 border-t border-amber-500/20 text-gray-500 text-lg text-center flex-shrink-0">
+        <div className="px-3 py-3 border-t border-amber-500/20 text-gray-500 text-lg text-center shrink-0">
           Connect wallet to chat
         </div>
       )}

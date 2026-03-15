@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useState, useEffect, useCallback } from "react";
+import { useSocket, socketRequest } from "../lib/socket";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { toast } from "sonner";
-import { User, Trophy, X, Volume2, Music, Flame, Zap, Swords } from "lucide-react";
+import { User, Trophy, X, Volume2, Music, Flame, Zap, Swords, Star } from "lucide-react";
 import { logger } from "../lib/logger";
+import { getXpProgressInfo } from "../lib/xpUtils";
 import { SoundManager } from "../game/managers/SoundManager";
 import { EventBus } from "../game/EventBus";
 
@@ -45,7 +45,18 @@ export function ProfileDialog({
   const [fireSoundsMuted, setFireSoundsMuted] = useState(false);
   const [sfxMuted, setSfxMuted] = useState(false);
 
-  const updateDisplayName = useMutation(api.players.updateDisplayName);
+  const { socket } = useSocket();
+
+  // Update display name via socket
+  const updateDisplayName = useCallback(
+    async (args: { walletAddress: string; displayName: string }) => {
+      if (!socket) throw new Error("Not connected");
+      const res = await socketRequest(socket, "update-display-name", args);
+      if (!res.success) throw new Error(res.error);
+      return res.data;
+    },
+    [socket]
+  );
 
   // Initialize sound settings from SoundManager
   useEffect(() => {
@@ -56,11 +67,33 @@ export function ProfileDialog({
     setSfxMuted(SoundManager.isSfxMutedState());
   }, [open]);
 
-  // Fetch recent games
-  const recentGames = useQuery(api.players.getRecentGames, { walletAddress, limit: 10 });
+  // Fetch XP info via socket
+  const [xpInfo, setXpInfo] = useState<any>(null);
+  useEffect(() => {
+    if (!socket || !walletAddress) return;
+    socketRequest(socket, "get-player-xp-info", { walletAddress }).then((res) => {
+      if (res.success) setXpInfo(res.data);
+    });
+  }, [socket, walletAddress]);
 
-  // Fetch 1v1 lobby history
-  const playerLobbies = useQuery(api.lobbies.getPlayerLobbies, { playerWallet: walletAddress });
+  // Fetch recent games via socket
+  const [recentGames, setRecentGames] = useState<any[] | undefined>(undefined);
+  useEffect(() => {
+    if (!socket || !walletAddress) return;
+    socketRequest(socket, "get-recent-games", { walletAddress, limit: 10 }).then((res) => {
+      if (res.success) setRecentGames(res.data);
+      else setRecentGames([]);
+    });
+  }, [socket, walletAddress]);
+
+  // Fetch 1v1 lobby history via socket
+  const [playerLobbies, setPlayerLobbies] = useState<any>(undefined);
+  useEffect(() => {
+    if (!socket || !walletAddress) return;
+    socketRequest(socket, "get-player-lobbies", { playerWallet: walletAddress }).then((res) => {
+      if (res.success) setPlayerLobbies(res.data);
+    });
+  }, [socket, walletAddress]);
 
   // Filter and sort 1v1 lobbies - only resolved ones (status 3), most recent first
   const recent1v1Games = (playerLobbies?.all ?? [])
@@ -159,7 +192,7 @@ export function ProfileDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="sm:max-w-[650px] p-0 bg-gradient-to-b from-indigo-950/98 to-slate-950/98 backdrop-blur-md border border-indigo-500/40 overflow-hidden"
+        className="sm:max-w-[650px] p-0 bg-linear-to-b from-indigo-950/98 to-slate-950/98 backdrop-blur-md border border-indigo-500/40 overflow-hidden"
       >
         {/* Custom close button */}
         <button
@@ -171,7 +204,7 @@ export function ProfileDialog({
 
         <div className="flex min-h-[450px]">
           {/* Sidebar Navigation */}
-          <div className="w-[140px] bg-black/40 border-r border-indigo-500/30 py-4 flex flex-col">
+          <div className="w-35 bg-black/40 border-r border-indigo-500/30 py-4 flex flex-col">
             <div className="px-3 mb-4">
               <h2 className="text-indigo-300 text-xs font-semibold uppercase tracking-wider">
                 Settings
@@ -213,6 +246,72 @@ export function ProfileDialog({
                   <p className="text-indigo-400/70 text-sm">Customize your display name</p>
                 </div>
 
+                {/* XP Progress Section */}
+                {xpInfo && (() => {
+                  const progressInfo = getXpProgressInfo(xpInfo.xp, xpInfo.level);
+                  const isMaxLevel = progressInfo.xpToNextLevel === 0;
+
+                  return (
+                    <div className="bg-linear-to-br from-indigo-900/50 to-purple-900/30 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-lg bg-linear-to-br from-yellow-500 via-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-yellow-500/30">
+                            <Star className="w-7 h-7 text-yellow-900" fill="currentColor" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-2xl font-bold text-white">Level {xpInfo.level}</span>
+                              <span className="px-2 py-0.5 bg-indigo-600/50 rounded text-xs text-indigo-200 font-medium">
+                                {progressInfo.levelTitle}
+                              </span>
+                            </div>
+                            <div className="text-indigo-400 text-sm">
+                              {xpInfo.xp.toLocaleString()} XP total
+                            </div>
+                          </div>
+                        </div>
+                        {xpInfo.currentWinStreak > 0 && (
+                          <div className="flex items-center gap-1 px-3 py-1.5 bg-orange-500/20 border border-orange-500/40 rounded-lg">
+                            <Flame className="w-4 h-4 text-orange-400" />
+                            <span className="text-orange-300 font-bold text-sm">{xpInfo.currentWinStreak}</span>
+                            <span className="text-orange-400/70 text-xs">streak</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-indigo-400">
+                            {isMaxLevel ? "MAX LEVEL REACHED" : `${progressInfo.progress}% to Level ${xpInfo.level + 1}`}
+                          </span>
+                          {!isMaxLevel && (
+                            <span className="text-indigo-400">
+                              {progressInfo.xpToNextLevel.toLocaleString()} XP needed
+                            </span>
+                          )}
+                        </div>
+                        <div className="h-3 bg-indigo-950/80 rounded-full overflow-hidden border border-indigo-700/50">
+                          <div
+                            className={`h-full rounded-full transition-all duration-700 ${
+                              isMaxLevel
+                                ? "bg-linear-to-r from-yellow-500 via-amber-400 to-yellow-500"
+                                : "bg-linear-to-r from-indigo-500 via-purple-500 to-indigo-400"
+                            }`}
+                            style={{ width: `${progressInfo.progress}%` }}
+                          />
+                        </div>
+                        {!isMaxLevel && (
+                          <div className="flex justify-between text-2.5 text-indigo-500">
+                            <span>Lv.{xpInfo.level}</span>
+                            <span>{progressInfo.nextLevelTitle}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
                   {/* Display Name */}
                   <div className="space-y-2">
@@ -250,7 +349,7 @@ export function ProfileDialog({
                         </div>
                       </div>
                     </div>
-                    <div className="bg-black/30 rounded-md border border-indigo-500/40 max-h-[180px] overflow-y-auto">
+                    <div className="bg-black/30 rounded-md border border-indigo-500/40 max-h-45 overflow-y-auto">
                       {recentGames === undefined ? (
                         <div className="text-center py-4 text-indigo-400/60 text-sm">
                           Loading...
@@ -318,7 +417,7 @@ export function ProfileDialog({
                         </div>
                       </div>
                     </div>
-                    <div className="bg-black/30 rounded-md border border-amber-500/40 max-h-[180px] overflow-y-auto">
+                    <div className="bg-black/30 rounded-md border border-amber-500/40 max-h-45 overflow-y-auto">
                       {playerLobbies === undefined ? (
                         <div className="text-center py-4 text-indigo-400/60 text-sm">
                           Loading...
@@ -353,7 +452,7 @@ export function ProfileDialog({
                                   <span className="text-xs text-indigo-400">
                                     {formatTimestampMs(lobby.resolvedAt ?? lobby.createdAt)}
                                   </span>
-                                  <span className="text-xs text-indigo-500 truncate max-w-[80px]">
+                                  <span className="text-xs text-indigo-500 truncate max-w-20">
                                     vs {opponent ? `${opponent.slice(0, 4)}...` : "?"}
                                   </span>
                                 </div>
@@ -378,7 +477,7 @@ export function ProfileDialog({
                   <Button
                     type="submit"
                     disabled={isUpdating}
-                    className="w-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold disabled:from-gray-600 disabled:to-gray-700 disabled:opacity-50"
+                    className="w-full bg-linear-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold disabled:from-gray-600 disabled:to-gray-700 disabled:opacity-50"
                   >
                     {isUpdating ? "Updating..." : "Save Changes"}
                   </Button>

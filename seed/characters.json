@@ -4,35 +4,55 @@
     "name": "Orc",
     "assetPath": "/characters/orc.png",
     "description": "A mighty fighter with high power and defense",
-    "isActive": true
+    "isActive": true,
+    "spriteOffsetY": 13,
+    "baseScale": 1.0,
+    "previewOffsetY": 0,
+    "previewScale": 1.0
   },
   {
     "id": 6,
     "name": "Pepe",
     "assetPath": "/characters/pepe.png",
     "description": "A legendary meme warrior with unique abilities",
-    "isActive": true
+    "isActive": true,
+    "spriteOffsetY": 13,
+    "baseScale": 1.0,
+    "previewOffsetY": 0,
+    "previewScale": 1.0
   },
   {
     "id": 7,
     "name": "Darthvader",
     "assetPath": "/characters/darthvader.png",
     "description": "Dark lord of the Sith with powerful force abilities",
-    "isActive": true
+    "isActive": true,
+    "spriteOffsetY": 13,
+    "baseScale": 1.0,
+    "previewOffsetY": 0,
+    "previewScale": 1.0
   },
   {
     "id": 8,
     "name": "Huggy wuggy",
     "assetPath": "/characters/huggywuggy.png",
     "description": "Creepy but cuddly creature from the shadows",
-    "isActive": true
+    "isActive": true,
+    "spriteOffsetY": 13,
+    "baseScale": 1.0,
+    "previewOffsetY": 0,
+    "previewScale": 1.0
   },
   {
     "id": 9,
     "name": "Yasuo",
     "assetPath": "/characters/yasuo.png",
     "description": "Swift wandering swordsman seeking redemption",
-    "isActive": true
+    "isActive": true,
+    "spriteOffsetY": 13,
+    "baseScale": 1.0,
+    "previewOffsetY": 0,
+    "previewScale": 1.0
   },
   {
     "id": 10,
@@ -41,7 +61,11 @@
     "description": "Nomu's native utility token, bought back on every product sale.",
     "nftCollection": "DsNoUoX6txsJkrsg1hnKA5CpCi575Tw13YgbqiYUzzvU",
     "nftCollectionName": "Nomu OG Collection",
-    "isActive": true
+    "isActive": true,
+    "spriteOffsetY": 12,
+    "baseScale": 1.0,
+    "previewOffsetY": 0,
+    "previewScale": 1.0
   },
   {
     "id": 11,
@@ -50,7 +74,11 @@
     "description": "Super solana is in the house",
     "nftCollection": "AMdMcYA1fFpjPQ3jwB5gAjKTMSJPVH651RtYZn74eQoy",
     "nftCollectionName": "HMS",
-    "isActive": true
+    "isActive": true,
+    "spriteOffsetY": 12,
+    "baseScale": 1.0,
+    "previewOffsetY": 0,
+    "previewScale": 1.0
   },
   {
     "id": 12,
@@ -59,7 +87,11 @@
     "description": "Ape together strong",
     "nftCollection": "8Rt3Ayqth4DAiPnW9MDFi63TiQJHmohfTWLMQFHi4KZH",
     "nftCollectionName": "MonkeDAO",
-    "isActive": true
+    "isActive": true,
+    "spriteOffsetY": 13,
+    "baseScale": 1.0,
+    "previewOffsetY": 0,
+    "previewScale": 0.8
   },
   {
     "id": 13,
@@ -68,6 +100,10 @@
     "description": "The original Solana dog coin warrior",
     "nftCollection": "Gvj3urg4ZQYQ4BRQpA8SeAX6GhuvRbvfB3TVVEKeKBnb",
     "nftCollectionName": "BONKz",
-    "isActive": true
+    "isActive": true,
+    "spriteOffsetY": 0,
+    "baseScale": 1.0,
+    "previewOffsetY": -8,
+    "previewScale": 0.8
   }
 ]

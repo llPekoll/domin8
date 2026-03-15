@@ -2,8 +2,43 @@
  * Sync Service Mutations - Database operations for blockchain sync
  */
 import { internalMutation, internalQuery } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { GAME_STATUS } from "./constants";
+
+/**
+ * Increment platform stats when a game finishes
+ * Called from upsertGameState when a new "finished" state is inserted
+ */
+export const incrementPlatformStats = internalMutation({
+  args: {
+    potLamports: v.number(),
+    uniqueWallets: v.number(),
+  },
+  handler: async (ctx, { potLamports, uniqueWallets }) => {
+    const existing = await ctx.db
+      .query("platformStats")
+      .withIndex("by_key", (q) => q.eq("key", "global"))
+      .first();
+
+    const houseFee = uniqueWallets > 1 ? Math.floor(potLamports * 0.05) : 0;
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        totalPotLamports: existing.totalPotLamports + potLamports,
+        earningsLamports: existing.earningsLamports + houseFee,
+        gamesCount: existing.gamesCount + 1,
+      });
+    } else {
+      await ctx.db.insert("platformStats", {
+        key: "global",
+        totalPotLamports: potLamports,
+        earningsLamports: houseFee,
+        gamesCount: 1,
+      });
+    }
+  },
+});
 
 /**
  * Upsert game state from blockchain to database
@@ -128,6 +163,14 @@ export const upsertGameState = internalMutation({
       // Create new state
       await db.insert("gameRoundStates", gameData);
       console.log(`[Sync Mutations] Created game ${roundId} (status: ${status}, map: ${gameRound.map})`);
+
+      // Increment platform stats when a finished game is first recorded
+      if (status === "finished" && gameData.totalPot) {
+        await ctx.runMutation(internal.syncServiceMutations.incrementPlatformStats, {
+          potLamports: gameData.totalPot,
+          uniqueWallets: gameData.wallets?.length ?? 0,
+        });
+      }
     }
   },
 });
@@ -201,5 +244,178 @@ export const getCurrentGameState = internalQuery({
       winner: activeGame.winner,
       prizeSent: activeGame.prizeSent,
     };
+  },
+});
+
+/**
+ * Sync participants from blockchain game state
+ * Called by syncService when game state is updated
+ *
+ * Handles:
+ * - Boss: ONE entry (locked character, betAmount = sum of all bets)
+ * - Non-boss: ONE entry PER BET (each bet = separate character)
+ */
+export const syncParticipants = internalMutation({
+  args: {
+    gameRound: v.number(),
+    bets: v.array(v.object({
+      walletIndex: v.number(),
+      amount: v.number(), // In lamports
+      skin: v.number(),
+      position: v.array(v.number()),
+    })),
+    wallets: v.array(v.string()),
+    bossWallet: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx, { gameRound, bets, wallets, bossWallet }) => {
+    const { db } = ctx;
+
+    if (!bets || bets.length === 0 || !wallets || wallets.length === 0) {
+      console.log(`[Sync Participants] No bets to sync for round ${gameRound}`);
+      return { synced: 0 };
+    }
+
+    console.log(`[Sync Participants] Syncing ${bets.length} bets for round ${gameRound}, bossWallet: ${bossWallet?.slice(0, 8)}...`);
+
+    // Track boss's total bet amount
+    let bossTotalBet = 0;
+    let bossFirstBetIndex = -1;
+
+    // First pass: calculate boss total if boss is in this game
+    if (bossWallet) {
+      bets.forEach((bet, betIndex) => {
+        const walletAddress = wallets[bet.walletIndex];
+        if (walletAddress === bossWallet) {
+          bossTotalBet += bet.amount;
+          if (bossFirstBetIndex === -1) {
+            bossFirstBetIndex = betIndex;
+          }
+        }
+      });
+      if (bossTotalBet > 0) {
+        console.log(`[Sync Participants] Boss total bet: ${bossTotalBet / 1_000_000_000} SOL`);
+      }
+    }
+
+    let syncedCount = 0;
+
+    // Process each bet
+    for (let betIndex = 0; betIndex < bets.length; betIndex++) {
+      const bet = bets[betIndex];
+      const walletAddress = wallets[bet.walletIndex];
+
+      if (!walletAddress) {
+        console.warn(`[Sync Participants] No wallet for bet index ${betIndex}`);
+        continue;
+      }
+
+      const isBoss = walletAddress === bossWallet;
+
+      // For boss: only create ONE participant (skip subsequent bets)
+      if (isBoss && betIndex !== bossFirstBetIndex) {
+        // Update boss's total bet amount if participant already exists
+        const bossOdid = walletAddress;
+        const existingBoss = await db
+          .query("currentGameParticipants")
+          .withIndex("by_odid", (q) => q.eq("odid", bossOdid))
+          .first();
+
+        if (existingBoss) {
+          await db.patch(existingBoss._id, {
+            betAmount: bossTotalBet / 1_000_000_000, // Convert to SOL
+          });
+        }
+        continue; // Skip creating new participant for subsequent boss bets
+      }
+
+      // Generate odid: wallet for boss, wallet_betIndex for others
+      const odid = isBoss ? walletAddress : `${walletAddress}_${betIndex}`;
+
+      // Check if participant already exists
+      const existing = await db
+        .query("currentGameParticipants")
+        .withIndex("by_odid", (q) => q.eq("odid", odid))
+        .first();
+
+      if (existing) {
+        // Update bet amount (for boss who may have added more bets)
+        const newBetAmount = isBoss ? bossTotalBet / 1_000_000_000 : bet.amount / 1_000_000_000;
+        if (existing.betAmount !== newBetAmount) {
+          await db.patch(existing._id, { betAmount: newBetAmount });
+          console.log(`[Sync Participants] Updated ${odid} betAmount to ${newBetAmount} SOL`);
+        }
+        continue;
+      }
+
+      // Resolve display name
+      const player = await db
+        .query("players")
+        .withIndex("by_wallet", (q) => q.eq("walletAddress", walletAddress))
+        .first();
+
+      const displayName = player?.displayName ||
+        `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`;
+
+      // Resolve character key from skin ID
+      const character = await db
+        .query("characters")
+        .filter((q) => q.eq(q.field("id"), bet.skin))
+        .first();
+
+      const characterKey = character?.name
+        ? character.name.toLowerCase().replace(/\s+/g, "-")
+        : "warrior";
+
+      // Calculate bet amount in SOL
+      const betAmount = isBoss ? bossTotalBet / 1_000_000_000 : bet.amount / 1_000_000_000;
+
+      // Insert new participant
+      await db.insert("currentGameParticipants", {
+        odid,
+        walletAddress,
+        displayName,
+        gameRound,
+        characterId: bet.skin,
+        characterKey,
+        betIndex,
+        betAmount,
+        position: bet.position,
+        isBoss,
+        spawnIndex: betIndex,
+      });
+
+      console.log(`[Sync Participants] Created participant ${odid} (${displayName}, ${characterKey}, ${betAmount} SOL, boss: ${isBoss})`);
+      syncedCount++;
+    }
+
+    console.log(`[Sync Participants] Synced ${syncedCount} new participants for round ${gameRound}`);
+    return { synced: syncedCount };
+  },
+});
+
+/**
+ * Clear participants for old game rounds
+ * Called when a new game starts to clean up old data
+ */
+export const clearOldParticipants = internalMutation({
+  args: { currentGameRound: v.number() },
+  handler: async (ctx, { currentGameRound }) => {
+    const { db } = ctx;
+
+    // Find all participants NOT in current game round
+    const oldParticipants = await db
+      .query("currentGameParticipants")
+      .filter((q) => q.neq(q.field("gameRound"), currentGameRound))
+      .collect();
+
+    for (const participant of oldParticipants) {
+      await db.delete(participant._id);
+    }
+
+    if (oldParticipants.length > 0) {
+      console.log(`[Sync Participants] Cleared ${oldParticipants.length} old participants (keeping round ${currentGameRound})`);
+    }
+
+    return { cleared: oldParticipants.length };
   },
 });

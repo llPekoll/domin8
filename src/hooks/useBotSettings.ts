@@ -4,9 +4,8 @@
  * Handles bot configuration, toggling, and statistics.
  */
 
-import { useCallback } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useCallback, useState, useEffect } from "react";
+import { useSocket, socketRequest } from "../lib/socket";
 import { usePrivyWallet } from "./usePrivyWallet";
 import { useWallets } from "@privy-io/react-auth/solana";
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
@@ -49,42 +48,59 @@ export interface BotConfiguration {
 export function useBotSettings() {
   const { connected, publicKey, walletAddress, solBalance } = usePrivyWallet();
   const { wallets } = useWallets();
+  const { socket } = useSocket();
 
-  // Queries
-  const config = useQuery(
-    api.botConfigurations.getConfiguration,
-    walletAddress ? { walletAddress } : "skip"
-  );
+  // State for queries
+  const [config, setConfig] = useState<any>(null);
+  const [stats, setStats] = useState<any>(null);
+  const [recentPerformance, setRecentPerformance] = useState<any>(null);
 
-  const stats = useQuery(
-    api.botConfigurations.getBotStats,
-    walletAddress ? { walletAddress } : "skip"
-  );
+  // Fetch configuration
+  useEffect(() => {
+    if (!socket || !walletAddress) return;
 
-  const recentPerformance = useQuery(
-    api.botConfigurations.getRecentBotPerformance,
-    walletAddress ? { walletAddress, limit: 20 } : "skip"
-  );
+    socketRequest(socket, "get-bot-configuration", { walletAddress }).then((res) => {
+      if (res.success) setConfig(res.data ?? null);
+    });
+  }, [socket, walletAddress]);
 
-  // Mutations
-  const saveConfigMutation = useMutation(api.botConfigurations.saveConfiguration);
-  const toggleActiveMutation = useMutation(api.botConfigurations.toggleBotActive);
-  const updateSessionSignerMutation = useMutation(api.botConfigurations.updateSessionSignerState);
-  const refillBudgetMutation = useMutation(api.botConfigurations.refillBudget);
+  // Fetch stats
+  useEffect(() => {
+    if (!socket || !walletAddress) return;
+
+    socketRequest(socket, "get-bot-stats", { walletAddress }).then((res) => {
+      if (res.success) setStats(res.data ?? null);
+    });
+  }, [socket, walletAddress]);
+
+  // Fetch recent performance
+  useEffect(() => {
+    if (!socket || !walletAddress) return;
+
+    socketRequest(socket, "get-recent-bot-performance", { walletAddress, limit: 20 }).then((res) => {
+      if (res.success) setRecentPerformance(res.data ?? null);
+    });
+  }, [socket, walletAddress]);
 
   /**
    * Save bot settings
    */
   const saveSettings = useCallback(
     async (settings: Partial<BotConfiguration>): Promise<{ success: boolean; error?: string }> => {
-      if (!walletAddress) {
+      if (!walletAddress || !socket) {
         return { success: false, error: "Wallet not connected" };
       }
 
       try {
-        await saveConfigMutation({
+        const res = await socketRequest(socket, "save-bot-configuration", {
           walletAddress,
           config: settings,
+        });
+        if (!res.success) throw new Error(res.error);
+
+        // Refresh config
+        socketRequest(socket, "get-bot-configuration", { walletAddress }).then((r) => {
+          if (r.success) setConfig(r.data ?? null);
         });
 
         toast.success("Settings saved");
@@ -96,7 +112,7 @@ export function useBotSettings() {
         return { success: false, error: errorMessage };
       }
     },
-    [walletAddress, saveConfigMutation]
+    [walletAddress, socket]
   );
 
   /**
@@ -104,14 +120,20 @@ export function useBotSettings() {
    */
   const toggleBot = useCallback(
     async (active: boolean): Promise<{ success: boolean; error?: string }> => {
-      if (!walletAddress) {
+      if (!walletAddress || !socket) {
         return { success: false, error: "Wallet not connected" };
       }
 
       try {
-        await toggleActiveMutation({
+        const res = await socketRequest(socket, "toggle-bot-active", {
           walletAddress,
           isActive: active,
+        });
+        if (!res.success) throw new Error(res.error);
+
+        // Refresh config
+        socketRequest(socket, "get-bot-configuration", { walletAddress }).then((r) => {
+          if (r.success) setConfig(r.data ?? null);
         });
 
         toast.success(active ? "Bot activated" : "Bot deactivated");
@@ -123,7 +145,7 @@ export function useBotSettings() {
         return { success: false, error: errorMessage };
       }
     },
-    [walletAddress, toggleActiveMutation]
+    [walletAddress, socket]
   );
 
   /**
@@ -131,14 +153,20 @@ export function useBotSettings() {
    */
   const updateSessionSigner = useCallback(
     async (enabled: boolean): Promise<{ success: boolean; error?: string }> => {
-      if (!walletAddress) {
+      if (!walletAddress || !socket) {
         return { success: false, error: "Wallet not connected" };
       }
 
       try {
-        await updateSessionSignerMutation({
+        const res = await socketRequest(socket, "update-session-signer-state", {
           walletAddress,
           enabled,
+        });
+        if (!res.success) throw new Error(res.error);
+
+        // Refresh config
+        socketRequest(socket, "get-bot-configuration", { walletAddress }).then((r) => {
+          if (r.success) setConfig(r.data ?? null);
         });
 
         return { success: true };
@@ -149,7 +177,7 @@ export function useBotSettings() {
         return { success: false, error: errorMessage };
       }
     },
-    [walletAddress, updateSessionSignerMutation]
+    [walletAddress, socket]
   );
 
   /**
@@ -159,7 +187,7 @@ export function useBotSettings() {
     async (
       amountSOL: number
     ): Promise<{ success: boolean; signature?: string; error?: string }> => {
-      if (!connected || !publicKey || !walletAddress) {
+      if (!connected || !publicKey || !walletAddress || !socket) {
         return { success: false, error: "Wallet not connected" };
       }
 
@@ -241,11 +269,19 @@ export function useBotSettings() {
           };
         }
 
-        // Record refill in database
-        await refillBudgetMutation({
+        // Record refill in database via socket
+        const refillRes = await socketRequest(socket, "refill-budget", {
           walletAddress,
           additionalBudget: amountLamports,
           transactionSignature: signature,
+        });
+        if (!refillRes.success) {
+          return { success: false, error: refillRes.error || "Failed to record refill" };
+        }
+
+        // Refresh config
+        socketRequest(socket, "get-bot-configuration", { walletAddress }).then((r) => {
+          if (r.success) setConfig(r.data ?? null);
         });
 
         toast.success(`Budget refilled with ${amountSOL} SOL`);
@@ -256,7 +292,7 @@ export function useBotSettings() {
         return { success: false, error: errorMessage };
       }
     },
-    [connected, publicKey, walletAddress, solBalance, wallets, refillBudgetMutation]
+    [connected, publicKey, walletAddress, solBalance, wallets, socket]
   );
 
   // Computed values

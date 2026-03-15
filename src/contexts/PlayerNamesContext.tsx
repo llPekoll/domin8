@@ -1,15 +1,14 @@
 import { createContext, useContext, ReactNode, useEffect, useState } from "react";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useSocket, socketRequest } from "../lib/socket";
 import { useActiveGame } from "../hooks/useActiveGame";
-import { logger } from "../lib/logger";
-import { EventBus } from "../game/EventBus";
 
 const PlayerNamesContext = createContext<any>(undefined);
 
 export function PlayerNamesProvider({ children }: { children: ReactNode }) {
   const { activeGame } = useActiveGame();
+  const { socket } = useSocket();
   const [walletAddresses, setWalletAddresses] = useState<string[]>([]);
+  const [playerNames, setPlayerNames] = useState<any[] | undefined>(undefined);
 
   // Extract unique wallet addresses from game state
   useEffect(() => {
@@ -20,32 +19,28 @@ export function PlayerNamesProvider({ children }: { children: ReactNode }) {
 
     // Convert PublicKey objects to strings and deduplicate
     const addresses = activeGame.wallets
-      .map((wallet) => wallet.toBase58())
-      .filter((addr, index, self) => self.indexOf(addr) === index);
+      .map((wallet: any) => wallet.toBase58())
+      .filter((addr: string, index: number, self: string[]) => self.indexOf(addr) === index);
 
     setWalletAddresses(addresses);
-    
-    logger.game.debug("[PlayerNamesContext] Extracted wallet addresses:", addresses.length);
   }, [activeGame]);
 
-  // Fetch player names for all wallet addresses
-  const playerNames = useQuery(
-    api.players.getPlayersByWallets,
-    walletAddresses.length > 0 ? { walletAddresses } : "skip"
-  );
-
-  // Pass player names to Phaser when they change
+  // Fetch player names for all wallet addresses via socket
   useEffect(() => {
-    if (!playerNames) return;
+    if (!socket || walletAddresses.length === 0) {
+      setPlayerNames(undefined);
+      return;
+    }
+    socketRequest(socket, "get-players-by-wallets", { walletAddresses }).then((res) => {
+      if (res.success) setPlayerNames(res.data);
+    });
+  }, [socket, walletAddresses]);
 
-    logger.game.debug("[PlayerNamesContext] Broadcasting player names to Phaser:", playerNames.length);
-    EventBus.emit("player-names-update", playerNames);
-  }, [playerNames]);
+  // Note: Player names for Phaser now come via unified participants-update event
+  // from server (names resolved server-side). This context is only used by React components.
 
   return (
-    <PlayerNamesContext.Provider value={{ playerNames }}>
-      {children}
-    </PlayerNamesContext.Provider>
+    <PlayerNamesContext.Provider value={{ playerNames }}>{children}</PlayerNamesContext.Provider>
   );
 }
 

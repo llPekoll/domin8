@@ -1,8 +1,10 @@
-import { useRef, useEffect, useMemo, useState } from "react";
+import { useRef, useEffect, useMemo, useState, useCallback } from "react";
 import { IRefPhaserGame } from "./PhaserGame";
 import { isMobile as isMobileDevice } from "react-device-detect";
 import { useActiveGame } from "./hooks/useActiveGame";
 import { usePrivyWallet } from "./hooks/usePrivyWallet";
+import { useBossInfo } from "./hooks/useBossInfo";
+import { useGameParticipants } from "./hooks/useGameParticipants";
 import { EventBus } from "./game/EventBus";
 import { setActiveGameData, setCurrentUserWallet } from "./game/main";
 import type { Character } from "./types/character";
@@ -77,6 +79,15 @@ export default function App() {
   // Get current user's wallet
   const { connected, ready: walletReady, publicKey, externalWalletAddress } = usePrivyWallet();
 
+  // Get boss info (previous winner)
+  const walletAddress = publicKey?.toBase58() || null;
+  const { isBoss, bossWallet } = useBossInfo(walletAddress);
+
+  // Track boss's first bet in current round (resets when round changes)
+  const [bossFirstBetPlaced, setBossFirstBetPlaced] = useState(false);
+  const [bossLockedCharacterId, setBossLockedCharacterId] = useState<number | null>(null);
+  const [lastRoundId, setLastRoundId] = useState<string | null>(null);
+
   // Auto-create player when wallet connects
   useAutoCreatePlayer(connected, publicKey?.toBase58() || null, externalWalletAddress || undefined);
 
@@ -85,6 +96,36 @@ export default function App() {
 
   // Send notification when game transitions from WAITING to OPEN (first bet placed)
   useGameCreatedNotification(currentRoundState);
+
+  // Get unified participants from Convex (includes resolved names, boss status)
+  const { participants } = useGameParticipants();
+
+  // Reset boss state when round changes
+  useEffect(() => {
+    const currentRoundId = currentRoundState?.gameRound?.toString() || null;
+    if (currentRoundId !== lastRoundId) {
+      setLastRoundId(currentRoundId);
+      setBossFirstBetPlaced(false);
+      setBossLockedCharacterId(null);
+    }
+  }, [currentRoundState?.gameRound, lastRoundId]);
+
+  // Callback for when boss places their first bet
+  const handleBossFirstBet = useCallback(
+    (characterId: number) => {
+      console.log("🔒 [APP] handleBossFirstBet called:", {
+        characterId,
+        isBoss,
+        bossFirstBetPlaced,
+      });
+      if (isBoss && !bossFirstBetPlaced) {
+        console.log("🔒 [APP] SETTING bossFirstBetPlaced=true, lockedCharId=", characterId);
+        setBossFirstBetPlaced(true);
+        setBossLockedCharacterId(characterId);
+      }
+    },
+    [isBoss, bossFirstBetPlaced]
+  );
 
   // ✅ Create a stable reference that only changes when meaningful data changes
   // This prevents infinite re-renders from object recreation
@@ -124,18 +165,62 @@ export default function App() {
   useEffect(() => {
     const walletAddress = publicKey?.toBase58() || null;
     setCurrentUserWallet(walletAddress);
-    console.log(`👤 [App] Current user wallet set:`, walletAddress);
   }, [publicKey]);
+
+  // Emit boss wallet info to Phaser game scene
+  useEffect(() => {
+    EventBus.emit("boss-info-update", { bossWallet });
+  }, [bossWallet]);
 
   // Simple: Just pipe blockchain data to Phaser via EventBus
   // Only updates when key fields actually change
+  // Include bossWallet to avoid timing issues
   useEffect(() => {
     const fullData = stableGameState?._fullData || null;
 
-
     setActiveGameData(fullData);
-    EventBus.emit("blockchain-state-update", fullData);
-  }, [stableGameState]);
+    EventBus.emit("blockchain-state-update", { gameState: fullData, bossWallet });
+  }, [stableGameState, bossWallet]);
+
+  // Emit unified participants to Phaser (from Convex, includes resolved names)
+  // Also re-emit when Phaser Game scene becomes ready (in case it missed the first emit)
+  useEffect(() => {
+    if (participants && participants.length > 0) {
+      console.log(`👥 [App] Emitting ${participants.length} participants to Phaser`);
+      EventBus.emit("participants-update", { participants });
+    }
+  }, [participants]);
+
+  // Re-emit game state and participants when Game scene becomes ready (handles late scene initialization)
+  useEffect(() => {
+    const handleSceneReady = (scene: any) => {
+      // Only re-emit for Game scene (not CharacterPreview or other scenes)
+      if (scene?.scene?.key === "Game") {
+        const fullData = stableGameState?._fullData || null;
+
+        // Re-emit boss wallet info
+        console.log(`👑 [App] Scene ready - re-emitting boss info:`, bossWallet);
+        EventBus.emit("boss-info-update", { bossWallet });
+
+        // Re-emit blockchain state (includes map data) FIRST
+        console.log(`🗺️ [App] Scene ready - re-emitting blockchain state`);
+        EventBus.emit("blockchain-state-update", { gameState: fullData, bossWallet });
+
+        // Re-emit participants AFTER map data is set (small delay to ensure order)
+        if (participants && participants.length > 0) {
+          setTimeout(() => {
+            console.log(`👥 [App] Scene ready - re-emitting ${participants.length} participants`);
+            EventBus.emit("participants-update", { participants });
+          }, 100);
+        }
+      }
+    };
+
+    EventBus.on("current-scene-ready", handleSceneReady);
+    return () => {
+      EventBus.off("current-scene-ready", handleSceneReady);
+    };
+  }, [participants, bossWallet, stableGameState]);
 
   // Shared props for all layouts
   const layoutProps = {
@@ -144,6 +229,11 @@ export default function App() {
     onCharacterSelected: setSelectedCharacter,
     walletReady,
     connected,
+    // Boss-related props
+    isBoss,
+    bossFirstBetPlaced,
+    bossLockedCharacterId,
+    onBossFirstBet: handleBossFirstBet,
   };
 
   // Render appropriate layout based on device and orientation

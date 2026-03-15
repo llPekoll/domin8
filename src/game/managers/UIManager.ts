@@ -1,4 +1,4 @@
-import { Scene } from "phaser";
+import Phaser, { Scene } from "phaser";
 import { GamePhase } from "./GlobalGameStateManager";
 import { EventBus } from "../EventBus";
 import { currentUserWallet } from "../main";
@@ -46,6 +46,27 @@ export class UIManager {
 
     // Listen for phase changes from GamePhaseManager
     EventBus.on("game-phase-changed", this.onPhaseChanged.bind(this));
+
+    // Listen for participants update to get player names (for winner display)
+    EventBus.on("participants-update", this.onParticipantsUpdate.bind(this));
+  }
+
+  /**
+   * Handle participants update from Convex (via App.tsx)
+   * Extract wallet -> displayName mapping for winner UI
+   */
+  private onParticipantsUpdate(data: {
+    participants: Array<{ walletAddress: string; displayName: string }>;
+  }) {
+    this.playerNamesMap.clear();
+    data.participants.forEach(({ walletAddress, displayName }) => {
+      if (displayName) {
+        this.playerNamesMap.set(walletAddress, displayName);
+      }
+    });
+    console.log(
+      `[UIManager] 👥 Player names updated from participants: ${this.playerNamesMap.size} entries`
+    );
   }
 
   /**
@@ -206,8 +227,7 @@ export class UIManager {
       this.winnerContainer.setAlpha(1); // Reset alpha in case it was faded
       this.phaseText.setVisible(true);
       this.phaseText.setText(`🏆 YOU WON ${winnerPrize} SOL!`);
-      this.subText.setVisible(true);
-      this.subText.setText("Restarting in 4s...");
+      this.subText.setVisible(false);
 
       // Show multiplier with punchy animation
       this.showMultiplier(multiplier);
@@ -240,7 +260,7 @@ export class UIManager {
   }
 
   /**
-   * Show multiplier with punchy scale animation
+   * Show multiplier with TOP SECRET stamp animation + counter
    */
   private showMultiplier(multiplier: number) {
     if (multiplier <= 1) {
@@ -248,31 +268,125 @@ export class UIManager {
       return;
     }
 
-    // Format multiplier (e.g., x2.5 or x10)
-    const multiplierStr =
-      multiplier >= 10 ? `x${Math.round(multiplier)}` : `x${multiplier.toFixed(1)}`;
-
-    this.multiplierText.setText(multiplierStr);
-    this.multiplierText.setVisible(true);
+    // Start with x1 - hidden until delay
+    this.multiplierText.setText("x1");
+    this.multiplierText.setVisible(false);
     this.multiplierText.setScale(0);
     this.multiplierText.setAlpha(1);
+    this.multiplierText.setRotation(Phaser.Math.DegToRad(60)); // Start heavily tilted
 
-    // Punchy scale-in animation
+    // STAMP animation: MASSIVE scale + heavy rotation slam (with delay)
     this.scene.tweens.add({
       targets: this.multiplierText,
-      scale: { from: 0, to: 1.3 },
-      duration: 300,
+      delay: 1800, // Wait for celebration to build up
+      scale: { from: 100, to: 3.3 }, // Start HUGE, slam down to 3x
+      rotation: { from: Phaser.Math.DegToRad(60), to: Phaser.Math.DegToRad(8) }, // Overshoot twist
+      duration: 400,
+      onStart: () => {
+        this.multiplierText.setVisible(true); // Show when animation starts
+      },
       ease: "Back.easeOut",
       onComplete: () => {
-        // Settle to normal size
+        // Settle rotation and scale - keep tilted like a stamp
         this.scene.tweens.add({
           targets: this.multiplierText,
-          scale: 1,
+          scale: 3,
+          rotation: Phaser.Math.DegToRad(12), // Stay tilted!
           duration: 150,
           ease: "Sine.easeOut",
         });
+
+        // Counter animation: x1 -> actual value
+        const endValue = multiplier;
+        const duration = Math.min(1200, 400 + multiplier * 100); // Longer for bigger multipliers
+
+        this.scene.tweens.addCounter({
+          from: 1,
+          to: endValue,
+          duration: duration,
+          ease: "Cubic.easeOut", // Slows down at end for drama
+          onUpdate: (tween) => {
+            const value = tween.getValue();
+            if (value === null) return;
+            const displayValue = value >= 10 ? `x${Math.round(value)}` : `x${value.toFixed(1)}`;
+            this.multiplierText.setText(displayValue);
+
+            // Color changes based on multiplier value - more intense = hotter colors
+            const color = this.getMultiplierColor(value);
+            this.multiplierText.setColor(color);
+          },
+          onComplete: () => {
+            // Final PUNCH when counter reaches the end
+            this.scene.tweens.add({
+              targets: this.multiplierText,
+              scale: { from: 3, to: 4 },
+              duration: 80,
+              yoyo: true,
+              ease: "Sine.easeInOut",
+              onComplete: () => {
+                // Shake for extra impact
+                this.scene.tweens.add({
+                  targets: this.multiplierText,
+                  x: this.multiplierText.x + 5,
+                  duration: 50,
+                  yoyo: true,
+                  repeat: 3,
+                  ease: "Sine.easeInOut",
+                });
+              },
+            });
+          },
+        });
       },
     });
+  }
+
+  /**
+   * Get color for multiplier value - gradient from green to red
+   * x1-x1.5: Green
+   * x1.5-x2.5: Yellow
+   * x2.5-x3.5: Orange (Domin8)
+   * x3.5-x5: Red-Orange
+   * x5+: Hot Red
+   */
+  private getMultiplierColor(value: number): string {
+    if (value < 1.5) {
+      return "#00FF00"; // Green
+    } else if (value < 2.5) {
+      // Green to Yellow
+      const t = (value - 1.5) / 1;
+      return this.lerpColor("#00FF00", "#FFFF00", t);
+    } else if (value < 3.5) {
+      // Yellow to Orange (Domin8)
+      const t = (value - 2.5) / 1;
+      return this.lerpColor("#FFFF00", "#FFA500", t);
+    } else if (value < 5) {
+      // Orange to Red-Orange
+      const t = (value - 3.5) / 1.5;
+      return this.lerpColor("#FFA500", "#FF4500", t);
+    } else {
+      // Hot Red for x5+
+      return "#FF2222";
+    }
+  }
+
+  /**
+   * Linearly interpolate between two hex colors
+   */
+  private lerpColor(color1: string, color2: string, t: number): string {
+    const r1 = parseInt(color1.slice(1, 3), 16);
+    const g1 = parseInt(color1.slice(3, 5), 16);
+    const b1 = parseInt(color1.slice(5, 7), 16);
+
+    const r2 = parseInt(color2.slice(1, 3), 16);
+    const g2 = parseInt(color2.slice(3, 5), 16);
+    const b2 = parseInt(color2.slice(5, 7), 16);
+
+    const r = Math.round(r1 + (r2 - r1) * t);
+    const g = Math.round(g1 + (g2 - g1) * t);
+    const b = Math.round(b1 + (b2 - b1) * t);
+
+    return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
   }
 
   /**
@@ -481,8 +595,8 @@ export class UIManager {
       repeat: -1,
     });
 
-    // Create winner UI container (bottom 1/3 of screen, like demo mode)
-    const bottomThirdY = this.scene.cameras.main.height * 0.75; // 75% down the screen
+    // Create winner UI container (bottom of screen, below the character)
+    const bottomThirdY = this.scene.cameras.main.height * 0.88; // 88% down the screen (shifted lower)
     this.winnerContainer = this.scene.add.container(this.centerX, bottomThirdY);
     this.winnerContainer.setDepth(1000);
     this.winnerContainer.setScrollFactor(0);
@@ -510,8 +624,11 @@ export class UIManager {
     });
     this.subText.setOrigin(0.5);
 
-    // Multiplier text (e.g., "x10") - punchy style
-    this.multiplierText = this.scene.add.text(0, 42, "", {
+    // Multiplier text (e.g., "x10") - punchy style, positioned at top-right area
+    // Using absolute screen position (not inside container) for easier positioning
+    const multiplierX = this.centerX + 100;
+    const multiplierY = this.scene.cameras.main.height * 0.25; // 25% from top
+    this.multiplierText = this.scene.add.text(multiplierX, multiplierY, "", {
       fontFamily: "metal-slug",
       fontSize: "20px",
       color: "#00FF00", // Bright green
@@ -520,10 +637,12 @@ export class UIManager {
       resolution: 4,
     });
     this.multiplierText.setOrigin(0.5);
+    this.multiplierText.setDepth(1001); // Above winner container
+    this.multiplierText.setScrollFactor(0);
     this.multiplierText.setVisible(false);
 
-    // Add to container
-    this.winnerContainer.add([this.phaseText, this.subText, this.multiplierText]);
+    // Add phaseText and subText to container (multiplierText is now independent)
+    this.winnerContainer.add([this.phaseText, this.subText]);
 
     // Create INSERT COIN text (blinking, Metal Slug style)
     // Position similar to demo countdown (75% down + 35 offset)
@@ -564,19 +683,6 @@ export class UIManager {
     } else if (!isInsertCoin && this.isUIReady()) {
       this.hideInsertCoin();
     }
-  }
-
-  setPlayerNames(playerNames: Array<{ walletAddress: string; displayName: string | null }>) {
-    this.playerNamesMap.clear();
-    playerNames.forEach(({ walletAddress, displayName }) => {
-      if (displayName) {
-        this.playerNamesMap.set(walletAddress, displayName);
-      }
-    });
-    console.log(
-      `[UIManager] Player names updated: ${this.playerNamesMap.size} with names, ${playerNames.length} total`
-    );
-    console.log(`[UIManager] Names map:`, Object.fromEntries(this.playerNamesMap));
   }
 
   updateTimer() {
@@ -635,6 +741,7 @@ export class UIManager {
   // Cleanup event listeners
   destroy() {
     EventBus.off("game-phase-changed", this.onPhaseChanged.bind(this));
+    EventBus.off("participants-update", this.onParticipantsUpdate.bind(this));
 
     // Cleanup insert coin tween
     if (this.insertCoinTween) {

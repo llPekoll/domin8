@@ -126,7 +126,7 @@ export function MultiParticipantPanel() {
                   )}
                   {participant.isHost && (
                     <div 
-                      className="inline-flex items-center gap-1 bg-gradient-to-r from-yellow-500/90 to-amber-600/90 px-1.5 py-0.5 rounded text-xs font-bold text-amber-950 shadow-sm"
+                      className="inline-flex items-center gap-1 bg-linear-to-r from-yellow-500/90 to-amber-600/90 px-1.5 py-0.5 rounded text-xs font-bold text-amber-950 shadow-sm"
                       title="Game Host"
                     >
                       <Crown className="w-3 h-3 fill-current" />

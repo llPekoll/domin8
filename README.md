@@ -310,3 +310,5 @@ VITE_PRIVY_APP_ID=your-privy-app-id
   // the music
   https://opengameart.org/content/battle-theme-a#
   https://www.patreon.com/cynicmusic
+
+presenceWallet = Bptm31P2QPrdePaGrqUN8ApAZqHnEuqh8y69UHpy51a

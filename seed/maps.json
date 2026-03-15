@@ -1,9 +1,9 @@
 [
   {
-    "description": "The original battleground where legends are made",
+    "description": "A purple-hued medieval fortress bathed in the warm glow of sunset with flickering lanterns illuminating stone corridors.",
     "id": 1,
     "isActive": true,
-    "name": "Classic Arena",
+    "name": "The Twilight Dungeon",
     "spawnConfiguration": {
       "centerX": 198,
       "centerY": 105,
@@ -15,10 +15,10 @@
     }
   },
   {
-    "description": "An enchanted woodland filled with ancient magic",
+    "description": "A dark, skull-adorned dungeon with blazing orange flames and a menacing dragon lurking in the shadows.",
     "id": 2,
     "isActive": true,
-    "name": "Mystic Forest",
+    "name": "The Cavern of the Damned",
     "spawnConfiguration": {
       "centerX": 198,
       "centerY": 110,

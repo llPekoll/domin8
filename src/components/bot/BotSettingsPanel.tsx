@@ -231,7 +231,7 @@ export function BotSettingsPanel() {
           <Button
             onClick={void handleRefill}
             disabled={isRefilling}
-            className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600"
+            className="bg-linear-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600"
           >
             {isRefilling ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -427,7 +427,7 @@ export function BotSettingsPanel() {
         <Button
           onClick={() => void handleSave()}
           disabled={isSaving}
-          className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600"
+          className="flex-1 bg-linear-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600"
         >
           {isSaving ? (
             <>
@@ -443,8 +443,8 @@ export function BotSettingsPanel() {
           disabled={isToggling || !canActivate}
           className={`flex-1 ${
             isActive
-              ? "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600"
-              : "bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600"
+              ? "bg-linear-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600"
+              : "bg-linear-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600"
           }`}
         >
           {isToggling ? (

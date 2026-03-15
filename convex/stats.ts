@@ -1,4 +1,4 @@
-import { query } from "./_generated/server";
+import { query, internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 
@@ -212,6 +212,172 @@ export const getAllTimeStats = query({
       averagePerGame: averagePerGame,
       averagePerBet: averagePerBet,
     };
+  },
+});
+
+/**
+ * Get platform stats: TVL (total SOL wagered) and platform earnings (house fees)
+ * Reads from the incremental platformStats table (single row lookup)
+ */
+export const getPlatformStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const stats = await ctx.db
+      .query("platformStats")
+      .withIndex("by_key", (q) => q.eq("key", "global"))
+      .first();
+
+    if (!stats) {
+      return { tvlSOL: 0, earningsSOL: 0, gamesCount: 0 };
+    }
+
+    return {
+      tvlSOL: stats.totalPotLamports / LAMPORTS_PER_SOL,
+      earningsSOL: stats.earningsLamports / LAMPORTS_PER_SOL,
+      gamesCount: stats.gamesCount,
+    };
+  },
+});
+
+/**
+ * One-time backfill: compute platformStats from all existing finished games
+ * Run once after deploying the platformStats table, then remove
+ */
+export const backfillPlatformStats = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const gameRounds = await ctx.db
+      .query("gameRoundStates")
+      .withIndex("by_status_and_round", (q) => q.eq("status", "finished"))
+      .collect();
+
+    let totalPotLamports = 0;
+    let earningsLamports = 0;
+    const processedRounds = new Set<number>();
+
+    for (const round of gameRounds) {
+      if (processedRounds.has(round.roundId)) continue;
+      processedRounds.add(round.roundId);
+
+      const pot = round.totalPot || 0;
+      totalPotLamports += pot;
+
+      const uniqueWallets = round.wallets?.length ?? 0;
+      if (uniqueWallets > 1) {
+        earningsLamports += Math.floor(pot * 0.05);
+      }
+    }
+
+    // Delete existing row if any
+    const existing = await ctx.db
+      .query("platformStats")
+      .withIndex("by_key", (q) => q.eq("key", "global"))
+      .first();
+    if (existing) {
+      await ctx.db.delete(existing._id);
+    }
+
+    await ctx.db.insert("platformStats", {
+      key: "global",
+      totalPotLamports,
+      earningsLamports,
+      gamesCount: processedRounds.size,
+    });
+
+    console.log(`[Backfill] Platform stats: TVL=${totalPotLamports / 1e9} SOL, Earnings=${earningsLamports / 1e9} SOL, Games=${processedRounds.size}`);
+    return { totalPotLamports, earningsLamports, gamesCount: processedRounds.size };
+  },
+});
+
+/**
+ * Get boss info (previous winner's wallet and character)
+ * Returns the wallet address and character ID of the previous game winner
+ * Used to determine if current user is the "Boss" with special privileges
+ */
+export const getBossInfo = query({
+  args: {},
+  handler: async (ctx) => {
+    // Query finished games, ordered by roundId descending (same as getLastFinishedGame)
+    const finishedGames = await ctx.db
+      .query("gameRoundStates")
+      .withIndex("by_status_and_round", (q) => q.eq("status", "finished"))
+      .order("desc")
+      .take(20);
+
+    if (finishedGames.length === 0) {
+      return { bossWallet: null, bossCharacterId: null };
+    }
+
+    // Find the most recent game with a valid winner (no time delay for boss detection)
+    const lastGame = finishedGames.find(
+      (game) =>
+        game.winner &&
+        game.winningBetIndex !== undefined &&
+        game.totalPot &&
+        game.totalPot > 0
+    );
+
+    if (!lastGame || !lastGame.winner) {
+      return { bossWallet: null, bossCharacterId: null };
+    }
+
+    // Get the winning bet's character (skin ID)
+    const winningBetIndex = lastGame.winningBetIndex!;
+    let bossCharacterId: number | null = null;
+
+    // Try to get character from finished state first
+    if (lastGame.betSkin && lastGame.betSkin.length > winningBetIndex) {
+      bossCharacterId = lastGame.betSkin[winningBetIndex];
+    }
+
+    // Fallback to waiting state if bet data is missing
+    if (bossCharacterId === null) {
+      const waitingState = await ctx.db
+        .query("gameRoundStates")
+        .withIndex("by_round_and_status", (q) =>
+          q.eq("roundId", lastGame.roundId).eq("status", "waiting")
+        )
+        .first();
+
+      if (waitingState?.betSkin && waitingState.betSkin.length > winningBetIndex) {
+        bossCharacterId = waitingState.betSkin[winningBetIndex];
+      }
+    }
+
+    return {
+      bossWallet: lastGame.winner,
+      bossCharacterId: bossCharacterId,
+    };
+  },
+});
+
+/**
+ * Internal version of getBossInfo for use in sync service
+ * Returns the wallet address of the previous game winner (the "boss")
+ */
+export const getBossWalletInternal = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    // Query finished games, ordered by roundId descending
+    const finishedGames = await ctx.db
+      .query("gameRoundStates")
+      .withIndex("by_status_and_round", (q) => q.eq("status", "finished"))
+      .order("desc")
+      .take(5);
+
+    if (finishedGames.length === 0) {
+      return null;
+    }
+
+    // Find the most recent game with a valid winner
+    const lastGame = finishedGames.find(
+      (game) =>
+        game.winner &&
+        game.totalPot &&
+        game.totalPot > 0
+    );
+
+    return lastGame?.winner ?? null;
   },
 });
 

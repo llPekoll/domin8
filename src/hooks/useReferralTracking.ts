@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
-import { useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useEffect, useState, useCallback } from "react";
+import { useSocket, socketRequest } from "../lib/socket";
 import { logger } from "../lib/logger";
 import { toast } from "sonner";
 
@@ -11,8 +10,8 @@ import { toast } from "sonner";
  * 3. Provides function to track referral when user signs up
  */
 export function useReferralTracking() {
+  const { socket } = useSocket();
   const [referralCode, setReferralCode] = useState<string | null>(null);
-  const trackReferralMutation = useMutation(api.referrals.trackReferral);
 
   // Capture referral code from URL on mount
   useEffect(() => {
@@ -42,55 +41,61 @@ export function useReferralTracking() {
    * Track referral for a new user
    * Call this when player is created
    */
-  const trackReferral = async (userId: string): Promise<boolean> => {
-    if (!referralCode) {
-      logger.ui.debug("No referral code to track");
-      return false;
-    }
-
-    try {
-      logger.ui.info("Tracking referral:", { referralCode, userId });
-      await trackReferralMutation({
-        referralCode,
-        referredUserId: userId,
-      });
-
-      // Clear referral code after successful tracking
-      localStorage.removeItem("referralCode");
-      setReferralCode(null);
-
-      logger.ui.info("Referral tracked successfully!");
-      toast.success("Referral applied! You were referred successfully.");
-      return true;
-    } catch (error) {
-      logger.ui.error("Failed to track referral:", error);
-
-      // Parse error message to show user-friendly toast
-      const errorMessage = error instanceof Error ? error.message : String(error);
-
-      if (errorMessage.includes("Cannot refer yourself")) {
-        toast.error("You cannot use your own referral code!");
-        // Clear the invalid referral code
-        localStorage.removeItem("referralCode");
-        setReferralCode(null);
-      } else if (errorMessage.includes("User was already referred")) {
-        toast.error("You have already been referred by someone else!");
-        // Clear the referral code since they're already registered
-        localStorage.removeItem("referralCode");
-        setReferralCode(null);
-      } else if (errorMessage.includes("Invalid referral code")) {
-        toast.error("Invalid referral code. Please check the link and try again.");
-        // Clear the invalid referral code
-        localStorage.removeItem("referralCode");
-        setReferralCode(null);
-      } else {
-        toast.error("Failed to apply referral. Please try again later.");
-        // Don't clear localStorage on unknown errors, allow retry
+  const trackReferral = useCallback(
+    async (userId: string): Promise<boolean> => {
+      if (!referralCode) {
+        logger.ui.debug("No referral code to track");
+        return false;
       }
 
-      return false;
-    }
-  };
+      if (!socket) {
+        logger.ui.error("Socket not connected, cannot track referral");
+        return false;
+      }
+
+      try {
+        logger.ui.info("Tracking referral:", { referralCode, userId });
+        const res = await socketRequest(socket, "track-referral", {
+          referralCode,
+          referredUserId: userId,
+        });
+
+        if (!res.success) throw new Error(res.error);
+
+        // Clear referral code after successful tracking
+        localStorage.removeItem("referralCode");
+        setReferralCode(null);
+
+        logger.ui.info("Referral tracked successfully!");
+        toast.success("Referral applied! You were referred successfully.");
+        return true;
+      } catch (error) {
+        logger.ui.error("Failed to track referral:", error);
+
+        // Parse error message to show user-friendly toast
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        if (errorMessage.includes("Cannot refer yourself")) {
+          toast.error("You cannot use your own referral code!");
+          localStorage.removeItem("referralCode");
+          setReferralCode(null);
+        } else if (errorMessage.includes("User was already referred")) {
+          toast.error("You have already been referred by someone else!");
+          localStorage.removeItem("referralCode");
+          setReferralCode(null);
+        } else if (errorMessage.includes("Invalid referral code")) {
+          toast.error("Invalid referral code. Please check the link and try again.");
+          localStorage.removeItem("referralCode");
+          setReferralCode(null);
+        } else {
+          toast.error("Failed to apply referral. Please try again later.");
+        }
+
+        return false;
+      }
+    },
+    [socket, referralCode]
+  );
 
   return {
     referralCode,

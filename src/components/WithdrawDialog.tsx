@@ -429,7 +429,7 @@ export function WithdrawDialog({ isOpen, onClose }: WithdrawDialogProps) {
             {/* Warning */}
             <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
               <div className="flex items-start gap-2">
-                <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
                 <div className="text-sm text-yellow-200">
                   <p className="font-medium mb-1">Important</p>
                   <p className="text-yellow-300/80">
@@ -453,7 +453,7 @@ export function WithdrawDialog({ isOpen, onClose }: WithdrawDialogProps) {
             </Button>
             <Button
               onClick={handleWithdraw}
-              className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold"
+              className="flex-1 bg-linear-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold"
               disabled={
                 isProcessing ||
                 !recipientAddress ||

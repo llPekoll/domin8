@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useSocket, socketRequest } from "../lib/socket";
 import { subscribeToPush, unsubscribeFromPush, isPushEnabled } from "./usePWA";
 
 interface UsePushNotificationsReturn {
@@ -18,14 +17,16 @@ export function usePushNotifications(walletAddress?: string): UsePushNotificatio
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [subscriberCount, setSubscriberCount] = useState(0);
+  const { socket } = useSocket();
 
-  // Convex mutations
-  const subscribeToConvex = useMutation(api.pushSubscriptions.subscribe);
-  const unsubscribeFromConvex = useMutation(api.pushSubscriptions.unsubscribe);
-  const linkWalletMutation = useMutation(api.pushSubscriptions.linkWallet);
-
-  // Get subscriber count
-  const subscriberCount = useQuery(api.pushSubscriptions.getSubscriptionCount) ?? 0;
+  // Fetch subscriber count via socket
+  useEffect(() => {
+    if (!socket) return;
+    socketRequest(socket, "get-subscription-count").then((res) => {
+      if (res.success) setSubscriberCount(res.data ?? 0);
+    });
+  }, [socket]);
 
   // Check initial state
   useEffect(() => {
@@ -47,14 +48,14 @@ export function usePushNotifications(walletAddress?: string): UsePushNotificatio
   // Link wallet when user logs in
   useEffect(() => {
     const linkWallet = async () => {
-      if (!walletAddress || !isSubscribed) return;
+      if (!walletAddress || !isSubscribed || !socket) return;
 
       try {
         const registration = await navigator.serviceWorker.ready;
         const subscription = await registration.pushManager.getSubscription();
 
         if (subscription) {
-          await linkWalletMutation({
+          await socketRequest(socket, "link-push-wallet", {
             endpoint: subscription.endpoint,
             walletAddress,
           });
@@ -65,13 +66,15 @@ export function usePushNotifications(walletAddress?: string): UsePushNotificatio
     };
 
     linkWallet();
-  }, [walletAddress, isSubscribed, linkWalletMutation]);
+  }, [walletAddress, isSubscribed, socket]);
 
   const subscribe = useCallback(async (): Promise<boolean> => {
     setError(null);
     setIsLoading(true);
 
     try {
+      if (!socket) throw new Error("Not connected");
+
       const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
       if (!vapidKey) {
         throw new Error("VAPID public key not configured");
@@ -91,8 +94,8 @@ export function usePushNotifications(walletAddress?: string): UsePushNotificatio
         throw new Error("Invalid subscription keys");
       }
 
-      // Save to Convex
-      await subscribeToConvex({
+      // Save to server via socket
+      await socketRequest(socket, "push-subscribe", {
         endpoint: subscription.endpoint,
         p256dh: btoa(String.fromCharCode(...new Uint8Array(p256dh))),
         auth: btoa(String.fromCharCode(...new Uint8Array(auth))),
@@ -110,13 +113,15 @@ export function usePushNotifications(walletAddress?: string): UsePushNotificatio
     } finally {
       setIsLoading(false);
     }
-  }, [subscribeToConvex, walletAddress]);
+  }, [socket, walletAddress]);
 
   const unsubscribe = useCallback(async (): Promise<boolean> => {
     setError(null);
     setIsLoading(true);
 
     try {
+      if (!socket) throw new Error("Not connected");
+
       // Get current subscription to get endpoint
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
@@ -125,8 +130,8 @@ export function usePushNotifications(walletAddress?: string): UsePushNotificatio
         // Unsubscribe from browser
         await unsubscribeFromPush();
 
-        // Remove from Convex
-        await unsubscribeFromConvex({
+        // Remove from server via socket
+        await socketRequest(socket, "push-unsubscribe", {
           endpoint: subscription.endpoint,
         });
       }
@@ -141,7 +146,7 @@ export function usePushNotifications(walletAddress?: string): UsePushNotificatio
     } finally {
       setIsLoading(false);
     }
-  }, [unsubscribeFromConvex]);
+  }, [socket]);
 
   return {
     isSupported,

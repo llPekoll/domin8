@@ -1,15 +1,14 @@
 import { useState, useCallback, useMemo, memo } from "react";
-import { useQuery, useAction } from "convex/react";
-import { usePrivyWallet } from "../hooks/usePrivyWallet";
+import { useActiveWallet } from "../contexts/ActiveWalletContext";
 import { useGameContract } from "../hooks/useGameContract";
-import { useActiveGame } from "../hooks/useActiveGame";
 import { useFundWallet } from "../hooks/useFundWallet";
 import { useNFTCharacters } from "../hooks/useNFTCharacters";
-import { api } from "../../convex/_generated/api";
+import { useSocket, socketRequest } from "../lib/socket";
 import { toast } from "sonner";
 import { EventBus } from "../game/EventBus";
 import { logger } from "../lib/logger";
 import { useAssets } from "../contexts/AssetsContext";
+import { useGamePhase, isBettingPhase } from "../hooks/useGamePhase";
 import type { Character } from "../types/character";
 import styles from "./ButtonShine.module.css";
 import { Plus, Wallet } from "lucide-react";
@@ -29,43 +28,40 @@ const BettingPanelMobile = memo(function BettingPanelMobile({
   selectedCharacter,
   onBetPlaced,
 }: BettingPanelMobileProps) {
-  const { connected, publicKey, solBalance, externalWalletAddress } = usePrivyWallet();
+  const {
+    connected,
+    activePublicKey: publicKey,
+    solBalance,
+    externalWalletAddress,
+    embeddedWalletAddress,
+  } = useActiveWallet();
   const { placeBet, validateBet } = useGameContract();
   const { handleAddFunds } = useFundWallet();
+  const gamePhase = useGamePhase();
 
   const [betAmount, setBetAmount] = useState<string>(DEFAULT_BET_AMOUNT.toString());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [botDialogOpen, setBotDialogOpen] = useState(false);
 
+  // Use embedded wallet for player data queries
   const walletAddress = useMemo(
-    () => (connected && publicKey ? publicKey.toString() : null),
-    [connected, publicKey]
+    () => embeddedWalletAddress,
+    [embeddedWalletAddress]
   );
 
   const { unlockedCharacters } = useNFTCharacters(externalWalletAddress, walletAddress);
-  const verifyCachedNFT = useAction(api.nftHolderScanner.verifyCachedNFTOwnership);
-  const playerData = useQuery(api.players.getPlayer, walletAddress ? { walletAddress } : "skip");
+  const { socket } = useSocket();
+  const verifyCachedNFT = useCallback(
+    async (args: { walletAddress: string; collectionAddress: string }) => {
+      if (!socket) return null;
+      const res = await socketRequest(socket, "verify-cached-nft-ownership", args);
+      if (res.success) return res.data;
+      return null;
+    },
+    [socket]
+  );
   const { maps: allMaps, characters: allCharacters } = useAssets();
-  const { activeGame } = useActiveGame();
 
-  const canPlaceBet = useMemo(() => {
-    if (!activeGame) return true;
-    const gameStatus = activeGame.status;
-    const betCount = activeGame.betCount || 0;
-
-    if (betCount === 0) return true;
-    if (gameStatus === 2) return true;
-    if (gameStatus === 1) return false;
-
-    if (gameStatus === 0) {
-      const currentTime = Math.floor(Date.now() / 1000);
-      const endTimestamp =
-        activeGame.endTimestamp?.toNumber() || activeGame.endDate?.toNumber() || 0;
-      return endTimestamp - currentTime > 0;
-    }
-
-    return false;
-  }, [activeGame]);
 
   const hasInsufficientBalance = useMemo(() => {
     if (solBalance === null) return false;
@@ -86,23 +82,17 @@ const BettingPanelMobile = memo(function BettingPanelMobile({
   };
 
   const handlePlaceBet = useCallback(async () => {
-    if (!connected || !publicKey || !playerData || !selectedCharacter) {
-      toast.error("Please wait for data to load or select a character");
+    if (!connected || !publicKey) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+    if (!selectedCharacter) {
+      toast.error("Please select a character first");
       return;
     }
 
     EventBus.emit("play-insert-coin-sound");
 
-    if (!canPlaceBet && activeGame) {
-      const status = activeGame.status;
-      if (status === 1) {
-        toast.error("Game has ended, please wait for next round...");
-        return;
-      } else if (status !== 2) {
-        toast.error("Cannot place bet at this time");
-        return;
-      }
-    }
 
     const amount = parseFloat(betAmount);
     if (isNaN(amount) || amount < MIN_BET_AMOUNT || amount > MAX_BET_AMOUNT) {
@@ -186,11 +176,8 @@ const BettingPanelMobile = memo(function BettingPanelMobile({
   }, [
     connected,
     publicKey,
-    playerData,
     selectedCharacter,
     betAmount,
-    canPlaceBet,
-    activeGame,
     placeBet,
     validateBet,
     onBetPlaced,
@@ -204,13 +191,18 @@ const BettingPanelMobile = memo(function BettingPanelMobile({
     return null;
   }
 
+  // Hide entire panel during non-betting phases (fighting, celebrating, VRF pending, cleanup)
+  if (!isBettingPhase(gamePhase)) {
+    return null;
+  }
+
   // Insufficient balance state
   if (hasInsufficientBalance) {
     return (
-      <div className="flex-shrink-0 bg-gradient-to-t from-gray-900 to-gray-800/90 border-t border-gray-700/50 p-3">
+      <div className="shrink-0 bg-linear-to-t from-gray-900 to-gray-800/90 border-t border-gray-700/50 p-3">
         <button
           onClick={() => walletAddress && handleAddFunds(walletAddress)}
-          className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-xl font-bold text-lg transition-all"
+          className="w-full flex items-center justify-center gap-2 py-3 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-xl font-bold text-lg transition-all"
         >
           <Plus className="w-5 h-5" />
           Add Funds to Play
@@ -223,7 +215,7 @@ const BettingPanelMobile = memo(function BettingPanelMobile({
   // Locked character state
   if (isSelectedCharacterLocked) {
     return (
-      <div className="flex-shrink-0 bg-gradient-to-t from-gray-900 to-gray-800/90 border-t border-gray-700/50 p-3">
+      <div className="shrink-0 bg-linear-to-t from-gray-900 to-gray-800/90 border-t border-gray-700/50 p-3">
         <div className="text-center text-red-400 text-sm py-2">
           This character requires an NFT. Select a different character.
         </div>
@@ -238,7 +230,7 @@ const BettingPanelMobile = memo(function BettingPanelMobile({
         <BotControlTab onClick={() => setBotDialogOpen(true)} />
       </div>
 
-      <div className="flex-shrink-0 bg-gradient-to-t from-amber-950 to-amber-900/90 border-t border-amber-600/30 p-3 space-y-2">
+      <div className="shrink-0 bg-linear-to-t from-amber-950 to-amber-900/90 border-t border-amber-600/30 p-3 space-y-2">
         {/* Row 1: Input + Quick bet buttons */}
         <div className="flex items-center gap-2">
           {/* SOL Input */}
@@ -284,7 +276,7 @@ const BettingPanelMobile = memo(function BettingPanelMobile({
           </button>
           <button
             onClick={() => setBetAmount(Math.min(solBalance! - 0.001, MAX_BET_AMOUNT).toFixed(3))}
-            className={`px-3 py-2 bg-gradient-to-b from-amber-500 to-amber-800 rounded-lg text-amber-100 font-bold transition-colors ${styles.shineButton}`}
+            className={`px-3 py-2 bg-linear-to-b from-amber-500 to-amber-800 rounded-lg text-amber-100 font-bold transition-colors ${styles.shineButton}`}
           >
             MAX
           </button>
@@ -293,10 +285,10 @@ const BettingPanelMobile = memo(function BettingPanelMobile({
         {/* Row 2: Place Bet button (full width) */}
         <button
           onClick={() => void handlePlaceBet()}
-          disabled={isSubmitting || !canPlaceBet || !selectedCharacter}
+          disabled={isSubmitting || !selectedCharacter}
           className={`
             w-full flex items-center justify-center gap-2 py-3
-            bg-gradient-to-b from-amber-500 to-amber-700
+            bg-linear-to-b from-amber-500 to-amber-700
             hover:from-amber-400 hover:to-amber-600
             disabled:from-gray-600 disabled:to-gray-700
             rounded-xl font-bold text-lg text-amber-100 uppercase tracking-wider
@@ -310,9 +302,7 @@ const BettingPanelMobile = memo(function BettingPanelMobile({
             ? "Select Character"
             : isSubmitting
               ? "Inserting..."
-              : !canPlaceBet
-                ? "Closed"
-                : "Insert Coin"}
+              : "Insert Coin"}
         </button>
       </div>
 
