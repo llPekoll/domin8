@@ -1,7 +1,7 @@
 // Solana and Anchor types for the Domin8 program
 import { PublicKey } from "@solana/web3.js";
 import { Buffer } from "buffer";
-import Domin8PrgmIDL from "../../../target/idl/domin8_prgm.json";
+import Domin8PrgmIDL from "./idl/domin8_prgm.json";
 
 // Extract Program ID from IDL
 export const DOMIN8_PROGRAM_ID = new PublicKey(Domin8PrgmIDL.address);

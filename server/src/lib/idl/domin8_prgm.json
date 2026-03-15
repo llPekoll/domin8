@@ -1,0 +1,1281 @@
+{
+  "address": "92LhoG1EGxWpRovjrjJ2vA8amNTHFZSTFr1EHUYWjkky",
+  "metadata": {
+    "name": "domin8_prgm",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "bet",
+      "docs": [
+        "Place a bet in the current game round",
+        "",
+        "Parameters:",
+        "- round_id: u64 - Round ID for the game",
+        "- bet_amount: u64 - Bet amount in lamports",
+        "- skin: u8 - Character skin ID (0-255)",
+        "- position: [u16; 2] - Spawn position [x, y]"
+      ],
+      "discriminator": [
+        94,
+        203,
+        166,
+        126,
+        20,
+        243,
+        169,
+        82
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "active_game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  99,
+                  116,
+                  105,
+                  118,
+                  101,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        },
+        {
+          "name": "bet_amount",
+          "type": "u64"
+        },
+        {
+          "name": "skin",
+          "type": "u8"
+        },
+        {
+          "name": "position",
+          "type": {
+            "array": [
+              "u16",
+              2
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_game_round",
+      "docs": [
+        "Create new game round (admin only, no bets yet)",
+        "",
+        "Parameters:",
+        "- round_id: u64 - Round ID for the game",
+        "- map: u8 - Map/background ID (0-255)"
+      ],
+      "discriminator": [
+        96,
+        168,
+        23,
+        66,
+        170,
+        244,
+        145,
+        171
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "active_game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  99,
+                  116,
+                  105,
+                  118,
+                  101,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        },
+        {
+          "name": "map",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "delete_game",
+      "docs": [
+        "Delete a game round from the blockchain (admin only)",
+        "",
+        "Parameters:",
+        "- round_id: u64 - Round ID for the game to delete"
+      ],
+      "discriminator": [
+        248,
+        14,
+        241,
+        11,
+        84,
+        218,
+        245,
+        234
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "end_game",
+      "docs": [
+        "End game, draw winner, and distribute prizes (admin only)",
+        "",
+        "Parameters:",
+        "- round_id: u64 - Round ID for the game"
+      ],
+      "discriminator": [
+        224,
+        135,
+        245,
+        99,
+        67,
+        175,
+        121,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "active_game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  99,
+                  116,
+                  105,
+                  118,
+                  101,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "oracle_queue",
+          "writable": true,
+          "address": "Cuj97ggrhhidhbu39TijNVqE74xvKJ69gDervRUXAxGh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "program_identity",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vrf_program",
+          "address": "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz"
+        },
+        {
+          "name": "slot_hashes",
+          "address": "SysvarS1otHashes111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_config",
+      "docs": [
+        "Initialize global domin8 configuration (admin only)",
+        "",
+        "Parameters:",
+        "- treasury: Pubkey - Treasury wallet for house fees",
+        "- house_fee: u64 - House fee in basis points (e.g., 500 = 5%)",
+        "- min_deposit_amount: u64 - Minimum bet amount in lamports",
+        "- max_deposit_amount: u64 - Maximum bet amount in lamports",
+        "- round_time: u64 - Game duration in seconds"
+      ],
+      "discriminator": [
+        208,
+        127,
+        21,
+        1,
+        194,
+        190,
+        196,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "active_game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  99,
+                  116,
+                  105,
+                  118,
+                  101,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "treasury",
+          "type": "pubkey"
+        },
+        {
+          "name": "house_fee",
+          "type": "u64"
+        },
+        {
+          "name": "min_deposit_amount",
+          "type": "u64"
+        },
+        {
+          "name": "max_deposit_amount",
+          "type": "u64"
+        },
+        {
+          "name": "round_time",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "send_prize_winner",
+      "docs": [
+        "Send prize to the winner of a completed game",
+        "",
+        "Parameters:",
+        "- round_id: u64 - Round ID for the game"
+      ],
+      "discriminator": [
+        246,
+        192,
+        68,
+        84,
+        41,
+        59,
+        100,
+        166
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  111,
+                  109,
+                  105,
+                  110,
+                  56,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "claimer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "winner",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "vrf_callback",
+      "docs": [
+        "VRF callback - called automatically by Magic Block VRF",
+        "",
+        "Parameters:",
+        "- randomness: [u8; 32] - 32 bytes of verifiable randomness"
+      ],
+      "discriminator": [
+        248,
+        224,
+        55,
+        227,
+        56,
+        10,
+        108,
+        36
+      ],
+      "accounts": [
+        {
+          "name": "vrf_program_identity",
+          "docs": [
+            "This check ensures that the vrf_program_identity (which is a PDA) is a signer",
+            "enforcing the callback is executed by the VRF program through CPI"
+          ],
+          "signer": true,
+          "address": "9irBy75QS2BN81FUgXuHcjqceJJRuc9oDkAe8TKVvvAw"
+        },
+        {
+          "name": "game",
+          "docs": [
+            "Game account passed via accounts_metas in VRF request"
+          ],
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "randomness",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Domin8Config",
+      "discriminator": [
+        240,
+        160,
+        179,
+        138,
+        97,
+        149,
+        175,
+        203
+      ]
+    },
+    {
+      "name": "Domin8Game",
+      "discriminator": [
+        242,
+        172,
+        164,
+        162,
+        16,
+        216,
+        9,
+        28
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "BetPlaced",
+      "discriminator": [
+        88,
+        88,
+        145,
+        226,
+        126,
+        206,
+        32,
+        0
+      ]
+    },
+    {
+      "name": "GameCreated",
+      "discriminator": [
+        218,
+        25,
+        150,
+        94,
+        177,
+        112,
+        96,
+        2
+      ]
+    },
+    {
+      "name": "GameEnded",
+      "discriminator": [
+        35,
+        93,
+        113,
+        153,
+        29,
+        144,
+        200,
+        109
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Unauthorized access - admin only"
+    },
+    {
+      "code": 6001,
+      "name": "GameLocked",
+      "msg": "Game system is locked"
+    },
+    {
+      "code": 6002,
+      "name": "GameNotOpen",
+      "msg": "Game is not open for betting"
+    },
+    {
+      "code": 6003,
+      "name": "GameNotEnded",
+      "msg": "Game has not ended yet"
+    },
+    {
+      "code": 6004,
+      "name": "InsufficientBet",
+      "msg": "Bet amount below minimum required"
+    },
+    {
+      "code": 6005,
+      "name": "ExcessiveBet",
+      "msg": "Bet amount exceeds maximum allowed"
+    },
+    {
+      "code": 6006,
+      "name": "GameAlreadyExists",
+      "msg": "Game round already exists"
+    },
+    {
+      "code": 6007,
+      "name": "RandomnessNotReady",
+      "msg": "VRF randomness not ready"
+    },
+    {
+      "code": 6008,
+      "name": "NoWinnerFound",
+      "msg": "No winner could be determined"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidWinner",
+      "msg": "Invalid winner account"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidGameStatus",
+      "msg": "Invalid game status for this operation"
+    },
+    {
+      "code": 6011,
+      "name": "GameExpired",
+      "msg": "Game round has expired"
+    },
+    {
+      "code": 6012,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds for bet"
+    },
+    {
+      "code": 6013,
+      "name": "ArithmeticError",
+      "msg": "Arithmetic operation failed"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidVrfForce",
+      "msg": "Invalid VRF force seed format"
+    },
+    {
+      "code": 6015,
+      "name": "InvalidWallet",
+      "msg": "Invalid wallet address"
+    },
+    {
+      "code": 6016,
+      "name": "FeeTooHigh",
+      "msg": "Fee percentage too high"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidRoundTime",
+      "msg": "Round time out of bounds"
+    },
+    {
+      "code": 6018,
+      "name": "NoBets",
+      "msg": "Game has no bets"
+    },
+    {
+      "code": 6019,
+      "name": "GameActive",
+      "msg": "Cannot modify active game"
+    },
+    {
+      "code": 6020,
+      "name": "UserBetLimitExceeded",
+      "msg": "User has exceeded maximum bets per game"
+    },
+    {
+      "code": 6021,
+      "name": "InvalidSkin",
+      "msg": "Invalid skin ID"
+    },
+    {
+      "code": 6022,
+      "name": "InvalidPosition",
+      "msg": "Invalid position coordinates"
+    },
+    {
+      "code": 6023,
+      "name": "InvalidGameAccount",
+      "msg": "Invalid game account provided"
+    }
+  ],
+  "types": [
+    {
+      "name": "BetInfo",
+      "docs": [
+        "Bet information with game-specific data for domin8"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet_index",
+            "type": "u16"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "skin",
+            "type": "u8"
+          },
+          {
+            "name": "position",
+            "type": {
+              "array": [
+                "u16",
+                2
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "BetPlaced",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total_pot",
+            "type": "u64"
+          },
+          {
+            "name": "bet_index",
+            "type": "u64"
+          },
+          {
+            "name": "is_new_user",
+            "type": "bool"
+          },
+          {
+            "name": "skin",
+            "type": "u8"
+          },
+          {
+            "name": "position",
+            "type": {
+              "array": [
+                "u16",
+                2
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Domin8Config",
+      "docs": [
+        "Global configuration for domin8 game"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "game_round",
+            "type": "u64"
+          },
+          {
+            "name": "house_fee",
+            "type": "u64"
+          },
+          {
+            "name": "min_deposit_amount",
+            "type": "u64"
+          },
+          {
+            "name": "max_deposit_amount",
+            "type": "u64"
+          },
+          {
+            "name": "round_time",
+            "type": "u64"
+          },
+          {
+            "name": "lock",
+            "type": "bool"
+          },
+          {
+            "name": "force",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Domin8Game",
+      "docs": [
+        "Main game state account"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "game_round",
+            "type": "u64"
+          },
+          {
+            "name": "start_date",
+            "type": "i64"
+          },
+          {
+            "name": "end_date",
+            "type": "i64"
+          },
+          {
+            "name": "total_deposit",
+            "type": "u64"
+          },
+          {
+            "name": "rand",
+            "type": "u64"
+          },
+          {
+            "name": "map",
+            "type": "u8"
+          },
+          {
+            "name": "user_count",
+            "type": "u64"
+          },
+          {
+            "name": "force",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "vrf_requested",
+            "type": "bool"
+          },
+          {
+            "name": "winner",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "winner_prize",
+            "type": "u64"
+          },
+          {
+            "name": "winning_bet_index",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "wallets",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "bets",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "BetInfo"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GameCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "initial_bet",
+            "type": "u64"
+          },
+          {
+            "name": "start_time",
+            "type": "i64"
+          },
+          {
+            "name": "end_time",
+            "type": "i64"
+          },
+          {
+            "name": "vrf_force",
+            "type": "string"
+          },
+          {
+            "name": "vrf_force_bytes",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GameEnded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "winner",
+            "type": "pubkey"
+          },
+          {
+            "name": "winning_bet_index",
+            "type": "u64"
+          },
+          {
+            "name": "winning_bet_amount",
+            "type": "u64"
+          },
+          {
+            "name": "total_pot",
+            "type": "u64"
+          },
+          {
+            "name": "prize",
+            "type": "u64"
+          },
+          {
+            "name": "house_fee",
+            "type": "u64"
+          },
+          {
+            "name": "house_fee_percentage",
+            "type": "u64"
+          },
+          {
+            "name": "total_bets",
+            "type": "u64"
+          },
+          {
+            "name": "unique_users",
+            "type": "u64"
+          },
+          {
+            "name": "win_probability",
+            "type": "u64"
+          },
+          {
+            "name": "vrf_force",
+            "type": "string"
+          },
+          {
+            "name": "vrf_force_bytes",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "randomness",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ],
+  "constants": [
+    {
+      "name": "SEED",
+      "type": "string",
+      "value": "\"anchor\""
+    }
+  ]
+}
