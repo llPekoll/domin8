@@ -1,0 +1,12 @@
+node_modules
+server
+convex
+target
+.git
+.anchor
+test-ledger
+android
+ios
+*.apk
+*.aab
+convex-backup
