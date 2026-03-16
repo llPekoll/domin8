@@ -611,6 +611,8 @@ export const checkAndEndOpenGames = internalAction({
       // 5. Game is CLOSED (status=1) - check if prize needs sending or next game needs creating
       if (activeGame.status === GAME_STATUS.CLOSED) {
         // Check if prize still needs to be sent
+        // Note: smart contract doesn't zero winnerPrize after sending, so we check
+        // if send_prize job exists (pending or completed) rather than relying on on-chain value
         if (activeGame.winnerPrize > 0 && activeGame.winner) {
           const sendPrizeScheduled = await ctx.runQuery(
             internal.gameSchedulerMutations.isActionScheduled,
@@ -636,10 +638,11 @@ export const checkAndEndOpenGames = internalAction({
             return { checked: true, action: "send_prize_recovery", roundId: activeGame.gameRound };
           }
 
-          return { checked: true, action: "none", reason: "send_prize_already_scheduled" };
+          // send_prize is scheduled or completed — fall through to check next game creation
+          console.log(`[Game Loop] send_prize already handled for round ${activeGame.gameRound}, checking next game...`);
         }
 
-        // Prize already sent, check if next game needs creating
+        // Check if next game needs creating
         const createGameScheduled = await ctx.runQuery(
           internal.gameSchedulerMutations.isActionScheduled,
           { roundId: activeGame.gameRound + 1, action: "create_game" }

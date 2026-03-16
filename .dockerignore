@@ -1,7 +1,5 @@
 node_modules
-server
-convex
-target
+server/node_modules
 .git
 .anchor
 test-ledger
@@ -10,3 +8,8 @@ ios
 *.apk
 *.aab
 convex-backup
+target/debug
+target/deploy
+target/release
+target/sbpf-solana-solana
+target/rust-analyzer
