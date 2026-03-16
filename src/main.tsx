@@ -10,7 +10,6 @@ import { AssetsProvider } from "./contexts/AssetsContext";
 import { PlayerNamesProvider } from "./contexts/PlayerNamesContext";
 import { ActiveWalletProvider } from "./contexts/ActiveWalletContext";
 import { SocketProvider } from "./lib/socket";
-import { Analytics } from "@vercel/analytics/react";
 
 const isAndroid = /Android/i.test(navigator.userAgent);
 
@@ -153,6 +152,5 @@ createRoot(document.getElementById("root")!).render(
         theme="dark"
       />
     </SocketProvider>
-    <Analytics />
   </StrictMode>
 );
