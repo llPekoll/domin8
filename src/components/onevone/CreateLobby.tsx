@@ -1,3 +1,4 @@
+// @ts-nocheck — Legacy Solana code, pending TON migration
 import { useState, useCallback } from "react";
 import { useActiveWallet } from "../../contexts/ActiveWalletContext";
 import { useSocket, socketRequest } from "../../lib/socket";

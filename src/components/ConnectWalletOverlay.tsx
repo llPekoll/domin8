@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
-import { usePrivy } from "@privy-io/react-auth";
+import { useActiveWallet } from "../contexts/ActiveWalletContext";
 import { Button } from "~/components/ui/button";
 
 const carouselSlides = [
@@ -10,7 +10,7 @@ const carouselSlides = [
 ];
 
 export function ConnectWalletOverlay() {
-  const { login } = usePrivy();
+  const { connect: login } = useActiveWallet();
   const [currentSlide, setCurrentSlide] = useState(0);
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
@@ -166,7 +166,7 @@ export function ConnectWalletOverlay() {
 
           {/* Supporting text - hidden in landscape */}
           <p className="text-center text-sm text-gray-400 mt-4 landscape:hidden">
-            No wallet? No problem! Use email or social login
+            Connect with Tonkeeper, MyTonWallet, or any TON wallet
           </p>
         </div>
       </div>

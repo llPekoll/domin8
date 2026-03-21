@@ -1,229 +1,123 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
-import { usePrivy } from "@privy-io/react-auth";
-import { useWallets } from "@privy-io/react-auth/solana";
-import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { getSharedConnection } from "../lib/sharedConnection";
-import { logger } from "../lib/logger";
+/**
+ * Active Wallet Context — TON version
+ *
+ * Replaces the Privy-based ActiveWalletContext with TonConnect.
+ * TonConnect manages a single wallet (no embedded/external split).
+ *
+ * Provides the same interface so components don't need major changes.
+ */
+
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  ReactNode,
+} from "react";
+import {
+  useTonConnectUI,
+  useTonAddress,
+  useTonWallet,
+} from "@tonconnect/ui-react";
+import { Address, fromNano } from "@ton/core";
+import { getTonClient } from "../lib/tonClient";
 
 interface ActiveWalletContextType {
-  // Active wallet info (the one user selected to use)
+  // Active wallet
   activeWalletAddress: string | null;
-  activePublicKey: PublicKey | null;
-  activeWallet: ReturnType<typeof useWallets>["wallets"][0] | null;
+  activePublicKey: string | null;  // compat: was Solana PublicKey, now just address string
+  activeWallet: null;              // compat: no Privy wallet object on TON
   isUsingExternalWallet: boolean;
 
-  // Embedded wallet info (always available)
+  // Embedded/external compat (TON = single wallet)
   embeddedWalletAddress: string | null;
-  embeddedWallet: ReturnType<typeof useWallets>["wallets"][0] | null;
-
-  // External wallet info (if linked)
   externalWalletAddress: string | null;
-  externalWallet: ReturnType<typeof useWallets>["wallets"][0] | null;
-  externalWalletType: string | null;
 
-  // Balance for active wallet
-  solBalance: number;
+  // Balance
+  tonBalance: number;
   isLoadingBalance: boolean;
   refreshBalance: () => Promise<void>;
 
-  // Actions
-  switchToEmbedded: () => void;
-  switchToExternal: () => void;
-  setActiveWallet: (address: string, isExternal: boolean) => void;
-
-  // Connection status
+  // Compat aliases
+  solBalance: number;
+  walletAddress: string | null;
   connected: boolean;
   ready: boolean;
+
+  // Actions
+  connect: () => void;
+  disconnect: () => void;
 }
 
 const ActiveWalletContext = createContext<ActiveWalletContextType | null>(null);
 
-const ACTIVE_WALLET_KEY = "domin8_active_wallet";
-
 export function ActiveWalletProvider({ children }: { children: ReactNode }) {
-  const { ready, authenticated, user } = usePrivy();
-  const { wallets } = useWallets();
-  const [useExternalWallet, setUseExternalWallet] = useState<boolean>(() => {
-    // Restore from localStorage
-    if (typeof window !== "undefined") {
-      return localStorage.getItem(ACTIVE_WALLET_KEY) === "external";
-    }
-    return false;
-  });
-  const [solBalance, setSolBalance] = useState<number>(0);
-  const [isLoadingBalance, setIsLoadingBalance] = useState<boolean>(false);
+  const [tonConnectUI] = useTonConnectUI();
+  const rawAddress = useTonAddress(false);
+  const friendlyAddress = useTonAddress(true);
+  const wallet = useTonWallet();
 
-  // Get Privy embedded wallet from user.linkedAccounts
-  const embeddedWalletAccount = user?.linkedAccounts?.find(
-    (account) =>
-      account.type === "wallet" &&
-      "walletClientType" in account &&
-      "chainType" in account &&
-      (account.walletClientType === "privy" || !account.walletClientType) &&
-      account.chainType === "solana"
-  );
+  const [tonBalance, setTonBalance] = useState<number>(0);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
-  // Get external wallet (non-Privy wallet, e.g., Phantom)
-  const externalWalletAccount = user?.linkedAccounts?.find(
-    (account) =>
-      account.type === "wallet" &&
-      "chainType" in account &&
-      account.chainType === "solana" &&
-      "walletClientType" in account &&
-      account.walletClientType !== "privy" &&
-      account.walletClientType
-  );
+  const connected = !!wallet;
+  const ready = true; // TonConnect is always ready after provider mounts
 
-  const embeddedWalletAddress = embeddedWalletAccount && "address" in embeddedWalletAccount
-    ? embeddedWalletAccount.address
-    : null;
-
-  const externalWalletAddress = externalWalletAccount && "address" in externalWalletAccount
-    ? externalWalletAccount.address
-    : null;
-
-  const externalWalletType = externalWalletAccount && "walletClientType" in externalWalletAccount
-    ? (externalWalletAccount.walletClientType as string)
-    : null;
-
-  // Find wallet objects
-  const embeddedWallet = embeddedWalletAddress
-    ? wallets.find((w) => w.address === embeddedWalletAddress) || null
-    : null;
-
-  const externalWallet = externalWalletAddress
-    ? wallets.find((w) => w.address === externalWalletAddress) || null
-    : null;
-
-  // Determine active wallet
-  const canUseExternal = useExternalWallet && externalWallet && externalWalletAddress;
-  const activeWallet = canUseExternal ? externalWallet : (embeddedWallet || wallets[0] || null);
-  const activeWalletAddress = activeWallet?.address || null;
-  const activePublicKey = activeWalletAddress ? new PublicKey(activeWalletAddress) : null;
-  const isUsingExternalWallet = Boolean(canUseExternal);
-
-  const connected = ready && authenticated && !!activeWalletAddress;
-
-  // Persist preference
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(ACTIVE_WALLET_KEY, useExternalWallet ? "external" : "embedded");
-    }
-  }, [useExternalWallet]);
-
-  // Reset to embedded if external wallet is no longer available
-  useEffect(() => {
-    if (useExternalWallet && !externalWalletAddress) {
-      setUseExternalWallet(false);
-    }
-  }, [useExternalWallet, externalWalletAddress]);
-
-  // Fetch SOL balance for active wallet
-  useEffect(() => {
-    if (!connected || !activeWalletAddress) {
-      setSolBalance(0);
-      return;
-    }
-
-    const publicKey = new PublicKey(activeWalletAddress);
-    const connection = getSharedConnection();
-    let subscriptionId: number | null = null;
-
-    const fetchInitialBalance = async () => {
-      setIsLoadingBalance(true);
-      try {
-        const balanceLamports = await connection.getBalance(publicKey);
-        const balanceSOL = balanceLamports / LAMPORTS_PER_SOL;
-        setSolBalance(balanceSOL);
-        logger.solana.debug("[ActiveWalletContext] Initial balance fetched:", balanceSOL);
-      } catch (error) {
-        logger.solana.error("Error fetching initial SOL balance:", error);
-        setSolBalance(0);
-      } finally {
-        setIsLoadingBalance(false);
-      }
-    };
-
-    const subscribeToBalance = async () => {
-      try {
-        subscriptionId = connection.onAccountChange(
-          publicKey,
-          (accountInfo) => {
-            const balanceSOL = accountInfo.lamports / LAMPORTS_PER_SOL;
-            setSolBalance(balanceSOL);
-            logger.solana.debug("[ActiveWalletContext] Balance updated via WebSocket:", balanceSOL);
-          },
-          "confirmed"
-        );
-        logger.solana.debug("[ActiveWalletContext] WebSocket subscription active, id:", subscriptionId);
-      } catch (error) {
-        logger.solana.error("Error subscribing to balance changes:", error);
-      }
-    };
-
-    void fetchInitialBalance();
-    void subscribeToBalance();
-
-    return () => {
-      if (subscriptionId !== null) {
-        connection.removeAccountChangeListener(subscriptionId);
-        logger.solana.debug("[ActiveWalletContext] WebSocket subscription removed, id:", subscriptionId);
-      }
-    };
-  }, [connected, activeWalletAddress]);
+  const address = rawAddress ? Address.parseRaw(rawAddress) : null;
 
   const refreshBalance = useCallback(async () => {
-    if (!connected || !activeWalletAddress) return;
-
+    if (!address) {
+      setTonBalance(0);
+      return;
+    }
     setIsLoadingBalance(true);
     try {
-      const connection = getSharedConnection();
-      const publicKey = new PublicKey(activeWalletAddress);
-      const balanceLamports = await connection.getBalance(publicKey);
-      const balanceSOL = balanceLamports / LAMPORTS_PER_SOL;
-      setSolBalance(balanceSOL);
-    } catch (error) {
-      logger.solana.error("Error refreshing SOL balance:", error);
+      const client = getTonClient();
+      const bal = await client.getBalance(address);
+      setTonBalance(parseFloat(fromNano(bal)));
+    } catch (err) {
+      console.error("[ActiveWallet] Balance error:", err);
     } finally {
       setIsLoadingBalance(false);
     }
-  }, [connected, activeWalletAddress]);
+  }, [address?.toString()]);
 
-  const switchToEmbedded = useCallback(() => {
-    setUseExternalWallet(false);
-    logger.solana.info("[ActiveWalletContext] Switched to embedded wallet");
-  }, []);
-
-  const switchToExternal = useCallback(() => {
-    if (externalWalletAddress) {
-      setUseExternalWallet(true);
-      logger.solana.info("[ActiveWalletContext] Switched to external wallet:", externalWalletType);
+  // Fetch balance on connect + poll every 15s
+  useEffect(() => {
+    if (!connected || !address) {
+      setTonBalance(0);
+      return;
     }
-  }, [externalWalletAddress, externalWalletType]);
+    refreshBalance();
+    const interval = setInterval(refreshBalance, 15000);
+    return () => clearInterval(interval);
+  }, [connected, address?.toString(), refreshBalance]);
 
-  const setActiveWallet = useCallback((address: string, isExternal: boolean) => {
-    setUseExternalWallet(isExternal);
-    logger.solana.info("[ActiveWalletContext] Active wallet set:", { address, isExternal });
-  }, []);
+  const connect = useCallback(() => {
+    tonConnectUI.openModal();
+  }, [tonConnectUI]);
+
+  const disconnect = useCallback(() => {
+    tonConnectUI.disconnect();
+  }, [tonConnectUI]);
 
   const value: ActiveWalletContextType = {
-    activeWalletAddress,
-    activePublicKey,
-    activeWallet,
-    isUsingExternalWallet,
-    embeddedWalletAddress,
-    embeddedWallet,
-    externalWalletAddress,
-    externalWallet,
-    externalWalletType,
-    solBalance,
+    activeWalletAddress: friendlyAddress || null,
+    activePublicKey: friendlyAddress || null,
+    activeWallet: null,
+    isUsingExternalWallet: false,
+    embeddedWalletAddress: friendlyAddress || null, // same as active on TON
+    externalWalletAddress: null,
+    tonBalance,
     isLoadingBalance,
     refreshBalance,
-    switchToEmbedded,
-    switchToExternal,
-    setActiveWallet,
+    solBalance: tonBalance,
+    walletAddress: friendlyAddress || null,
     connected,
     ready,
+    connect,
+    disconnect,
   };
 
   return (
@@ -236,7 +130,9 @@ export function ActiveWalletProvider({ children }: { children: ReactNode }) {
 export function useActiveWallet() {
   const context = useContext(ActiveWalletContext);
   if (!context) {
-    throw new Error("useActiveWallet must be used within an ActiveWalletProvider");
+    throw new Error(
+      "useActiveWallet must be used within an ActiveWalletProvider"
+    );
   }
   return context;
 }

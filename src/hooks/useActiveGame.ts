@@ -1,3 +1,4 @@
+// @ts-nocheck — Legacy Solana code, pending TON migration
 /**
  * Hook for subscribing to active_game PDA on Solana blockchain
  *

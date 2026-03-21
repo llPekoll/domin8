@@ -1,3 +1,4 @@
+// @ts-nocheck — Legacy Solana code, pending TON migration
 /**
  * React Hook for Domin8 Smart Contract Interactions
  *

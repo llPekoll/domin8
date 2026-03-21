@@ -6,7 +6,8 @@
  */
 
 import { useCallback, useState } from "react";
-import { useSessionSigners } from "@privy-io/react-auth";
+// TODO: TON migration - session signers need rework
+// import { useSessionSigners } from "@privy-io/react-auth";
 import { usePrivyWallet } from "./usePrivyWallet";
 import { useBotSettings } from "./useBotSettings";
 import { toast } from "sonner";
@@ -18,7 +19,9 @@ const BOT_SIGNER_ID = import.meta.env.VITE_PRIVY_BOT_SIGNER_ID;
 export function useBotSession() {
   const { connected, walletAddress } = usePrivyWallet();
   const { sessionSignerEnabled, updateSessionSigner } = useBotSettings();
-  const { addSessionSigners, removeSessionSigners } = useSessionSigners();
+  // TODO: TON migration - session signers need rework
+  const addSessionSigners = async (..._args: any[]) => { throw new Error("Not implemented for TON"); };
+  const removeSessionSigners = async (..._args: any[]) => { throw new Error("Not implemented for TON"); };
 
   const [isEnabling, setIsEnabling] = useState(false);
   const [isDisabling, setIsDisabling] = useState(false);
