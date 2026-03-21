@@ -1,0 +1,15 @@
+{
+  "projects": [
+    {
+      "name": "domin8",
+      "path": "./tact/domin8.tact",
+      "output": "./build",
+      "options": {
+        "debug": true,
+        "external": false,
+        "ipfsAbiGetter": false,
+        "interfacesGetter": false
+      }
+    }
+  ]
+}

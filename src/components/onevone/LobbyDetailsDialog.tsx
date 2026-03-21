@@ -4,7 +4,7 @@ import { EventBus } from "../../game/EventBus";
 import { logger } from "../../lib/logger";
 import { useAssets } from "../../contexts/AssetsContext";
 import { usePrivyWallet } from "../../hooks/usePrivyWallet";
-import { usePrivy } from "@privy-io/react-auth";
+import { useActiveWallet } from "../../contexts/ActiveWalletContext";
 import { useSocket, socketRequest } from "../../lib/socket";
 import { toast } from "sonner";
 import type { Character } from "../../types/character";
@@ -68,8 +68,9 @@ export function LobbyDetailsDialog({
   onDoubleDown,
 }: LobbyDetailsDialogProps) {
   const { characters, maps } = useAssets();
-  const { connected, publicKey, solBalance } = usePrivyWallet();
-  const { login, ready } = usePrivy();
+  const { connected, solBalance, walletAddress } = usePrivyWallet();
+  const publicKey = walletAddress; // compat: was Solana PublicKey, now address string
+  const { connect: login, ready } = useActiveWallet();
 
   // Check if user has enough balance to join (amount is in lamports)
   const hasEnoughBalance = lobby ? solBalance >= lobby.amount / 1e9 : false;

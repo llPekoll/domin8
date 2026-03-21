@@ -7,7 +7,8 @@
 import { useCallback, useState, useEffect } from "react";
 import { useSocket, socketRequest } from "../lib/socket";
 import { usePrivyWallet } from "./usePrivyWallet";
-import { useWallets } from "@privy-io/react-auth/solana";
+// TODO: TON migration - bot wallet signing needs rework
+// import { useWallets } from "@privy-io/react-auth/solana";
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { toast } from "sonner";
 import { logger } from "../lib/logger";
@@ -47,7 +48,7 @@ export interface BotConfiguration {
 
 export function useBotSettings() {
   const { connected, publicKey, walletAddress, solBalance } = usePrivyWallet();
-  const { wallets } = useWallets();
+  const wallets: any[] = []; // TODO: TON migration - bot signing needs rework
   const { socket } = useSocket();
 
   // State for queries

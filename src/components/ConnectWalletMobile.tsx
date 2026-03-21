@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Sparkles } from "lucide-react";
-import { usePrivy } from "@privy-io/react-auth";
+import { useActiveWallet } from "../contexts/ActiveWalletContext";
 import { Button } from "~/components/ui/button";
 
 const carouselSlides = [
@@ -10,7 +10,7 @@ const carouselSlides = [
 ];
 
 export function ConnectWalletMobile() {
-  const { login } = usePrivy();
+  const { connect: login } = useActiveWallet();
   const [currentSlide, setCurrentSlide] = useState(0);
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);

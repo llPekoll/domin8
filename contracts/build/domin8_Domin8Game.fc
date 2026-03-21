@@ -1,0 +1,964 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; domin8_Domin8Game.headers.fc
+;;
+;; Header files for Domin8Game
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_store_address_opt
+builder __tact_store_address_opt(builder b, slice address) inline;
+
+;; __tact_not_null
+forall X -> X __tact_not_null(X x) impure inline;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; __tact_dict_get_slice_uint
+int __tact_dict_get_slice_uint(cell d, int kl, slice k, int vl) inline;
+
+;; __tact_dict_set_slice_uint
+(cell, ()) __tact_dict_set_slice_uint(cell d, int kl, slice k, int v, int vl) inline;
+
+;; __tact_dict_get_uint_cell
+cell __tact_dict_get_uint_cell(cell d, int kl, int k) inline;
+
+;; __tact_dict_set_uint_cell
+(cell, ()) __tact_dict_set_uint_cell(cell d, int kl, int k, cell v) inline;
+
+;; $DeployOk$_store
+builder $DeployOk$_store(builder build_0, (int) v) inline;
+
+;; $DeployOk$_store_cell
+cell $DeployOk$_store_cell((int) v, builder b) inline;
+
+;; $InternalGameEnded$_store
+builder $InternalGameEnded$_store(builder build_0, (int, slice, int, int) v) inline;
+
+;; $InternalGameEnded$_store_cell
+cell $InternalGameEnded$_store_cell((int, slice, int, int) v, builder b) inline;
+
+;; $InternalUnlock$_store
+builder $InternalUnlock$_store(builder build_0, tuple v) inline;
+
+;; $InternalUnlock$_store_cell
+cell $InternalUnlock$_store_cell(tuple v, builder b) inline;
+
+;; $BetInfo$_store
+builder $BetInfo$_store(builder build_0, (slice, int, int, int, int) v) inline;
+
+;; $BetInfo$_store_cell
+cell $BetInfo$_store_cell((slice, int, int, int, int) v, builder b) inline;
+
+;; $BetInfo$_load
+(slice, ((slice, int, int, int, int))) $BetInfo$_load(slice sc_0) inline;
+
+;; $BetInfo$_as_optional
+tuple $BetInfo$_as_optional((slice, int, int, int, int) v) inline;
+
+;; $BetInfo$_load_opt
+tuple $BetInfo$_load_opt(cell cl) inline;
+
+;; $Domin8Game$_store
+builder $Domin8Game$_store(builder build_0, (slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) v) inline;
+
+;; $Domin8Game$_load
+(slice, ((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell))) $Domin8Game$_load(slice sc_0) inline;
+
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
+
+;; $BetInfo$_not_null
+((slice, int, int, int, int)) $BetInfo$_not_null(tuple v) inline;
+
+;; $BetInfo$_to_tuple
+tuple $BetInfo$_to_tuple(((slice, int, int, int, int)) v) inline;
+
+;; $BetInfo$_to_opt_tuple
+tuple $BetInfo$_to_opt_tuple(tuple v) inline;
+
+;; $BetInfo$_to_opt_external
+tuple $BetInfo$_to_opt_external(tuple v) inline;
+
+;; $GameState$_to_external
+(int, int, int, int, int, int, int, int, slice, int, int) $GameState$_to_external(((int, int, int, int, int, int, int, int, slice, int, int)) v) inline;
+
+;; $Domin8Game$init$_load
+(slice, ((slice, int))) $Domin8Game$init$_load(slice sc_0) inline;
+
+;; $Domin8Game$_contract_init
+(slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) $Domin8Game$_contract_init(slice $parent, int $gameId) impure inline;
+
+;; $Domin8Game$_contract_load
+(slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) $Domin8Game$_contract_load() impure inline;
+
+;; $Domin8Game$_contract_store
+() $Domin8Game$_contract_store((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) v) impure inline;
+
+;; $Domin8Game$_fun_computeHash
+((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell), int) $Domin8Game$_fun_computeHash((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) $self, int $value) impure inline_ref;
+
+;; $GameState$_constructor_gameId_status_mapId_startDate_endDate_totalPot_betCount_userCount_winner_winnerPrize_prizeSent
+((int, int, int, int, int, int, int, int, slice, int, int)) $GameState$_constructor_gameId_status_mapId_startDate_endDate_totalPot_betCount_userCount_winner_winnerPrize_prizeSent(int $gameId, int $status, int $mapId, int $startDate, int $endDate, int $totalPot, int $betCount, int $userCount, slice $winner, int $winnerPrize, int $prizeSent) inline;
+
+;; $Domin8Game$_fun_state
+((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell), (int, int, int, int, int, int, int, int, slice, int, int)) $Domin8Game$_fun_state((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) $self) impure inline_ref;
+
+;; $Domin8Game$_fun_bet
+((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell), tuple) $Domin8Game$_fun_bet((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) $self, int $index) impure inline_ref;
+
+;; $Domin8Game$_fun_playerBets
+((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell), int) $Domin8Game$_fun_playerBets((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) $self, slice $player) impure inline_ref;
+
+;; $MessageParameters$_constructor_bounce_to_value_mode_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_bounce_to_value_mode_body(int $bounce, slice $to, int $value, int $mode, cell $body) inline;
+
+;; $Domin8Game$_fun_notify
+((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell), ()) $Domin8Game$_fun_notify((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) $self, cell $body) impure inline;
+
+;; $BetInfo$_constructor_player_amount_skin_posX_posY
+((slice, int, int, int, int)) $BetInfo$_constructor_player_amount_skin_posX_posY(slice $player, int $amount, int $skin, int $posX, int $posY) inline;
+
+;; $SendParameters$_constructor_to_value_mode_body
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_body(slice $to, int $value, int $mode, cell $body) inline;
+
+;; $InternalUnlock$_constructor_
+(tuple) $InternalUnlock$_constructor_() inline;
+
+;; $InternalGameEnded$_constructor_gameId_winner_prize_fee
+((int, slice, int, int)) $InternalGameEnded$_constructor_gameId_winner_prize_fee(int $gameId, slice $winner, int $prize, int $fee) inline;
+
+;; $DeployOk$_constructor_queryId
+((int)) $DeployOk$_constructor_queryId(int $queryId) inline;
+
+
+;; domin8_Domin8Game.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+int __tact_sha256(slice data) asm """
+
+            <{
+                <{ DUP SREFS }> PUSHCONT
+                <{ LDREFRTOS }> PUSHCONT
+                WHILE
+                DEPTH
+                HASHEXT_SHA256
+            }> PUSHCONT
+            1 1 CALLXARGS
+
+""";
+
+(slice, slice) __tact_load_address_opt(slice cs) asm """
+
+            b{00} SDBEGINSQ
+            IF:<{
+              PUSHNULL
+            }>ELSE<{
+              LDMSGADDR
+              SWAP
+            }>
+
+""";
+
+builder __tact_store_addr_none(builder b) asm "b{00} STSLICECONST";
+
+builder __tact_store_address_opt(builder b, slice address) inline {
+    if (null?(address)) {
+        return __tact_store_addr_none(b);
+    } else {
+        return b.store_slice(address);
+    }
+}
+
+forall X -> X __tact_not_null(X x) impure inline {
+    throw_if(128, null?(x)); return x;
+}
+
+(cell, int) __tact_dict_delete(cell dict, int key_len, slice index) asm(index dict key_len) """
+    DICTDEL
+""";
+
+(slice, int) __tact_dict_get(cell dict, int key_len, slice index) asm(index dict key_len) """
+    DICTGET NULLSWAPIFNOT
+""";
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+forall X0, X1, X2, X3, X4 -> tuple __tact_tuple_create_5((X0, X1, X2, X3, X4) v) asm """
+    5 TUPLE
+""";
+
+forall X0, X1, X2, X3, X4 -> (X0, X1, X2, X3, X4) __tact_tuple_destroy_5(tuple v) asm """
+    5 UNTUPLE
+""";
+
+int __tact_dict_get_slice_uint(cell d, int kl, slice k, int vl) inline {
+    var (r, ok) = __tact_dict_get(d, kl, k);
+    if (ok) {
+        return r~load_uint(vl);
+    } else {
+        return null();
+    }
+}
+
+(cell, ()) __tact_dict_set_slice_uint(cell d, int kl, slice k, int v, int vl) inline {
+    if (null?(v)) {
+        var (r, ok) = __tact_dict_delete(d, kl, k);
+        return (r, ());
+    } else {
+        return (dict_set_builder(d, kl, k, begin_cell().store_uint(v, vl)), ());
+    }
+}
+
+cell __tact_dict_get_uint_cell(cell d, int kl, int k) inline {
+    var (r, ok) = udict_get_ref?(d, kl, k);
+    if (ok) {
+        return r;
+    } else {
+        return null();
+    }
+}
+
+(cell, ()) __tact_dict_set_uint_cell(cell d, int kl, int k, cell v) inline {
+    if (null?(v)) {
+        var (r, ok) = udict_delete?(d, kl, k);
+        return (r, ());
+    } else {
+        return (udict_set_ref(d, kl, k, v), ());
+    }
+}
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+int $global_myBalance() impure asm """
+    BALANCE FIRST
+""";
+
+() $global_nativeReserve(int $amount, int $mode) impure asm """
+    RAWRESERVE
+""";
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+() $global_send((int, cell, cell, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+    STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+    // → Stack state
+    // s0: Builder
+    // s1: `data`
+    // s2: `code`
+    // s3: `body`
+    // s4: `mode`
+
+    // Group 2: Placing the Builder after code and data, then checking those for nullability
+    s2 XCHG0
+    DUP2
+    ISNULL
+    SWAP
+    ISNULL
+    AND
+    // → Stack state
+    // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+    // s1: `code`
+    // s2: `data`
+    // s3: Builder
+    // s4: `body`
+    // s5: `mode`
+
+    // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+    <{
+        DROP2 // drop `data` and `code`, since either of those is null
+        b{0} STSLICECONST
+    }> PUSHCONT
+
+    // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+    <{
+        // _ split_depth:(Maybe (## 5))
+        //   special:(Maybe TickTock)
+        //   code:(Maybe ^Cell)
+        //   data:(Maybe ^Cell)
+        //   library:(Maybe ^Cell)
+        // = StateInit;
+        ROT                // place message Builder on top
+        b{10} STSLICECONST // store Maybe = true, Either = false
+        // Start composing inlined StateInit
+        b{00} STSLICECONST // store split_depth and special first
+        STDICT             // store code
+        STDICT             // store data
+        b{0} STSLICECONST  // store library
+    }> PUSHCONT
+
+    // Group 3: IFELSE that does the branching shown above
+    IFELSE
+    // → Stack state
+    // s0: Builder
+    // s1: null or StateInit
+    // s2: `body`
+    // s3: `mode`
+
+    // Group 4: Finalizing the message
+    STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+    ENDC
+    // → Stack state
+    // s0: Cell
+    // s1: `mode`
+
+    // Group 5: Sending the message, with `mode` on top
+    SWAP
+    SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+""";
+
+int $global_now() impure asm """
+    NOW
+""";
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+slice $Cell$_fun_beginParse(cell $self) impure asm """
+    CTOS
+""";
+
+((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell), ()) $Domin8Game$_fun_notify((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) $self, cell $body) impure inline {
+    var (($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts)) = $self;
+    slice $to = __tact_context_get_sender();
+    int $bounce = false;
+    if (false) {
+        int $balance = $global_myBalance();
+        int $balanceBeforeMessage = ($balance - $Context$_get_value(__tact_context_get()));
+        if (($balanceBeforeMessage < 0)) {
+            $global_nativeReserve(0, 0);
+            $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 130, $body));
+            return (($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts), ());
+        }
+    }
+    $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 66, $body));
+    return (($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts), ());
+}
+
+;; domin8_Domin8Game.constants.fc
+;; Cell D+LVwT54jVBEzRnEHnZMpvPOqGAUP4RHGiUmUzQSRC0=
+cell __gen_cell_cell_0fe2d5c13e788d5044cd19c41e764ca6f3cea860143f84471a2526533412442d() asm """
+    B{b5ee9c7241010101001200002000000000446f6d696e38205072697a65b5036f6e} B>boc PUSHREF
+""";
+
+;; Cell mn+rNkoFWAUh7DOqvW6C8A/WWhPc/TMHlqI/op/lRXg=
+cell __gen_cell_cell_9a7fab364a05580521ec33aabd6e82f00fd65a13dcfd330796a23fa29fe54578() asm """
+    B{b5ee9c7241010101000f00001a0000000047616d6520446f6e65a1b42cc8} B>boc PUSHREF
+""";
+
+;; domin8_Domin8Game.storage.fc
+;;
+;; Type: Context
+;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
+;;
+
+_ $Context$_get_value((int, slice, int, slice) v) inline {
+    var (v'bounceable, v'sender, v'value, v'raw) = v;
+    return v'value;
+}
+
+;;
+;; Type: SendParameters
+;; TLB: _ mode:int257 body:Maybe ^cell code:Maybe ^cell data:Maybe ^cell value:int257 to:address bounce:bool = SendParameters
+;;
+
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_body(slice $to, int $value, int $mode, cell $body) inline {
+    return ($mode, $body, null(), null(), $value, $to, true);
+}
+
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_bounce_to_value_mode_body(int $bounce, slice $to, int $value, int $mode, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: DeployOk
+;; Header: 0xaff90f57
+;; TLB: deploy_ok#aff90f57 queryId:uint64 = DeployOk
+;;
+
+builder $DeployOk$_store(builder build_0, (int) v) inline {
+    var (v'queryId) = v;
+    build_0 = store_uint(build_0, 2952335191, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    return build_0;
+}
+
+cell $DeployOk$_store_cell((int) v, builder b) inline {
+    return $DeployOk$_store(b, v).end_cell();
+}
+
+((int)) $DeployOk$_constructor_queryId(int $queryId) inline {
+    return ($queryId);
+}
+
+;;
+;; Type: InternalGameEnded
+;; Header: 0xee3c5e88
+;; TLB: internal_game_ended#ee3c5e88 gameId:uint64 winner:address prize:coins fee:coins = InternalGameEnded
+;;
+
+builder $InternalGameEnded$_store(builder build_0, (int, slice, int, int) v) inline {
+    var (v'gameId, v'winner, v'prize, v'fee) = v;
+    build_0 = store_uint(build_0, 3996933768, 32);
+    build_0 = build_0.store_uint(v'gameId, 64);
+    build_0 = build_0.store_slice(v'winner);
+    build_0 = build_0.store_varuint16(v'prize);
+    build_0 = build_0.store_varuint16(v'fee);
+    return build_0;
+}
+
+cell $InternalGameEnded$_store_cell((int, slice, int, int) v, builder b) inline {
+    return $InternalGameEnded$_store(b, v).end_cell();
+}
+
+((int, slice, int, int)) $InternalGameEnded$_constructor_gameId_winner_prize_fee(int $gameId, slice $winner, int $prize, int $fee) inline {
+    return ($gameId, $winner, $prize, $fee);
+}
+
+;;
+;; Type: InternalUnlock
+;; Header: 0xa0d1042a
+;; TLB: internal_unlock#a0d1042a  = InternalUnlock
+;;
+
+builder $InternalUnlock$_store(builder build_0, tuple v) inline {
+    build_0 = store_uint(build_0, 2698052650, 32);
+    return build_0;
+}
+
+cell $InternalUnlock$_store_cell(tuple v, builder b) inline {
+    return $InternalUnlock$_store(b, v).end_cell();
+}
+
+(tuple) $InternalUnlock$_constructor_() inline {
+    return empty_tuple();
+}
+
+;;
+;; Type: BetInfo
+;; TLB: _ player:address amount:coins skin:uint8 posX:uint16 posY:uint16 = BetInfo
+;;
+
+builder $BetInfo$_store(builder build_0, (slice, int, int, int, int) v) inline {
+    var (v'player, v'amount, v'skin, v'posX, v'posY) = v;
+    build_0 = build_0.store_slice(v'player);
+    build_0 = build_0.store_varuint16(v'amount);
+    build_0 = build_0.store_uint(v'skin, 8);
+    build_0 = build_0.store_uint(v'posX, 16);
+    build_0 = build_0.store_uint(v'posY, 16);
+    return build_0;
+}
+
+cell $BetInfo$_store_cell((slice, int, int, int, int) v, builder b) inline {
+    return $BetInfo$_store(b, v).end_cell();
+}
+
+(slice, ((slice, int, int, int, int))) $BetInfo$_load(slice sc_0) inline {
+    var v'player = sc_0~load_msg_addr();
+    var v'amount = sc_0~load_varuint16();
+    var v'skin = sc_0~load_uint(8);
+    var v'posX = sc_0~load_uint(16);
+    var v'posY = sc_0~load_uint(16);
+    return (sc_0, (v'player, v'amount, v'skin, v'posX, v'posY));
+}
+
+tuple $BetInfo$_as_optional((slice, int, int, int, int) v) inline {
+    var (v'player, v'amount, v'skin, v'posX, v'posY) = v;
+    return __tact_tuple_create_5(v'player, v'amount, v'skin, v'posX, v'posY);
+}
+
+tuple $BetInfo$_load_opt(cell cl) inline {
+    if (null?(cl)) {
+        return null();
+    }
+    var sc = cl.begin_parse();
+    return $BetInfo$_as_optional(sc~$BetInfo$_load());
+}
+
+((slice, int, int, int, int)) $BetInfo$_not_null(tuple v) inline {
+    throw_if(128, null?(v));
+    var (slice vvv'player, int vvv'amount, int vvv'skin, int vvv'posX, int vvv'posY) = __tact_tuple_destroy_5(v);
+    return (vvv'player, vvv'amount, vvv'skin, vvv'posX, vvv'posY);
+}
+
+tuple $BetInfo$_to_tuple(((slice, int, int, int, int)) v) inline {
+    var (v'player, v'amount, v'skin, v'posX, v'posY) = v;
+    return __tact_tuple_create_5(v'player, v'amount, v'skin, v'posX, v'posY);
+}
+
+tuple $BetInfo$_to_opt_tuple(tuple v) inline {
+    if (null?(v)) { return null(); } 
+    return $BetInfo$_to_tuple($BetInfo$_not_null(v)); 
+}
+
+tuple $BetInfo$_to_opt_external(tuple v) inline {
+    var loaded = $BetInfo$_to_opt_tuple(v);
+    if (null?(loaded)) {
+        return null();
+    } else {
+        return (loaded);
+    }
+}
+
+((slice, int, int, int, int)) $BetInfo$_constructor_player_amount_skin_posX_posY(slice $player, int $amount, int $skin, int $posX, int $posY) inline {
+    return ($player, $amount, $skin, $posX, $posY);
+}
+
+;;
+;; Type: GameState
+;; TLB: _ gameId:uint64 status:uint8 mapId:uint8 startDate:uint64 endDate:uint64 totalPot:coins betCount:uint32 userCount:uint32 winner:address winnerPrize:coins prizeSent:bool = GameState
+;;
+
+(int, int, int, int, int, int, int, int, slice, int, int) $GameState$_to_external(((int, int, int, int, int, int, int, int, slice, int, int)) v) inline {
+    var (v'gameId, v'status, v'mapId, v'startDate, v'endDate, v'totalPot, v'betCount, v'userCount, v'winner, v'winnerPrize, v'prizeSent) = v; 
+    return (v'gameId, v'status, v'mapId, v'startDate, v'endDate, v'totalPot, v'betCount, v'userCount, v'winner, v'winnerPrize, v'prizeSent);
+}
+
+((int, int, int, int, int, int, int, int, slice, int, int)) $GameState$_constructor_gameId_status_mapId_startDate_endDate_totalPot_betCount_userCount_winner_winnerPrize_prizeSent(int $gameId, int $status, int $mapId, int $startDate, int $endDate, int $totalPot, int $betCount, int $userCount, slice $winner, int $winnerPrize, int $prizeSent) inline {
+    return ($gameId, $status, $mapId, $startDate, $endDate, $totalPot, $betCount, $userCount, $winner, $winnerPrize, $prizeSent);
+}
+
+;;
+;; Type: Domin8Game
+;; TLB: _ parent:address gameId:uint64 configured:bool houseFee:uint16 minBet:coins maxBet:coins roundTime:uint32 mapId:uint8 commitHash:uint256 status:uint8 startDate:uint64 endDate:uint64 totalPot:coins betCount:uint32 userCount:uint32 winner:address winnerPrize:coins prizeSent:bool bets:dict<uint32, ^BetInfo{player:address,amount:coins,skin:uint8,posX:uint16,posY:uint16}> playerBetCounts:dict<address, uint32> = Domin8Game
+;;
+
+builder $Domin8Game$_store(builder build_0, (slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) v) inline {
+    var (v'parent, v'gameId, v'configured, v'houseFee, v'minBet, v'maxBet, v'roundTime, v'mapId, v'commitHash, v'status, v'startDate, v'endDate, v'totalPot, v'betCount, v'userCount, v'winner, v'winnerPrize, v'prizeSent, v'bets, v'playerBetCounts) = v;
+    build_0 = build_0.store_slice(v'parent);
+    build_0 = build_0.store_uint(v'gameId, 64);
+    build_0 = build_0.store_int(v'configured, 1);
+    build_0 = build_0.store_uint(v'houseFee, 16);
+    build_0 = build_0.store_varuint16(v'minBet);
+    build_0 = build_0.store_varuint16(v'maxBet);
+    build_0 = build_0.store_uint(v'roundTime, 32);
+    build_0 = build_0.store_uint(v'mapId, 8);
+    build_0 = build_0.store_uint(v'commitHash, 256);
+    build_0 = build_0.store_uint(v'status, 8);
+    build_0 = build_0.store_uint(v'startDate, 64);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_uint(v'endDate, 64);
+    build_1 = build_1.store_varuint16(v'totalPot);
+    build_1 = build_1.store_uint(v'betCount, 32);
+    build_1 = build_1.store_uint(v'userCount, 32);
+    build_1 = __tact_store_address_opt(build_1, v'winner);
+    build_1 = build_1.store_varuint16(v'winnerPrize);
+    build_1 = build_1.store_int(v'prizeSent, 1);
+    build_1 = build_1.store_dict(v'bets);
+    build_1 = build_1.store_dict(v'playerBetCounts);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+(slice, ((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell))) $Domin8Game$_load(slice sc_0) inline {
+    var v'parent = sc_0~load_msg_addr();
+    var v'gameId = sc_0~load_uint(64);
+    var v'configured = sc_0~load_int(1);
+    var v'houseFee = sc_0~load_uint(16);
+    var v'minBet = sc_0~load_varuint16();
+    var v'maxBet = sc_0~load_varuint16();
+    var v'roundTime = sc_0~load_uint(32);
+    var v'mapId = sc_0~load_uint(8);
+    var v'commitHash = sc_0~load_uint(256);
+    var v'status = sc_0~load_uint(8);
+    var v'startDate = sc_0~load_uint(64);
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'endDate = sc_1~load_uint(64);
+    var v'totalPot = sc_1~load_varuint16();
+    var v'betCount = sc_1~load_uint(32);
+    var v'userCount = sc_1~load_uint(32);
+    var v'winner = sc_1~__tact_load_address_opt();
+    var v'winnerPrize = sc_1~load_varuint16();
+    var v'prizeSent = sc_1~load_int(1);
+    var v'bets = sc_1~load_dict();
+    var v'playerBetCounts = sc_1~load_dict();
+    return (sc_0, (v'parent, v'gameId, v'configured, v'houseFee, v'minBet, v'maxBet, v'roundTime, v'mapId, v'commitHash, v'status, v'startDate, v'endDate, v'totalPot, v'betCount, v'userCount, v'winner, v'winnerPrize, v'prizeSent, v'bets, v'playerBetCounts));
+}
+
+(slice, ((slice, int))) $Domin8Game$init$_load(slice sc_0) inline {
+    var v'parent = sc_0~load_msg_addr();
+    var v'gameId = sc_0~load_int(257);
+    return (sc_0, (v'parent, v'gameId));
+}
+
+(slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) $Domin8Game$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$Domin8Game$_load();
+    }
+    else {
+        (slice $parent, int $gameId) = $sc~$Domin8Game$init$_load();
+        $sc.end_parse();
+        return $Domin8Game$_contract_init($parent, $gameId);
+    }
+}
+
+() $Domin8Game$_contract_store((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $Domin8Game$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract Domin8Game functions
+;;
+
+(slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) $Domin8Game$_contract_init(slice $parent, int $gameId) impure inline {
+    var (($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts)) = (null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null());
+    $self'parent = $parent;
+    $self'gameId = $gameId;
+    $self'configured = false;
+    $self'houseFee = 0;
+    $self'minBet = 0;
+    $self'maxBet = 0;
+    $self'roundTime = 0;
+    $self'mapId = 0;
+    $self'commitHash = 0;
+    $self'status = 0;
+    $self'startDate = 0;
+    $self'endDate = 0;
+    $self'totalPot = 0;
+    $self'betCount = 0;
+    $self'userCount = 0;
+    $self'winner = null();
+    $self'winnerPrize = 0;
+    $self'prizeSent = false;
+    return ($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts);
+}
+
+((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell), int) $Domin8Game$_fun_computeHash((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) $self, int $value) impure inline_ref {
+    var (($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts)) = $self;
+    var $fresh$ret_0 = __tact_sha256($Cell$_fun_beginParse($Builder$_fun_endCell(store_uint($global_beginCell(), $value, 256))));
+    return (($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts), $fresh$ret_0);
+}
+
+((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell), (int, int, int, int, int, int, int, int, slice, int, int)) $Domin8Game$_fun_state((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) $self) impure inline_ref {
+    var (($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts)) = $self;
+    var $fresh$ret_1 = $GameState$_constructor_gameId_status_mapId_startDate_endDate_totalPot_betCount_userCount_winner_winnerPrize_prizeSent($self'gameId, $self'status, $self'mapId, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent);
+    return (($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts), $fresh$ret_1);
+}
+
+((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell), tuple) $Domin8Game$_fun_bet((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) $self, int $index) impure inline_ref {
+    var (($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts)) = $self;
+    var $fresh$ret_2 = $BetInfo$_load_opt(__tact_dict_get_uint_cell($self'bets, 32, $index));
+    return (($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts), $fresh$ret_2);
+}
+
+((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell), int) $Domin8Game$_fun_playerBets((slice, int, int, int, int, int, int, int, int, int, int, int, int, int, int, slice, int, int, cell, cell) $self, slice $player) impure inline_ref {
+    var (($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts)) = $self;
+    int $c = __tact_dict_get_slice_uint($self'playerBetCounts, 267, $player, 32);
+    if (null?($c)) {
+        var $fresh$ret_3 = 0;
+        return (($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts), $fresh$ret_3);
+    }
+    var $fresh$ret_4 = __tact_not_null($c);
+    return (($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts), $fresh$ret_4);
+}
+
+;;
+;; Get methods of a Contract Domin8Game
+;;
+
+_ %state() method_id(77589) {
+    var self = $Domin8Game$_contract_load();
+    var res = self~$Domin8Game$_fun_state();
+    return $GameState$_to_external(res);
+}
+
+_ %bet(int $index) method_id(81863) {
+    int $index = $index;
+    var self = $Domin8Game$_contract_load();
+    var res = self~$Domin8Game$_fun_bet($index);
+    return $BetInfo$_to_opt_external(res);
+}
+
+_ %playerBets(slice $player) method_id(117608) {
+    slice $player = $player;
+    var self = $Domin8Game$_contract_load();
+    var res = self~$Domin8Game$_fun_playerBets($player);
+    return res;
+}
+
+;;
+;; Routing of a Contract Domin8Game
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts) = $Domin8Game$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    var op = in_msg~load_opcode_internal();
+    ;; Receive SetGameConfig message
+    if (op == 793987244) {
+        var $msg'houseFee = in_msg~load_uint(16);
+        var $msg'minBet = in_msg~load_varuint16();
+        var $msg'maxBet = in_msg~load_varuint16();
+        var $msg'roundTime = in_msg~load_uint(32);
+        var $msg'mapId = in_msg~load_uint(8);
+        var $msg'commitHash = in_msg~load_uint(256);
+        throw_unless(34262, ( equal_slices_bits(__tact_context_get_sender(), $self'parent) ));
+        throw_unless(20796, (~ $self'configured));
+        $self'houseFee = $msg'houseFee;
+        $self'minBet = $msg'minBet;
+        $self'maxBet = $msg'maxBet;
+        $self'roundTime = $msg'roundTime;
+        $self'mapId = $msg'mapId;
+        $self'commitHash = $msg'commitHash;
+        $self'configured = true;
+        $Domin8Game$_contract_store(($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts));
+        return ();
+    }
+    
+    ;; Receive PlaceBet message
+    if (op == 2856584092) {
+        var $msg'skin = in_msg~load_uint(8);
+        var $msg'posX = in_msg~load_uint(16);
+        var $msg'posY = in_msg~load_uint(16);
+        throw_unless(41450, $self'configured);
+        var ($ctx'bounceable, $ctx'sender, $ctx'value, $ctx'raw) = __tact_context_get();
+        int $gasReserve = 50000000;
+        int $betAmount = ($ctx'value - $gasReserve);
+        throw_unless(62871, ($self'status != 2));
+        throw_unless(13888, ($betAmount >= $self'minBet));
+        throw_unless(39652, ($betAmount <= $self'maxBet));
+        throw_unless(32386, ($self'betCount < 1000));
+        int $userBets = 0;
+        int $existing = __tact_dict_get_slice_uint($self'playerBetCounts, 267, $ctx'sender, 32);
+        if ((~ null?($existing))) {
+            $userBets = __tact_not_null($existing);
+        }
+        int $maxPerUser = 30;
+        if (($betAmount < 10000000)) {
+            $maxPerUser = 20;
+        }
+        throw_unless(45614, ($userBets < $maxPerUser));
+        ifnot ($self'status) {
+            $self'status = 1;
+            $self'startDate = $global_now();
+            $self'endDate = ($global_now() + $self'roundTime);
+        }
+        throw_unless(33109, ($global_now() <= $self'endDate));
+        if (null?($existing)) {
+            $self'userCount = ($self'userCount + 1);
+        }
+        $self'bets~__tact_dict_set_uint_cell(32, $self'betCount, $BetInfo$_store_cell($BetInfo$_constructor_player_amount_skin_posX_posY($ctx'sender, $betAmount, $msg'skin, $msg'posX, $msg'posY), begin_cell()));
+        $self'betCount = ($self'betCount + 1);
+        $self'totalPot = ($self'totalPot + $betAmount);
+        $self'playerBetCounts~__tact_dict_set_slice_uint(267, $ctx'sender, ($userBets + 1), 32);
+        $Domin8Game$_contract_store(($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts));
+        return ();
+    }
+    
+    ;; Receive RevealAndEnd message
+    if (op == 1984275175) {
+        var $msg'secret = in_msg~load_uint(256);
+        throw_unless(34262, ( equal_slices_bits(__tact_context_get_sender(), $self'parent) ));
+        throw_unless(2537, ($self'status == 1));
+        throw_unless(44538, ($global_now() >= $self'endDate));
+        throw_unless(2089, ($self'betCount > 0));
+        int $hash = ($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts)~$Domin8Game$_fun_computeHash($msg'secret);
+        throw_unless(13204, ($hash == $self'commitHash));
+        $self'status = 2;
+        if (($self'userCount == 1)) {
+            var ($bet'player, $bet'amount, $bet'skin, $bet'posX, $bet'posY) = $BetInfo$_not_null($BetInfo$_load_opt(__tact_dict_get_uint_cell($self'bets, 32, 0)));
+            $self'winner = $bet'player;
+            $self'winnerPrize = $bet'amount;
+            $global_send($SendParameters$_constructor_to_value_mode_body($self'parent, 10000000, 1, $InternalUnlock$_store_cell($InternalUnlock$_constructor_(), begin_cell())));
+        } else {
+            int $randomPoint = ($msg'secret % $self'totalPot);
+            int $cumulative = 0;
+            int $i = 0;
+            while (($i < $self'betCount)) {
+                var ($bet'player, $bet'amount, $bet'skin, $bet'posX, $bet'posY) = $BetInfo$_not_null($BetInfo$_load_opt(__tact_dict_get_uint_cell($self'bets, 32, $i)));
+                $cumulative = ($cumulative + $bet'amount);
+                if (($cumulative > $randomPoint)) {
+                    $self'winner = $bet'player;
+                    int $fee = (($self'totalPot * $self'houseFee) / 10000);
+                    $self'winnerPrize = ($self'totalPot - $fee);
+                    $global_send($SendParameters$_constructor_to_value_mode_body($self'parent, ($fee + 10000000), 1, $InternalGameEnded$_store_cell($InternalGameEnded$_constructor_gameId_winner_prize_fee($self'gameId, __tact_not_null($self'winner), $self'winnerPrize, $fee), begin_cell())));
+                    $Domin8Game$_contract_store(($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts));
+                    return ();
+                }
+                $i = ($i + 1);
+            }
+        }
+        $Domin8Game$_contract_store(($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts));
+        return ();
+    }
+    
+    ;; Receive ClaimPrize message
+    if (op == 2639554183) {
+        var $msg = empty_tuple();
+        throw_unless(62200, ($self'status == 2));
+        throw_unless(22030, (~ $self'prizeSent));
+        throw_unless(24793, (~ null?($self'winner)));
+        slice $s = __tact_context_get_sender();
+        throw_unless(42435, ( (( equal_slices_bits($s, __tact_not_null($self'winner)) )) ? (true) : (( equal_slices_bits($s, $self'parent) )) ));
+        $self'prizeSent = true;
+        $global_send($SendParameters$_constructor_to_value_mode_body(__tact_not_null($self'winner), $self'winnerPrize, 1, __gen_cell_cell_0fe2d5c13e788d5044cd19c41e764ca6f3cea860143f84471a2526533412442d()));
+        $global_send($SendParameters$_constructor_to_value_mode_body($self'parent, 0, 160, __gen_cell_cell_9a7fab364a05580521ec33aabd6e82f00fd65a13dcfd330796a23fa29fe54578()));
+        $Domin8Game$_contract_store(($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts));
+        return ();
+    }
+    
+    ;; Receive Deploy message
+    if (op == 0x946a98b6) {
+        var $deploy'queryId = in_msg~load_uint(64);
+        ($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts)~$Domin8Game$_fun_notify($DeployOk$_store_cell($DeployOk$_constructor_queryId($deploy'queryId), begin_cell()));
+        $Domin8Game$_contract_store(($self'parent, $self'gameId, $self'configured, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'mapId, $self'commitHash, $self'status, $self'startDate, $self'endDate, $self'totalPot, $self'betCount, $self'userCount, $self'winner, $self'winnerPrize, $self'prizeSent, $self'bets, $self'playerBetCounts));
+        return ();
+    }
+    
+    ;; Throw if not handled
+    throw(130);
+}
+
+
+() __tact_selector_hack_asm() impure asm """
+@atend @ 1 {
+        execute current@ context@ current!
+        {
+            // The core idea of this function is to save gas by avoiding unnecessary dict jump, when recv_internal/recv_external is called
+            // We want to extract recv_internal/recv_external from the dict and select needed function
+            // not by jumping to the needed function by it's index, but by using usual IF statements.
+
+            }END> b> // Close previous builder, now we have a cell of previous code on top of the stack
+
+            <{ // Start of the new code builder
+                SETCP0
+                // Swap the new code builder with the previous code, now we have previous code on top of the stack
+                swap
+                // Transform cell to slice and load first ref from the previous code, now we have the dict on top of the stack
+                <s ref@
+
+                // Extract the recv_internal from the dict
+                dup 0 swap @procdictkeylen idict@ { "internal shortcut error" abort } ifnot
+                swap
+
+                // Delete the recv_internal from the dict
+                0 swap @procdictkeylen idict- drop
+                // Delete the recv_external from the dict (it's okay if it's not there)
+                -1 swap @procdictkeylen idict- drop
+                // Delete the __tact_selector_hack from the dict
+                65535 swap @procdictkeylen idict- drop
+
+                // Bring the code builder from the bottom of the stack
+                // because if recv_external extraction is optional, and the number of elements on the stack is not fixed
+                depth 1- roll
+                // Swap with the dict from which we extracted recv_internal and (maybe) recv_external
+                swap
+
+                // Check if the dict is empty
+                dup null?
+                // Store a copy of this flag in the bottom of the stack
+                dup depth 1- -roll
+                {
+                    // If the dict is empty, just drop it (it will be null if it's empty)
+                    drop
+                }
+                {
+                    // If the dict is not empty, prepare continuation to be stored in c3
+                    <{
+                        // Save this dict as first ref in this continuation, it will be pushed in runtime by DICTPUSHCONST
+                        swap @procdictkeylen DICTPUSHCONST
+                        // Jump to the needed function by it's index
+                        DICTIGETJMPZ
+                        // If such key is not found, throw 11 along with the key as an argument
+                        11 THROWARG
+                    }> PUSHCONT
+                    // Store the continuation in c3
+                    c3 POP
+                } cond
+
+                // Function id is on top of the (runtime) stack
+                DUP IFNOTJMP:<{
+                    // place recv_internal here
+                    DROP swap @addop
+                }>
+
+                // Bring back the flag, indicating if the dict is empty or not from the bottom of the stack
+                depth 1- roll
+                {
+                    // If the dict is empty, throw 11
+                    11 THROWARG
+                }
+                {
+                    // If the dict is not empty, jump to continuation from c3
+                    c3 PUSH JMPX
+                } cond
+            }> b>
+        } : }END>c
+        current@ context! current!
+    } does @atend !
+""";
+
+() __tact_selector_hack() method_id(65535) {
+    return __tact_selector_hack_asm();
+}

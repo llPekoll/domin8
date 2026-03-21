@@ -1,0 +1,1075 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; domin8_Domin8.headers.fc
+;;
+;; Header files for Domin8
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; $Deploy$_store
+builder $Deploy$_store(builder build_0, (int) v) inline;
+
+;; $Deploy$_store_cell
+cell $Deploy$_store_cell((int) v, builder b) inline;
+
+;; $DeployOk$_store
+builder $DeployOk$_store(builder build_0, (int) v) inline;
+
+;; $DeployOk$_store_cell
+cell $DeployOk$_store_cell((int) v, builder b) inline;
+
+;; $SetGameConfig$_store
+builder $SetGameConfig$_store(builder build_0, (int, int, int, int, int, int) v) inline;
+
+;; $SetGameConfig$_store_cell
+cell $SetGameConfig$_store_cell((int, int, int, int, int, int) v, builder b) inline;
+
+;; $RevealAndEnd$_store
+builder $RevealAndEnd$_store(builder build_0, (int) v) inline;
+
+;; $RevealAndEnd$_store_cell
+cell $RevealAndEnd$_store_cell((int) v, builder b) inline;
+
+;; $ClaimPrize$_store
+builder $ClaimPrize$_store(builder build_0, tuple v) inline;
+
+;; $ClaimPrize$_store_cell
+cell $ClaimPrize$_store_cell(tuple v, builder b) inline;
+
+;; $SetLobbyConfig$_store
+builder $SetLobbyConfig$_store(builder build_0, (slice, int, int, int, int, int) v) inline;
+
+;; $SetLobbyConfig$_store_cell
+cell $SetLobbyConfig$_store_cell((slice, int, int, int, int, int) v, builder b) inline;
+
+;; $SettleLobby$_store
+builder $SettleLobby$_store(builder build_0, (int, int) v) inline;
+
+;; $SettleLobby$_store_cell
+cell $SettleLobby$_store_cell((int, int) v, builder b) inline;
+
+;; $RescueLobby$_store
+builder $RescueLobby$_store(builder build_0, (int) v) inline;
+
+;; $RescueLobby$_store_cell
+cell $RescueLobby$_store_cell((int) v, builder b) inline;
+
+;; $Domin8$_store
+builder $Domin8$_store(builder build_0, (slice, slice, int, int, int, int, int, int, int) v) inline;
+
+;; $Domin8$_load
+(slice, ((slice, slice, int, int, int, int, int, int, int))) $Domin8$_load(slice sc_0) inline;
+
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
+
+;; $MasterConfig$_to_external
+(slice, slice, int, int, int, int, int, int, int) $MasterConfig$_to_external(((slice, slice, int, int, int, int, int, int, int)) v) inline;
+
+;; $Domin8Game$init$_store
+builder $Domin8Game$init$_store(builder build_0, (slice, int) v) inline;
+
+;; $Domin8Lobby$init$_store
+builder $Domin8Lobby$init$_store(builder build_0, (slice, int) v) inline;
+
+;; $Domin8$init$_load
+(slice, ((slice))) $Domin8$init$_load(slice sc_0) inline;
+
+;; $Domin8$_contract_init
+(slice, slice, int, int, int, int, int, int, int) $Domin8$_contract_init(slice $owner) impure inline;
+
+;; $Domin8$_contract_load
+(slice, slice, int, int, int, int, int, int, int) $Domin8$_contract_load() impure inline;
+
+;; $Domin8$_contract_store
+() $Domin8$_contract_store((slice, slice, int, int, int, int, int, int, int) v) impure inline;
+
+;; $Cell$_fun_asSlice
+slice $Cell$_fun_asSlice(cell $self) impure inline;
+
+;; $global_newAddress
+slice $global_newAddress(int $chain, int $hash) impure inline;
+
+;; $global_contractAddressExt
+slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline;
+
+;; $global_contractAddress
+slice $global_contractAddress((cell, cell) $s) impure inline;
+
+;; $Domin8Game$_init_child
+(cell, cell) $Domin8Game$_init_child(slice $parent, int $gameId) inline_ref;
+
+;; $MessageParameters$_constructor_bounce_to_value_mode_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_bounce_to_value_mode_body(int $bounce, slice $to, int $value, int $mode, cell $body) inline;
+
+;; $Domin8Lobby$_init_child
+(cell, cell) $Domin8Lobby$_init_child(slice $parent, int $lobbyId) inline_ref;
+
+;; $Domin8$_fun_gameAddr
+((slice, slice, int, int, int, int, int, int, int), slice) $Domin8$_fun_gameAddr((slice, slice, int, int, int, int, int, int, int) $self, int $gameId) impure inline_ref;
+
+;; $Domin8$_fun_lobbyAddr
+((slice, slice, int, int, int, int, int, int, int), slice) $Domin8$_fun_lobbyAddr((slice, slice, int, int, int, int, int, int, int) $self, int $lobbyId) impure inline_ref;
+
+;; $MasterConfig$_constructor_admin_treasury_houseFee_minBet_maxBet_roundTime_currentRound_lobbyCount_locked
+((slice, slice, int, int, int, int, int, int, int)) $MasterConfig$_constructor_admin_treasury_houseFee_minBet_maxBet_roundTime_currentRound_lobbyCount_locked(slice $admin, slice $treasury, int $houseFee, int $minBet, int $maxBet, int $roundTime, int $currentRound, int $lobbyCount, int $locked) inline;
+
+;; $Domin8$_fun_config
+((slice, slice, int, int, int, int, int, int, int), (slice, slice, int, int, int, int, int, int, int)) $Domin8$_fun_config((slice, slice, int, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $Domin8$_fun_gameAddress
+((slice, slice, int, int, int, int, int, int, int), slice) $Domin8$_fun_gameAddress((slice, slice, int, int, int, int, int, int, int) $self, int $gameId) impure inline_ref;
+
+;; $Domin8$_fun_lobbyAddress
+((slice, slice, int, int, int, int, int, int, int), slice) $Domin8$_fun_lobbyAddress((slice, slice, int, int, int, int, int, int, int) $self, int $lobbyId) impure inline_ref;
+
+;; $Domin8$_fun_currentGameAddress
+((slice, slice, int, int, int, int, int, int, int), slice) $Domin8$_fun_currentGameAddress((slice, slice, int, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $Domin8$_fun_notify
+((slice, slice, int, int, int, int, int, int, int), ()) $Domin8$_fun_notify((slice, slice, int, int, int, int, int, int, int) $self, cell $body) impure inline;
+
+;; $Domin8$_fun_requireOwner
+((slice, slice, int, int, int, int, int, int, int), ()) $Domin8$_fun_requireOwner((slice, slice, int, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $Domin8$_fun_owner
+((slice, slice, int, int, int, int, int, int, int), slice) $Domin8$_fun_owner((slice, slice, int, int, int, int, int, int, int) $self) impure inline_ref;
+
+;; $SendParameters$_constructor_to_value_mode_code_data_body
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_code_data_body(slice $to, int $value, int $mode, cell $code, cell $data, cell $body) inline;
+
+;; $Deploy$_constructor_queryId
+((int)) $Deploy$_constructor_queryId(int $queryId) inline;
+
+;; $SendParameters$_constructor_to_value_mode_body
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_body(slice $to, int $value, int $mode, cell $body) inline;
+
+;; $SetGameConfig$_constructor_houseFee_minBet_maxBet_roundTime_mapId_commitHash
+((int, int, int, int, int, int)) $SetGameConfig$_constructor_houseFee_minBet_maxBet_roundTime_mapId_commitHash(int $houseFee, int $minBet, int $maxBet, int $roundTime, int $mapId, int $commitHash) inline;
+
+;; $RevealAndEnd$_constructor_secret
+((int)) $RevealAndEnd$_constructor_secret(int $secret) inline;
+
+;; $SetLobbyConfig$_constructor_playerA_amount_houseFee_mapId_skinA_commitHash
+((slice, int, int, int, int, int)) $SetLobbyConfig$_constructor_playerA_amount_houseFee_mapId_skinA_commitHash(slice $playerA, int $amount, int $houseFee, int $mapId, int $skinA, int $commitHash) inline;
+
+;; $DeployOk$_constructor_queryId
+((int)) $DeployOk$_constructor_queryId(int $queryId) inline;
+
+
+;; domin8_Domin8.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+builder $global_beginCell() impure asm """
+    NEWC
+""";
+
+int $global_contractHash(cell $code, cell $data) impure asm """
+    s0 PUSH HASHCU // `data` hash
+    s2 PUSH HASHCU // `code` hash
+    SWAP2
+    CDEPTH         // `data` depth
+    SWAP
+    CDEPTH         // `code` depth
+    131380 INT     // (2 << 16) | (1 << 8) | 0x34
+
+    // Group 2: Composition of the Builder
+    NEWC
+    24 STU  // store refs_descriptor | bits_descriptor | data
+    16 STU  // store depth_descriptor for `code`
+    16 STU  // store depth_descriptor for `data`
+    256 STU // store `code` hash
+    256 STU // store `data` hash
+
+    // Group 3: SHA256 hash of the resulting Builder
+    ONE HASHEXT_SHA256
+""";
+
+slice $Slice$_fun_asAddressUnsafe(slice $self) impure asm "NOP";
+
+slice $Cell$_fun_beginParse(cell $self) impure asm """
+    CTOS
+""";
+
+slice $Cell$_fun_asSlice(cell $self) impure inline {
+    var ($self) = $self;
+    return $Cell$_fun_beginParse($self);
+}
+
+cell $Builder$_fun_endCell(builder $self) impure asm """
+    ENDC
+""";
+
+slice $global_newAddress(int $chain, int $hash) impure inline {
+    return $Slice$_fun_asAddressUnsafe($Cell$_fun_asSlice($Builder$_fun_endCell(store_uint(store_int(store_uint($global_beginCell(), 4, 3), $chain, 8), $hash, 256))));
+}
+
+slice $global_contractAddressExt(int $chain, cell $code, cell $data) impure inline {
+    int $hash = $global_contractHash($code, $data);
+    return $global_newAddress($chain, $hash);
+}
+
+slice $global_contractAddress((cell, cell) $s) impure inline {
+    var (($s'code, $s'data)) = $s;
+    return $global_contractAddressExt(0, $s'code, $s'data);
+}
+
+slice $global_myAddress() impure asm """
+    MYADDR
+""";
+
+int $global_myBalance() impure asm """
+    BALANCE FIRST
+""";
+
+() $global_nativeReserve(int $amount, int $mode) impure asm """
+    RAWRESERVE
+""";
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+() $global_send((int, cell, cell, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+    STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+    // → Stack state
+    // s0: Builder
+    // s1: `data`
+    // s2: `code`
+    // s3: `body`
+    // s4: `mode`
+
+    // Group 2: Placing the Builder after code and data, then checking those for nullability
+    s2 XCHG0
+    DUP2
+    ISNULL
+    SWAP
+    ISNULL
+    AND
+    // → Stack state
+    // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+    // s1: `code`
+    // s2: `data`
+    // s3: Builder
+    // s4: `body`
+    // s5: `mode`
+
+    // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+    <{
+        DROP2 // drop `data` and `code`, since either of those is null
+        b{0} STSLICECONST
+    }> PUSHCONT
+
+    // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+    <{
+        // _ split_depth:(Maybe (## 5))
+        //   special:(Maybe TickTock)
+        //   code:(Maybe ^Cell)
+        //   data:(Maybe ^Cell)
+        //   library:(Maybe ^Cell)
+        // = StateInit;
+        ROT                // place message Builder on top
+        b{10} STSLICECONST // store Maybe = true, Either = false
+        // Start composing inlined StateInit
+        b{00} STSLICECONST // store split_depth and special first
+        STDICT             // store code
+        STDICT             // store data
+        b{0} STSLICECONST  // store library
+    }> PUSHCONT
+
+    // Group 3: IFELSE that does the branching shown above
+    IFELSE
+    // → Stack state
+    // s0: Builder
+    // s1: null or StateInit
+    // s2: `body`
+    // s3: `mode`
+
+    // Group 4: Finalizing the message
+    STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+    ENDC
+    // → Stack state
+    // s0: Cell
+    // s1: `mode`
+
+    // Group 5: Sending the message, with `mode` on top
+    SWAP
+    SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+""";
+
+((slice, slice, int, int, int, int, int, int, int), ()) $Domin8$_fun_notify((slice, slice, int, int, int, int, int, int, int) $self, cell $body) impure inline {
+    var (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)) = $self;
+    slice $to = __tact_context_get_sender();
+    int $bounce = false;
+    if (false) {
+        int $balance = $global_myBalance();
+        int $balanceBeforeMessage = ($balance - $Context$_get_value(__tact_context_get()));
+        if (($balanceBeforeMessage < 0)) {
+            $global_nativeReserve(0, 0);
+            $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 130, $body));
+            return (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked), ());
+        }
+    }
+    $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 66, $body));
+    return (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked), ());
+}
+
+((slice, slice, int, int, int, int, int, int, int), ()) $Domin8$_fun_requireOwner((slice, slice, int, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)) = $self;
+    throw_unless(132, ( equal_slices_bits(__tact_context_get_sender(), $self'owner) ));
+    return (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked), ());
+}
+
+((slice, slice, int, int, int, int, int, int, int), slice) $Domin8$_fun_owner((slice, slice, int, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)) = $self;
+    var $fresh$ret_41 = $self'owner;
+    return (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked), $fresh$ret_41);
+}
+
+;; domin8_Domin8.constants.fc
+;; Cell 6SGmM/TBCDHu3CaF1teIKB0jTSd8N98UCl4sM+iAGQo=
+cell __gen_cell_cell_e921a633f4c10831eedc2685d6d788281d234d277c37df140a5e2c33e880190a() asm """
+    B{b5ee9c7241010101001000001c00000000446f6d696e3820466565f83d2c87} B>boc PUSHREF
+""";
+
+;; Cell HwOyRpmln6qwiUYs1NKuB/6D7Q5U6vXwGZwNtnCSYpI=
+cell __gen_cell_cell_1f03b24699a59faab089462cd4d2ae07fe83ed0e54eaf5f0199c0db670926292() asm """
+    B{b5ee9c7241010101000d0000160000000031763120466565af9536e3} B>boc PUSHREF
+""";
+
+;; Cell iAkjHkmQEbO6c8BL8COI9EO0oRMSxtx/MXyIk6xBr3c=
+cell __gen_cell_cell_8809231e499011b3ba73c04bf02388f443b4a11312c6dc7f317c8893ac41af77() asm """
+    B{b5ee9c724101010100140000240000000041646d696e207769746864726177f91d8663} B>boc PUSHREF
+""";
+
+;; domin8_Domin8.storage.fc
+;;
+;; Type: Context
+;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
+;;
+
+_ $Context$_get_value((int, slice, int, slice) v) inline {
+    var (v'bounceable, v'sender, v'value, v'raw) = v;
+    return v'value;
+}
+
+;;
+;; Type: SendParameters
+;; TLB: _ mode:int257 body:Maybe ^cell code:Maybe ^cell data:Maybe ^cell value:int257 to:address bounce:bool = SendParameters
+;;
+
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_code_data_body(slice $to, int $value, int $mode, cell $code, cell $data, cell $body) inline {
+    return ($mode, $body, $code, $data, $value, $to, true);
+}
+
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_body(slice $to, int $value, int $mode, cell $body) inline {
+    return ($mode, $body, null(), null(), $value, $to, true);
+}
+
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_bounce_to_value_mode_body(int $bounce, slice $to, int $value, int $mode, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: Deploy
+;; Header: 0x946a98b6
+;; TLB: deploy#946a98b6 queryId:uint64 = Deploy
+;;
+
+builder $Deploy$_store(builder build_0, (int) v) inline {
+    var (v'queryId) = v;
+    build_0 = store_uint(build_0, 2490013878, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    return build_0;
+}
+
+cell $Deploy$_store_cell((int) v, builder b) inline {
+    return $Deploy$_store(b, v).end_cell();
+}
+
+((int)) $Deploy$_constructor_queryId(int $queryId) inline {
+    return ($queryId);
+}
+
+;;
+;; Type: DeployOk
+;; Header: 0xaff90f57
+;; TLB: deploy_ok#aff90f57 queryId:uint64 = DeployOk
+;;
+
+builder $DeployOk$_store(builder build_0, (int) v) inline {
+    var (v'queryId) = v;
+    build_0 = store_uint(build_0, 2952335191, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    return build_0;
+}
+
+cell $DeployOk$_store_cell((int) v, builder b) inline {
+    return $DeployOk$_store(b, v).end_cell();
+}
+
+((int)) $DeployOk$_constructor_queryId(int $queryId) inline {
+    return ($queryId);
+}
+
+;;
+;; Type: SetGameConfig
+;; Header: 0x2f5348ac
+;; TLB: set_game_config#2f5348ac houseFee:uint16 minBet:coins maxBet:coins roundTime:uint32 mapId:uint8 commitHash:uint256 = SetGameConfig
+;;
+
+builder $SetGameConfig$_store(builder build_0, (int, int, int, int, int, int) v) inline {
+    var (v'houseFee, v'minBet, v'maxBet, v'roundTime, v'mapId, v'commitHash) = v;
+    build_0 = store_uint(build_0, 793987244, 32);
+    build_0 = build_0.store_uint(v'houseFee, 16);
+    build_0 = build_0.store_varuint16(v'minBet);
+    build_0 = build_0.store_varuint16(v'maxBet);
+    build_0 = build_0.store_uint(v'roundTime, 32);
+    build_0 = build_0.store_uint(v'mapId, 8);
+    build_0 = build_0.store_uint(v'commitHash, 256);
+    return build_0;
+}
+
+cell $SetGameConfig$_store_cell((int, int, int, int, int, int) v, builder b) inline {
+    return $SetGameConfig$_store(b, v).end_cell();
+}
+
+((int, int, int, int, int, int)) $SetGameConfig$_constructor_houseFee_minBet_maxBet_roundTime_mapId_commitHash(int $houseFee, int $minBet, int $maxBet, int $roundTime, int $mapId, int $commitHash) inline {
+    return ($houseFee, $minBet, $maxBet, $roundTime, $mapId, $commitHash);
+}
+
+;;
+;; Type: RevealAndEnd
+;; Header: 0x7645a2e7
+;; TLB: reveal_and_end#7645a2e7 secret:uint256 = RevealAndEnd
+;;
+
+builder $RevealAndEnd$_store(builder build_0, (int) v) inline {
+    var (v'secret) = v;
+    build_0 = store_uint(build_0, 1984275175, 32);
+    build_0 = build_0.store_uint(v'secret, 256);
+    return build_0;
+}
+
+cell $RevealAndEnd$_store_cell((int) v, builder b) inline {
+    return $RevealAndEnd$_store(b, v).end_cell();
+}
+
+((int)) $RevealAndEnd$_constructor_secret(int $secret) inline {
+    return ($secret);
+}
+
+;;
+;; Type: ClaimPrize
+;; Header: 0x9d546687
+;; TLB: claim_prize#9d546687  = ClaimPrize
+;;
+
+builder $ClaimPrize$_store(builder build_0, tuple v) inline {
+    build_0 = store_uint(build_0, 2639554183, 32);
+    return build_0;
+}
+
+cell $ClaimPrize$_store_cell(tuple v, builder b) inline {
+    return $ClaimPrize$_store(b, v).end_cell();
+}
+
+;;
+;; Type: SetLobbyConfig
+;; Header: 0x8ff69549
+;; TLB: set_lobby_config#8ff69549 playerA:address amount:coins houseFee:uint16 mapId:uint8 skinA:uint8 commitHash:uint256 = SetLobbyConfig
+;;
+
+builder $SetLobbyConfig$_store(builder build_0, (slice, int, int, int, int, int) v) inline {
+    var (v'playerA, v'amount, v'houseFee, v'mapId, v'skinA, v'commitHash) = v;
+    build_0 = store_uint(build_0, 2415301961, 32);
+    build_0 = build_0.store_slice(v'playerA);
+    build_0 = build_0.store_varuint16(v'amount);
+    build_0 = build_0.store_uint(v'houseFee, 16);
+    build_0 = build_0.store_uint(v'mapId, 8);
+    build_0 = build_0.store_uint(v'skinA, 8);
+    build_0 = build_0.store_uint(v'commitHash, 256);
+    return build_0;
+}
+
+cell $SetLobbyConfig$_store_cell((slice, int, int, int, int, int) v, builder b) inline {
+    return $SetLobbyConfig$_store(b, v).end_cell();
+}
+
+((slice, int, int, int, int, int)) $SetLobbyConfig$_constructor_playerA_amount_houseFee_mapId_skinA_commitHash(slice $playerA, int $amount, int $houseFee, int $mapId, int $skinA, int $commitHash) inline {
+    return ($playerA, $amount, $houseFee, $mapId, $skinA, $commitHash);
+}
+
+;;
+;; Type: SettleLobby
+;; Header: 0x3caf0788
+;; TLB: settle_lobby#3caf0788 lobbyId:uint64 secret:uint256 = SettleLobby
+;;
+
+builder $SettleLobby$_store(builder build_0, (int, int) v) inline {
+    var (v'lobbyId, v'secret) = v;
+    build_0 = store_uint(build_0, 1018103688, 32);
+    build_0 = build_0.store_uint(v'lobbyId, 64);
+    build_0 = build_0.store_uint(v'secret, 256);
+    return build_0;
+}
+
+cell $SettleLobby$_store_cell((int, int) v, builder b) inline {
+    return $SettleLobby$_store(b, v).end_cell();
+}
+
+;;
+;; Type: RescueLobby
+;; Header: 0x28941e49
+;; TLB: rescue_lobby#28941e49 lobbyId:uint64 = RescueLobby
+;;
+
+builder $RescueLobby$_store(builder build_0, (int) v) inline {
+    var (v'lobbyId) = v;
+    build_0 = store_uint(build_0, 680795721, 32);
+    build_0 = build_0.store_uint(v'lobbyId, 64);
+    return build_0;
+}
+
+cell $RescueLobby$_store_cell((int) v, builder b) inline {
+    return $RescueLobby$_store(b, v).end_cell();
+}
+
+;;
+;; Type: MasterConfig
+;; TLB: _ admin:address treasury:address houseFee:uint16 minBet:coins maxBet:coins roundTime:uint32 currentRound:uint64 lobbyCount:uint64 locked:bool = MasterConfig
+;;
+
+(slice, slice, int, int, int, int, int, int, int) $MasterConfig$_to_external(((slice, slice, int, int, int, int, int, int, int)) v) inline {
+    var (v'admin, v'treasury, v'houseFee, v'minBet, v'maxBet, v'roundTime, v'currentRound, v'lobbyCount, v'locked) = v; 
+    return (v'admin, v'treasury, v'houseFee, v'minBet, v'maxBet, v'roundTime, v'currentRound, v'lobbyCount, v'locked);
+}
+
+((slice, slice, int, int, int, int, int, int, int)) $MasterConfig$_constructor_admin_treasury_houseFee_minBet_maxBet_roundTime_currentRound_lobbyCount_locked(slice $admin, slice $treasury, int $houseFee, int $minBet, int $maxBet, int $roundTime, int $currentRound, int $lobbyCount, int $locked) inline {
+    return ($admin, $treasury, $houseFee, $minBet, $maxBet, $roundTime, $currentRound, $lobbyCount, $locked);
+}
+
+;;
+;; Type: Domin8Game
+;; TLB: _ parent:address gameId:uint64 configured:bool houseFee:uint16 minBet:coins maxBet:coins roundTime:uint32 mapId:uint8 commitHash:uint256 status:uint8 startDate:uint64 endDate:uint64 totalPot:coins betCount:uint32 userCount:uint32 winner:address winnerPrize:coins prizeSent:bool bets:dict<uint32, ^BetInfo{player:address,amount:coins,skin:uint8,posX:uint16,posY:uint16}> playerBetCounts:dict<address, uint32> = Domin8Game
+;;
+
+builder $Domin8Game$init$_store(builder build_0, (slice, int) v) inline {
+    var (v'parent, v'gameId) = v;
+    build_0 = build_0.store_slice(v'parent);
+    build_0 = build_0.store_int(v'gameId, 257);
+    return build_0;
+}
+
+cell $Domin8Game$_child_get_code() impure asm """
+    B{b5ee9c7201021f0100087d00022cff008e88f4a413f4bcf2c80bed53208e8130e1ed43d90102020271030404eaeda2edfb01d072d721d200d200fa4021103450666f04f86102f862ed44d0d200018e24fa40810101d7005902d1016d6d707054700054700054700053006d210e11100e551d7002e30d1115945f0f5f06e01113d70d1ff2e0822182102f5348acbae302218210aa44039cbae3022182107645a2e7ba0a0b0c0d020166050602adbe5b476a268690000c7127d20408080eb802c816880b6b6b8382a38002a38002a380029803690870888072a8eb80171868889888a088988890889888908888889088888880888888807888807aa876d9e2b882f87b620c0a09026db3c57b513434800063893e9020404075c01640b4405b5b5c1c151c00151c00151c0014c01b484384440395475c00b8c376cf1b2edb26e00a0702d9b3f1fb513434800063893e9020404075c01640b4405b5b5c1c151c00151c00151c0014c01b484384440395475c00b8c34444c4450444c4448444c44484444444844444440444444403c44403d543b6cf15c417c3db10481ba48c1b66481bbcb4201bc95bc178881ba48c1b77a00a0800185612547bda547cba547cba2c004c8020230259f40f6fa192306ddf206e92306d8e11d0fa40fa00d307d30fd30f55406c156f05e2004281010b220280204133f40a6fa19401d70130925b6de2206e923070e0206ef2d08000defa40d33fd200d30ffa00fa00d31fd307d3ffd307d33fd401d0d33ffa00d31fd31fd72c01916d93fa4001e201fa00d200f404f404300911140909111309091112090911110909111009109f109e109d109c109b109a57141112111311121111111211111110111111100f11100f550e01a4313a3a3a3a3a3a04d30ffa00fa00d31fd307d3ff30820085d6f8425613c705f2f481513c1110b301111001f2f41110111211100f11110f7f111105111005104f103e4dc0104b108a107910681036454043301e01fe31d307d30fd30f308200a1ea5613f2f4f8416f24306c12820afaf080a18200f5972ec302f2f4813640215614bef2f482009ae4215613bbf2f4817e822a8103e8b9f2f470561981010b2480204133f40a6fa19401d70130925b6de2206eb3983120206ef2d08001de801e238208989680b993308014de228200b22e02b9f2f40e04fce3022182109d546687bae302018210946a98b6ba8ee7d33f30c8018210aff90f5758cb1fcb3fc91112111411121111111311111110111211100f11110f0e11100e10df10ce10bd10ac109b108a10791068105710461035443012f84270705003804201503304c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00e010111e1201fe2f9d3d3d3d71f823f8235612a04feddf82008155f8232fbbf2f46e9309a409de802023513048135076c855405045ce58fa02cb07cb0fcb0fc902111702542490206e953059f45b30944133f417e207a45088a081010b1115a40311160302111502011115018020216e955b59f4593098c801cf014133f441e21111111311110f014e1110111211100f11110f0e11100e10df10ce10bd10ac109b108a107910681067105610354430121e04f631d3ff30820085d6f8425614c705f2f48109e92ac001f2f48200adfaf82329bef2f481082926c200f2f41112111311121111111211111110111111100f11100f10ef10de10cd10bc10ab109a108910781067105610451034111441305614db3c8133943c2cba1bf2f47225c001e30f1112111311121111111211111314151603fe5b8200f2f829c002f2f481560e01b3f2f48160d9226eb3f2f4f8428200a5c323206ef2d0805220c70592317f95015612c705e2f2f47f22206ef2d080718824595a6d6d40037fc8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00708100a088561455201b1c1d000e5f0f5f06f2c0820026c8cbffc9d09b9320d74a91d5e868f90400da1101fe333357122180207059f40f6fa192306ddf206e92306d8e11d0fa40fa00d307d30fd30f55406c156f05e2206ef2d0806f255f038208989680716f00c801308210a0d1042a01cb1fc9561555205a6d6d40037fc8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c917019c111427a9087020935308b98eb82380202259f40f6fa192306ddf206e92306d8e11d0fa40fa00d307d30fd30f55406c156f05e2206ef2d0806f255f0313a05303bce30232a4e85f030111130141331801441110111111100f11100f10ef10de10cd10bc10ab102a1089107810671056503304051e000601fb0001fa10235f033333535ea8812710a9045360a1218208989680a07125206ef2d0805615524306c855308210ee3c5e885005cb1f13cb3fce01fa0201fa02c956150350445a6d6d40037fc8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0011121113111219014e1111111211111110111111100f11100f10ef10de10cd10bc10ab108910781067105610454433021a00c8c87f01ca001114111311121111111055e0011113011114ce01111101cb3f1fca001dcb0f500bfa025009fa0217cb1f15cb0713cbffcb07cb3f01c8cb3f58fa0212cb1f12cb1f58206e9430cf84809201cee258fa0212ca0012f40012f400cdc9ed54db31002000000000446f6d696e38205072697a65001a0000000047616d6520446f6e65019c5a6d6d40037fc8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb001111111311111110111211100f11110f0e11100e10df551c1e00c4c87f01ca001114111311121111111055e0011113011114ce01111101cb3f1fca001dcb0f500bfa025009fa0217cb1f15cb0713cbffcb07cb3f01c8cb3f58fa0212cb1f12cb1f58206e9430cf84809201cee258fa0212ca0012f40012f400cdc9ed54} B>boc PUSHREF
+""";
+
+(cell, cell) $Domin8Game$_init_child(slice $parent, int $gameId) inline_ref {
+    ;; Build init code cell
+
+    ;; Contract Code: Domin8Game
+    cell init_code = $Domin8Game$_child_get_code();
+
+
+    builder b = begin_cell();
+    b = b.store_int(false, 1);
+    b = $Domin8Game$init$_store(b, ($parent, $gameId));
+    return (init_code, b.end_cell());
+}
+
+;;
+;; Type: Domin8Lobby
+;; TLB: _ parent:address lobbyId:uint64 configured:bool playerA:address playerB:address amount:coins houseFee:uint16 mapId:uint8 skinA:uint8 skinB:uint8 commitHash:uint256 status:uint8 winner:address createdAt:uint64 = Domin8Lobby
+;;
+
+builder $Domin8Lobby$init$_store(builder build_0, (slice, int) v) inline {
+    var (v'parent, v'lobbyId) = v;
+    build_0 = build_0.store_slice(v'parent);
+    build_0 = build_0.store_int(v'lobbyId, 257);
+    return build_0;
+}
+
+cell $Domin8Lobby$_child_get_code() impure asm """
+    B{b5ee9c72010213010005c300025aff008e88f4a413f4bcf2c80bed53208e983001d072d721d200d200fa4021103450666f04f86102f862e1ed43d9010201eba64bc57b51343480006391be9034cff4803e9035cb00645b64fe900078807e8034c3f4c1f4c1f5007434c1f4fff4c1f5cb00645b64fe9000788074cfcc0417841744170416c416841644160415c4159b07a386fe9020404075c01640b440485c1b5c151c00151c001b48442f442af8b6cf1b2a9b12a00301feed44d0d200018e46fa40d33fd200fa40d72c01916d93fa4001e201fa00d30fd307d307d401d0d307d3ffd307d72c01916d93fa4001e201d33f30105e105d105c105b105a10591058105710566c1e8e1bfa40810101d7005902d10121706d705470005470006d2110bd10abe20f925f0fe00dd70d1ff2e0822182108ff69549040014547c2a547cb9547ba72904b8ba8ebc31326c3333343802fa40fa00d30fd307d307d3ff30820085d6f8422cc705f2f481513c09b319f2f4f82310ac109b7f0b5e3610581047103645145033e0218210fbbd3a85bae3022182103caf0788bae30221821028941e49ba0f05060702b431333701d307308200a1ea29f2f4f8416f2430328109e909c00019f2f4811a2a5389c705b3f2f4820afaf080a181245a5317bef2f427715128a12082080f4240bc923038e30d10bd10ac109b108a107910681057104610354043080f03fe31d33f31d3ff30820085d6f8422ec705f2f482009da422c001f2f4820082e7296eb3f2f410cd10bc10ab109a108910781067105610451034413e2edb3c6c228133945113baf2f4720da9380091279128e227aa005307a8812710a90466a122206ef2d080718823595a6d6d40037fc8cf8580ca00cf8440ce01fa028069cf400a0b0c02bae302018210946a98b6ba8ecbd33f30c8018210aff90f5758cb1fcb3fc910ce10bd10ac109b108a10791068105710461035443012f84270705003804201503304c8cf8580ca00cf8440ce01fa02806acf40f400c901fb00e05f0ff2c0820e0f01742288103b5a6d6d40037fc8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb000900220000000045786365737320726566756e640026c8cbffc9d09b9320d74a91d5e868f90400da110018000000003176312057696e2101fe025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00708100a024206ef2d0805610034145c855308210991c80a05005cb1f13cb3fce01fa0201fa02c92f55205a6d6d40037fc8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb000d00b810cd10bc10ab109a1089107810671056104510344300c87f01ca0055d050dece1bcb3f19ca0017ce5005206e9430cf84809201cee25003fa02cb0fcb07cb0701c8cb0712cbff12cb0758206e9430cf84809201cee212cb3fcdc9ed5403fe5b820085d6f8422dc705f2f420c0019d811026f8232fa1810e10bcf2f4de71882a5449305a6d6d40037fc8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb00276eb3e300708100a06f00c801308210a0d1042a01cb1fc92e55205a6d6d40037fc8cf8580121011008cc87f01ca0055d050dece1bcb3f19ca0017ce5005206e9430cf84809201cee25003fa02cb0fcb07cb0701c8cb0712cbff12cb0758206e9430cf84809201cee212cb3fcdc9ed54018027206ef2d080718829595a6d6d40037fc8cf8580ca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb001200ecca00cf8440ce01fa028069cf40025c6e016eb0935bcf819d58cf8680cf8480f400f400cf81e2f400c901fb0010bd551ac87f01ca0055d050dece1bcb3f19ca0017ce5005206e9430cf84809201cee25003fa02cb0fcb07cb0701c8cb0712cbff12cb0758206e9430cf84809201cee212cb3fcdc9ed54001400000000526566756e64} B>boc PUSHREF
+""";
+
+(cell, cell) $Domin8Lobby$_init_child(slice $parent, int $lobbyId) inline_ref {
+    ;; Build init code cell
+
+    ;; Contract Code: Domin8Lobby
+    cell init_code = $Domin8Lobby$_child_get_code();
+
+
+    builder b = begin_cell();
+    b = b.store_int(false, 1);
+    b = $Domin8Lobby$init$_store(b, ($parent, $lobbyId));
+    return (init_code, b.end_cell());
+}
+
+;;
+;; Type: Domin8
+;; TLB: _ owner:address treasury:address houseFee:uint16 minBet:coins maxBet:coins roundTime:uint32 currentRound:uint64 lobbyCount:uint64 locked:bool = Domin8
+;;
+
+builder $Domin8$_store(builder build_0, (slice, slice, int, int, int, int, int, int, int) v) inline {
+    var (v'owner, v'treasury, v'houseFee, v'minBet, v'maxBet, v'roundTime, v'currentRound, v'lobbyCount, v'locked) = v;
+    build_0 = build_0.store_slice(v'owner);
+    build_0 = build_0.store_slice(v'treasury);
+    build_0 = build_0.store_uint(v'houseFee, 16);
+    build_0 = build_0.store_varuint16(v'minBet);
+    build_0 = build_0.store_varuint16(v'maxBet);
+    build_0 = build_0.store_uint(v'roundTime, 32);
+    build_0 = build_0.store_uint(v'currentRound, 64);
+    build_0 = build_0.store_uint(v'lobbyCount, 64);
+    build_0 = build_0.store_int(v'locked, 1);
+    return build_0;
+}
+
+(slice, ((slice, slice, int, int, int, int, int, int, int))) $Domin8$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    var v'treasury = sc_0~load_msg_addr();
+    var v'houseFee = sc_0~load_uint(16);
+    var v'minBet = sc_0~load_varuint16();
+    var v'maxBet = sc_0~load_varuint16();
+    var v'roundTime = sc_0~load_uint(32);
+    var v'currentRound = sc_0~load_uint(64);
+    var v'lobbyCount = sc_0~load_uint(64);
+    var v'locked = sc_0~load_int(1);
+    return (sc_0, (v'owner, v'treasury, v'houseFee, v'minBet, v'maxBet, v'roundTime, v'currentRound, v'lobbyCount, v'locked));
+}
+
+(slice, ((slice))) $Domin8$init$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    return (sc_0, (v'owner));
+}
+
+(slice, slice, int, int, int, int, int, int, int) $Domin8$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$Domin8$_load();
+    }
+    else {
+        (slice $owner) = $sc~$Domin8$init$_load();
+        $sc.end_parse();
+        return $Domin8$_contract_init($owner);
+    }
+}
+
+() $Domin8$_contract_store((slice, slice, int, int, int, int, int, int, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $Domin8$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract Domin8 functions
+;;
+
+(slice, slice, int, int, int, int, int, int, int) $Domin8$_contract_init(slice $owner) impure inline {
+    var (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)) = (null(), null(), null(), null(), null(), null(), null(), null(), null());
+    $self'owner = $owner;
+    $self'treasury = $owner;
+    $self'houseFee = 500;
+    $self'minBet = 1000000;
+    $self'maxBet = 10000000000;
+    $self'roundTime = 60;
+    $self'currentRound = 0;
+    $self'lobbyCount = 0;
+    $self'locked = false;
+    return ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked);
+}
+
+((slice, slice, int, int, int, int, int, int, int), slice) $Domin8$_fun_gameAddr((slice, slice, int, int, int, int, int, int, int) $self, int $gameId) impure inline_ref {
+    var (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)) = $self;
+    var $fresh$ret_35 = $global_contractAddress($Domin8Game$_init_child($global_myAddress(), $gameId));
+    return (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked), $fresh$ret_35);
+}
+
+((slice, slice, int, int, int, int, int, int, int), slice) $Domin8$_fun_lobbyAddr((slice, slice, int, int, int, int, int, int, int) $self, int $lobbyId) impure inline_ref {
+    var (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)) = $self;
+    var $fresh$ret_36 = $global_contractAddress($Domin8Lobby$_init_child($global_myAddress(), $lobbyId));
+    return (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked), $fresh$ret_36);
+}
+
+((slice, slice, int, int, int, int, int, int, int), (slice, slice, int, int, int, int, int, int, int)) $Domin8$_fun_config((slice, slice, int, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)) = $self;
+    var $fresh$ret_37 = $MasterConfig$_constructor_admin_treasury_houseFee_minBet_maxBet_roundTime_currentRound_lobbyCount_locked($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked);
+    return (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked), $fresh$ret_37);
+}
+
+((slice, slice, int, int, int, int, int, int, int), slice) $Domin8$_fun_gameAddress((slice, slice, int, int, int, int, int, int, int) $self, int $gameId) impure inline_ref {
+    var (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)) = $self;
+    var $fresh$ret_38 = ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)~$Domin8$_fun_gameAddr($gameId);
+    return (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked), $fresh$ret_38);
+}
+
+((slice, slice, int, int, int, int, int, int, int), slice) $Domin8$_fun_lobbyAddress((slice, slice, int, int, int, int, int, int, int) $self, int $lobbyId) impure inline_ref {
+    var (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)) = $self;
+    var $fresh$ret_39 = ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)~$Domin8$_fun_lobbyAddr($lobbyId);
+    return (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked), $fresh$ret_39);
+}
+
+((slice, slice, int, int, int, int, int, int, int), slice) $Domin8$_fun_currentGameAddress((slice, slice, int, int, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)) = $self;
+    var $fresh$ret_40 = ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)~$Domin8$_fun_gameAddr($self'currentRound);
+    return (($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked), $fresh$ret_40);
+}
+
+;;
+;; Get methods of a Contract Domin8
+;;
+
+_ %config() method_id(103021) {
+    var self = $Domin8$_contract_load();
+    var res = self~$Domin8$_fun_config();
+    return $MasterConfig$_to_external(res);
+}
+
+_ %gameAddress(int $gameId) method_id(123078) {
+    int $gameId = $gameId;
+    var self = $Domin8$_contract_load();
+    var res = self~$Domin8$_fun_gameAddress($gameId);
+    return res;
+}
+
+_ %lobbyAddress(int $lobbyId) method_id(123468) {
+    int $lobbyId = $lobbyId;
+    var self = $Domin8$_contract_load();
+    var res = self~$Domin8$_fun_lobbyAddress($lobbyId);
+    return res;
+}
+
+_ %currentGameAddress() method_id(72363) {
+    var self = $Domin8$_contract_load();
+    var res = self~$Domin8$_fun_currentGameAddress();
+    return res;
+}
+
+_ %owner() method_id(83229) {
+    var self = $Domin8$_contract_load();
+    var res = self~$Domin8$_fun_owner();
+    return res;
+}
+
+;;
+;; Routing of a Contract Domin8
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked) = $Domin8$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+        ;; Receive InitConfig message
+        if (op == 2673672256) {
+            var $msg'treasury = in_msg~load_msg_addr();
+            var $msg'houseFee = in_msg~load_uint(16);
+            var $msg'minBet = in_msg~load_varuint16();
+            var $msg'maxBet = in_msg~load_varuint16();
+            var $msg'roundTime = in_msg~load_uint(32);
+            ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)~$Domin8$_fun_requireOwner();
+            throw_unless(3519, ($msg'houseFee <= 1000));
+            throw_unless(19745, ($msg'minBet > 0));
+            throw_unless(48958, ($msg'maxBet > $msg'minBet));
+            throw_unless(12600, ( (($msg'roundTime >= 10)) ? (($msg'roundTime <= 86400)) : (false) ));
+            $self'treasury = $msg'treasury;
+            $self'houseFee = $msg'houseFee;
+            $self'minBet = $msg'minBet;
+            $self'maxBet = $msg'maxBet;
+            $self'roundTime = $msg'roundTime;
+            $Domin8$_contract_store(($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked));
+            return ();
+        }
+        
+        ;; Receive CreateGame message
+        if (op == 3373137410) {
+            var $msg'mapId = in_msg~load_uint(8);
+            var $msg'commitHash = in_msg~load_uint(256);
+            ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)~$Domin8$_fun_requireOwner();
+            throw_unless(25893, (~ $self'locked));
+            $self'currentRound = ($self'currentRound + 1);
+            $self'locked = true;
+            var ($init'code, $init'data) = $Domin8Game$_init_child($global_myAddress(), $self'currentRound);
+            slice $addr = $global_contractAddress(($init'code, $init'data));
+            $global_send($SendParameters$_constructor_to_value_mode_code_data_body($addr, 30000000, 1, $init'code, $init'data, $Deploy$_store_cell($Deploy$_constructor_queryId(0), begin_cell())));
+            $global_send($SendParameters$_constructor_to_value_mode_body($addr, 20000000, 1, $SetGameConfig$_store_cell($SetGameConfig$_constructor_houseFee_minBet_maxBet_roundTime_mapId_commitHash($self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $msg'mapId, $msg'commitHash), begin_cell())));
+            $Domin8$_contract_store(($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked));
+            return ();
+        }
+        
+        ;; Receive RevealAndEnd message
+        if (op == 1984275175) {
+            var $msg'secret = in_msg~load_uint(256);
+            ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)~$Domin8$_fun_requireOwner();
+            slice $addr = ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)~$Domin8$_fun_gameAddr($self'currentRound);
+            $global_send($SendParameters$_constructor_to_value_mode_body($addr, 50000000, 1, $RevealAndEnd$_store_cell($RevealAndEnd$_constructor_secret($msg'secret), begin_cell())));
+            $Domin8$_contract_store(($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked));
+            return ();
+        }
+        
+        ;; Receive ClaimPrize message
+        if (op == 2639554183) {
+            var $msg = empty_tuple();
+            slice $addr = ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)~$Domin8$_fun_gameAddr($self'currentRound);
+            $global_send($SendParameters$_constructor_to_value_mode_body($addr, 50000000, 1, $ClaimPrize$_store_cell($msg, begin_cell())));
+            $Domin8$_contract_store(($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked));
+            return ();
+        }
+        
+        ;; Receive CreateLobby message
+        if (op == 3976891980) {
+            var $msg'mapId = in_msg~load_uint(8);
+            var $msg'skin = in_msg~load_uint(8);
+            var $msg'commitHash = in_msg~load_uint(256);
+            var ($ctx'bounceable, $ctx'sender, $ctx'value, $ctx'raw) = __tact_context_get();
+            int $gasReserve = 150000000;
+            int $betAmount = ($ctx'value - $gasReserve);
+            throw_unless(26156, ($betAmount >= $self'minBet));
+            throw_unless(10881, ($betAmount <= $self'maxBet));
+            $self'lobbyCount = ($self'lobbyCount + 1);
+            var ($init'code, $init'data) = $Domin8Lobby$_init_child($global_myAddress(), $self'lobbyCount);
+            slice $addr = $global_contractAddress(($init'code, $init'data));
+            $global_send($SendParameters$_constructor_to_value_mode_code_data_body($addr, 30000000, 1, $init'code, $init'data, $Deploy$_store_cell($Deploy$_constructor_queryId(0), begin_cell())));
+            $global_send($SendParameters$_constructor_to_value_mode_body($addr, ($betAmount + 20000000), 1, $SetLobbyConfig$_store_cell($SetLobbyConfig$_constructor_playerA_amount_houseFee_mapId_skinA_commitHash($ctx'sender, $betAmount, $self'houseFee, $msg'mapId, $msg'skin, $msg'commitHash), begin_cell())));
+            $Domin8$_contract_store(($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked));
+            return ();
+        }
+        
+        ;; Receive SettleLobby message
+        if (op == 1018103688) {
+            var $msg'lobbyId = in_msg~load_uint(64);
+            var $msg'secret = in_msg~load_uint(256);
+            ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)~$Domin8$_fun_requireOwner();
+            slice $addr = ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)~$Domin8$_fun_lobbyAddr($msg'lobbyId);
+            $global_send($SendParameters$_constructor_to_value_mode_body($addr, 50000000, 1, $SettleLobby$_store_cell(($msg'lobbyId, $msg'secret), begin_cell())));
+            $Domin8$_contract_store(($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked));
+            return ();
+        }
+        
+        ;; Receive RescueLobby message
+        if (op == 680795721) {
+            var $msg'lobbyId = in_msg~load_uint(64);
+            ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)~$Domin8$_fun_requireOwner();
+            slice $addr = ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)~$Domin8$_fun_lobbyAddr($msg'lobbyId);
+            $global_send($SendParameters$_constructor_to_value_mode_body($addr, 50000000, 1, $RescueLobby$_store_cell(($msg'lobbyId), begin_cell())));
+            $Domin8$_contract_store(($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked));
+            return ();
+        }
+        
+        ;; Receive InternalGameEnded message
+        if (op == 3996933768) {
+            var $msg'gameId = in_msg~load_uint(64);
+            var $msg'winner = in_msg~load_msg_addr();
+            var $msg'prize = in_msg~load_varuint16();
+            var $msg'fee = in_msg~load_varuint16();
+            $self'locked = false;
+            if (($msg'fee > 0)) {
+                $global_send($SendParameters$_constructor_to_value_mode_body($self'treasury, $msg'fee, 1, __gen_cell_cell_e921a633f4c10831eedc2685d6d788281d234d277c37df140a5e2c33e880190a()));
+            }
+            $Domin8$_contract_store(($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked));
+            return ();
+        }
+        
+        ;; Receive InternalLobbySettled message
+        if (op == 2568781984) {
+            var $msg'lobbyId = in_msg~load_uint(64);
+            var $msg'winner = in_msg~load_msg_addr();
+            var $msg'prize = in_msg~load_varuint16();
+            var $msg'fee = in_msg~load_varuint16();
+            int $remaining = $Context$_get_value(__tact_context_get());
+            if (($remaining > 10000000)) {
+                $global_send($SendParameters$_constructor_to_value_mode_body($self'treasury, 0, 64, __gen_cell_cell_1f03b24699a59faab089462cd4d2ae07fe83ed0e54eaf5f0199c0db670926292()));
+            }
+            $Domin8$_contract_store(($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked));
+            return ();
+        }
+        
+        ;; Receive InternalUnlock message
+        if (op == 2698052650) {
+            var $msg = empty_tuple();
+            $self'locked = false;
+            $Domin8$_contract_store(($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked));
+            return ();
+        }
+        
+        ;; Receive Withdraw message
+        if (op == 195467089) {
+            var $msg'amount = in_msg~load_varuint16();
+            ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)~$Domin8$_fun_requireOwner();
+            $global_send($SendParameters$_constructor_to_value_mode_body($self'treasury, $msg'amount, 1, __gen_cell_cell_8809231e499011b3ba73c04bf02388f443b4a11312c6dc7f317c8893ac41af77()));
+            $Domin8$_contract_store(($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked));
+            return ();
+        }
+        
+        ;; Receive Deploy message
+        if (op == 0x946a98b6) {
+            var $deploy'queryId = in_msg~load_uint(64);
+            ($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked)~$Domin8$_fun_notify($DeployOk$_store_cell($DeployOk$_constructor_queryId($deploy'queryId), begin_cell()));
+            $Domin8$_contract_store(($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked));
+            return ();
+        }
+        
+    }
+    ;; Empty Receiver and Text Receivers
+    var text_op = slice_hash(in_msg);
+    ;; Receive "Game Done" message
+    if (text_op == 0xac1c274805636b2fc7512b27c8cb33c6e09ac1d51ce595a5567af90cfee18ca4) {
+        $Domin8$_contract_store(($self'owner, $self'treasury, $self'houseFee, $self'minBet, $self'maxBet, $self'roundTime, $self'currentRound, $self'lobbyCount, $self'locked));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}
+
+
+() __tact_selector_hack_asm() impure asm """
+@atend @ 1 {
+        execute current@ context@ current!
+        {
+            // The core idea of this function is to save gas by avoiding unnecessary dict jump, when recv_internal/recv_external is called
+            // We want to extract recv_internal/recv_external from the dict and select needed function
+            // not by jumping to the needed function by it's index, but by using usual IF statements.
+
+            }END> b> // Close previous builder, now we have a cell of previous code on top of the stack
+
+            <{ // Start of the new code builder
+                SETCP0
+                // Swap the new code builder with the previous code, now we have previous code on top of the stack
+                swap
+                // Transform cell to slice and load first ref from the previous code, now we have the dict on top of the stack
+                <s ref@
+
+                // Extract the recv_internal from the dict
+                dup 0 swap @procdictkeylen idict@ { "internal shortcut error" abort } ifnot
+                swap
+
+                // Delete the recv_internal from the dict
+                0 swap @procdictkeylen idict- drop
+                // Delete the recv_external from the dict (it's okay if it's not there)
+                -1 swap @procdictkeylen idict- drop
+                // Delete the __tact_selector_hack from the dict
+                65535 swap @procdictkeylen idict- drop
+
+                // Bring the code builder from the bottom of the stack
+                // because if recv_external extraction is optional, and the number of elements on the stack is not fixed
+                depth 1- roll
+                // Swap with the dict from which we extracted recv_internal and (maybe) recv_external
+                swap
+
+                // Check if the dict is empty
+                dup null?
+                // Store a copy of this flag in the bottom of the stack
+                dup depth 1- -roll
+                {
+                    // If the dict is empty, just drop it (it will be null if it's empty)
+                    drop
+                }
+                {
+                    // If the dict is not empty, prepare continuation to be stored in c3
+                    <{
+                        // Save this dict as first ref in this continuation, it will be pushed in runtime by DICTPUSHCONST
+                        swap @procdictkeylen DICTPUSHCONST
+                        // Jump to the needed function by it's index
+                        DICTIGETJMPZ
+                        // If such key is not found, throw 11 along with the key as an argument
+                        11 THROWARG
+                    }> PUSHCONT
+                    // Store the continuation in c3
+                    c3 POP
+                } cond
+
+                // Function id is on top of the (runtime) stack
+                DUP IFNOTJMP:<{
+                    // place recv_internal here
+                    DROP swap @addop
+                }>
+
+                // Bring back the flag, indicating if the dict is empty or not from the bottom of the stack
+                depth 1- roll
+                {
+                    // If the dict is empty, throw 11
+                    11 THROWARG
+                }
+                {
+                    // If the dict is not empty, jump to continuation from c3
+                    c3 PUSH JMPX
+                } cond
+            }> b>
+        } : }END>c
+        current@ context! current!
+    } does @atend !
+""";
+
+() __tact_selector_hack() method_id(65535) {
+    return __tact_selector_hack_asm();
+}
