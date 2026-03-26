@@ -378,8 +378,8 @@ pub enum Domin81v1Error {
 
 ## Summary of Client-Side Changes
 
-On your frontend (TypeScript) or convex backend (lobbies.ts), the flow will change slightly:
+On your frontend (TypeScript) or API server backend (lobbies.ts), the flow will change slightly:
 
 1.  **Call `join_lobby`**: This transaction will now initiate the randomness request.
-2.  **Do NOT call `settle_lobby`**: Your convex should no longer attempt to send the `settle_lobby` transaction.
+2.  **Do NOT call `settle_lobby`**: Your server should no longer attempt to send the `settle_lobby` transaction.
 3.  **Listen for Result**: Instead of polling for ORAO fulfillment, subscribe to the `Domin81v1Lobby` account. When `status` changes to `2` (RESOLVED) or `winner` is set, the MagicBlock network has successfully called your `settle_lobby` instruction.

@@ -1,6 +1,6 @@
 /**
  * Socket.io event handlers
- * Replaces Convex queries/mutations with direct DB access
+ * Direct DB access for socket events
  */
 import type { Server, Socket } from "socket.io";
 import { eq, and, desc, sql, ne, or, gte, lt, asc } from "drizzle-orm";

@@ -46,7 +46,6 @@ export function CopyrightPage() {
               <li>Phaser.js (MIT License)</li>
               <li>Solana Web3.js (Apache 2.0)</li>
               <li>Anchor Framework (Apache 2.0)</li>
-              <li>Convex (Proprietary)</li>
             </ul>
           </section>
 

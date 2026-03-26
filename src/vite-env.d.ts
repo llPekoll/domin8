@@ -2,9 +2,6 @@
 /// <reference types="vite-plugin-pwa/client" />
 
 interface ImportMetaEnv {
-  // Convex
-  readonly VITE_CONVEX_URL: string;
-
   // Privy
   readonly VITE_PRIVY_APP_ID: string;
 

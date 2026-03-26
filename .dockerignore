@@ -7,7 +7,7 @@ android
 ios
 *.apk
 *.aab
-convex-backup
+convex/
 target/debug
 target/deploy
 target/release

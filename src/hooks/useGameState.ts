@@ -2,7 +2,7 @@
  * Hook for accessing game state from Solana blockchain
  *
  * NOW USES: Direct blockchain subscription via active_game PDA
- * BEFORE: Convex polling (5 second delay)
+ * BEFORE: API polling (5 second delay)
  * BENEFIT: <1 second updates vs 5 seconds
  */
 import { useActiveGame } from "./useActiveGame";

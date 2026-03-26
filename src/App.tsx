@@ -91,13 +91,13 @@ export default function App() {
   // Auto-create player when wallet connects
   useAutoCreatePlayer(connected, publicKey?.toBase58() || null, externalWalletAddress || undefined);
 
-  // Get current game state directly from blockchain (no Convex, <1s updates)
+  // Get current game state directly from blockchain (<1s updates)
   const { activeGame: currentRoundState } = useActiveGame();
 
   // Send notification when game transitions from WAITING to OPEN (first bet placed)
   useGameCreatedNotification(currentRoundState);
 
-  // Get unified participants from Convex (includes resolved names, boss status)
+  // Get unified participants from API server (includes resolved names, boss status)
   const { participants } = useGameParticipants();
 
   // Reset boss state when round changes
@@ -182,7 +182,7 @@ export default function App() {
     EventBus.emit("blockchain-state-update", { gameState: fullData, bossWallet });
   }, [stableGameState, bossWallet]);
 
-  // Emit unified participants to Phaser (from Convex, includes resolved names)
+  // Emit unified participants to Phaser (from API server, includes resolved names)
   // Also re-emit when Phaser Game scene becomes ready (in case it missed the first emit)
   useEffect(() => {
     if (participants && participants.length > 0) {

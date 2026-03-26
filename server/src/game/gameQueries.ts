@@ -1,6 +1,6 @@
 /**
  * Database queries for game state management
- * Replaces syncServiceMutations.ts and gameSchedulerMutations.ts from Convex
+ * Database queries for game state management
  */
 import { eq, and, ne, lt, gte, desc, sql, or } from "drizzle-orm";
 import { db } from "../db/index.js";

@@ -52,7 +52,7 @@ export class UIManager {
   }
 
   /**
-   * Handle participants update from Convex (via App.tsx)
+   * Handle participants update from API server (via App.tsx)
    * Extract wallet -> displayName mapping for winner UI
    */
   private onParticipantsUpdate(data: {

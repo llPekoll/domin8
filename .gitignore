@@ -3,7 +3,6 @@
 app
 gradle
 
-convex/_generated
 test-output.log
 target/.rustc_info.json
 .anchor/*
@@ -53,8 +52,6 @@ app/build/
 *.idsig
 *.keystore
 
-# Convex backup
-convex-backup
 
 # Server
 server/node_modules

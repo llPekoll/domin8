@@ -72,7 +72,7 @@ export function PrivacyPage() {
             <p>We use the following third-party services:</p>
             <ul className="list-disc pl-6 space-y-2 mt-2">
               <li><strong>Privy:</strong> Authentication and wallet management</li>
-              <li><strong>Convex:</strong> Real-time database and backend</li>
+              <li><strong>API Server:</strong> Real-time database and backend</li>
               <li><strong>Helius:</strong> Blockchain event monitoring</li>
               <li><strong>Vercel:</strong> Hosting and analytics</li>
               <li><strong>Magic Block:</strong> VRF randomness provider</li>

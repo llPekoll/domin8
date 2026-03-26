@@ -336,7 +336,7 @@ export class Game extends Scene {
       this.handleGameCleanup();
     });
 
-    // Listen for unified participants update from Convex (via App.tsx)
+    // Listen for unified participants update from API server (via App.tsx)
     EventBus.on(
       "participants-update",
       ({ participants }: { participants: GameParticipant[] }) => {
@@ -427,7 +427,7 @@ export class Game extends Scene {
   }
 
   // Update game state from blockchain (map/background only)
-  // Participant spawning is now handled by handleParticipantsUpdate via Convex
+  // Participant spawning is now handled by handleParticipantsUpdate via API server
   // bossWallet is passed directly to avoid timing issues
   updateGameState(gameState: any, bossWallet?: string | null) {
     // Update bossWallet if provided (takes precedence over EventBus update)
@@ -483,7 +483,7 @@ export class Game extends Scene {
     this.uiManager.updateGameState(gameState);
 
     // Note: Participant spawning is handled by handleParticipantsUpdate
-    // which receives unified data from Convex via participants-update event
+    // which receives unified data from API server via participants-update event
   }
 
   private getCharacterConfig(skinId: number): {
@@ -503,7 +503,7 @@ export class Game extends Scene {
   }
 
   /**
-   * Handle unified participants update from Convex
+   * Handle unified participants update from API server
    * This is the primary way participants are spawned/updated - data comes pre-resolved from server
    */
   private handleParticipantsUpdate(participants: GameParticipant[]) {
@@ -553,7 +553,7 @@ export class Game extends Scene {
       const newParticipant = {
         _id: participantId,
         playerId: participant.walletAddress,
-        displayName: participant.displayName, // Pre-resolved from Convex
+        displayName: participant.displayName, // Pre-resolved from API server
         betAmount: participant.betAmount,
         character: {
           key: participant.characterKey,
@@ -567,7 +567,7 @@ export class Game extends Scene {
         isBoss: participant.isBoss,
       };
 
-      logger.game.debug("[Game] ✅ Spawning participant from Convex:", newParticipant);
+      logger.game.debug("[Game] ✅ Spawning participant from API server:", newParticipant);
       this.playerManager.addParticipant(newParticipant);
 
       // Play challenger sound to notify all players of new participant

@@ -1,6 +1,6 @@
 /**
  * XP System Utilities for Frontend
- * Mirrors the level thresholds from convex/xpConstants.ts
+ * Mirrors the level thresholds from server XP constants
  */
 
 // Level thresholds - must match backend

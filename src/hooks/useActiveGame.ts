@@ -1,8 +1,8 @@
 /**
  * Hook for subscribing to active_game PDA on Solana blockchain
  *
- * This replaces Convex polling with direct blockchain subscription
- * Updates in <1 second vs 5 seconds with Convex
+ * This replaces API polling with direct blockchain subscription
+ * Updates in <1 second vs 5 seconds with API server
  *
  * Based on risk.fun pattern: useJackpot.ts (lines 108-273)
  */
@@ -162,7 +162,7 @@ export function useActiveGame() {
     return pda;
   }, [program]);
 
-  // Enrich raw game data with map data from Convex when available
+  // Enrich raw game data with map data from API server when available
   useEffect(() => {
     logger.solana.debug("[DOMIN8] 🔄 Map enrichment effect triggered", {
       hasRawGameData: !!rawGameData,

@@ -2,7 +2,7 @@
 
 A fast-paced, real-time battle royale betting game built on Solana blockchain where players control multiple characters in dynamic arenas.
 
-## 🎮 Game Overview
+## Game Overview
 
 Royal Rumble is a multiplayer battle game where:
 
@@ -10,50 +10,38 @@ Royal Rumble is a multiplayer battle game where:
 - Each player starts with a randomly assigned character that can be re-rolled
 - Games adapt dynamically based on participant count
 - Winners earn rewards proportional to their bets
-- Built with real-time updates using Convex
+- Built with real-time updates using Socket.io
 
-## 🚀 Quick Start
+## Quick Start
 
-### Local Development with Convex
+### Local Development
 
 ```bash
 # Install dependencies using Bun (required)
 bun install
 
-# Start Convex backend locally with Docker Compose
-docker-compose up
+# Start the backend API server (Socket.io + PostgreSQL)
+bun run server:dev
 
-# Get admin key
-docker compose exec backend ./generate_admin_key.sh
-# In a separate terminal, run the development server
-
-# push env var in convex
-CRANK_AUTHORITY_PRIVATE_KEY=<PRIVATE_KEY_OF_A_WALLET>
-SOLANA_RPC_ENDPOINT=https://api.devnet.solana.com
+# In a separate terminal, run the frontend development server
+bun run dev
 ```
 
-at that stage you still have to copy seeds to make it work
-Go in convex -> Data on the left panel -> then add
-copy the the json (list are valid too)
-->seed/characters.json
-->seed/maps.json
-then you can start the game
+### Seed Data
 
-```bash
-bun dev
-```
+To populate initial game data, insert the seed files into your PostgreSQL database:
 
-**Important Notes:**
+- `seed/characters.json` - Character definitions
+- `seed/maps.json` - Map configurations
 
-- **Docker Compose**: Required to run Convex backend locally with database support
-- **Database Target**: The `docker-compose.yml` includes a PostgreSQL database connection (see `POSTGRES_URL` in environment variables)
-- **Ports Used**:
-  - `3210` - Convex backend
-  - `3211` - Site proxy
-  - `6791` - Convex dashboard
-- **Dashboard Access**: Visit `http://localhost:6791` to access the Convex dashboard after starting Docker Compose
+Then you can start the game.
 
-## 🎲 Game Mechanics
+**Ports Used:**
+
+- `5173` - Frontend (Vite dev server)
+- `3000` - Backend API (Socket.io server)
+
+## Game Mechanics
 
 ### Dynamic Game Phases
 
@@ -67,7 +55,7 @@ The game adapts based on the number of participants:
 - Arena Phase (10s) - Characters spawn and move to center
 - Results Phase (5s) - Winners announced and payouts distributed
 
-#### Large Games (≥ 8 participants)
+#### Large Games (>= 8 participants)
 
 **7 phases (75 seconds total)**
 
@@ -85,60 +73,61 @@ The game adapts based on the number of participants:
 - **Character System**: Start with a random character, option to re-roll
 - **Multiple Maps**: Various arenas with unique spawn configurations
 - **Bet-to-Size Scaling**: Character size increases with bet amount
-- **Real-time Updates**: Live game state synchronization via Convex
+- **Real-time Updates**: Live game state synchronization via Socket.io
 - **Smart Matchmaking**: Automatic bot filling for entertainment value
 
-## 🏗️ Tech Stack
+## Tech Stack
 
 - **Runtime**: [Bun](https://bun.sh/) - Fast JavaScript runtime
-- **Backend**: [Convex](https://convex.dev/) - Real-time serverless backend
+- **Backend**: Socket.io API server (Node.js)
+- **Database**: PostgreSQL
 - **Frontend**: React + TypeScript + Vite
 - **Game Engine**: [Phaser.js](https://phaser.io/) - 2D game framework
 - **Blockchain**: Solana (Anchor framework)
 - **Styling**: Tailwind CSS
-- **State Management**: Convex React hooks
+- **Deployment**: Coolify with Nixpacks (frontend) and Dockerfile (backend)
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 /
-├── convex/              # Backend logic
-│   ├── games.ts         # Game loop and phase management
-│   ├── players.ts       # Player actions and betting
-│   ├── schema.ts        # Database schema
-│   └── crons.ts         # Scheduled tasks
+├── server/              # Backend API (Socket.io + PostgreSQL)
+│   ├── index.ts         # Server entry point
+│   └── ...              # API routes, game logic, DB access
 ├── src/
 │   ├── game/           # Phaser game engine
 │   │   ├── scenes/     # Game scenes for each phase
 │   │   └── config.ts   # Game configuration
 │   ├── components/     # React UI components
 │   └── app/           # Application pages
+├── programs/
+│   └── domin8_prgm/    # Solana smart contract (Anchor)
 └── public/
     └── assets/        # Game assets
         ├── characters/ # Character sprites
         └── maps/      # Background images
 ```
 
-## 🎨 Adding Content
+## Adding Content
 
 ### New Character
 
 1. Add sprite to `/public/assets/characters/`
-2. Insert record in `characters` table
+2. Insert record in `characters` table (PostgreSQL)
 3. Configure animations (idle, walk, attack)
 
 ### New Map
 
 1. Add background to `/public/assets/maps/`
-2. Insert record in `maps` table
+2. Insert record in `maps` table (PostgreSQL)
 3. Configure spawn positions and limits
 
-## 🔧 Development
+## Development
 
 ### Prerequisites
 
 - [Bun](https://bun.sh/) - JavaScript runtime
-- [Docker](https://www.docker.com/) & Docker Compose - For local Convex backend
+- [PostgreSQL](https://www.postgresql.org/) - Database (or use Coolify-managed instance)
 - [Solana CLI](https://docs.solana.com/cli/install-solana-cli-tools) - For smart contract development
 - [Anchor](https://www.anchor-lang.com/docs/installation) - Solana framework
 
@@ -207,14 +196,11 @@ bun run anchor:localnet
 # Install dependencies
 bun install
 
-# Start Convex backend (required for development)
-docker-compose up
+# Start the backend API server
+bun run server:dev
 
-# Run development server (in a separate terminal)
+# Run frontend development server (in a separate terminal)
 bun run dev
-
-# Stop Convex backend
-docker-compose down
 
 # Build for production
 bun run build
@@ -226,16 +212,7 @@ bun run lint
 bun run typecheck
 ```
 
-### Local Convex Backend
-
-The project uses Docker Compose to run a local Convex backend with PostgreSQL database support. This provides:
-
-- Full offline development capabilities
-- Local database for testing
-- Convex dashboard at `http://localhost:6791`
-- Backend API at `http://localhost:3210`
-
-## 🎯 Game Rules
+## Game Rules
 
 ### Betting System
 
@@ -250,14 +227,13 @@ The project uses Docker Compose to run a local Convex backend with PostgreSQL da
 - Player always wins (practice mode)
 - Bet is refunded with no profit/loss
 
-## 🚦 Environment Variables
+## Environment Variables
 
 Create a `.env.local` file (copy from `.env.example`):
 
 ```env
-# Convex configuration
-CONVEX_DEPLOYMENT=your-deployment
-VITE_CONVEX_URL=http://127.0.0.1:3210
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/domin8
 
 # Solana configuration
 SOLANA_RPC_URL=your-rpc-url
@@ -274,32 +250,32 @@ VITE_PRIVY_APP_ID=your-privy-app-id
 
 **Note**: Each developer should have their own `.env.local` with their specific wallet and program ID.
 
-## 📚 Documentation
+## Documentation
 
 - [CLAUDE.md](./CLAUDE.md) - AI assistant instructions and codebase overview
 - [GAME_SPECS.md](./GAME_SPECS.md) - Detailed game specifications
 - [ANIMATION_ENGINE_SPECS.md](./ANIMATION_ENGINE_SPECS.md) - Animation system details
-- [CONVEX_IMPLEMENTATION.md](./CONVEX_IMPLEMENTATION.md) - Backend implementation guide
 - [SINGLE_PLAYER_LOGIC.md](./SINGLE_PLAYER_LOGIC.md) - Single player mode details
 - [ROADMAP.md](./ROADMAP.md) - Development roadmap
 
-## 🤝 Contributing
+## Contributing
 
 1. Check existing issues and documentation
 2. Follow the code style in existing files
 3. Test your changes thoroughly
 4. Submit a pull request with clear description
 
-## 📄 License
+## License
 
 [Your License Here]
 
-## 🔗 Resources
+## Resources
 
-- [Convex Documentation](https://docs.convex.dev/)
 - [Phaser.js Documentation](https://phaser.io/docs)
 - [Solana Cookbook](https://solanacookbook.com/)
 - [Bun Documentation](https://bun.sh/docs)
+- [Socket.io Documentation](https://socket.io/docs/)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
 - [metalslug font](https://fontstruct.com/fontstructions/download/2547046)
   //cursor
   https://aspecsgaming.itch.io/pixel-art-cursors/download/eyJleHBpcmVzIjoxNzYxNzU1NDU5LCJpZCI6Mjc1MDYyOX0%3d.6PqdH7xtvE7mIDdAY4NOXhcY8NM%3d

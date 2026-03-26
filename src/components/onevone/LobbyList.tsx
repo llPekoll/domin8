@@ -190,8 +190,8 @@ export function LobbyList({
         toast.success("Transaction confirmed!", { id: "join-tx-confirm" });
         logger.ui.info("Join transaction confirmed on blockchain", { signature });
 
-        // Call Convex action to update lobby in database
-        logger.ui.debug("Calling Convex action to update lobby in database");
+        // Call API server action to update lobby in database
+        logger.ui.debug("Calling API server action to update lobby in database");
 
         const result = await joinLobbyAction({
           playerBWallet: currentPlayerWallet,
@@ -213,7 +213,7 @@ export function LobbyList({
           onLobbyJoined?.(result.lobbyId);
         } else {
           toast.error("Failed to update lobby in database");
-          logger.ui.error("Convex action failed");
+          logger.ui.error("API server action failed");
         }
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);

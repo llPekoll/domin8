@@ -85,7 +85,7 @@ pub struct BetInfo {
 
 ---
 
-## 2. BACKEND (CONVEX)
+## 2. BACKEND (API SERVER)
 
 ### Database Schema (Simplified)
 
@@ -148,11 +148,11 @@ players: {
 
 ### Functions (8 files)
 
-1. **syncService.ts** - Syncs blockchain to Convex every 45s
+1. **syncService.ts** - Syncs blockchain to database every 45s
    - `syncBlockchainState()` → main cron job
    - `syncActiveGame()` → stores game state in DB
    - `processEndedGames()` → detects when game should end
-   - `scheduleEndGameAction()` → schedules Convex job
+   - `scheduleEndGameAction()` → schedules server job
 
 2. **gameScheduler.ts** - Executes game state transitions
    - `executeEndGame()` → calls smart contract end_game
@@ -183,8 +183,8 @@ players: {
 ### Crons (Running)
 
 ```typescript
-// Every 45 seconds - sync blockchain state to Convex
-crons.interval("sync-blockchain-state", { seconds: 45 }, 
+// Every 45 seconds - sync blockchain state to database
+crons.interval("sync-blockchain-state", { seconds: 45 },
   internal.syncService.syncBlockchainState
 );
 
@@ -277,13 +277,13 @@ enum GamePhase {
 
 **useActiveGame.ts**
 - Subscribes to `active_game` PDA via `getSharedGameSubscription()`
-- Real-time updates (<1s) vs Convex polling (45s)
+- Real-time updates (<1s) vs API polling (45s)
 - Returns blockchain game state + map lookup
 - Transforms Solana PublicKey → base58 string
 
 **useNFTCharacters.ts**
 - Checks if user owns NFT collection for exclusive characters
-- Calls `verifyNFTOwnership` Convex action
+- Calls `verifyNFTOwnership` server action
 
 **useGameState.ts** - Legacy game state helper
 
@@ -326,13 +326,13 @@ enum GamePhase {
 │ - Other players can call bet()       │
 │ - Each bet: skin + position          │
 │ - Status = 0 (open)                 │
-│ - Convex syncs every 45s             │
+│ - Server syncs every 45s              │
 │ - Frontend shows countdown           │
 └──────────────────────────────────────┘
            ↓ [End time reached]
 ┌──────────────────────────────────────┐
 │ gameScheduler.executeEndGame()       │
-│ 1. Convex scheduler triggers         │
+│ 1. Server scheduler triggers          │
 │ 2. Calls smart contract end_game()   │
 │ 3. Orao VRF used to select winner   │
 │ 4. Status = 1 (closed)              │
@@ -459,7 +459,7 @@ On-chain (smart contract):
   - position: [x, y] spawn coordinates
   - walletIndex: which unique wallet placed bet
 
-Off-chain (Convex):
+Off-chain (database):
   - Cached for faster queries
   - NO bet signatures stored (blockchain is source of truth)
   - NO off-chain betting
@@ -516,7 +516,7 @@ Available Characters (seed/characters.json):
 - The custom `domin8-vrf` program in CLAUDE.md
 - Two-round VRF (top-4 then winner)
 - VRF seed storage separate accounts
-- Backend VRF requests from Convex
+- Backend VRF requests from server
 
 ---
 
@@ -546,7 +546,7 @@ Available Characters (seed/characters.json):
 ❌ VRF seed accounts on-chain
 ❌ Blockchain call status tracking
 ❌ Game participant table (just stores on blockchain)
-❌ Bet signature tracking in Convex
+❌ Bet signature tracking in database
 
 ### DIFFERENT
 ⚠️ Game phases: 3 fixed (waiting → arena → results), not 3-7 variable
@@ -555,7 +555,7 @@ Available Characters (seed/characters.json):
 ⚠️ Winner selection: Once per game, not twice
 ⚠️ Sync interval: 45s, not 3s (game loop)
 ⚠️ Prize sending: Scheduled job, not automatic
-⚠️ Participants: Stored on-chain only, not in Convex tables
+⚠️ Participants: Stored on-chain only, not in database tables
 
 ---
 
@@ -587,7 +587,7 @@ Network: Devnet (per Anchor.toml)
 Orao VRF: VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y
 ```
 
-### Convex Functions
+### Server Functions
 ```
 Sync interval: 45 seconds (blockchain to DB)
 Job cleanup: Every 6 hours
@@ -625,7 +625,7 @@ These features are mentioned in CLAUDE.md but NOT in the actual code:
 4. **Transaction Queue** - No transactionQueue table
 5. **Events System** - events.ts exists but mostly empty
 6. **Player Stats** - achievements array exists but unused
-7. **Bet Signature Tracking** - No txSignature in Convex (blockchain only)
+7. **Bet Signature Tracking** - No txSignature in database (blockchain only)
 8. **Multiple Participant Betting** - Can only bet once per game
 9. **Spectator Mode** - No implementation
 10. **Emergency Refund** - delete_game exists but no refund mechanism
@@ -642,7 +642,7 @@ These features are mentioned in CLAUDE.md but NOT in the actual code:
 | Bank Bot | Yes | No | Missing |
 | Demo Bots | 20 (yes) | 20 (yes) | Correct |
 | Smart Contract | 11 instructions | 6 instructions | Fewer |
-| Convex Tables | 6 game-related | 3 game-related | Simpler |
+| DB Tables | 6 game-related | 3 game-related | Simpler |
 | Winner Selection | Once or twice | Once | Simpler |
 | Bet Storage | On + Off chain | On-chain only | Different |
 | Sync Interval | 3s + 45s | 45s | Slower |
@@ -657,6 +657,6 @@ These features are mentioned in CLAUDE.md but NOT in the actual code:
 4. **Database Schema** → Remove gameParticipants, bankBalance, transactions
 5. **Game Types** → Remove top-4 betting, bank bot, spectator phases
 6. **Architecture Summary** → Update to reflect actual flows
-7. **Tech Stack** → Confirm all components (Phaser, Convex, Anchor, Privy are correct)
+7. **Tech Stack** → Confirm all components (Phaser, API server, Anchor, Privy are correct)
 8. **Features** → Mark bank bot, top-4, spectator as NOT implemented
 

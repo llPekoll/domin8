@@ -4,9 +4,9 @@ Add lobby sharing via URL with privacy-focused token (8-char random UUID) and pr
 
 ### Steps
 
-1. **Add `isPrivate` and `shareToken` fields to schema** in [`convex/schema.ts`](d:\Dev\royalrumble\convex\schema.ts) — Add `isPrivate: v.optional(v.boolean())` and `shareToken: v.string()` to `oneVOneLobbies` table; add index `by_shareToken: ["shareToken"]` for fast URL lookup.
+1. **Add `isPrivate` and `shareToken` fields to schema** in the database schema — Add `isPrivate` (optional boolean) and `shareToken` (string) to `oneVOneLobbies` table; add index `by_shareToken: ["shareToken"]` for fast URL lookup.
 
-2. **Update Convex lobby mutations and queries** in [`convex/lobbies.ts`](d:\Dev\royalrumble\convex\lobbies.ts):
+2. **Update server lobby mutations and queries** in the lobbies module:
    - Add `isPrivate` parameter to `createLobby` action args
    - Generate `shareToken` via `crypto.randomUUID().slice(0, 8)` in `createLobbyInDb` and `_internalCreateLobby`
    - Update `getOpenLobbies` query to filter out private lobbies: add `.filter((q) => q.neq(q.field("isPrivate"), true))`

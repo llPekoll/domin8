@@ -92,13 +92,14 @@ The ORAO VRF model differs from Switchboard. It typically follows a **Request \-
 3. Refactor join\_lobby.rs to request randomness instead of resolving.  
 4. Update lib.rs to expose new instructions.
 
-### **Step 2: Backend (Convex) Sync**
+### **Step 2: Backend (API Server) Sync**
 
-1. Update oneVOneLobbies schema in convex/schema.ts to track the new status (2 \= Awaiting VRF).  
-2. Update convex/lobbies.ts:  
+1. Update oneVOneLobbies schema in server schema to track the new status (2 \= Awaiting VRF).
+2. Update server lobbies module:  
    * joinLobby action: Update to handle the new "Joined but not settled" state.  
    * settleLobby action: New action to call the on-chain settle\_lobby instruction.  
    * **Crank:** Update syncLobbyFromBlockchain to detect lobbies in state 2 (Awaiting VRF) and try to call settleLobby if randomness is ready.
+
 
 ### **Step 3: Frontend Integration**
 
@@ -136,7 +137,7 @@ let winner\_is\_player\_a \= randomness\[0\] % 2 \== 0;
 
 * \[ \] **Contract:** Swap Switchboard for ORAO in domin8\_1v1\_prgm.  
 * \[ \] **Contract:** Split join into join (request) and settle (resolve).  
-* \[ \] **Convex:** Update schema and actions for 3-state lifecycle.  
+* \[ \] **Server:** Update schema and actions for 3-state lifecycle.  
 * \[ \] **Frontend:** Update OneVOneFightScene to poll for status changes (2 \-\> 1).  
 * \[ \] **Frontend:** Add "Double Down" button logic.  
 * \[ \] **Frontend:** Create LobbyDetailsDialog.  

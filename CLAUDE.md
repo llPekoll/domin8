@@ -2,20 +2,21 @@
 
 ## Project Overview
 
-A fast-paced battle royale betting game on Solana where players bet on themselves in real-time battles. Built with Convex, React, Phaser.js, and Solana blockchain integration using Magic Block VRF for verifiable randomness.
+A fast-paced battle royale betting game on Solana where players bet on themselves in real-time battles. Built with a Socket.io API server, PostgreSQL, React, Phaser.js, and Solana blockchain integration using Magic Block VRF for verifiable randomness.
 
 ## Tech Stack
 
 - **Runtime**: Bun (not npm)
-- **Backend**: Convex (real-time serverless)
+- **Backend**: Socket.io API server + PostgreSQL
 - **Frontend**: React + TypeScript + Vite
 - **Game Engine**: Phaser.js (WebGL/Canvas)
 - **Blockchain**: Solana (Anchor framework)
 - **VRF Provider**: Magic Block VRF (ephemeral rollup, cost-optimized)
 - **Wallet**: Privy (embedded wallets, seamless auth)
 - **Styling**: Tailwind CSS
-- **State**: Convex React hooks
+- **State**: Socket.io real-time events
 - **Events**: Helius webhooks for blockchain updates
+- **Deployment**: Coolify (frontend via Nixpacks, API via Dockerfile)
 
 ## Commands
 
@@ -52,14 +53,10 @@ anchor deploy
 
 ```
 /
-├── convex/                    # Backend functions and schema
-│   ├── gameScheduler.ts       # Execute smart contract calls
-│   ├── gameSchedulerMutations.ts  # Job tracking
-│   ├── players.ts             # Player CRUD operations
-│   ├── characters.ts          # Character management
-│   ├── maps.ts                # Map management
-│   ├── schema.ts              # Database schema
-│   └── crons.ts               # Scheduled functions
+├── server/                    # Socket.io API server (Node.js)
+│   ├── Dockerfile             # Production container
+│   ├── src/                   # Server source code
+│   └── package.json           # Server dependencies
 ├── programs/
 │   └── domin8_prgm/           # Main game smart contract
 │       ├── src/
@@ -119,9 +116,9 @@ When no game is active, players see a **map carousel**:
 
 #### Game Flow
 
-**Triggered by Convex creating a game:**
+**Triggered by API server creating a game:**
 
-1. **Game Creation**: Convex calls `create_game_round` instruction
+1. **Game Creation**: API server calls `create_game_round` instruction
    - Game status = **WAITING** (no bets yet)
    - **NO countdown** (start_date = 0, end_date = 0)
    - **NO VRF requested** (cost optimization!)
@@ -138,7 +135,7 @@ When no game is active, players see a **map carousel**:
    - Adds more bets (SOL transferred)
    - **NO VRF requested yet** (deferred to end_game)
 
-4. **Countdown Expires**: Convex calls `end_game` (first call)
+4. **Countdown Expires**: API server calls `end_game` (first call)
    - **Single player**: Uses deterministic seed, returns winner immediately
    - **Multiple players**: Requests Magic Block VRF, returns early
    - Sets `vrf_requested = true`
@@ -147,12 +144,12 @@ When no game is active, players see a **map carousel**:
    - Stores randomness in `game.rand`
    - Executed within seconds
 
-6. **Convex calls `end_game` again** (second call, ~3s later)
+6. **API server calls `end_game` again** (second call, ~3s later)
    - Uses stored VRF randomness to select winner
    - Game status = CLOSED
    - **Multiple players**: 5% house fee
 
-7. **Prize Distribution**: Convex calls `send_prize_winner`
+7. **Prize Distribution**: API server calls `send_prize_winner`
    - 95% to winner (or 100% for single player refund)
    - 5% to treasury (multi-player only)
 
@@ -165,9 +162,9 @@ All games follow this **optimized flow**:
 1. **WAITING** (Map Carousel)
    - Carousel spins, showing available maps
    - Players can place bets anytime
-   - Convex creates game when ready
+   - API server creates game when ready
 
-2. **GAME CREATION** (Convex creates game)
+2. **GAME CREATION** (API server creates game)
    - Status = WAITING
    - No bets, no countdown, no VRF
    - Carousel stops on selected map
@@ -182,7 +179,7 @@ All games follow this **optimized flow**:
    - Each bet includes: amount, skin (character), position (spawn coords)
    - NO VRF requested during betting (deferred to end_game)
 
-5. **GAME END - FIRST CALL** (Convex calls end_game)
+5. **GAME END - FIRST CALL** (API server calls end_game)
    - **Single player**: Deterministic seed, winner selected immediately
    - **Multi-player**: VRF requested, returns early with "call again in 3s"
    - Sets `vrf_requested = true` for multi-player
@@ -191,13 +188,13 @@ All games follow this **optimized flow**:
    - `vrf_callback` instruction called automatically
    - Stores randomness in `game.rand`
 
-7. **GAME END - SECOND CALL** (Convex calls end_game again)
+7. **GAME END - SECOND CALL** (API server calls end_game again)
    - Uses stored VRF randomness
    - Weighted selection: bigger bet = higher chance
    - Game status = CLOSED
    - Winner determined, prize calculated
 
-8. **PRIZE DISTRIBUTION** (Convex calls send_prize_winner)
+8. **PRIZE DISTRIBUTION** (API server calls send_prize_winner)
    - Winner receives 95% (or 100% if solo)
    - Treasury receives 5% (multi-player only)
 
@@ -209,13 +206,13 @@ All games follow this **optimized flow**:
 #### Core Features
 
 - **Map Carousel**: Engaging spinning carousel while waiting for games
-- **Convex-Managed Games**: Backend creates games, players place bets
+- **Server-Managed Games**: Backend creates games, players place bets
 - **VRF Cost Optimization**: VRF only requested in end_game for multi-player games
 - **Single Player Refunds**: Full refund with 0% fee if only 1 player
 - **Multiple Maps**: Carousel displays available maps (bg1, bg2)
 - **Character System**: 8 characters available (some NFT-gated)
 - **Bet-to-size**: Character size scales with bet amount
-- **Helius Webhooks**: Blockchain events → Convex → Frontend via WebSocket
+- **Helius Webhooks**: Blockchain events → API server → Frontend via WebSocket
 - **Magic Block VRF**: Cheap, fast verifiable randomness
 
 ### Betting System
@@ -236,10 +233,10 @@ All games follow this **optimized flow**:
 
 ### Technical Features
 
-- **Events-Based Sync**: Helius webhooks → Convex → Frontend
+- **Events-Based Sync**: Helius webhooks → API server → Frontend
 - **Type-safe**: End-to-end TypeScript
 - **Responsive**: Mobile and desktop support
-- **Scalable**: Serverless architecture (Convex)
+- **Scalable**: Socket.io API server + PostgreSQL
 - **Non-custodial**: Smart contract holds funds, not backend
 - **Seamless Auth**: Privy embedded wallets (email/social login)
 - **Signless UX**: Privy handles transaction signing smoothly
@@ -258,7 +255,7 @@ All games follow this **optimized flow**:
    - Creates global config account (PDA)
    - **NO active_game PDA created** (removed for simplification)
 
-2. **create_game_round** - Convex creates game
+2. **create_game_round** - API server creates game
    - **NO bets placed** (just initializes game)
    - **NO VRF request** (deferred to end_game)
    - **NO countdown** (starts on first bet)
@@ -353,7 +350,7 @@ MIN_ROUND_TIME = 10 seconds
 MAX_ROUND_TIME = 86400 seconds (24 hours)
 ```
 
-## Database Schema (Convex)
+## Database Schema (PostgreSQL)
 
 ### Core Tables
 
@@ -424,35 +421,16 @@ From `seed/maps.json`:
 - ID 1: bg1 (128 max players, 200px spawn radius)
 - ID 2: bg2 (128 max players, 200px spawn radius)
 
-## Convex Backend
+## API Server Backend
 
-### Scheduled Functions (Crons)
+### Key Features
 
-```typescript
-// Every 6 hours - cleanup old scheduled jobs
-crons.interval("cleanup-old-scheduled-jobs", { hours: 6 },
-  internal.gameSchedulerMutations.cleanupOldJobs
-);
-```
-
-### Key Functions
-
-**gameScheduler.ts**
-- `createGameRound()` - Calls smart contract create_game_round instruction
-- `executeEndGame()` - Calls smart contract end_game instruction
-- `executeSendPrize()` - Calls smart contract send_prize_winner instruction
-
-**gameSchedulerMutations.ts**
-- Job tracking (prevent duplicates)
-- Status updates (pending → completed/failed)
-- Cleanup old jobs (older than 24 hours)
-
-### Real-time Features
-
-- Helius webhook listens for program events
-- Events stored in Convex database
-- Frontend subscribes to Convex via WebSocket (<1s updates)
-- Automatic UI updates via Convex React hooks
+- Game scheduling (create rounds, end games, send prizes)
+- Job tracking (prevent duplicates, status updates)
+- Helius webhook listener for blockchain events
+- Real-time updates via Socket.io WebSocket
+- Player/character/map management via PostgreSQL
+- Leaderboard, chat, XP system
 
 ## VRF Integration (Magic Block)
 
@@ -470,7 +448,7 @@ crons.interval("cleanup-old-scheduled-jobs", { hours: 6 },
    - **Single player games**: Will never request VRF
 
 2. **VRF Request** (in end_game, multi-player only)
-   - When countdown expires, Convex calls `end_game`
+   - When countdown expires, API server calls `end_game`
    - If `user_count > 1` and `!vrf_requested`:
      - Requests VRF via `create_request_randomness_ix` from SDK
      - Sets `vrf_requested = true`
@@ -483,7 +461,7 @@ crons.interval("cleanup-old-scheduled-jobs", { hours: 6 },
    - Executed within seconds
 
 4. **Winner Selection** (end_game second call)
-   - Convex calls `end_game` again (~3s later)
+   - API server calls `end_game` again (~3s later)
    - Uses `game.rand` from callback
    - Weighted selection: higher bets = higher win chance
 
@@ -565,11 +543,11 @@ When no game is active, players see the **map carousel**:
 - `validateBet(amount)` - Check bet validity
 - Builds Anchor instructions manually
 - Signs via Privy's `signAndSendAllTransactions()`
-- Supports `bet` instruction (Convex creates games)
+- Supports `bet` instruction (API server creates games)
 
 **useNFTCharacters.ts**
 - Checks NFT ownership for exclusive characters
-- Calls `verifyNFTOwnership` Convex action
+- Calls `verifyNFTOwnership` API action
 
 ## Game Flow Diagram
 
@@ -578,9 +556,9 @@ When no game is active, players see the **map carousel**:
 │   MAP CAROUSEL       │ Spinning maps while waiting
 │  Engaging idle state │ Players can bet anytime
 └──────────────────────┘
-           ↓ [Convex creates game]
+           ↓ [API server creates game]
 ┌──────────────────────────────────────┐
-│ Convex: create_game_round            │
+│ Server: create_game_round            │
 │ - Status = WAITING                   │
 │ - NO bets, NO countdown, NO VRF      │
 │ - Carousel stops on selected map     │
@@ -601,14 +579,14 @@ When no game is active, players see the **map carousel**:
 │ - Players call bet() instruction     │
 │ - Each bet: skin + position          │
 │ - Status = OPEN                      │
-│ - Helius webhooks → Convex           │
+│ - Helius webhooks → API server       │
 │ - Frontend shows countdown           │
 │ - NO VRF requested yet               │
 └──────────────────────────────────────┘
            ↓ [End time reached]
 ┌──────────────────────────────────────┐
 │ gameScheduler.executeEndGame() #1    │
-│ 1. Convex scheduler triggers         │
+│ 1. Server scheduler triggers         │
 │ 2. Calls smart contract end_game()   │
 │ 3. Single player: deterministic seed │
 │    → Winner selected immediately     │
@@ -624,7 +602,7 @@ When no game is active, players see the **map carousel**:
            ↓ [~3 seconds later]
 ┌──────────────────────────────────────┐
 │ gameScheduler.executeEndGame() #2    │
-│ 1. Convex calls end_game again       │
+│ 1. Server calls end_game again       │
 │ 2. Uses stored VRF randomness        │
 │ 3. Status = CLOSED                   │
 │ 4. Winner stored in blockchain       │
@@ -650,7 +628,7 @@ When no game is active, players see the **map carousel**:
 │ 1. Fade out game                     │
 │ 2. Return to map carousel            │
 │ 3. Carousel resumes spinning         │
-│ 4. Convex can create next game       │
+│ 4. Server can create next game       │
 └──────────────────────────────────────┘
 ```
 
@@ -658,7 +636,7 @@ When no game is active, players see the **map carousel**:
 
 ### Game Costs
 
-**Per Game Costs** (Backend/Convex pays):
+**Per Game Costs** (Backend pays):
 
 **Single Player (1 bet only)**:
 - Create game: ~0.000005 SOL
@@ -696,8 +674,8 @@ When no game is active, players see the **map carousel**:
 ## Environment Variables
 
 ```env
-# Convex Backend
-CONVEX_DEPLOYMENT=
+# Database
+DATABASE_URL=                                    # PostgreSQL connection string
 
 # Solana
 SOLANA_RPC_URL=
@@ -707,13 +685,13 @@ BACKEND_WALLET_SECRET=                          # For settlements
 
 # Privy
 VITE_PRIVY_APP_ID=                              # Client-side (exposed to browser)
-PRIVY_APP_SECRET=                               # Backend-only (Convex uses this)
+PRIVY_APP_SECRET=                               # Backend-only (server uses this)
 
 # Helius (for webhooks)
 HELIUS_API_KEY=                                 # For blockchain event monitoring
 
 # Note: Vite only exposes variables prefixed with VITE_ to the browser
-# All other variables are only accessible server-side in Convex
+# All other variables are only accessible server-side
 ```
 
 ## Security
@@ -728,7 +706,7 @@ HELIUS_API_KEY=                                 # For blockchain event monitorin
 
 ## Resources
 
-- [Convex Docs](https://docs.convex.dev/)
+- [Socket.io Docs](https://socket.io/docs/)
 - [Phaser.js Docs](https://phaser.io/docs)
 - [Solana Cookbook](https://solanacookbook.com/)
 - [Anchor Framework](https://www.anchor-lang.com/)
@@ -762,10 +740,10 @@ HELIUS_API_KEY=                                 # For blockchain event monitorin
 ├─────────────────────────────────────────────────────────────┤
 │ Frontend (React + Vite + Phaser)                            │
 │   - Privy for auth + embedded wallets                       │
-│   - Convex WebSocket for real-time updates (<1s)            │
+│   - Socket.io for real-time updates (<1s)                   │
 │   - 60fps animations on canvas                              │
 ├─────────────────────────────────────────────────────────────┤
-│ Backend (Convex Serverless)                                 │
+│ Backend (Socket.io API + PostgreSQL)                        │
 │   - Creates games (create_game_round)                       │
 │   - Scheduled jobs (end_game, send_prize)                   │
 │   - Helius webhook listener (event processing)              │
@@ -784,7 +762,7 @@ HELIUS_API_KEY=                                 # For blockchain event monitorin
 **1. Hybrid On/Off-Chain**
 - ✅ Bets: On-chain (trustless escrow)
 - ✅ VRF: On-chain (Magic Block VRF, cost-optimized)
-- ✅ Game Creation: Convex-managed (off-chain trigger)
+- ✅ Game Creation: Server-managed (off-chain trigger)
 - ✅ Game Logic: Off-chain (fast, flexible)
 - ✅ Animations: Off-chain (smooth, no blockchain lag)
 
@@ -820,7 +798,7 @@ HELIUS_API_KEY=                                 # For blockchain event monitorin
 
 **7. Events-Based Architecture**
 - Helius webhooks for blockchain events
-- Convex stores and broadcasts events
+- API server stores and broadcasts events
 - Frontend subscribes via WebSocket
 - No polling, no active_game PDA needed
 
@@ -830,11 +808,11 @@ HELIUS_API_KEY=                                 # For blockchain event monitorin
 
 ### What's Implemented
 ✅ Map carousel (engaging waiting state)
-✅ Real game mode (Convex-managed)
+✅ Real game mode (server-managed)
 ✅ Magic Block VRF integration (cost-optimized)
 ✅ 7-instruction smart contract (optimized)
 ✅ Privy wallet integration (seamless UX)
-✅ Helius webhooks + Convex events
+✅ Helius webhooks + Socket.io events
 ✅ 8 characters (some NFT-gated)
 ✅ 2 maps (bg1, bg2)
 ✅ Bet-to-size scaling
@@ -861,14 +839,14 @@ HELIUS_API_KEY=                                 # For blockchain event monitorin
 
 ### Flow Confirmed
 ✅ Map carousel spins while waiting for players
-✅ Convex creates game (carousel stops on map)
+✅ API server creates game (carousel stops on map)
 ✅ First bet starts countdown (60s)
 ✅ Betting phase: players place bets (no VRF)
 ✅ Countdown expires → end_game (1st call)
 ✅ Single player: full refund, deterministic seed (immediate)
 ✅ Multi-player: VRF requested in end_game, returns early
 ✅ VRF callback stores randomness
-✅ Convex calls end_game again (2nd call, ~3s later)
+✅ API server calls end_game again (2nd call, ~3s later)
 ✅ Multi-player: 95/5 split, VRF randomness
 ✅ Prize sent → return to carousel
 ✅ Carousel resumes, ready for next game

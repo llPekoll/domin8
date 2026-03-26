@@ -9,7 +9,6 @@ export default tseslint.config(
     ignores: [
       "dist",
       "eslint.config.js",
-      "convex/_generated",
       "postcss.config.js",
       "tailwind.config.js",
       "vite.config.ts",
@@ -31,7 +30,6 @@ export default tseslint.config(
         project: [
           "./tsconfig.node.json",
           "./tsconfig.app.json",
-          "./convex/tsconfig.json",
         ],
       },
     },
@@ -70,7 +68,7 @@ export default tseslint.config(
       // END: Allow implicit `any`s
 
       // Allow async functions without await
-      // for consistency (esp. Convex `handler`s)
+      // for consistency
       "@typescript-eslint/require-await": "off",
     },
   },

@@ -1,7 +1,7 @@
 /**
  * Final NFT Verification Test - Production Ready
  *
- * Tests the exact logic used in Convex NFT verification:
+ * Tests the exact logic used in NFT verification:
  * - Dynamic pagination with early exit
  * - Mainnet RPC for NFT detection
  * - Support for all collection types (Metaplex, Mooar, etc.)

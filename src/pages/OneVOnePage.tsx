@@ -84,7 +84,7 @@ export function OneVOnePage() {
   // Get current player's wallet address as string (for query)
   const currentPlayerWallet = publicKey?.toString();
 
-  // Get open lobbies from Convex (real-time updates)
+  // Get open lobbies from API server (real-time updates)
   // Pass current player wallet so they can see their own private lobbies
   const [openLobbiesQuery, setOpenLobbiesQuery] = useState<any[] | null>(null);
   useEffect(() => {
@@ -108,7 +108,7 @@ export function OneVOnePage() {
   useEffect(() => {
     if (openLobbies.length > 0) {
       console.log(
-        "[1v1 Debug] Open lobbies from Convex:",
+        "[1v1 Debug] Open lobbies from API server:",
         openLobbies.map((l) => ({
           lobbyId: l.lobbyId,
           characterA: l.characterA,
@@ -475,7 +475,7 @@ export function OneVOnePage() {
 
         toast.success("Transaction confirmed!", { id: "join-tx-confirm" });
 
-        // Call Convex action to update lobby in database
+        // Call API server action to update lobby in database
         const result = await joinLobbyAction({
           playerBWallet: currentWallet,
           lobbyId: lobbyToJoin.lobbyId,
@@ -584,7 +584,7 @@ export function OneVOnePage() {
 
         logger.solana.info("Double Down confirmed", { signature });
 
-        // Call Convex action to create lobby (with win streak for double-down)
+        // Call API server action to create lobby (with win streak for double-down)
         const result = await createLobbyAction({
           playerAWallet: publicKey.toString(),
           amount: amount,

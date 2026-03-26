@@ -123,7 +123,7 @@ export function CreateLobby({
       toast.success("Transaction confirmed!", { id: "tx-confirm" });
       logger.solana.info("Transaction confirmed on blockchain", { signature });
 
-      // Call Convex action to create lobby in database
+      // Call API server action to create lobby in database
       const result = await createLobbyAction({
         playerAWallet: publicKey.toString(),
         amount: betAmountLamports,
@@ -147,7 +147,7 @@ export function CreateLobby({
         onLobbyCreated?.(result.lobbyId);
       } else {
         toast.error("Failed to create lobby in database");
-        logger.solana.error("Convex action failed");
+        logger.solana.error("API server action failed");
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);

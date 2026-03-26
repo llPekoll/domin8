@@ -1,5 +1,5 @@
 /**
- * Main game loop - replaces Convex crons
+ * Main game loop - scheduled game management
  * Uses setTimeout chains instead of setInterval
  */
 import type { Server } from "socket.io";

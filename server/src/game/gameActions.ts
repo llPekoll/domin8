@@ -1,6 +1,6 @@
 /**
  * Game action implementations
- * Replaces gameScheduler.ts from Convex
+ * Game scheduler - creates rounds, ends games, sends prizes
  */
 import { SolanaClient } from "../lib/solana.js";
 import { GAME_STATUS, GAME_TIMING } from "../lib/types.js";

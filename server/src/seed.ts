@@ -1,5 +1,5 @@
 /**
- * Seed script - imports data from seed JSON files and Convex backup
+ * Seed script - imports data from seed JSON files
  * Run: cd server && bun src/seed.ts
  */
 import { db } from "./db/index.js";
@@ -10,7 +10,7 @@ import {
 import { readFileSync, existsSync } from "fs";
 
 const SEED_DIR = "../seed";
-const BACKUP_DIR = "/tmp/convex-extract";
+const BACKUP_DIR = "/tmp/data-extract";
 
 function readJsonl(path: string): any[] {
   if (!existsSync(path)) return [];
