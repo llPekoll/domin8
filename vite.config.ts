@@ -67,5 +67,11 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ["@privy-io/react-auth", "eventemitter3"],
+    exclude: ["@phosphor-icons/webcomponents"],
+  },
+  build: {
+    rollupOptions: {
+      external: ["@phosphor-icons/webcomponents"],
+    },
   },
 });
