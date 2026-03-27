@@ -1,8 +1,9 @@
 [phases.setup]
-nixPkgs = ["bun", "nodejs_20"]
+nixPkgs = ["nodejs_20"]
+cmds = ["npm install -g bun@1.3.6"]
 
 [phases.install]
-cmds = ["bun install --ignore-scripts"]
+cmds = ["bun install"]
 
 [phases.build]
 cmds = ["bun run build"]
